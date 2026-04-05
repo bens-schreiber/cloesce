@@ -31,11 +31,11 @@ export namespace NullabilityChecks {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "NullabilityChecks"."id" AS "id", "NullabilityChecks"."notNullableString" AS "notNullableString", "NullabilityChecks"."nullableString" AS "nullableString" FROM "NullabilityChecks" WHERE "NullabilityChecks"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<NullabilityChecks.Self | null> {
-                return await Orm.fromEnv(env).getQuery<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.DataSources.Default.getQuery(env, id), NullabilityChecks.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.DataSources.Default.getQuery(env, id), NullabilityChecks.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "NullabilityChecks"."id" AS "id", "NullabilityChecks"."notNullableString" AS "notNullableString", "NullabilityChecks"."nullableString" AS "nullableString" FROM "NullabilityChecks" WHERE "NullabilityChecks"."id" > ?1 ORDER BY "NullabilityChecks"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<NullabilityChecks.Self[]> {
-                return await Orm.fromEnv(env).listQuery<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.DataSources.Default.listQuery(env, lastSeen_id, limit), NullabilityChecks.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.DataSources.Default.listQuery(env, lastSeen_id, limit), NullabilityChecks.DataSources.Default.include);
             },
         }
     }
@@ -46,12 +46,12 @@ export namespace NullabilityChecks {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

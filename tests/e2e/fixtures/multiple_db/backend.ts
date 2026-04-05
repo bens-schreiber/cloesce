@@ -26,11 +26,11 @@ export namespace DB1Model {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<DB1Model.Self | null> {
-                return await Orm.fromEnv(env).getQuery<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.getQuery(env, id), DB1Model.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.getQuery(env, id), DB1Model.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" > ?1 ORDER BY "DB1Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<DB1Model.Self[]> {
-                return await Orm.fromEnv(env).listQuery<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB1Model.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB1Model.DataSources.Default.include);
             },
         }
     }
@@ -41,12 +41,12 @@ export namespace DB1Model {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace DB2Model {
@@ -67,11 +67,11 @@ export namespace DB2Model {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<DB2Model.Self | null> {
-                return await Orm.fromEnv(env).getQuery<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.getQuery(env, id), DB2Model.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.getQuery(env, id), DB2Model.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" > ?1 ORDER BY "DB2Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<DB2Model.Self[]> {
-                return await Orm.fromEnv(env).listQuery<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB2Model.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB2Model.DataSources.Default.include);
             },
         }
     }
@@ -82,12 +82,12 @@ export namespace DB2Model {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

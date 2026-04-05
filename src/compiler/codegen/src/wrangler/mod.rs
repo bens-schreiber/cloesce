@@ -325,7 +325,7 @@ impl WranglerDefault {
         spec.main = Some(
             spec.main
                 .clone()
-                .unwrap_or_else(|| "backend.ts".to_string()), // TODO: non-hardcoded default
+                .unwrap_or_else(|| "workers.ts".to_string()), // TODO: non-hardcoded default
         );
 
         // Ensure all bindings referenced in the WranglerEnv exist in the spec

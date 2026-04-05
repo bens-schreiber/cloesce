@@ -26,11 +26,11 @@ export namespace Course {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Course.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Course.Self>(Course.Meta, Course.DataSources.Default.getQuery(env, id), Course.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Course.Self>(Course.Meta, Course.DataSources.Default.getQuery(env, id), Course.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Course.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Course.Self>(Course.Meta, Course.DataSources.Default.listQuery(env, lastSeen_id, limit), Course.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Course.Self>(Course.Meta, Course.DataSources.Default.listQuery(env, lastSeen_id, limit), Course.DataSources.Default.include);
             },
         }
     }
@@ -41,12 +41,12 @@ export namespace Course {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace Student {
@@ -69,22 +69,22 @@ export namespace Student {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
             async get(env: Env, id: number, name: string): Promise<Student.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.getQuery(env, id, name), Student.DataSources.CoursesOrderedDescending.include, {  });
+                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.getQuery(env, id, name), Student.DataSources.CoursesOrderedDescending.include, {  });
             },
             listQuery: (env: Env, lastId: number, lastName: string, limit: number) => env.db.prepare(`WITH students AS (SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName") SELECT * FROM students WHERE id > ?1 AND name > ?2 ORDER BY id ASC, name ASC LIMIT ?3`).bind(lastId, lastName, limit),
             async list(env: Env, lastId: number, lastName: string, limit: number): Promise<Student.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.listQuery(env, lastId, lastName, limit), Student.DataSources.CoursesOrderedDescending.include);
+                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.listQuery(env, lastId, lastName, limit), Student.DataSources.CoursesOrderedDescending.include);
             },
         }
         export const Default = {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
             async get(env: Env, id: number, name: string): Promise<Student.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Student.Self>(Student.Meta, Student.DataSources.Default.getQuery(env, id, name), Student.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.DataSources.Default.getQuery(env, id, name), Student.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, lastSeen_name: number, limit: number) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastSeen_id, lastSeen_name, limit),
             async list(env: Env, lastSeen_id: number, lastSeen_name: number, limit: number): Promise<Student.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Student.Self>(Student.Meta, Student.DataSources.Default.listQuery(env, lastSeen_id, lastSeen_name, limit), Student.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.DataSources.Default.listQuery(env, lastSeen_id, lastSeen_name, limit), Student.DataSources.Default.include);
             },
         }
     }
@@ -95,12 +95,12 @@ export namespace Student {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace StudentCourse {
@@ -124,22 +124,22 @@ export namespace StudentCourse {
             include: {},
             getQuery: (env: Env, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),
             async get(env: Env, studentId: number, studentName: string, courseId: number): Promise<StudentCourse.Self | null> {
-                return await Orm.fromEnv(env).getQuery<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_studentId: number, lastSeen_studentName: number, lastSeen_courseId: number, limit: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit),
             async list(env: Env, lastSeen_studentId: number, lastSeen_studentName: number, lastSeen_courseId: number, limit: number): Promise<StudentCourse.Self[]> {
-                return await Orm.fromEnv(env).listQuery<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.Default.include);
             },
         }
         export const WithStudentCourse = {
             include: {"course":{"studentCourses":{}},"student":{"studentCourses":{}}},
             getQuery: (env: Env, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),
             async get(env: Env, studentId: number, studentName: string, courseId: number): Promise<StudentCourse.Self | null> {
-                return await Orm.fromEnv(env).getQuery<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.WithStudentCourse.include, {  });
+                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.WithStudentCourse.include, {  });
             },
             listQuery: (env: Env, lastSeen_studentId: number, lastSeen_studentName: number, lastSeen_courseId: number, limit: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit),
             async list(env: Env, lastSeen_studentId: number, lastSeen_studentName: number, lastSeen_courseId: number, limit: number): Promise<StudentCourse.Self[]> {
-                return await Orm.fromEnv(env).listQuery<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.WithStudentCourse.include);
+                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.WithStudentCourse.include);
             },
         }
     }
@@ -150,12 +150,12 @@ export namespace StudentCourse {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

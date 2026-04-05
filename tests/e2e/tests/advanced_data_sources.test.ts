@@ -62,7 +62,7 @@ describe("Advanced Data Sources", () => {
         lastId: 0,
         limit: 100,
       },
-      "BurgersWithLettuceOrdered"
+      "BurgersWithLettuceOrdered",
     );
 
     expect(res.ok, withRes("$list should be OK", res)).toBe(true);

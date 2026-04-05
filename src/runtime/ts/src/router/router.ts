@@ -14,7 +14,7 @@ import {
   CidlType,
 } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
-import { Orm, HttpResult } from "../ui/backend.js";
+import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
 
@@ -69,7 +69,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) { }
+  ) {}
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -531,7 +531,9 @@ async function validateRequest(
 
   // Filter out injected parameters
   const requiredParams = route.method.parameters.filter(
-    (p) => p.cidl_type !== "Env" && !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
+    (p) =>
+      p.cidl_type !== "Env" &&
+      !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract all method parameters from the body
@@ -622,7 +624,6 @@ async function hydrate(
   const meta = route.model!;
   const dataSource: DataSource =
     meta.data_sources[route.method.data_source ?? "Default"];
-  const orm = Orm.fromEnv(env);
 
   // Error state: If some outside force tweaked the database schema, the query may fail.
   // Otherwise, this indicates a bug in the compiler or runtime.
@@ -634,7 +635,11 @@ async function hydrate(
     );
 
   try {
-    let result = await dataSource.gen.get(env, ...Object.values(route.getParamValues), ...Object.values(route.keyFields));
+    let result = await dataSource.gen.get(
+      env,
+      ...Object.values(route.getParamValues),
+      ...Object.values(route.keyFields),
+    );
 
     // Result will only be null if the record does not exist for a D1 query
     // (KV or R2 based models will just be empty, as that is a valid state).
@@ -675,11 +680,8 @@ async function methodDispatch(
   }
 
   const wrapResult = (res: any): HttpResult => {
-    const rt = route.method.return_type;
-    const httpResult: HttpResult<unknown> =
-      typeof rt === "object" && rt !== null && "HttpResult" in rt
-        ? res
-        : HttpResult.ok(200, res);
+    const httpResult =
+      res instanceof HttpResult ? res : HttpResult.ok(200, res);
     return httpResult.setMediaType(route.method.return_media);
   };
 

@@ -26,11 +26,11 @@ export namespace CrudHaver {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "CrudHaver"."id" AS "id", "CrudHaver"."name" AS "name" FROM "CrudHaver" WHERE "CrudHaver"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<CrudHaver.Self | null> {
-                return await Orm.fromEnv(env).getQuery<CrudHaver.Self>(CrudHaver.Meta, CrudHaver.DataSources.Default.getQuery(env, id), CrudHaver.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<CrudHaver.Self>(CrudHaver.Meta, CrudHaver.DataSources.Default.getQuery(env, id), CrudHaver.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "CrudHaver"."id" AS "id", "CrudHaver"."name" AS "name" FROM "CrudHaver" WHERE "CrudHaver"."id" > ?1 ORDER BY "CrudHaver"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<CrudHaver.Self[]> {
-                return await Orm.fromEnv(env).listQuery<CrudHaver.Self>(CrudHaver.Meta, CrudHaver.DataSources.Default.listQuery(env, lastSeen_id, limit), CrudHaver.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<CrudHaver.Self>(CrudHaver.Meta, CrudHaver.DataSources.Default.listQuery(env, lastSeen_id, limit), CrudHaver.DataSources.Default.include);
             },
         }
     }
@@ -41,12 +41,12 @@ export namespace CrudHaver {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace Parent {
@@ -69,22 +69,22 @@ export namespace Parent {
             include: {"children":{},"favoriteChild":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Parent.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Parent.Self>(Parent.Meta, Parent.DataSources.Default.getQuery(env, id), Parent.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Parent.Self>(Parent.Meta, Parent.DataSources.Default.getQuery(env, id), Parent.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" > ?1 ORDER BY "Parent"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Parent.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Parent.Self>(Parent.Meta, Parent.DataSources.Default.listQuery(env, lastSeen_id, limit), Parent.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Parent.Self>(Parent.Meta, Parent.DataSources.Default.listQuery(env, lastSeen_id, limit), Parent.DataSources.Default.include);
             },
         }
         export const WithChildren = {
             include: {"children":{},"favoriteChild":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Parent.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Parent.Self>(Parent.Meta, Parent.DataSources.WithChildren.getQuery(env, id), Parent.DataSources.WithChildren.include, {  });
+                return await Orm.fromEnv(env).get<Parent.Self>(Parent.Meta, Parent.DataSources.WithChildren.getQuery(env, id), Parent.DataSources.WithChildren.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" > ?1 ORDER BY "Parent"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Parent.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Parent.Self>(Parent.Meta, Parent.DataSources.WithChildren.listQuery(env, lastSeen_id, limit), Parent.DataSources.WithChildren.include);
+                return await Orm.fromEnv(env).list<Parent.Self>(Parent.Meta, Parent.DataSources.WithChildren.listQuery(env, lastSeen_id, limit), Parent.DataSources.WithChildren.include);
             },
         }
     }
@@ -95,12 +95,12 @@ export namespace Parent {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace Child {
@@ -122,11 +122,11 @@ export namespace Child {
             include: {"parent":{"children":{}}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Child"."id" AS "id", "Child"."parentId" AS "parentId", "Parent_1"."id" AS "parent.id", "Parent_1"."favoriteChildId" AS "parent.favoriteChildId", "Child_2"."id" AS "parent.children.id", "Child_2"."parentId" AS "parent.children.parentId" FROM "Child" LEFT JOIN "Parent" AS "Parent_1" ON "Child"."parentId" = "Parent_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent_1"."id" = "Child_2"."parentId" WHERE "Child"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Child.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Child.Self>(Child.Meta, Child.DataSources.Default.getQuery(env, id), Child.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Child.Self>(Child.Meta, Child.DataSources.Default.getQuery(env, id), Child.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Child"."id" AS "id", "Child"."parentId" AS "parentId", "Parent_1"."id" AS "parent.id", "Parent_1"."favoriteChildId" AS "parent.favoriteChildId", "Child_2"."id" AS "parent.children.id", "Child_2"."parentId" AS "parent.children.parentId" FROM "Child" LEFT JOIN "Parent" AS "Parent_1" ON "Child"."parentId" = "Parent_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent_1"."id" = "Child_2"."parentId" WHERE "Child"."id" > ?1 ORDER BY "Child"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Child.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Child.Self>(Child.Meta, Child.DataSources.Default.listQuery(env, lastSeen_id, limit), Child.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Child.Self>(Child.Meta, Child.DataSources.Default.listQuery(env, lastSeen_id, limit), Child.DataSources.Default.include);
             },
         }
     }
@@ -137,12 +137,12 @@ export namespace Child {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

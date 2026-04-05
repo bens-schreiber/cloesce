@@ -20,7 +20,7 @@ import { InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) { }
+  private constructor(private env: unknown) {}
 
   static fromEnv(env: unknown): Orm {
     return new Orm(env);
@@ -286,7 +286,7 @@ export class Orm {
     return await this.hydrate(meta, base, {}, includeTree);
   }
 
-  async getQuery<T extends object>(
+  async get<T extends object>(
     meta: Model,
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
@@ -301,10 +301,11 @@ export class Orm {
       return null;
     }
 
-    return await this.hydrate(meta, res, keyFields, includeTree);
+    const mapped = Orm.map(meta, res, includeTree)[0];
+    return await this.hydrate(meta, mapped, keyFields, includeTree);
   }
 
-  async listQuery<T extends object>(
+  async list<T extends object>(
     meta: Model,
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,

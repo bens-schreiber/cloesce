@@ -28,11 +28,11 @@ export namespace Dog {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Dog"."id" AS "id", "Dog"."name" AS "name", "Dog"."age" AS "age" FROM "Dog" WHERE "Dog"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Dog.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Dog.Self>(Dog.Meta, Dog.DataSources.Default.getQuery(env, id), Dog.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Dog.Self>(Dog.Meta, Dog.DataSources.Default.getQuery(env, id), Dog.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Dog"."id" AS "id", "Dog"."name" AS "name", "Dog"."age" AS "age" FROM "Dog" WHERE "Dog"."id" > ?1 ORDER BY "Dog"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Dog.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Dog.Self>(Dog.Meta, Dog.DataSources.Default.listQuery(env, lastSeen_id, limit), Dog.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Dog.Self>(Dog.Meta, Dog.DataSources.Default.listQuery(env, lastSeen_id, limit), Dog.DataSources.Default.include);
             },
         }
     }
@@ -43,12 +43,12 @@ export namespace Dog {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

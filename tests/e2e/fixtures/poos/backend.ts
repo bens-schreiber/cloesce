@@ -37,11 +37,11 @@ export namespace PooAcceptYield {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "PooAcceptYield"."id" AS "id" FROM "PooAcceptYield" WHERE "PooAcceptYield"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<PooAcceptYield.Self | null> {
-                return await Orm.fromEnv(env).getQuery<PooAcceptYield.Self>(PooAcceptYield.Meta, PooAcceptYield.DataSources.Default.getQuery(env, id), PooAcceptYield.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<PooAcceptYield.Self>(PooAcceptYield.Meta, PooAcceptYield.DataSources.Default.getQuery(env, id), PooAcceptYield.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "PooAcceptYield"."id" AS "id" FROM "PooAcceptYield" WHERE "PooAcceptYield"."id" > ?1 ORDER BY "PooAcceptYield"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<PooAcceptYield.Self[]> {
-                return await Orm.fromEnv(env).listQuery<PooAcceptYield.Self>(PooAcceptYield.Meta, PooAcceptYield.DataSources.Default.listQuery(env, lastSeen_id, limit), PooAcceptYield.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<PooAcceptYield.Self>(PooAcceptYield.Meta, PooAcceptYield.DataSources.Default.listQuery(env, lastSeen_id, limit), PooAcceptYield.DataSources.Default.include);
             },
         }
     }
@@ -52,12 +52,12 @@ export namespace PooAcceptYield {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

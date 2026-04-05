@@ -30,11 +30,11 @@ export namespace D1BackedModel {
             include: {"kvData":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
             async get(env: Env, id: number, keyParam: string): Promise<D1BackedModel.Self | null> {
-                return await Orm.fromEnv(env).getQuery<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.DataSources.Default.getQuery(env, id), D1BackedModel.DataSources.Default.include, { keyParam });
+                return await Orm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.DataSources.Default.getQuery(env, id), D1BackedModel.DataSources.Default.include, { keyParam });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<D1BackedModel.Self[]> {
-                return await Orm.fromEnv(env).listQuery<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.DataSources.Default.listQuery(env, lastSeen_id, limit), D1BackedModel.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.DataSources.Default.listQuery(env, lastSeen_id, limit), D1BackedModel.DataSources.Default.include);
             },
         }
     }
@@ -45,12 +45,12 @@ export namespace D1BackedModel {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { keyParam?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace PaginatedKVModel {
@@ -79,12 +79,12 @@ export namespace PaginatedKVModel {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace PureKVModel {
@@ -113,12 +113,12 @@ export namespace PureKVModel {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

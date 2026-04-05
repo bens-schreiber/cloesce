@@ -192,13 +192,12 @@ impl ClientTemplate<'_> {
     }
 
     fn ds_kind_union(&self, data_sources: &BTreeMap<&str, DataSource<'_>>) -> String {
-        let joined = data_sources
+        data_sources
             .values()
             .filter(|d| !d.is_internal)
             .map(|d| format!("\"{}\"", d.name))
             .collect::<Vec<_>>()
-            .join(" | ");
-        joined
+            .join(" | ")
     }
 
     fn ds_get_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {

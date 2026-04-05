@@ -1,6 +1,6 @@
 import { Orm, HttpResult } from "../ui/backend.js";
-import { ApiMethod, Cidl, DataSource, Field, Model } from "../cidl.js";
-import { ApiImplementation, MatchedRoute } from "./router.js";
+import { ApiMethod, Model } from "../cidl.js";
+import { ApiImplementation } from "./router.js";
 
 export function crudRoute(
   meta: Model,
@@ -51,13 +51,13 @@ async function get(
   const dataSource = meta.data_sources[dataSourceRef];
 
   // Args is the union of all data source get params across all data sources for the model,
-  // plus the key fields for the model. To find the parameters for this specific data source, 
+  // plus the key fields for the model. To find the parameters for this specific data source,
   // we have to take the intersection of the data source get params and the args passed in.
   const paramOrder = new Map(
-    dataSource.get!.parameters.map((p, i) => [p.name, i])
+    dataSource.get!.parameters.map((p, i) => [p.name, i]),
   );
   const keyFields = new Set(meta.key_fields);
-  const dataSourceArgs: unknown[] = new Array(paramOrder.size);
+  const dataSourceArgs: unknown[] = Array.from({ length: paramOrder.size });
   const keyFieldArgs: Record<string, any> = {};
 
   for (let i = 0; i < method.parameters.length; i++) {
@@ -74,7 +74,11 @@ async function get(
     }
   }
 
-  const res = await dataSource.gen.get(env, ...dataSourceArgs, ...Object.values(keyFieldArgs));
+  const res = await dataSource.gen.get(
+    env,
+    ...dataSourceArgs,
+    ...Object.values(keyFieldArgs),
+  );
   if (res === null) {
     return HttpResult.fail(404);
   }
@@ -96,9 +100,9 @@ async function list(
   // To find the parameters for this specific data source, we have to take the intersection
   // of the data source get params and the args passed in, while preserving the order.
   const paramOrder = new Map(
-    dataSource.list!.parameters.map((p, i) => [p.name, i])
+    dataSource.list!.parameters.map((p, i) => [p.name, i]),
   );
-  const dataSourceArgs: unknown[] = new Array(paramOrder.size);
+  const dataSourceArgs: unknown[] = Array.from({ length: paramOrder.size });
 
   for (let i = 0; i < method.parameters.length; i++) {
     const paramName = method.parameters[i].name;

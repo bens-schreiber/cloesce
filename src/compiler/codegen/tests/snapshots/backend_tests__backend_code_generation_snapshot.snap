@@ -67,11 +67,11 @@ export namespace HasSqlColumnTypes {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<HasSqlColumnTypes.Self | null> {
-                return await Orm.fromEnv(env).getQuery<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.DataSources.Default.getQuery(env, id), HasSqlColumnTypes.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.DataSources.Default.getQuery(env, id), HasSqlColumnTypes.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" > ?1 ORDER BY "HasSqlColumnTypes"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<HasSqlColumnTypes.Self[]> {
-                return await Orm.fromEnv(env).listQuery<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.DataSources.Default.listQuery(env, lastSeen_id, limit), HasSqlColumnTypes.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.DataSources.Default.listQuery(env, lastSeen_id, limit), HasSqlColumnTypes.DataSources.Default.include);
             },
         }
     }
@@ -82,12 +82,12 @@ export namespace HasSqlColumnTypes {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ManyToManyModelA {
@@ -108,11 +108,11 @@ export namespace ManyToManyModelA {
             include: {"manyToManyNav":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ManyToManyModelA"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."right" AS "manyToManyNav.id" FROM "ManyToManyModelA" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelA"."id" = "ManyToManyModelAManyToManyModelB_2"."left" LEFT JOIN "ManyToManyModelB" AS "ManyToManyModelB_1" ON "ManyToManyModelAManyToManyModelB_2"."right" = "ManyToManyModelB_1"."id" WHERE "ManyToManyModelA"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<ManyToManyModelA.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.DataSources.Default.getQuery(env, id), ManyToManyModelA.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.DataSources.Default.getQuery(env, id), ManyToManyModelA.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ManyToManyModelA"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."right" AS "manyToManyNav.id" FROM "ManyToManyModelA" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelA"."id" = "ManyToManyModelAManyToManyModelB_2"."left" LEFT JOIN "ManyToManyModelB" AS "ManyToManyModelB_1" ON "ManyToManyModelAManyToManyModelB_2"."right" = "ManyToManyModelB_1"."id" WHERE "ManyToManyModelA"."id" > ?1 ORDER BY "ManyToManyModelA"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ManyToManyModelA.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.DataSources.Default.listQuery(env, lastSeen_id, limit), ManyToManyModelA.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.DataSources.Default.listQuery(env, lastSeen_id, limit), ManyToManyModelA.DataSources.Default.include);
             },
         }
     }
@@ -123,12 +123,12 @@ export namespace ManyToManyModelA {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ManyToManyModelB {
@@ -149,11 +149,11 @@ export namespace ManyToManyModelB {
             include: {"manyToManyNav":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ManyToManyModelB"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."left" AS "manyToManyNav.id" FROM "ManyToManyModelB" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelB"."id" = "ManyToManyModelAManyToManyModelB_2"."right" LEFT JOIN "ManyToManyModelA" AS "ManyToManyModelA_1" ON "ManyToManyModelAManyToManyModelB_2"."left" = "ManyToManyModelA_1"."id" WHERE "ManyToManyModelB"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<ManyToManyModelB.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.DataSources.Default.getQuery(env, id), ManyToManyModelB.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.DataSources.Default.getQuery(env, id), ManyToManyModelB.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ManyToManyModelB"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."left" AS "manyToManyNav.id" FROM "ManyToManyModelB" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelB"."id" = "ManyToManyModelAManyToManyModelB_2"."right" LEFT JOIN "ManyToManyModelA" AS "ManyToManyModelA_1" ON "ManyToManyModelAManyToManyModelB_2"."left" = "ManyToManyModelA_1"."id" WHERE "ManyToManyModelB"."id" > ?1 ORDER BY "ManyToManyModelB"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ManyToManyModelB.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.DataSources.Default.listQuery(env, lastSeen_id, limit), ManyToManyModelB.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.DataSources.Default.listQuery(env, lastSeen_id, limit), ManyToManyModelB.DataSources.Default.include);
             },
         }
     }
@@ -164,12 +164,12 @@ export namespace ManyToManyModelB {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ModelWithCompositePk {
@@ -192,11 +192,11 @@ export namespace ModelWithCompositePk {
             include: {},
             getQuery: (env: Env, tenantId: string, rowId: number) => env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") = (?1, ?2)`).bind(tenantId, rowId),
             async get(env: Env, tenantId: string, rowId: number): Promise<ModelWithCompositePk.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.DataSources.Default.getQuery(env, tenantId, rowId), ModelWithCompositePk.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.DataSources.Default.getQuery(env, tenantId, rowId), ModelWithCompositePk.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_tenantId: number, lastSeen_rowId: number, limit: number) => env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") > (?1, ?2) ORDER BY "ModelWithCompositePk"."tenantId" ASC, "ModelWithCompositePk"."rowId" ASC LIMIT ?3`).bind(lastSeen_tenantId, lastSeen_rowId, limit),
             async list(env: Env, lastSeen_tenantId: number, lastSeen_rowId: number, limit: number): Promise<ModelWithCompositePk.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.DataSources.Default.listQuery(env, lastSeen_tenantId, lastSeen_rowId, limit), ModelWithCompositePk.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.DataSources.Default.listQuery(env, lastSeen_tenantId, lastSeen_rowId, limit), ModelWithCompositePk.DataSources.Default.include);
             },
         }
     }
@@ -207,12 +207,12 @@ export namespace ModelWithCompositePk {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ModelWithCustomDs {
@@ -234,22 +234,22 @@ export namespace ModelWithCustomDs {
             include: {},
             getQuery: (env: Env, id: number, externalParam: string) => env.db.prepare(`SELECT * FROM ModelWithCustomDs WHERE id = ?1 AND name LIKE ?2`).bind(id, externalParam),
             async get(env: Env, id: number, externalParam: string): Promise<ModelWithCustomDs.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Custom.getQuery(env, id, externalParam), ModelWithCustomDs.DataSources.Custom.include, {  });
+                return await Orm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Custom.getQuery(env, id, externalParam), ModelWithCustomDs.DataSources.Custom.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name" FROM "ModelWithCustomDs" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ModelWithCustomDs.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Custom.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.DataSources.Custom.include);
+                return await Orm.fromEnv(env).list<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Custom.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.DataSources.Custom.include);
             },
         }
         export const Default = {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name" FROM "ModelWithCustomDs" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<ModelWithCustomDs.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Default.getQuery(env, id), ModelWithCustomDs.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Default.getQuery(env, id), ModelWithCustomDs.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name" FROM "ModelWithCustomDs" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ModelWithCustomDs.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Default.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.DataSources.Default.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.DataSources.Default.include);
             },
         }
     }
@@ -260,12 +260,12 @@ export namespace ModelWithCustomDs {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace OneToManyModel {
@@ -286,11 +286,11 @@ export namespace OneToManyModel {
             include: {"oneToManyNav":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<OneToManyModel.Self | null> {
-                return await Orm.fromEnv(env).getQuery<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.DataSources.Default.getQuery(env, id), OneToManyModel.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.DataSources.Default.getQuery(env, id), OneToManyModel.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" > ?1 ORDER BY "OneToManyModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<OneToManyModel.Self[]> {
-                return await Orm.fromEnv(env).listQuery<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.DataSources.Default.listQuery(env, lastSeen_id, limit), OneToManyModel.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.DataSources.Default.listQuery(env, lastSeen_id, limit), OneToManyModel.DataSources.Default.include);
             },
         }
     }
@@ -301,12 +301,12 @@ export namespace OneToManyModel {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ToyotaPrius {
@@ -332,33 +332,33 @@ export namespace ToyotaPrius {
             include: {"metadata":{},"photoData":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
             async get(env: Env, id: number, someKey: string): Promise<ToyotaPrius.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.Default.getQuery(env, id), ToyotaPrius.DataSources.Default.include, { someKey });
+                return await Orm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.Default.getQuery(env, id), ToyotaPrius.DataSources.Default.include, { someKey });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ToyotaPrius.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.Default.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.Default.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.Default.include);
             },
         }
         export const WithKv = {
             include: {"metadata":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
             async get(env: Env, id: number, someKey: string): Promise<ToyotaPrius.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithKv.getQuery(env, id), ToyotaPrius.DataSources.WithKv.include, { someKey });
+                return await Orm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithKv.getQuery(env, id), ToyotaPrius.DataSources.WithKv.include, { someKey });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ToyotaPrius.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithKv.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.WithKv.include);
+                return await Orm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithKv.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.WithKv.include);
             },
         }
         export const WithR2 = {
             include: {"photoData":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
             async get(env: Env, id: number, someKey: string): Promise<ToyotaPrius.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithR2.getQuery(env, id), ToyotaPrius.DataSources.WithR2.include, { someKey });
+                return await Orm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithR2.getQuery(env, id), ToyotaPrius.DataSources.WithR2.include, { someKey });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ToyotaPrius.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithR2.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.WithR2.include);
+                return await Orm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.DataSources.WithR2.listQuery(env, lastSeen_id, limit), ToyotaPrius.DataSources.WithR2.include);
             },
         }
     }
@@ -369,12 +369,12 @@ export namespace ToyotaPrius {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { someKey?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace BasicModel {
@@ -395,11 +395,11 @@ export namespace BasicModel {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<BasicModel.Self | null> {
-                return await Orm.fromEnv(env).getQuery<BasicModel.Self>(BasicModel.Meta, BasicModel.DataSources.Default.getQuery(env, id), BasicModel.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<BasicModel.Self>(BasicModel.Meta, BasicModel.DataSources.Default.getQuery(env, id), BasicModel.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" > ?1 ORDER BY "BasicModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<BasicModel.Self[]> {
-                return await Orm.fromEnv(env).listQuery<BasicModel.Self>(BasicModel.Meta, BasicModel.DataSources.Default.listQuery(env, lastSeen_id, limit), BasicModel.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<BasicModel.Self>(BasicModel.Meta, BasicModel.DataSources.Default.listQuery(env, lastSeen_id, limit), BasicModel.DataSources.Default.include);
             },
         }
     }
@@ -410,12 +410,12 @@ export namespace BasicModel {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace HasOneToOne {
@@ -437,11 +437,11 @@ export namespace HasOneToOne {
             include: {"oneToOneNav":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<HasOneToOne.Self | null> {
-                return await Orm.fromEnv(env).getQuery<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.DataSources.Default.getQuery(env, id), HasOneToOne.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.DataSources.Default.getQuery(env, id), HasOneToOne.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" > ?1 ORDER BY "HasOneToOne"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<HasOneToOne.Self[]> {
-                return await Orm.fromEnv(env).listQuery<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.DataSources.Default.listQuery(env, lastSeen_id, limit), HasOneToOne.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.DataSources.Default.listQuery(env, lastSeen_id, limit), HasOneToOne.DataSources.Default.include);
             },
         }
     }
@@ -452,12 +452,12 @@ export namespace HasOneToOne {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ModelWithCruds {
@@ -479,22 +479,22 @@ export namespace ModelWithCruds {
             include: {},
             getQuery: (env: Env, name: string) => env.db.prepare(`SELECT * FROM ModelWithCruds WHERE name = ?1`).bind(name),
             async get(env: Env, name: string): Promise<ModelWithCruds.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.ByName.getQuery(env, name), ModelWithCruds.DataSources.ByName.include, {  });
+                return await Orm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.ByName.getQuery(env, name), ModelWithCruds.DataSources.ByName.include, {  });
             },
             listQuery: (env: Env, name: string, limit: number) => env.db.prepare(`SELECT * FROM ModelWithCruds WHERE name LIKE ?1 LIMIT ?2`).bind(name, limit),
             async list(env: Env, name: string, limit: number): Promise<ModelWithCruds.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.ByName.listQuery(env, name, limit), ModelWithCruds.DataSources.ByName.include);
+                return await Orm.fromEnv(env).list<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.ByName.listQuery(env, name, limit), ModelWithCruds.DataSources.ByName.include);
             },
         }
         export const Default = {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."categoryId" AS "categoryId", "ModelWithCruds"."name" AS "name" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<ModelWithCruds.Self | null> {
-                return await Orm.fromEnv(env).getQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.getQuery(env, id), ModelWithCruds.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.getQuery(env, id), ModelWithCruds.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."categoryId" AS "categoryId", "ModelWithCruds"."name" AS "name" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ModelWithCruds.Self[]> {
-                return await Orm.fromEnv(env).listQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.listQuery(env, lastSeen_id, limit), ModelWithCruds.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.listQuery(env, lastSeen_id, limit), ModelWithCruds.DataSources.Default.include);
             },
         }
     }
@@ -505,12 +505,12 @@ export namespace ModelWithCruds {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ModelWithKv {
@@ -544,12 +544,12 @@ export namespace ModelWithKv {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id1?: string, id2?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 export namespace ModelWithR2 {
@@ -579,12 +579,12 @@ export namespace ModelWithR2 {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

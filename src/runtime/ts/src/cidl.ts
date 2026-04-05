@@ -1,7 +1,5 @@
 /** NOTE: These definitions mirror the definitions in the Compiler */
 
-import { D1PreparedStatement } from "@cloudflare/workers-types";
-
 export type CrudKind = "Save" | "Get" | "List";
 
 export type CidlType =

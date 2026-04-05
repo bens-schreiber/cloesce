@@ -41,11 +41,11 @@ export namespace BlobHaver {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<BlobHaver.Self | null> {
-                return await Orm.fromEnv(env).getQuery<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.DataSources.Default.getQuery(env, id), BlobHaver.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.DataSources.Default.getQuery(env, id), BlobHaver.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" > ?1 ORDER BY "BlobHaver"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<BlobHaver.Self[]> {
-                return await Orm.fromEnv(env).listQuery<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.DataSources.Default.listQuery(env, lastSeen_id, limit), BlobHaver.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.DataSources.Default.listQuery(env, lastSeen_id, limit), BlobHaver.DataSources.Default.include);
             },
         }
     }
@@ -56,12 +56,12 @@ export namespace BlobHaver {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

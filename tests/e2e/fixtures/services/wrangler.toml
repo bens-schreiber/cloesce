@@ -1,3 +1,3 @@
 compatibility_date = "2025-10-02"
-main = "backend.ts"
+main = "workers.ts"
 name = "cloesce"

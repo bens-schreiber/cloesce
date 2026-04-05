@@ -26,11 +26,11 @@ export namespace Weather {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Weather.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Weather.Self>(Weather.Meta, Weather.DataSources.Default.getQuery(env, id), Weather.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.DataSources.Default.getQuery(env, id), Weather.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Weather.Self[]> {
-                return await Orm.fromEnv(env).listQuery<Weather.Self>(Weather.Meta, Weather.DataSources.Default.listQuery(env, lastSeen_id, limit), Weather.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Weather.Self>(Weather.Meta, Weather.DataSources.Default.listQuery(env, lastSeen_id, limit), Weather.DataSources.Default.include);
             },
         }
     }
@@ -41,12 +41,12 @@ export namespace Weather {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

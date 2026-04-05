@@ -99,13 +99,13 @@ export namespace {{ model.name }} {
 {%- if let Some(get) = &ds.get %}
             getQuery: (env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.db.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
             async get(env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}{% for key in &model.key_fields %}, {{ key }}: string{% endfor %}): Promise<{{ model.name }}.Self | null> {
-                return await Orm.fromEnv(env).getQuery<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include, { {% for (i, key) in model.key_fields.iter().enumerate() %}{{ key }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
+                return await Orm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include, { {% for (i, key) in model.key_fields.iter().enumerate() %}{{ key }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
             },
 {%- endif %}
 {%- if let Some(list) = &ds.list %}
             listQuery: (env: Env{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.db.prepare(`{{ list.raw_sql }}`).bind({% for (i, param) in list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < list.parameters.len() %}, {% endif %}{% endfor %}),
             async list(env: Env{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}): Promise<{{ model.name }}.Self[]> {
-                return await Orm.fromEnv(env).listQuery<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.listQuery(env{% for param in list.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include);
+                return await Orm.fromEnv(env).list<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.listQuery(env{% for param in list.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include);
             },
 {%- endif %}
         }
@@ -119,21 +119,19 @@ export namespace {{ model.name }} {
 
     export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>{% if !model.key_fields.is_empty() %}, keyFields?: { {% for (i, key) in model.key_fields.iter().enumerate() %}{{ key }}?: string{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} }{% endif %} }): Promise<Self | null> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).getQuery<Self>(Meta, args.query, args.include, {% if !model.key_fields.is_empty() %}args.keyFields ?? {}{% else %}{}{% endif %});
+        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {% if !model.key_fields.is_empty() %}args.keyFields ?? {}{% else %}{}{% endif %});
     }
 
     export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
         args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
+        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
     }
 }
 {%- endfor %}
 import cidl from "./cidl.json" with { type: "json" };
 {%- for (_key, model) in &ast.models %}
 {%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
 (cidl.models.{{ model.name }}.data_sources["{{ ds.name }}"] as any).gen = {{ model.name }}.DataSources.{{ ds.name }};
-{%- endif %}
 {%- endfor %}
 {%- endfor %}
 
