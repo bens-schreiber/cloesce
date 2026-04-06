@@ -12,98 +12,80 @@ Services are another core concept that allows you to encapsulate business logic 
 
 Instead, Services are used to group related, complex functionality together and can be injected into other parts of your application using Cloesce's dependency injection system.
 
-
 ## Hello World Service
 
-Let's create a simple Service that returns a "Hello, World!" message.
+```cloesce
+service HelloWorldService {
+    helloString: string
+}
 
-```typescript
-import { Service, Get, HttpResult } from 'cloesce/backend';
-
-@Service
-export class HelloWorldService {
-
-    init(): HttpResult<void> | undefined {
-        // Optional initialization logic can go here
-    }
-
-    @Get()
-    hello(): string {
-        return "Hello, World!";
-    }
+api HelloWorldService {
+    hello(self) -> string
 }
 ```
 
-After running `npx cloesce compile`, this Service will be available at the endpoint `HelloWorldService/hello`, and a client method will be generated for you to call it from the frontend.
+
+
+After running `npx cloesce compile`, a backend method can be implemented for the `hello` API:
+```typescript
+import * as Cloesce from "@cloesce/backend";
+
+class HelloWorldService extends Cloesce.HelloWorldService.Api {
+    init(self: Cloesce.HelloWorldService.Self): void {
+        self.helloString = "Hello, World!";
+    }
+
+    hello(self): string {
+        return self.helloString;
+    }
+}
+```
 
 ## Dependency Injection
 
-To share dependencies across your Cloesce application methods, Cloesce utilizes dependency injection. By default, Cloesce provides two dependencies:
-- Wrangler Environment: Access to your Cloudflare Workers environment variables.
-- Request: The incoming HTTP request object.
+To share dependencies across your Cloesce application methods, Cloesce utilizes a dependency injection container. By default, Cloesce provides only the Wrangler environment as a dependency.
 
-You can access these dependencies by decorating your method parameters with the `@Inject` decorator on any Cloesce Model or Service method:
-```typescript
-import { Service, Get, WranglerEnv } from 'cloesce/backend';
-
-@WranglerEnv
-class Env {
-    d1: D1Database;
-}
-
-@Service
-export class HelloWorldService {
-    @Get()
-    async hello(@Inject env: Env, @Inject request: Request): Promise<string> {
-        console.log("Request URL:", request.url);
-        const res = await env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
-        return res.message;
-    }
+To define a custom dependency, simply add an `inject` block to your schema:
+```cloesce
+inject {
+    MyDependency
 }
 ```
 
-Unlike Models, which require all attributes to be SQL columns, KV keys, or R2 objects, Services allow attributes to be any arbitrary value, searching for them in the dependency injection context. This means you can easily inject custom Services, utilities, or configurations into your Service methods as needed.
+This type can then be passed in to any `api` method or `service` definition and will be resolved by the dependency injection container at runtime. Additionally, typing a field with `env` will inject the Wrangler environment.
 
-```typescript
-@Service
-export class HelloWorldService {
+```cloesce
+env {
+    // ...
+}
 
-    env: Env;
-    request: Request;
-    foo: string;
+inject {
+    YouTubeApiClient
+}
 
-    init(): void {
-        this.foo = "bar";
-    }
+service VideoService {
+    wrangler: env
+    ytClient: YouTubeApiClient
+}
 
-    @Get()
-    async hello(): Promise<string> {
-        console.log("Request URL:", this.request.url);
-        const res = await this.env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
-        return res.message + " and foo is " + this.foo;
-    }
+api VideoService {
+    getVideo(self, videoId: string) -> stream
+
+    // also valid
+    getVideoStatic(wrangler: env, ytClient: YouTubeApiClient, videoId: string) -> stream
 }
 ```
+
 
 ## Services as Dependencies
 
 Services can also be injected into other Services. They cannot be circularly dependent, but otherwise, you can freely compose Services together.
 
-```typescript
-@Service
-export class GreetingService {
-    greet(name: string): string {
-        return `Hello, ${name}!`;
-    }
-}
+```cloesce
 
-@Service
-export class HelloWorldService {
-    greetingService: GreetingService;
+service FooService { }
 
-    @Get()
-    hello(name: string): string {
-        return this.greetingService.greet(name);
-    }
+service BarService {
+    foo: FooService
 }
 ```

@@ -343,6 +343,7 @@ tmp/
 tmp.*
 examples/*/package-lock.json
 src/ts/package-lock.json
+!docs/cidl.js
 
 # ----------- MDBOOK VVV  ----------- 
 book

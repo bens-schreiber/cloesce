@@ -1,11 +1,11 @@
 # Installation
 
 > [!NOTE]
-> Cloesce supports only TypeScript to TypeScript compilation as of Alpha v0.2.0. Support for additional languages will be added in future releases.
+> Cloesce supports only TypeScript compilation as of v0.3.0. Support for additional languages will be added in future releases.
 
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 
-This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, example Models, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
+This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
 
 ## Prerequisites
 
@@ -29,11 +29,14 @@ cd my-cloesce-app
 
 A simple project structure is created for you.
 ```
+
 ├── src/
-│   ├── data/           # Example Cloesce Models
+│   ├── api/            # API route handlers
 │   └── web/            # Frontend web assets
 ├── test/               # Unit tests for example Models
 ├── migrations/         # Database migration files
-├── cloesce.config.ts # Cloesce configuration
+├── schema/
+│   └── schema.clo      # Cloesce schema definition
+├── cloesce.config.ts   # Cloesce configuration
 └── package.json        # Project dependencies and scripts
 ```

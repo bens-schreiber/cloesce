@@ -4,49 +4,43 @@
 > Cloesce is under active development, expanding its feature set as it pushes toward [full
 > Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
-*Cloesce* converts class definitions into a full stack Cloudflare application.
+*Cloesce* is a language that describes a full stack application built on Cloudflare's edge ecosystem. 
 
-Inspired by 
-- [Entity Framework](https://learn.microsoft.com/en-us/ef/)
-- [NestJS](https://nestjs.com/)
-- [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet)
-- [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) 
-- [gRPC](https://grpc.io/)
-- and Infrastructure as Code (IaC)
+From a simple model definition, Cloesce generates a complete application, including an ORM, migration engine, web framework, runtime validation library, IaC tool, and API Generator. 
 
-Cloesce is not just an ORM, migration engine, web framework, runtime validation library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
+```cloesce
+env {
+    d1 { db }
+    kv { namespace }
+    r2 { bucket }
+}
 
-<!-- langtabs-start -->
-```typescript
-@Crud("GET", "SAVE", "LIST")
-@Model("db")
-class User {
-    id: Integer;
-    name: String;
-    posts: Post[];
-
-    @KV("user/settings/{id}", namespace)
-    settings: KValue<unknown>;
-
-    @R2("user/avatars/{id}.png", bucket)
-    avatar: R2Object;
-
-    @Post()
-    hello(): User {
-        return this;
+[use db]
+[use get, save, list]
+model User {
+    primary { 
+        id: int 
     }
+
+    nav(Posts::id) {
+        posts
+    }
+
+    kv(namespace, "user/settings/{id}") {
+        settings: json
+    }
+
+    r2(bucket, "user/avatars/{id}.png") {
+        avatar
+    }
+
+    name: string
+}
+
+api User {
+    get helloWorld(self) -> User
 }
 ```
-```python
-# Coming in a later release!
-```
-```rs
-// Coming in a later release!
-```
-<!-- langtabs-end -->
-
-*How easy can full stack development get?*
-
 
 ## Contributing
 

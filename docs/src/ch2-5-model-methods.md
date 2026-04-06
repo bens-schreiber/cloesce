@@ -7,98 +7,111 @@ In this section, we will explore how to define methods on Models that are expose
 ## Static and Instance Methods
 
 > [!WARNING]
-> GET methods in alpha v0.2.0 do not support complex types as parameters (such as other Models, arrays, etc). 
-> Only primitive types like `string`, `number`, `boolean` are supported. This limitation will be lifted in future releases.
+> GET methods in v0.3.0 do not support complex types as parameters (such as other Models, arrays, etc). 
+> Only primitive types like `string`, `number`, `bool` are supported. This limitation will be lifted in future releases.
 
-A Model class in Cloesce may have both static and instance methods.
+A Model in Cloesce may have both "static" and "instance" methods.
 
-A static method simply exists on the same namespace as the Model class. An instance method exists on an actual instance of the Model.
+A static method exists on the namespace of the Model class itself and can be called without hydrating the Model.
 
-Methods must be decorated with an HTTP Verb such as `@Get`, `@Post`, etc. to be exposed as API endpoints.
+An instance method exists on an actual instance of the Model and can access the fields of that instance via `self`. When an instance method is called, Cloesce will automatically hydrate the Model instance with the appropriate data before invoking the method. Each instance method may specify a Data Source to how `self` should be hydrated.
 
-Each endpoint may take a [Data Source](./ch2-3-data-sources.md) as an optional query parameter to specify which related data to include in the response. It may also define a Data Source inline if it should not be shared with the client.
+```cloesce
+[use db]
+model User {
+    primary {
+        id: int
+    }
+
+    name: string
+    
+    nav (Dog::ownerId) {
+        dogs
+    }
+}
+
+api User {
+    get echo() -> string
+    get myDogs(self) -> Array<Dog>
+    get selfWithoutDogs([source NoDogs] self) -> User
+
+    post updateName(self, newName: string) -> void
+}
+
+source NoDogs for User {
+    include { }
+}
+```
+
+After compilation, all methods of the `User` Model will be exposed as API endpoints, returning HTTP `501` (Not Implemented) until they are implemented on the Workers side.
+
+An example implementation of the `User` Model methods in TypeScript might look like this:
 
 ```typescript
-import { Model, Integer, HttpResult } from "cloesce/backend";
+import * as Cloesce from "@cloesce/backend";
 
-@Model("db")
-export class User {
-    id: Integer;
-    name: string;
-
-    @Get()
-    static echo(input: string): HttpResult<string> {
+class UserApi extends Cloesce.User.Api {
+    echo(input: string): HttpResult<string> {
         if (isBadWord(input)) {
             return HttpResult.fail(400, "I'm not saying that!");
         }
 
-        return HttpResult.ok(`Echo: ${input}`);
+        return HttpResult.ok(200, `Echo: ${input}`);
     }
 
-    @Get()
-    greet(): string {
-        return `Hello, my name is ${this.name}.`;
+    myDogs(self: Cloesce.User.Self): Dog[] {
+        // Since this method was hydrated with the default Data Source, 
+        // `self` includes the `dogs` Navigation Field.
+        return self.dogs;
     }
 
-    foo() {
-        // Not exposed as an API method
+    selfWithoutDogs(self: Cloesce.User.Self): User {
+        // Since this method was hydrated with the `NoDogs` Data Source,
+        // `self` does not include the `dogs` Navigation Field.
+        return self;
+    }
+
+    updateName(self: Cloesce.User.Self,newName: string): void {
+        await Cloesce.User.save({ ...self, name: newName });
     }
 }
 ```
 
-After compilation via `npx cloesce compile`, the above Model will have two API endpoints:
-- `GET /User/echo?input=yourInput` Calls the static `echo` method.
-- `GET /User/{id}/greet` Calls the instance `greet` method on the `User` instance with the specified `id`.
-
-To query these endpoints, a full generated client that matches the exact structure defined in the Model is available after compilation in `.generated/client.ts`.
+The generated client API will have fully typed methods to invoke these endpoints as if they were Object Oriented methods on the class `User`.
 
 ## CRUD Methods
 
 > [!IMPORTANT]
-> Delete is not yet supported as a generated CRUD method in alpha v0.2.0, but it is planned for a future release.
+> Delete is not yet supported as a generated CRUD method in v0.3.0, but it is planned for a future release.
 
 > [!NOTE]
-> R2 does not support CRUD methods for streaming the object body, instead it only sends the metadata.
+> R2 does not support CRUD methods for streaming the object body, only the metadata.
 
-When creating Models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) boilerplate. To save this effort, Cloesce automatically generates standard CRUD methods if included in the Model decorator. These methods are exposed as API endpoints. Internally, they simply run the [Cloesce ORM](./ch2-6-cloesce-orm.md) operations available via the `Orm` class.
+When creating Models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) boilerplate. To save this effort, Cloesce is capable of generating implementations for CRUD methods without any extra work. These methods are exposed as API endpoints. Internally, they simply run the [Cloesce ORM](./ch2-6-cloesce-orm.md) operations.
 
-```typescript
-import { Model, Integer, Crud } from "cloesce/backend";
-
-@Crud("GET", "SAVE", "LIST")
-@Model("db")
-export class User {
-    id: Integer;
-    name: string;
+```cloesce
+[use db]
+[use get, save, list]
+model User {
+    primary {
+        id: int
+    } 
 }
 ```
 
-The above `User` Model will have the following API endpoints generated automatically:
-- `GET /User/{id}/GET?__dataSource=` Fetch a `User` by its primary key.
-- `POST /User/SAVE?__dataSource=` Create or update a `User`. The `User` data is passed in the request body as JSON.
-- `GET /User/LIST?__dataSource=` List all `User` instances.
+Now, the client will have access to the methods `User.$get`, `User.$save`, and `User.$list` for free, which will call the corresponding API endpoints to perform those operations. The `$get` method takes in the primary key(s) of the Model to fetch a single instance, while the `$list` method takes in pagination parameters to fetch multiple instances.
 
-All CRUD methods take an optional `DataSource` in the request to specify which navigation properties to include in the response. This defaults to the default Data Source.
+By default, these methods use the default Data Source for the Model. However, each CRUD method accepts a Data Source as a parameter, allowing you to choose which Data Source to use when invoking the method. This provides flexibility in how much data is fetched when performing CRUD operations.
 
-## Private Data Sources
+To hide a Data Source from the client CRUD methods, simply mark the Data Source as `internal`:
 
-A Model may be composed of several other Models, KV entries and R2 objects, but one method may only need to fetch a subset of that data. In this case, you can define a Data Source for that specific method:
-
-```typescript
-@Model("db")
-export class User {
-    id: Integer;
-    name: string;
-
-    @R2("profilePictures/{id}.png", "myBucket")
-    profilePicture: R2Object | undefined;
-
-    @Get({ includeTree: {} }) // can also define as a `const` outside the method and reuse it if needed
-    getComputedField(): string {
-        return `User: ${this.name}`;
+```cloesce
+[internal]
+source Internal for User {
+    include {
+        dogs
     }
 }
-
 ```
 
 ## Runtime Validation
@@ -110,91 +123,94 @@ There are many valid types for method parameters in Cloesce, such as:
 | Type | Description |
 |------|-------------|
 | `string` | String values |
-| `number` | Floating-point numbers |
-| `Integer` | Integer values |
-| `boolean` | Boolean values (true/false) |
-| `Date` | Date and time values |
-| `Uint8Array` | Binary data |
-| `DataSourceOf<T>` | Any data source for Model type `T` |
-| `unknown` | JSON data of unknown structure |
-| `DeepPartial<T>` | Partial version of Model type `T` where anything can be missing |
+| `double` | Floating-point numbers |
+| `int` | Integer values |
+| `bool` | Boolean values (true/false) |
+| `date` | Date and time values |
+| `blob` | Binary data |
+| `DataSource<T>` | Any data source for Model type `T` |
+| `json` | JSON data of unknown structure |
+| `Partial<T>` | Partial version of Model type `T` where anything can be missing |
 | Plain Old Objects | Objects with properties of supported types |
 | Model types | Custom Models (e.g., `User`, `Post`) |
-| Arrays | Arrays of any supported type (e.g., `string[]`, `User[]`) |
-| Nullable unions | Nullable versions of any type (e.g., `string \| null`, `User \| null`) |
-| `HttpResult<T>` | HTTP result wrapping any supported type `T` |
-| `ReadableStream` | Stream of data |
+| `Array<T>` | Arrays of any supported type (e.g., `Array<string>`, `Array<User>`) |
+| `Option<T>` | Nullable versions of any type |
+| `stream` | Stream of data |
 
 ## Plain Old Objects
 
 > [!NOTE]
-> Plain old objects can only consist of serializable properties supported by Cloesce. They must be exported so that they can be linked. They cannot contain streams.
+> Plain old objects can only consist of serializable properties supported by Cloesce. They cannot contain any streams.
 
 Cloesce supports the use of Plain Old Objects (POOs) as method parameters and return types. A POO is an object with properties that are of supported types. This allows developers to return or accept complex data structures without needing to define a full Model for them.
 
-```typescript
-import { Model, Integer, HttpResult } from "cloesce/backend";
-
-export class Profile {
-    bio: string;
-    age: Integer;
-    interests: string[];
+```cloesce
+poo Profile {
+    bio: string
+    age: int
+    interests: Array<string>
 }
 
-@Model("db")
-export class User {
-    id: Integer;
-    name: string;
+model User {
+    // ...
+}
 
-    @Post()
-    updateProfile(profile: Profile): HttpResult<string> {
-        // Update the user's profile with the provided data
-        return HttpResult.ok("Profile updated successfully.");
-    }
+api User {
+    get profile(self) -> Profile
+    post updateProfile(self, profile: Profile) -> void
 }
 ```
 
+## Partial
 
-## HttpResult
-
-Every method response in Cloesce is converted to an `HttpResult` internally. This allows methods to have fine-grained control over the HTTP response, including status codes and headers.
-
-## DeepPartial
-
-Cloesce provides a special utility type called `DeepPartial<T>`, which allows for the creation of objects where all properties of type `T` are optional, and this optionality is applied recursively to nested objects. This is particularly useful for update operations where you may only want to provide a subset of the properties of a Model.
+Cloesce provides a special utility type called `Partial<T>`, which allows for the creation of objects where all properties of type `T` are optional, and this optionality is applied recursively to nested objects. This is particularly useful for update operations where you may only want to provide a subset of the properties of a Model.
 
 ## Stream Input and Output
 
-Cloesce supports streaming data both as input parameters and return values in Model methods. This is particularly useful for handling large files or data streams without loading everything into memory at once. Streams can be hinted to Cloesce using the `ReadableStream` type.
+Cloesce supports streaming data both as input parameters and return values in Model methods. This is particularly useful for handling large files or data streams without loading everything into memory at once. Streams can be hinted to Cloesce using the `stream` type.
 
-If a method parameter is of type `ReadableStream`, no other validation is performed on the input data. Additionally, no other parameters are allowed in the method signature when using a stream input (aside from injected dependencies, which are discussed later).
+If a method parameter is of type `stream`, no other validation is performed on the input data. Additionally, no other parameters are allowed in the method signature when using a stream input (aside from injected dependencies, which are discussed later).
 
-When a method returns a `ReadableStream`, Cloesce will return a plain `Response` on the client side, allowing for efficient streaming of data back to the client.
-
-Cloesce allows a `HttpResult<ReadableStream>` to be returned as well, which provides the ability to set custom status codes and headers while still streaming data.
+When a method returns a `stream`, Cloesce will return a plain `Response` on the client side, allowing for efficient streaming of data back to the client.
 
 For example, to return a R2 object's body as a stream, you can define a method like this:
 
+```cloesce
+model MediaFile {
+    primary {
+        id: int
+    }
+
+    r2(myBucket, "media/{id}.png") {
+        file
+    }
+}
+
+api MediaFile {
+    post uploadFile(self, wrangler: env, file: stream) -> void
+    get downloadFile(self) -> stream
+}
+```
+
 ```typescript
-import { Model, Integer, R2Object, Get, HttpResult } from "cloesce/backend";
+import * as Cloesce from "@cloesce/backend";
 
-@Model("db")
-export class MediaFile {
-    id: Integer;
+class MediaFileApi extends Cloesce.MediaFile.Api {
+    async uploadFile(self: Cloesce.MediaFile.Self, wrangler: Cloesce.Env, file: CfReadableStream): Promise<void> {
+        const key = Cloesce.Weather.KeyFormat.file(self.id);
+        await wrangler.myBucket.put(key, file);
+     }
 
-    @R2("media/{id}.png", "myBucket")
-    r2Object: R2Object | undefined;
-
-    @Get()
-    downloadFile(): HttpResult<ReadableStream> {
-        if (!this.r2Object) {
+    downloadFile(self: Cloesce.MediaFile.Self): HttpResult<CfReadableStream> {
+        if (!self.file) {
             return HttpResult.fail(404, "File not found.");
         }
 
         // Body is never loaded into memory, just streamed!
-        return HttpResult.ok(this.r2Object.body);
-    }
+        return HttpResult.ok(self.file.body);
+     }
 }
 ```
+
 
 

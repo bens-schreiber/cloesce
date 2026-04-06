@@ -137,7 +137,6 @@ impl Fixture {
         let default_migrations_path = "migrations";
         let cloesce_source = fixture_dir.join("schema.cloesce");
 
-        tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
             Command::new("./target/release/compile")
                 .arg(cloesce_dir)
@@ -196,7 +195,6 @@ impl Fixture {
             project_root.join("src/compiler")
         };
 
-        tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("./target/release/migrate")
                 .arg(&cidl_path)

@@ -67,7 +67,6 @@ test:
 .PHONY: build-docs
 build-docs:
 	@echo "CLOESCE: Building documentation for Rust and TypeScript code..."
-	cd $(DOCS_DIR) && mdbook-langtabs install
 	cd $(DOCS_DIR) && mdbook build
 
 	@if command -v pandoc >/dev/null 2>&1; then \

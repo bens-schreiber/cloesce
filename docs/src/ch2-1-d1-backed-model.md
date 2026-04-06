@@ -1,35 +1,27 @@
 # Basic D1 Backed Model
 
-In this section, we will explore the basic properties of a D1 backed Model in Cloesce. [Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers.
+[Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers. Cloesce provides first class support for D1, allowing you to define Models backed by D1 tables with just a few lines of code.
 
 ## Defining a Model
-> [!NOTE]
-> Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve, and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
 
-> [!TIP]
-> Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, i.e., snake case, camel case, etc). Cloesce will automatically treat a property named `id` as the primary key.
+All Cloesce models are defined within a `.clo` or `.cloesce` file. In `v0.3.0`, all symbols within a file are globally scoped, so you can split your Models and APIs across multiple files as you see fit.
 
-Compilation in Cloesce consists of three phases: Extraction, Analysis, and Code Generation. 
+```cloesce
+[use db]
+model User {
+    primary {
+        id: int
+    }
 
-During Extraction, Cloesce scans your source files (designated with `*.cloesce.ts`) for Model definitions. Models are defined using the `@Model()` decorator. 
-
-```typescript
-import { Model, Integer, PrimaryKey } from "cloesce/backend";
-
-@Model("db")
-export class User {
-    @PrimaryKey
-    id: Integer;
-
-    name: string;
+    name: string
 }
 ```
 
 The above code defines a Model "User" stored in the D1 database `db`, with several properties:
 | Property | Description |
 |--------|-------------|
-| `User` | Cloesce infers from the class attributes that this Model is backed by a D1 table `User` |
-| `id` | Integer property decorated with `@PrimaryKey`, indicating it is the Model’s primary key. |
+| `User` | A table backed by the D1 database `db` |
+| `id` | Integer property decorated scoped as a primary key |
 | `name` | String property representing the user’s name; stored as a regular column in the D1 database. |
 
 ## Supported D1 Column Types
@@ -38,40 +30,21 @@ Cloesce supports a variety of column types for D1 Models. These are the supporte
 
 | TypeScript Type | SQLite Type | Notes |
 |-----------------|-------------|-------|
-| `Integer` | `INTEGER` | Represents an integer value |
+| `int` | `INTEGER` | Represents an integer value |
 | `string` | `TEXT` | Represents a string value |
-| `boolean` | `INTEGER` | 0 for false, 1 for true |
-| `Date` | `TEXT` | Stored in ISO 8601 format |
-| `number` | `REAL` | Represents a floating-point number |
-| `Uint8Array` | `BLOB` | Represents binary data |
+| `bool` | `INTEGER` | 0 for false, 1 for true |
+| `date` | `TEXT` | Stored in ISO 8601 format |
+| `double` | `REAL` | Represents a floating-point number |
+| `blob` | `BLOB` | Represents binary data |
 
-All of these types by themselves are `NOT NULL` by default. To make a property nullable, you can use a union with `null`, e.g., `property: string | null;`. `undefined` is reserved for [Navigation Properties](./ch2-2-navigation-properties.md) and cannot be used to indicate nullability.
-
-Notably, an `Integer` primary key is automatically set to `AUTOINCREMENT` in D1, so you don't need to manually assign values to it when creating new records (useful for the [ORM functions](./ch2-6-cloesce-orm.md)).
-
-## Fluent API
-
-Some column configurations cannot be cleanly expressed through TypeScript decorators alone. For these cases, Cloesce provides a Fluent API that can called in `cloesce.config.ts` to further customize the D1 schema. For example, to make a column unique:
-
-```ts
-import { defineConfig } from "cloesce/config";
-import { Weather } from "./src/data/models.cloesce";
-
-const config = defineConfig({
-    // ...
-});
-
-config.model(Weather, builder => {
-    builder.unique("dateTime", "location");
-});
+All of these types by themselves are `NOT NULL` by default. To make a property nullable, you may wrap it in an `Option` generic:
+```cloesce
+model User {
+    optionalField: Option<string>
+}
 ```
 
-Additionally, Cloesce exposes a method to modify the AST after extraction:
-```ts
-config.rawAst((ast) => {
-    // modify the raw AST here
-});
-```
+Notably, an `int` primary key is automatically set to `AUTOINCREMENT` in D1, so you don't need to manually assign values to it when creating new records (useful for the [ORM functions](./ch2-6-cloesce-orm.md)).
 
 ## Migrating the Database
 

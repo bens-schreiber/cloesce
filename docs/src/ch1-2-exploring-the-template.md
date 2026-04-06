@@ -2,99 +2,88 @@
 
 After creating your project with `create-cloesce`, several example files are included to help you get started. Below is an overview of those files and their purpose.
 
-## Wrangler Environment
+## Schema
+
+### Wrangler Environment
 
 All Cloudflare Workers define [a set of bindings](https://developers.cloudflare.com/workers/configuration/environment-variables/) that provision resources such as [D1 databases](https://developers.cloudflare.com/d1/), [R2 buckets](https://developers.cloudflare.com/r2/), [KV namespaces](https://developers.cloudflare.com/kv/concepts/kv-namespaces/), and miscellaneous environment variables.
 
-Cloesce uses a class decorated with `@WranglerEnv` to define the Wrangler Environment for your application, tailored to the resources you need.
-
-In `src/data/main.ts`, a basic Wrangler Environment has been defined.
-
-```typescript
-@WranglerEnv
-export class Env {
-    db: D1Database;
-    bucket: R2Bucket;
-    myVariable: string;
+```cloesce
+env {
+    d1 { db }
+    r2 { bucket }
 }
 ```
 
-The above implementation of `Env` defines a Wrangler environment with a D1 database binding named `db`, an R2 bucket named `bucket`, and a string environment variable named `myVariable`. 
+In the above Cloesce snippet, we define a Wrangler Environment with a D1 database binding named `db` and an R2 bucket named `bucket`.
 
-A typical Cloudflare Worker defines these bindings in a `wrangler.jsonc` file, but Cloesce generates this file for you during compilation based on the `@WranglerEnv` class.
+After compilation, Cloesce generates a `wrangler.jsonc` (or `wrangler.toml` if configured) with the appropriate bindings for your application based on the `env` block in your schema. Cloesce does not handle provisioning of these resources, so you must assign each resources id to an existing resource in your Cloudflare account.
 
 Read more about the Wrangler Environment in the [Wrangler Environment](./ch2-7-wrangler-environment.md) chapter.
 
-## Custom Main Function
-
-Cloudflare Workers are serverless functions that run at Cloudflare’s edge and respond to HTTP requests. Each Worker defines an entry point function through which all requests are routed.
-
-Cloesce allows this same functionality through a custom `main` definition (seen in `src/data/main.ts`)
-
-```typescript
-export default async function main(
-    request: Request,
-    env: Env,
-    app: CloesceApp,
-    ctx: ExecutionContext
-): Promise<Response> {...}
-```
-
-Just like the standard Workers entrypoint, this function receives the inbound `Request`, the Wrangler Environment defined by the decorated `@WranglerEnv` class, and an `ExecutionContext` for managing background tasks.
-
-Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations.
-
-Read more about custom main functions in the [Middleware](./ch4-0-middleware.md) chapter.
-
-## Example Models
+### Models
 
 Models are the core building blocks of a Cloesce application. They define exactly how your data is structured, what relationships exist between different data entities, and what API endpoints will be generated to interact with that data.
 
 Unlike other ORMs, Cloesce Models are not limited to just relational data stored in a SQL database. Models can also include data stored in R2 buckets, KV namespaces, or inject external services.
 
-In `src/data/Models.ts` you will find two example Models, `Weather` and `WeatherReport`.
+In `schema/schema.clo` you will find two example Models, `Weather` and `WeatherReport`.
 
 <details>
     <summary>Weather Code Snippet</summary>
 
-```typescript
-@Model("db")
-export class Weather {
-    id: Integer;
+```cloesce
+[use db]
+[use list, save, get]
+model WeatherReport {
+    primary {
+        id: int
+    }
 
-    weatherReportId: Integer;
-    weatherReport: WeatherReport | undefined;
+    nav (Weather::weatherReportId) {
+        weatherEntries
+    }
 
-    dateTime: Date;
-    location: string;
-    temperature: number;
-    condition: string;
-
-    @R2("weather/photo/{id}", "bucket")
-    photo: R2ObjectBody | undefined;
-
-    @Post()
-    async uploadPhoto(@Inject env: Env, stream: ReadableStream) { ... }
-
-    @Get()
-    downloadPhoto() { ... }
+    title: string
+    description: string
 }
+
 ```
 </details>
 
 <details>
     <summary>WeatherReport Code Snippet</summary>
 
-```typescript
-@Crud("GET", "LIST", "SAVE")
-@Model("db")
-export class WeatherReport {
-    id: Integer;
+```cloesce
+[use db]
+[use get, list, save]
+model Weather {
+    primary {
+        id: int
+    }
 
-    title: string;
-    description: string;
+    foreign (WeatherReport::id) {
+        weatherReportId
+        nav { weatherReport }
+    }
+    
+    r2 (bucket, "weather/photos/{id}.jpg") {
+        photo
+    }
 
-    weatherEntries: Weather[];
+    dateTime: date
+    location: string
+    temperature: int
+    condition: string
+}
+
+api Weather {
+    post uploadPhoto(self, e: env, s: stream) -> void
+    get downloadPhoto([source R2Only] self) -> stream
+}
+
+source R2Only for Weather {
+    include { photo }
 }
 ```
 </details>
@@ -108,7 +97,7 @@ The `Weather` Model consists of:
 | `dateTime` | Scalar column | D1 |
 | `temperature` | Scalar column | D1 |
 | `condition` | Scalar column | D1 |
-| `photo` | R2 object, key format `weather/photo/{id}` | R2 |
+| `photo` | R2 object, key format `weather/photo/{id}.jpg` | R2 |
 | `uploadPhoto` | API endpoint | Workers |
 | `downloadPhoto` | API endpoint | Workers |
 
@@ -121,8 +110,34 @@ The `WeatherReport` Model consists of:
 | `title` | Scalar column | D1 |
 | `summary` | Scalar column | D1 |
 | `weatherEntries` | One-to-Many relationship with `Weather` | D1 |
-| `GET` | Generated CRUD operation | Workers |
-| `SAVE` | Generated CRUD operation | Workers |
-| `LIST` | Generated CRUD operation | Workers |
+| `get` | Generated CRUD operation | Workers |
+| `save` | Generated CRUD operation | Workers |
+| `list` | Generated CRUD operation | Workers |
 
 Read more about how Models work in the [Models](./ch2-0-models.md) chapter.
+
+## API
+
+In `src/api/main.ts`, you will find all of the TypeScript API route handlers for the example application. These handlers extend generated API interfaces, and must be explicitly registered during application initialization.
+
+While Cloesce has a default Workers entrypoint in the generated backend code, almost every application will require custom API route handlers to implement business logic that cannot be expressed in the schema.
+
+```ts
+class Weather extends Cloesce.Weather.Api {
+    async uploadPhoto(self: Cloesce.Weather.Self, e: Cloesce.Env, s: CfReadableStream): Promise<void> {
+        // ...
+    }
+
+    downloadPhoto(self: Cloesce.Weather.Self): HttpResult<CfReadableStream> {
+        // ...
+    }
+}
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = (await Cloesce.cloesce())
+            .register(new Weather());
+        // ... 
+    }
+}
+```
