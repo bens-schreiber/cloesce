@@ -4,9 +4,13 @@
 
 ## Defining a Model
 
-All Cloesce models are defined within a `.clo` or `.cloesce` file. In `v0.3.0`, all symbols within a file are globally scoped, so you can split your Models and APIs across multiple files as you see fit.
+> [!NOTE] 
+> In `v0.3.0`, all symbols within a file are globally scoped, so you can split your Models and APIs across multiple files as you see fit.
+
+All Cloesce models are defined within a `.clo` or `.cloesce` file. 
 
 ```cloesce
+// my-model.clo
 [use db]
 model User {
     primary {

@@ -1,40 +1,52 @@
-# cloesce (alpha, v0.1.0)
+# cloesce (alpha, v0.3.0)
+> [!WARNING]
+> Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
+> support across any language. The syntax and features described here are subject to change as the project evolves.
 
-> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes toward [full
-> Cloudflare support across any language](https://cloesce.pages.dev/ch6-1-future-vision). In this alpha, breaking changes can occur between releases.
+**Cloesce** is an interface definition language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From a simple schema, Cloesce supports features like:
 
-*Cloesce* converts class definitions into a full stack Cloudflare application.
+| Feature              | Status |
+|----------------------|--------|
+| ORM                  | ✅     |
+| RPC stubs            | ✅     |
+| IaC                  | ✅     |
+| SQL Migrations       | ✅     |
+| Runtime Validation   | ✅     |
+| Writing Glue         | ❌     |
 
-Inspired by 
-- [Entity Framework](https://learn.microsoft.com/en-us/ef/)
-- [NestJS](https://nestjs.com/)
-- [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet)
-- [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) 
-- [gRPC](https://grpc.io/)
-- and Infrastructure as Code (IaC)
+## How Easy can Full Stack Development Be?
 
-Cloesce is not just an ORM, migration engine, web framework, runtime validation library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
+```rs
+env {
+    d1 { db }
+    kv { namespace }
+    r2 { bucket }
+}
 
-<!-- langtabs-start -->
-```typescript
-@Crud("GET", "SAVE", "LIST")
-@Model("db")
-class User {
-    id: Integer;
-    name: String;
-    posts: Post[];
-
-    @KV("user/settings/{id}", namespace)
-    settings: KValue<unknown>;
-
-    @R2("user/avatars/{id}.png", bucket)
-    avatar: R2Object;
-
-    @Post()
-    hello(): User {
-        // D1, KV, and R2 all hydrated here!
-        return this;
+[use db]
+[use get, save, list]
+model User {
+    primary { 
+        id: int 
     }
+
+    nav(Posts::id) {
+        posts
+    }
+
+    kv(namespace, "user/settings/{id}") {
+        settings: json
+    }
+
+    r2(bucket, "user/avatars/{id}.png") {
+        avatar
+    }
+
+    name: string
+}
+
+api User {
+    get helloWorld(self) -> User
 }
 ```
 
@@ -49,13 +61,20 @@ curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
 
 See the [Typescript API Reference](https://cloesce-ts.pages.dev) for the generated client library documentation.
 
+## VS Code Extension
+
+A basic language highlighting extension for Cloesce is available in the [VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=BenSchreiber.cloesce-lang). In the future, this extension will also include a full LSP server.
+
+More editor integrations are planned for the future (and you can always contribute your own!). If you're interested in contributing an editor extension, reach out in the [Discord](https://discord.gg/saVTbcGHwF) server.
+
+
 ## Contributing
 
 Contributions are welcome at all levels. Join our [Discord](https://discord.gg/saVTbcGHwF) to discuss ideas, report issues, or get help getting started. [Create an issue](https://github.com/bens-schreiber/cloesce/issues/new) on GitHub if you find a bug or have a feature request.
 
 ## Coalesce
 
-Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).)
+Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).
 
 # Building, Formatting, Testing
 
@@ -67,8 +86,7 @@ Before building, ensure you have the required dependencies installed:
 - [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` and `wasm32-wasip1` targets)
 - [Node.js](https://nodejs.org/) and npm
 
-**Optional (but recommended):**
-- [binaryen](https://github.com/WebAssembly/binaryen) (for WASM optimization) - `brew install binaryen`
+**Optional:**
 - [pandoc](https://pandoc.org/) (for documentation) - `brew install pandoc`
 - [mdbook](https://rust-lang.github.io/mdBook/) (for documentation) - `cargo install mdbook`
 

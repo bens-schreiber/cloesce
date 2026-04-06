@@ -1,12 +1,21 @@
-# Introduction
+# The Cloesce Language
 
 > [!WARNING]
-> Cloesce is under active development, expanding its feature set as it pushes toward [full
-> Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
+> Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
+> support across any language. The syntax and features described here are subject to change as the project evolves.
 
-*Cloesce* is a language that describes a full stack application built on Cloudflare's edge ecosystem. 
+**Cloesce** is an interface definition language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From a simple schema, Cloesce supports features like:
 
-From a simple model definition, Cloesce generates a complete application, including an ORM, migration engine, web framework, runtime validation library, IaC tool, and API Generator. 
+| Feature              | Status |
+|----------------------|--------|
+| ORM                  | ✅     |
+| RPC stubs            | ✅     |
+| IaC                  | ✅     |
+| SQL Migrations       | ✅     |
+| Runtime Validation   | ✅     |
+| Writing Glue         | ❌     |
+
+## How Easy can Full Stack Development Be?
 
 ```cloesce
 env {

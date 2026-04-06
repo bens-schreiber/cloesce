@@ -50,9 +50,23 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
+/**
+ * The result of a paginated query to Workers KV or R2.
+ */
 export interface Paginated<T> {
+  /**
+   * The results of the pagination query. A maximum of 1000 results will be returned, but may be less.
+   */
   results: T[];
+
+  /**
+   * A cursor to be used in the next pagination query. Will be `null` if there are no more results to paginate through.
+   */
   cursor: string | null;
+
+  /**
+   * Whether the pagination query is complete, meaning there are no more results to paginate through. This is `true` if `cursor` is `null`, and `false` otherwise.
+   */
   complete: boolean;
 }
 
@@ -80,11 +94,18 @@ export class HttpResult<T = unknown> {
     public mediaType?: MediaType,
   ) {}
 
+  /**
+   * Return some OK result with the given status, data, and headers.
+   */
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T> {
     const headers: Headers = new Headers(init);
     return new HttpResult<T>(true, status, headers, data, undefined);
   }
 
+  /**
+   * Return a failure result with the given status, message, and headers.
+   * No body may be attached.
+   */
   static fail(status: number, message?: string, init?: HeadersInit) {
     const headers: Headers = new Headers(init);
     return new HttpResult<never>(false, status, headers, undefined, message);
@@ -145,6 +166,7 @@ export class HttpResult<T = unknown> {
     });
   }
 
+  /** @internal */
   setMediaType(mediaType: MediaType): this {
     this.mediaType = mediaType;
     return this;

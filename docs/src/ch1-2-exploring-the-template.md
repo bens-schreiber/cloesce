@@ -29,6 +29,32 @@ Unlike other ORMs, Cloesce Models are not limited to just relational data stored
 
 In `schema/schema.clo` you will find two example Models, `Weather` and `WeatherReport`.
 
+The `Weather` Model consists of:
+
+| Feature | Type / Description | Source / Layer |
+|---------|-----------------|----------------|
+| `id` | Primary Key | D1 |
+| `weatherReport` | One-to-One relationship | D1 |
+| `dateTime` | Scalar column | D1 |
+| `temperature` | Scalar column | D1 |
+| `condition` | Scalar column | D1 |
+| `photo` | R2 object, key format `weather/photo/{id}.jpg` | R2 |
+| `uploadPhoto` | API endpoint | Workers |
+| `downloadPhoto` | API endpoint | Workers |
+
+
+
+The `WeatherReport` Model consists of:
+| Feature | Type / Description | Source / Layer |
+|---------|-----------------|----------------|
+| `id` | Primary Key | D1 |
+| `title` | Scalar column | D1 |
+| `summary` | Scalar column | D1 |
+| `weatherEntries` | One-to-Many relationship with `Weather` | D1 |
+| `get` | Generated CRUD operation | Workers |
+| `save` | Generated CRUD operation | Workers |
+| `list` | Generated CRUD operation | Workers |
+
 <details>
     <summary>Weather Code Snippet</summary>
 
@@ -87,32 +113,6 @@ source R2Only for Weather {
 }
 ```
 </details>
-
-The `Weather` Model consists of:
-
-| Feature | Type / Description | Source / Layer |
-|---------|-----------------|----------------|
-| `id` | Primary Key | D1 |
-| `weatherReport` | One-to-One relationship | D1 |
-| `dateTime` | Scalar column | D1 |
-| `temperature` | Scalar column | D1 |
-| `condition` | Scalar column | D1 |
-| `photo` | R2 object, key format `weather/photo/{id}.jpg` | R2 |
-| `uploadPhoto` | API endpoint | Workers |
-| `downloadPhoto` | API endpoint | Workers |
-
-
-
-The `WeatherReport` Model consists of:
-| Feature | Type / Description | Source / Layer |
-|---------|-----------------|----------------|
-| `id` | Primary Key | D1 |
-| `title` | Scalar column | D1 |
-| `summary` | Scalar column | D1 |
-| `weatherEntries` | One-to-Many relationship with `Weather` | D1 |
-| `get` | Generated CRUD operation | Workers |
-| `save` | Generated CRUD operation | Workers |
-| `list` | Generated CRUD operation | Workers |
 
 Read more about how Models work in the [Models](./ch2-0-models.md) chapter.
 

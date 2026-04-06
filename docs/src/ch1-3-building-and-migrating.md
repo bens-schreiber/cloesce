@@ -15,18 +15,13 @@ npx cloesce compile
 
 This command looks for a `cloesce.config.ts` file in your project root, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used. Unlike many other tools, Cloesce does not require a configuration file to be written in Cloesce itself, which allows you to execute arbitrary code during compilation to generate your schema (e.g. pull environment variables, read from other files, etc).
 
-After compilation, a `.cloesce` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build. The folder contains:
-- `cidl.json`:
-    
-    The Cloesce Interface Definition Language AST exported to JSON. This file is used internally by Cloesce during migrations, and is utilized by the generated backend code as a source of truth for the structure of your Models and their linked features.
+After compilation, a `.cloesce` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build.
 
-- `client.ts`: 
-    
-    The generated client code for accessing your Models from the frontend. Import this file in your frontend code to interact with your Cloesce Models over HTTP.
-
-- `backend.ts`: 
-    
-    The generated Cloesce ORM and API stubs for your backend. All Cloesce features translate to a namespace or interface in this file.
+| File        | Description |
+|-------------|-------------|
+| `cidl.json` | The Cloesce Interface Definition Language AST exported to JSON. This file is used internally by Cloesce during migrations, and is utilized by the generated backend code as a source of truth for the structure of your Models and their linked features. |
+| `client.ts` | The generated client code for accessing your Models from the frontend. Import this file in your frontend code to interact with your Cloesce Models over HTTP. |
+| `backend.ts` | The generated Cloesce ORM and API stubs for your backend. All Cloesce features translate to a namespace or interface in this file. |
 
 ## Generating Migrations
 

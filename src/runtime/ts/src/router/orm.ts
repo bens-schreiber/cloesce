@@ -26,6 +26,13 @@ export class Orm {
     return new Orm(env);
   }
 
+  /**
+   * Maps a D1Result to a Cloesce Model based on the provided metadata and include tree.
+   *
+   * Fails silently if a mapping cannot be performed for some row, skipping it in results.
+   *
+   * Capable of mapping only queries returned from `Orm.select`, which are aliased in an Object Oriented fashion.
+   */
   static map<T extends object>(
     meta: Model,
     d1Results: D1Result,
@@ -53,11 +60,29 @@ export class Orm {
     return JSON.parse(mapQueryRes.unwrap()) as T[];
   }
 
+  /**
+   * A SQL `SELECT` query generator based on the provided metadata and include tree.
+   *
+   * All navigation fields are `LEFT JOIN`ed to the result.
+   * Aliases all fields of a Model in an Object Oriented fashion s.t. they can be referenced like:
+   * `[navigation.name]`, `[navigation.nestedNavigation.name]`, etc. in the mapping function.
+   *
+   * All top level columns of a Model are aliased by name:
+   * `[columnName]`.
+   *
+   * Utilizes the provided `includeTree` to determine which navigation fields to `LEFT JOIN` and include in the result.
+   *
+   * @returns a SQL `SELECT` string that can be executed to retrieve the Model(s).
+   */
   static select<T extends object>(
     meta: Model,
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
+    if (!meta.d1_binding) {
+      return "";
+    }
+
     const { wasm } = RuntimeContainer.get();
     const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
     const includeTreeRes = WasmResource.fromString(
@@ -79,6 +104,12 @@ export class Orm {
     return selectQueryRes.unwrap();
   }
 
+  /**
+   * Given some base object (be it empty or the result of an `Orm.map`), hydrates all of the fields recursively
+   * using the `includeTree` to determine which navigation properties to hydrate.
+   *
+   * For KV and R2 fields, performs the necessary queries to Workers KV and R2 to retrieve the data, which is then attached to the base object.
+   */
   async hydrate<T extends object>(
     meta: Model,
     base: any,
@@ -106,6 +137,21 @@ export class Orm {
   }
 
   // TODO: Better ORM error handling strategies
+  /**
+   * Performs a SQL + KV upsert based on the provided metadata and include tree, returning the upserted model.
+   * Recursively performs upserts for all nested navigation properties included in the `includeTree`.
+   *
+   * The `newModel` parameter is a partial model object that specifies the new values to upsert, and serves as the basis for generating the upsert SQL query.
+   *
+   * The SQL query will execute as an insert if:
+   * - The primary key fields are missing from `newModel`
+   *
+   * The SQL query will execute as an insert OR update if:
+   * - All fields are provided with values in `newModel`
+   *
+   * The SQL query will execute as an update if:
+   * - At least one field is missing from `newModel`, but all primary key fields are provided with values.
+   */
   async upsert<T extends object>(
     meta: Model,
     newModel: DeepPartial<T>,
@@ -288,6 +334,12 @@ export class Orm {
     return await this.hydrate(meta, base, {}, includeTree);
   }
 
+  /**
+   * Given some `D1PreparedStatement` that is expected to return a single row representing a Model,
+   * maps the result to the Model based on the provided metadata and include tree, and returns it.
+   *
+   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
+   */
   async get<T extends object>(
     meta: Model,
     query: D1PreparedStatement | null | undefined,
@@ -307,6 +359,12 @@ export class Orm {
     return await this.hydrate(meta, mapped, keyFields, includeTree);
   }
 
+  /**
+   * Given some `D1PreparedStatement` that is expected to return multiple rows representing Models,
+   * maps the results to the Models based on the provided metadata and include tree, and returns them as an array.
+   *
+   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
+   */
   async list<T extends object>(
     meta: Model,
     query: D1PreparedStatement | null | undefined,

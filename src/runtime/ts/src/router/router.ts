@@ -24,7 +24,7 @@ export type DependencyKey = { tag: string };
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
- * Comes with the WranglerEnv and Request by default.
+ * Comes with the Wrangler environment pre-injected
  */
 export class DependencyContainer {
   private container = new Map<string, any>();
@@ -54,7 +54,7 @@ export class DependencyContainer {
 
 /**
  * @internal
- * Singleton instance containing the CIDL, constructor registry, and wasm binary.
+ * Singleton instance containing the CIDL and and wasm binary.
  * These values are guaranteed to never change throughout a workers lifetime.
  */
 export class RuntimeContainer {
@@ -95,7 +95,7 @@ export type MiddlewareFn = (
 ) => Promise<HttpResult | void> | HttpResult | void;
 
 /**
- * Expected states in which the router may exit.
+ * States in which the router may exit.
  */
 export enum RouterError {
   UnknownPrefix,
@@ -122,6 +122,10 @@ export class CloesceApp {
   // Additionally, contains injected dependencies, mapped to their instance.
   private apiRegistry: Map<string, unknown> = new Map();
 
+  /**
+   * Register an API implementation or Injected dependency with the router,
+   * making it available for routing and injection, respectively.
+   */
   public register(api: { readonly tag: string }): this {
     if (this.apiRegistry.has(api.tag)) {
       console.warn(
@@ -148,7 +152,7 @@ export class CloesceApp {
   /**
    * Registers middleware for a specific namespace (Model or Service)
    *
-   * Runs before request validation and method middleware, and after services are initialized.
+   * Runs before request validation and method middleware.
    *
    * @param m - The middleware function to register.
    */
