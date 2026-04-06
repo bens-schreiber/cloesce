@@ -6,51 +6,15 @@
 
 **Cloesce** is an interface definition language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From a simple schema, Cloesce supports features like:
 
-| Feature              | Status |
+| Feature              | Support |
 |----------------------|--------|
-| D1,KV,R2 ORM         | ✅     |
+| ORM                  | ✅     |
 | RPC stubs            | ✅     |
 | Middleware           | ✅     |
 | IaC                  | ✅     |
 | SQL Migrations       | ✅     |
 | Runtime Validation   | ✅     |
 | Writing Glue         | ❌     |
-
-## How Easy can Full Stack Development Be?
-
-```cloesce
-env {
-    d1 { db }
-    kv { namespace }
-    r2 { bucket }
-}
-
-[use db]
-[use get, save, list]
-model User {
-    primary { 
-        id: int 
-    }
-
-    nav(Posts::id) {
-        posts
-    }
-
-    kv(namespace, "user/settings/{id}") {
-        settings: json
-    }
-
-    r2(bucket, "user/avatars/{id}.png") {
-        avatar
-    }
-
-    name: string
-}
-
-api User {
-    get helloWorld(self) -> User
-}
-```
 
 ## Contributing
 
