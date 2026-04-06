@@ -69,6 +69,9 @@ build-docs:
 	@echo "CLOESCE: Building documentation for Rust and TypeScript code..."
 	cd $(DOCS_DIR) && mdbook build
 
+# https://github.com/rust-lang/mdBook/pull/3028
+	@find $(DOCS_DIR)/book -name 'toc*.js' -print0 | xargs -0 sed -i '' 's@if (link.href === current_page@if (link.href.replace(/\.html$$/, "") === current_page.replace(/\.html$$/, "")@g'
+
 	@if command -v pandoc >/dev/null 2>&1; then \
 		cat $(DOCS_DIR)/src/*.md > $(DOCS_DIR)/book/llms-full.md; \
 		echo "CLOESCE: Converting Markdown documentation to plain text with pandoc..."; \
