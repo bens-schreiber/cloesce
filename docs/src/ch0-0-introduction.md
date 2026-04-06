@@ -1,52 +1,20 @@
-# Introduction
+# The Cloesce Language
 
 > [!WARNING]
-> Cloesce is under active development, expanding its feature set as it pushes toward [full
-> Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
+> Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
+> support across any language. The syntax and features described here are subject to change as the project evolves.
 
-*Cloesce* converts class definitions into a full stack Cloudflare application.
+**Cloesce** is an interface definition language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From a simple schema, Cloesce supports features like:
 
-Inspired by 
-- [Entity Framework](https://learn.microsoft.com/en-us/ef/)
-- [NestJS](https://nestjs.com/)
-- [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet)
-- [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) 
-- [gRPC](https://grpc.io/)
-- and Infrastructure as Code (IaC)
-
-Cloesce is not just an ORM, migration engine, web framework, runtime validation library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
-
-<!-- langtabs-start -->
-```typescript
-@Crud("GET", "SAVE", "LIST")
-@Model("db")
-class User {
-    id: Integer;
-    name: String;
-    posts: Post[];
-
-    @KV("user/settings/{id}", namespace)
-    settings: KValue<unknown>;
-
-    @R2("user/avatars/{id}.png", bucket)
-    avatar: R2Object;
-
-    @Post()
-    hello(): User {
-        return this;
-    }
-}
-```
-```python
-# Coming in a later release!
-```
-```rs
-// Coming in a later release!
-```
-<!-- langtabs-end -->
-
-*How easy can full stack development get?*
-
+| Feature              | Support |
+|----------------------|--------|
+| ORM                  | ✅     |
+| RPC stubs            | ✅     |
+| Middleware           | ✅     |
+| IaC                  | ✅     |
+| SQL Migrations       | ✅     |
+| Runtime Validation   | ✅     |
+| Writing Glue         | ❌     |
 
 ## Contributing
 

@@ -33,7 +33,7 @@ impl TypeScriptMapper {
             return name.to_string();
         }
 
-        if ast.models.contains_key(name) {
+        if ast.models.contains_key(name) || ast.services.contains_key(name) {
             format!("{name}.Self")
         } else {
             name.to_string()

@@ -1,3 +1,13 @@
+# [0.3.0] - 2026-4-6
+### Added
+- Cloesce Language
+- Compile to a TypeScript RPC-style client, along with ORM functions.
+
+### Changed
+- Removed TypeScript extraction process
+
+### Fixed
+
 # [0.2.3] - 2026-3-24
 ### Added
 - Added duplicate model error handling. 

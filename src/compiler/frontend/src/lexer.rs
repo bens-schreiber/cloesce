@@ -18,8 +18,6 @@ pub enum Token<'src> {
     Source,
     #[token("for")]
     For,
-    #[token("exposes")]
-    Exposes,
     #[token("service")]
     Service,
     #[token("inject")]
@@ -46,8 +44,6 @@ pub enum Token<'src> {
     List,
     #[token("include")]
     Include,
-    #[token("crud")]
-    Crud,
     #[token("nav")]
     Nav,
     #[token("primary")]

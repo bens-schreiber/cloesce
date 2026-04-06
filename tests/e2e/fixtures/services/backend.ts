@@ -26,7 +26,7 @@ export namespace BarService {
     export const Tag = "BarService";
 
     export interface Self {
-        foo: FooService;
+        foo: FooService.Self;
     }
 
     export abstract class Api {

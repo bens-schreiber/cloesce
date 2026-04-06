@@ -1,7 +1,7 @@
 # Summary
 
-[Introduction](./ch0-0-introduction.md)
-[LLMs and TypeDoc](./ch0-1-typedoc.md)
+[The Cloesce Language](./ch0-0-introduction.md)
+[LLMs, TypeDoc and VS Code](./ch0-1-typedoc.md)
 
 - [Getting Started](./ch1-0-getting-started.md)
     - [Installation](./ch1-1-installation.md)
@@ -10,15 +10,12 @@
     - [Deploying](./ch1-4-deploying.md)
 - [Models](./ch2-0-models.md)
     - [Basic D1 Backed Model](./ch2-1-d1-backed-model.md)
-    - [D1 Navigation Properties](./ch2-2-navigation-properties.md)
+    - [D1 Navigation Fields](./ch2-2-navigation-fields.md)
     - [Data Sources](./ch2-3-data-sources.md)
-    - [KV and R2 Properties](./ch2-4-kv-r2-properties.md)
+    - [KV and R2 Fields](./ch2-4-kv-r2-fields.md)
     - [Model Methods](./ch2-5-model-methods.md)
     - [Cloesce ORM](./ch2-6-cloesce-orm.md)
     - [Wrangler Environment](./ch2-7-wrangler-environment.md)
 - [Services](./ch3-0-services.md)
 - [Middleware](./ch4-0-middleware.md)
 - [Testing](./ch5-0-testing.md)
-- [Compiler Reference](./ch6-0-compiler-reference.md)
-    - [Future Vision](./ch6-1-future-vision.md)
-    - [Architecture Overview](./ch6-2-architecture-overview.md)

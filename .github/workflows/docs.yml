@@ -22,14 +22,12 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/mdbook
-            ~/.cargo/bin/mdbook-langtabs
           key: ${{ runner.os }}-mdbook-bins
       
       - name: Install mdBook and plugins
         if: steps.cache-mdbook.outputs.cache-hit != 'true'
         run: |
           cargo install mdbook --locked
-          cargo install mdbook-langtabs --locked
 
       - name: Install Pandoc
         run: |
