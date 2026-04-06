@@ -22,7 +22,7 @@ jobs:
         working-directory: src/runtime/ts
         run: |
           LATEST=$(npm view $(node -p "require('./package.json').name") version)
-          npm version $LATEST --no-git-tag-version
+          npm version $LATEST --no-git-tag-version --allow-same-version
 
       - name: Build Typedoc
         run: |
