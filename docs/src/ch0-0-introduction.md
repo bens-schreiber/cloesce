@@ -8,8 +8,9 @@
 
 | Feature              | Status |
 |----------------------|--------|
-| ORM                  | ✅     |
+| D1,KV,R2 ORM         | ✅     |
 | RPC stubs            | ✅     |
+| Middleware           | ✅     |
 | IaC                  | ✅     |
 | SQL Migrations       | ✅     |
 | Runtime Validation   | ✅     |
