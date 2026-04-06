@@ -49,34 +49,38 @@ type WasmConfig = {
 };
 
 function findCloesceFiles(searchPaths: string[], root: string): string[] {
-  return searchPaths.flatMap((p: string) => {
+  const results: string[] = [];
+
+  function collectFromDir(dir: string) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        collectFromDir(full);
+      } else if (entry.isFile() && /\.(cloesce|clo)$/i.test(entry.name)) {
+        results.push(full);
+      }
+    }
+  }
+
+  for (const p of searchPaths) {
     const full = path.isAbsolute(p) ? p : path.resolve(root, p);
 
     if (!fs.existsSync(full)) {
       console.warn(`Warning: Path "${p}" does not exist`);
-      return [];
+      continue;
     }
 
     const stats = fs.statSync(full);
 
     if (stats.isFile()) {
-      return /\.cloesce$/i.test(full) ? [full] : [];
-    }
-
-    return collectCloesceFiles(full);
-  });
-}
-
-function collectCloesceFiles(dir: string): string[] {
-  const results: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...collectCloesceFiles(full));
-    } else if (entry.isFile() && /\.cloesce$/i.test(entry.name)) {
-      results.push(full);
+      if (/\.(cloesce|clo)$/i.test(full)) {
+        results.push(full);
+      }
+    } else if (stats.isDirectory()) {
+      collectFromDir(full);
     }
   }
+
   return results;
 }
 
@@ -98,6 +102,11 @@ const cmds = subcommands({
         );
 
         const root = process.cwd();
+        const cloesceFiles = findCloesceFiles(
+          config.srcPaths,
+          process.cwd(),
+        ).map((p) => path.relative(root, p));
+
         const compileConfig: WasmConfig = {
           name: "compile",
           wasmUrl: new URL("./compile.wasm", import.meta.url),
@@ -106,9 +115,7 @@ const cmds = subcommands({
             wranglerConfigPath,
             config.migrationsPath,
             config.workersUrl,
-            ...findCloesceFiles(config.srcPaths, root).map((p) =>
-              path.relative(root, p),
-            ),
+            ...cloesceFiles,
           ],
           wranglerConfigPath,
         };

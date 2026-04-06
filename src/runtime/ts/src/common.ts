@@ -9,7 +9,10 @@ export class InternalError extends Error {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * todo: update to https://github.com/dmmulroy/better-result
+ */
 export class Either<L, R> {
   private constructor(
     private readonly inner: { ok: true; right: R } | { ok: false; left: L },
