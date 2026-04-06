@@ -17,7 +17,7 @@ Cloesce respects the design constraints of KV storage. For Models backed purely 
 - Navigation fields  
 - Migrations  
 
-```cloese
+```cloesce
 env {
     kv {
         myNamespace
