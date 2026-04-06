@@ -74,7 +74,7 @@ class UserApi extends Cloesce.User.Api {
         return self;
     }
 
-    updateName(self: Cloesce.User.Self,newName: string): void {
+    async updateName(self: Cloesce.User.Self,newName: string): Promise<void> {
         await Cloesce.User.save({ ...self, name: newName });
     }
 }
