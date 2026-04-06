@@ -1,4 +1,4 @@
-# [0.3.0] - 2026-4-10
+# [0.3.0] - 2026-4-6
 ### Added
 - Cloesce Language
 - Compile to a TypeScript RPC-style client, along with ORM functions.
