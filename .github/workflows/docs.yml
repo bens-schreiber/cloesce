@@ -37,6 +37,11 @@ jobs:
       - name: Build mdBook
         run: make build-docs
 
+      - name: Patch mdBook TOC links
+        run: |
+          find docs/book -name 'toc*.js' -print0 \
+            | xargs -0 sed -i 's@if (link.href === current_page@if (link.href.replace(/\.html$/, "") === current_page.replace(/\.html$/, "")@g'
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
