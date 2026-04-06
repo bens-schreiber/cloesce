@@ -19,14 +19,14 @@ jobs:
           node-version: '20'
 
       - name: Set version from latest NPM
-        working-directory: src/ts
+        working-directory: src/runtime/ts
         run: |
           LATEST=$(npm view $(node -p "require('./package.json').name") version)
           npm version $LATEST --no-git-tag-version
 
       - name: Build Typedoc
         run: |
-          npm install --prefix src/ts
+          npm install --prefix src/runtime/ts
           make build-typedoc
 
       - name: Deploy to Cloudflare Pages
