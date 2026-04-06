@@ -1,6 +1,6 @@
 # Basic D1 Backed Model
 
-[Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers. Cloesce provides first class support for D1, allowing you to define Models backed by D1 tables with just a few lines of code.
+[Cloudflare D1](https://developers.cloudflare.com/d1/) is a serverless SQL database built on SQLite for Workers. Cloesce provides first class support for D1, allowing you to define Models backed by D1 tables with just a few lines of code.
 
 ## Defining a Model
 
