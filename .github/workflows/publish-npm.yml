@@ -3,6 +3,10 @@ name: Publish npm package
 on:
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: write
+  
 jobs:
   publish-npm:
     name: Publish to npm
