@@ -72,11 +72,6 @@ impl OutputFile {
             base_name: base_name.to_string(),
         }
     }
-
-    /// The full canonicalized path to the out file
-    fn path(&self) -> PathBuf {
-        self.path.canonicalize().unwrap()
-    }
 }
 
 impl Drop for OutputFile {
@@ -123,7 +118,7 @@ impl Fixture {
     }
 
     /// On all success, returns the cidl and wrangler config, otherwise returns the failed file.
-    pub fn compile(&self, workers_domain: &str) -> Result<(bool, PathBuf, PathBuf), String> {
+    pub fn compile(&self, _workers_domain: &str) -> Result<(bool, PathBuf, PathBuf), String> {
         let project_root = self.get_project_root();
         let compiler_dir = project_root.join("src/compiler");
 
@@ -133,19 +128,10 @@ impl Fixture {
         let backend_out = OutputFile::new(fixture_dir, "backend.ts");
         let client_out = OutputFile::new(fixture_dir, "client.ts");
 
-        let cloesce_dir = &self.path.parent().unwrap();
-        let default_migrations_path = "migrations";
-        let cloesce_source = fixture_dir.join("schema.cloesce");
-
         let cmd = self.run_command(
-            Command::new("./target/release/compile")
-                .arg(cloesce_dir)
-                .arg(wrangler_out.path())
-                .arg(default_migrations_path)
-                .arg(workers_domain)
-                .arg(cloesce_source)
-                .arg("--snap")
-                .current_dir(&compiler_dir),
+            Command::new(compiler_dir.join("target/release/cloesce"))
+                .args(["compile", "--snap"])
+                .current_dir(fixture_dir),
         );
 
         let mut has_diff = false;
@@ -189,21 +175,19 @@ impl Fixture {
 
     pub fn migrate(&self, cidl: &Path, wrangler_path: &Path) -> Result<(bool, bool), String> {
         let fixture_root = self.path.parent().expect("fixture root to exist");
-        let cidl_path = cidl.canonicalize().unwrap();
         let compiler_dir = {
             let project_root = self.get_project_root();
             project_root.join("src/compiler")
         };
 
         let res = self.run_command(
-            Command::new("./target/release/migrate")
-                .arg(&cidl_path)
-                .arg("--fixed")
-                .arg("--all")
-                .arg("out.Initial")
-                .arg(&wrangler_path)
-                .arg(fixture_root)
-                .current_dir(&compiler_dir),
+            Command::new(compiler_dir.join("target/release/cloesce"))
+                .args(["migrate", "--fixed", "--all", "out.Initial"])
+                .arg("--cidl")
+                .arg(cidl)
+                .arg("--wrangler")
+                .arg(wrangler_path)
+                .current_dir(fixture_root),
         );
 
         let res = match res {

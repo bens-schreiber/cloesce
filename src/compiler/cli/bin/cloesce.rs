@@ -6,7 +6,128 @@ use frontend::{
     fmt::DisplayError,
     lexer::{CloesceLexer, LexTarget},
 };
+use serde::Deserialize;
 use tracing_subscriber::FmtSubscriber;
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+struct ParsedCloesceConfig {
+    src_paths: Vec<String>,
+    out_path: String,
+    workers_url: String,
+    migrations_path: String,
+    #[serde(default)]
+    wrangler_config_format: WranglerConfigFormat,
+}
+
+impl Default for ParsedCloesceConfig {
+    fn default() -> Self {
+        ParsedCloesceConfig {
+            src_paths: vec![],
+            out_path: ".cloesce".to_string(),
+            workers_url: "http://localhost:8787".to_string(),
+            migrations_path: "./migrations".to_string(),
+            wrangler_config_format: WranglerConfigFormat::default(),
+        }
+    }
+}
+
+struct CloesceConfig {
+    parsed: ParsedCloesceConfig,
+    root: std::path::PathBuf,
+}
+
+impl CloesceConfig {
+    fn cloesce_dir(&self) -> std::path::PathBuf {
+        self.root.join(&self.parsed.out_path)
+    }
+
+    fn wrangler_path(&self) -> std::path::PathBuf {
+        self.root
+            .join(self.parsed.wrangler_config_format.wrangler_file_name())
+    }
+
+    fn cidl_path(&self) -> std::path::PathBuf {
+        self.cloesce_dir().join("cidl.json")
+    }
+
+    fn load(root: &std::path::Path) -> Result<CloesceConfig, String> {
+        let config_path = root.join("cloesce.config.jsonc");
+        let raw = std::fs::read_to_string(&config_path)
+            .map_err(|e| format!("Failed to read {}: {}", config_path.display(), e))?;
+        let stripped = json_comments::StripComments::new(raw.as_bytes());
+        let parsed = serde_json::from_reader(stripped)
+            .map_err(|e| format!("Failed to parse {}: {}", config_path.display(), e))?;
+        Ok(CloesceConfig {
+            parsed,
+            root: root.to_path_buf(),
+        })
+    }
+
+    fn collect_source(&self, root: &std::path::Path) -> Vec<PathBuf> {
+        fn is_source(path: &std::path::Path) -> bool {
+            matches!(
+                path.extension().and_then(|e| e.to_str()),
+                Some("cloesce") | Some("clo")
+            )
+        }
+
+        let mut results = Vec::new();
+        for p in &self.parsed.src_paths {
+            let full = if std::path::Path::new(p).is_absolute() {
+                PathBuf::from(p)
+            } else {
+                root.join(p)
+            };
+
+            if !full.exists() {
+                tracing::warn!("src path does not exist: {}", full.display());
+                continue;
+            }
+
+            if full.is_file() {
+                if is_source(&full) {
+                    results.push(full);
+                }
+                continue;
+            }
+
+            let mut queue = std::collections::VecDeque::new();
+            queue.push_back(full);
+            while let Some(dir) = queue.pop_front() {
+                let Ok(entries) = std::fs::read_dir(&dir) else {
+                    continue;
+                };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        queue.push_back(path);
+                    } else if is_source(&path) {
+                        results.push(path);
+                    }
+                }
+            }
+        }
+        results
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+enum WranglerConfigFormat {
+    #[default]
+    Toml,
+    Jsonc,
+}
+
+impl WranglerConfigFormat {
+    fn wrangler_file_name(&self) -> &'static str {
+        match self {
+            WranglerConfigFormat::Toml => "wrangler.toml",
+            WranglerConfigFormat::Jsonc => "wrangler.jsonc",
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "cloesce")]
@@ -24,14 +145,6 @@ pub enum Command {
 #[derive(Args)]
 #[command(name = "compile")]
 pub struct CompileArgs {
-    pub cloesce_dir: PathBuf,
-    pub wrangler_path: PathBuf,
-    pub default_migrations_path: PathBuf,
-    pub worker_url: String,
-
-    #[arg(required = true, num_args = 1.., value_name = "PATH")]
-    pub targets: Vec<PathBuf>,
-
     // For the Cloesce regression tests. Prefixes files with "out.".
     #[arg(long)]
     pub snap: bool,
@@ -40,8 +153,6 @@ pub struct CompileArgs {
 #[derive(Args)]
 #[command(name = "migrate", version = "0.0.3")]
 pub struct MigrateArgs {
-    pub cidl_path: PathBuf,
-
     #[arg(long, conflicts_with = "all", required_unless_present = "all")]
     pub binding: Option<String>,
 
@@ -52,8 +163,14 @@ pub struct MigrateArgs {
     pub fixed: bool,
 
     pub name: String,
-    pub wrangler_path: PathBuf,
-    pub root_path: PathBuf,
+
+    /// Override the CIDL input path (defaults to config-derived path)
+    #[arg(long)]
+    pub cidl: Option<PathBuf>,
+
+    /// Override the wrangler config path (defaults to config-derived path)
+    #[arg(long)]
+    pub wrangler: Option<PathBuf>,
 }
 
 fn main() {
@@ -62,9 +179,17 @@ fn main() {
         .expect("Failed to set global default subscriber");
 
     let cli = Cli::parse();
-    let run = || match cli.command {
-        Command::Compile(args) => compile::compile(args),
-        Command::Migrate(args) => migrate::migrate(args),
+    let run = || {
+        let root = std::env::current_dir().map_err(|e| e.to_string())?;
+        let config = CloesceConfig::load(&root)?;
+
+        match cli.command {
+            Command::Compile(args) => {
+                let sources = config.collect_source(&root);
+                compile::compile(args, config, sources)
+            }
+            Command::Migrate(args) => migrate::migrate(args, config),
+        }
     };
 
     match panic::catch_unwind(run) {
@@ -90,10 +215,17 @@ mod compile {
 
     use super::*;
 
-    pub fn compile(args: CompileArgs) -> Result<(), String> {
+    pub fn compile(
+        args: CompileArgs,
+        config: CloesceConfig,
+        target_paths: Vec<PathBuf>,
+    ) -> Result<(), String> {
+        if target_paths.is_empty() {
+            return Err("No .clo / .cloesce source files found".to_string());
+        }
+
         // Lexing
-        let sources = args
-            .targets
+        let sources = target_paths
             .into_iter()
             .map(|p| {
                 let src = std::fs::read_to_string(&p)
@@ -129,19 +261,15 @@ mod compile {
 
         // Codegen
         let wrangler = {
-            let mut generator = WranglerGenerator::from_path(&args.wrangler_path);
+            let mut generator = WranglerGenerator::from_path(&config.wrangler_path());
             let mut spec = generator.as_spec();
 
-            WranglerDefault::set_defaults(
-                &mut spec,
-                &ast,
-                args.default_migrations_path.to_str().unwrap(),
-            );
+            WranglerDefault::set_defaults(&mut spec, &ast, &config.parsed.migrations_path);
             generator.generate(spec)
         };
 
-        let backend = BackendGenerator::generate(&ast, &args.worker_url);
-        let client = ClientGenerator::generate(&ast, &args.worker_url);
+        let backend = BackendGenerator::generate(&ast, &config.parsed.workers_url);
+        let client = ClientGenerator::generate(&ast, &config.parsed.workers_url);
 
         let output_name = |name: &str| {
             if args.snap {
@@ -153,7 +281,7 @@ mod compile {
 
         // Output CIDL
         {
-            let cidl_path = args.cloesce_dir.join(output_name("cidl.json"));
+            let cidl_path = config.cloesce_dir().join(output_name("cidl.json"));
             let mut file =
                 open_file_or_create(&cidl_path).expect("Failed to create cidl output file");
             file.write_all(ast.to_json().as_bytes())
@@ -162,8 +290,15 @@ mod compile {
 
         // Output Wrangler
         {
-            let mut wrangler_file = open_file_or_create(&args.wrangler_path)
-                .expect("Failed to create wrangler output file");
+            let wrangler_path = if args.snap {
+                config.cloesce_dir().join(output_name(
+                    config.parsed.wrangler_config_format.wrangler_file_name(),
+                ))
+            } else {
+                config.wrangler_path()
+            };
+            let mut wrangler_file =
+                open_file_or_create(&wrangler_path).expect("Failed to create wrangler output file");
             wrangler_file
                 .write_all(wrangler.as_bytes())
                 .expect("file to be written");
@@ -171,7 +306,7 @@ mod compile {
 
         // Output backend
         {
-            let backend_path = args.cloesce_dir.join(output_name("backend.ts")); // TODO: hardcoded to ts
+            let backend_path = config.cloesce_dir().join(output_name("backend.ts")); // TODO: hardcoded to ts
             let mut file =
                 open_file_or_create(&backend_path).expect("Failed to create backend output file");
             file.write_all(backend.as_bytes())
@@ -180,7 +315,7 @@ mod compile {
 
         // Output client
         {
-            let client_path = args.cloesce_dir.join(output_name("client.ts")); // TODO: hardcoded to ts
+            let client_path = config.cloesce_dir().join(output_name("client.ts")); // TODO: hardcoded to ts
             let mut file =
                 open_file_or_create(&client_path).expect("Failed to create client output file");
             file.write_all(client.as_bytes())
@@ -192,16 +327,16 @@ mod compile {
 }
 
 mod migrate {
-    use std::io::Read;
-
     use ast::MigrationsAst;
     use codegen::wrangler::WranglerGenerator;
     use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
     use super::*;
 
-    pub fn migrate(args: MigrateArgs) -> Result<(), String> {
-        let wrangler = WranglerGenerator::from_path(&args.wrangler_path);
+    pub fn migrate(args: MigrateArgs, config: CloesceConfig) -> Result<(), String> {
+        let wrangler_path = args.wrangler.unwrap_or_else(|| config.wrangler_path());
+        let cidl_path = args.cidl.unwrap_or_else(|| config.cidl_path());
+        let wrangler = WranglerGenerator::from_path(&wrangler_path);
         let spec = wrangler.as_spec();
 
         if spec.d1_databases.is_empty() {
@@ -241,8 +376,8 @@ mod migrate {
                 }
             };
 
-            let migrations_dir = args
-                .root_path
+            let migrations_dir = config
+                .root
                 .join(db.migrations_dir.as_deref().unwrap_or("migrations"));
 
             std::fs::create_dir_all(&migrations_dir)
@@ -302,8 +437,7 @@ mod migrate {
                 .transpose()?;
 
             // Migrate only the models with the specified D1 binding
-            let ast_contents =
-                std::fs::read_to_string(&args.cidl_path).map_err(|e| e.to_string())?;
+            let ast_contents = std::fs::read_to_string(&cidl_path).map_err(|e| e.to_string())?;
             let mut ast = MigrationsAst::from_json(&ast_contents)?;
             ast.models
                 .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
@@ -352,13 +486,11 @@ mod migrate {
             print!("> ");
             std::io::stdout().flush().unwrap();
 
-            let line = match read_stdin_line() {
-                Ok(line) => line,
-                Err(_) => {
-                    eprintln!("Error reading input. Aborting migrations.");
-                    std::process::abort();
-                }
-            };
+            let mut line = String::new();
+            if std::io::stdin().read_line(&mut line).is_err() {
+                eprintln!("Error reading input. Aborting migrations.");
+                std::process::abort();
+            }
 
             match line.trim().to_lowercase().as_str() {
                 "d" | "drop" => {
@@ -373,13 +505,11 @@ mod migrate {
                     print!("> ");
                     std::io::stdout().flush().unwrap();
 
-                    let input = match read_stdin_line() {
-                        Ok(line) => line,
-                        Err(_) => {
-                            eprintln!("Error reading input. Aborting migrations.");
-                            std::process::abort();
-                        }
-                    };
+                    let mut input = String::new();
+                    if std::io::stdin().read_line(&mut input).is_err() {
+                        eprintln!("Error reading input. Aborting migrations.");
+                        std::process::abort();
+                    }
 
                     let idx = input.trim().parse::<usize>().unwrap_or_else(|_| {
                         tracing::error!("Invalid selection. Aborting migrations.");
@@ -399,31 +529,5 @@ mod migrate {
                 }
             }
         }
-    }
-
-    // Necessary for reading NodeJS stdin
-    pub fn read_stdin_line() -> std::io::Result<String> {
-        let mut buf = [0u8; 1];
-        let mut out = String::new();
-
-        loop {
-            match std::io::stdin().read(&mut buf) {
-                Ok(0) => break, // EOF
-                Ok(_) => {
-                    let c = buf[0] as char;
-                    out.push(c);
-                    if c == '\n' {
-                        break;
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                    continue;
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
-        Ok(out)
     }
 }

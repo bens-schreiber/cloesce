@@ -299,8 +299,11 @@ dependencies = [
  "clap",
  "codegen",
  "frontend",
+ "json_comments",
  "migrations",
  "semantic",
+ "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
