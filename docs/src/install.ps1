@@ -51,8 +51,23 @@ New-Item -ItemType Directory -Path $TmpDir | Out-Null
 try {
     $ZipPath = Join-Path $TmpDir "${AssetName}.zip"
 
+    $ChecksumUrl = "${DownloadUrl}.sha256"
+    $ChecksumPath = Join-Path $TmpDir "${AssetName}.zip.sha256"
+
     Write-Host "Downloading ${AssetName}.zip..."
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
+
+    Write-Host "Downloading checksum..."
+    Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumPath -UseBasicParsing
+
+    Write-Host "Verifying checksum..."
+    $ExpectedHash = (Get-Content $ChecksumPath -Raw).Trim().Split(' ')[0].ToUpper()
+    $ActualHash = (Get-FileHash -Path $ZipPath -Algorithm SHA256).Hash.ToUpper()
+    if ($ActualHash -ne $ExpectedHash) {
+        Write-Error "Checksum verification failed!`n  Expected: $ExpectedHash`n  Actual:   $ActualHash"
+        exit 1
+    }
+    Write-Host "Checksum verified."
 
     Write-Host "Extracting..."
     Expand-Archive -Path $ZipPath -DestinationPath $TmpDir -Force

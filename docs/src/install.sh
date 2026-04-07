@@ -44,8 +44,28 @@ DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${ASSET
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+CHECKSUM_URL="${DOWNLOAD_URL}.sha256"
+
 echo "Downloading ${ASSET_NAME}.tar.gz..."
 curl -fsSL "$DOWNLOAD_URL" -o "${TMPDIR}/${ASSET_NAME}.tar.gz"
+
+echo "Downloading checksum..."
+curl -fsSL "$CHECKSUM_URL" -o "${TMPDIR}/${ASSET_NAME}.tar.gz.sha256"
+
+echo "Verifying checksum..."
+EXPECTED_HASH="$(awk '{print $1}' "${TMPDIR}/${ASSET_NAME}.tar.gz.sha256")"
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL_HASH="$(sha256sum "${TMPDIR}/${ASSET_NAME}.tar.gz" | awk '{print $1}')"
+else
+  ACTUAL_HASH="$(shasum -a 256 "${TMPDIR}/${ASSET_NAME}.tar.gz" | awk '{print $1}')"
+fi
+if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+  echo "Checksum verification failed!" >&2
+  echo "  Expected: ${EXPECTED_HASH}" >&2
+  echo "  Actual:   ${ACTUAL_HASH}" >&2
+  exit 1
+fi
+echo "Checksum verified."
 
 echo "Extracting..."
 tar -xzf "${TMPDIR}/${ASSET_NAME}.tar.gz" -C "$TMPDIR"

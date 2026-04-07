@@ -4,7 +4,7 @@
 - Distribution scripts for the standalone binary
 - `cloesce.jsonc` file for configuring the new CLI
 - Environment support using the `--env` flag in the CLI
-- Support for config files for each environment via `cloesce.config.{env}.json` (e.g. `cloesce.config.production.json`)
+- Support for config files for each environment via `{env}.cloesce.jsonc` (e.g. `production.cloesce.jsonc`)
 
 ### Changed
 - Removed NPM CLI for Cloesce in favor of the standalone binary
