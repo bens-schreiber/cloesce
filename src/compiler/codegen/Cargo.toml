@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
-askama = "0.14.0"
+askama = "0.15.6"
 indexmap = { workspace = true }
 json_comments = { workspace = true }
 migrations = { path = "../migrations" }
