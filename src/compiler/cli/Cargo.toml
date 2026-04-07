@@ -15,12 +15,8 @@ tracing = { workspace = true }
 tracing-subscriber = "0.3.22"
 
 [[bin]]
-name = "compile"
-path = "bin/compile.rs"
-
-[[bin]]
-name = "migrate"
-path = "bin/migrate.rs"
+name = "cloesce"
+path = "bin/cloesce.rs"
 
 [lib]
 doctest = false
