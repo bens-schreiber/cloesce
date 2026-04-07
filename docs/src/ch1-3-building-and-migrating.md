@@ -30,7 +30,7 @@ In your project directory, run the following command to compile your Cloesce Mod
 cloesce compile
 ```
 
-This command looks for a `cloesce.jsonc` file in your current directory, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used. Unlike many other tools, Cloesce does not require a configuration file to be written in Cloesce itself, which allows you to execute arbitrary code during compilation to generate your schema (e.g. pull environment variables, read from other files, etc).
+This command looks for a `cloesce.jsonc` file in your current directory, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used. Because `cloesce.jsonc` is JSONC, it provides static configuration rather than executable code. For environment-specific settings, use separate config files such as `staging.cloesce.jsonc` or `production.cloesce.jsonc` and select them with `cloesce --env <name> ...`; for values that need to vary at invocation time, prefer supported CLI flags in your build or deployment scripts.
 
 After compilation, a `.cloesce` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build.
 
