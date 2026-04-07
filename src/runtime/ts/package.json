@@ -29,9 +29,6 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "cloesce": "dist/cli.js"
-  },
   "typesVersions": {
     "*": {
       ".": [
