@@ -3,6 +3,30 @@
 > [!NOTE]
 > Cloesce supports only TypeScript compilation as of v0.3.0. Support for additional languages will be added in future releases.
 
+## Installing the Cloesce CLI
+
+The `cloesce` CLI provides the `compile`, `migrate`, and `version` subcommands used in your project scripts.
+
+### Linux and macOS
+
+```sh
+curl -fsSL https://cloesce.pages.dev/install.sh | sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://cloesce.pages.dev/install.ps1 | iex
+```
+
+Verify the installation:
+
+```sh
+cloesce version
+```
+
+---
+
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 
 This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.

@@ -9,7 +9,7 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && chmod +x dist/cli.js",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm",
     "copy-rs-orm-wasm": "cp ../../compiler/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm"
   },
   "dependencies": {

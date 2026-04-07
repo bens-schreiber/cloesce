@@ -61,11 +61,9 @@ build-cross:
 	@[ -n "$(TARGET)" ] || { echo "Usage: make build-cross TARGET=<triple> [USE_CROSS=1]"; exit 1; }
 	@echo "CLOESCE: Building CLI binaries for $(TARGET)..."
 	@if [ "$(USE_CROSS)" = "1" ]; then \
-		cross build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin compile; \
-		cross build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin migrate; \
+		cross build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin cloesce; \
 	else \
-		cargo build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin compile; \
-		cargo build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin migrate; \
+		cargo build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin cloesce; \
 	fi
 
 # Package a single cross-compile target into a release archive.
@@ -77,14 +75,12 @@ package-cross:
 	$(eval ASSET := $(call asset_name,$(TARGET)))
 	mkdir -p dist
 	@if echo "$(TARGET)" | grep -q "windows"; then \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/compile.exe dist/compile.exe; \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/migrate.exe dist/migrate.exe; \
-		cd dist && zip $(ASSET).zip compile.exe migrate.exe && rm compile.exe migrate.exe; \
+		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce.exe dist/cloesce.exe; \
+		cd dist && zip $(ASSET).zip cloesce.exe && rm cloesce.exe; \
 		echo "CLOESCE: Packaged dist/$(ASSET).zip"; \
 	else \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/compile dist/compile; \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/migrate dist/migrate; \
-		cd dist && tar -czf $(ASSET).tar.gz compile migrate && rm compile migrate; \
+		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce dist/cloesce; \
+		cd dist && tar -czf $(ASSET).tar.gz cloesce && rm cloesce; \
 		echo "CLOESCE: Packaged dist/$(ASSET).tar.gz"; \
 	fi
 

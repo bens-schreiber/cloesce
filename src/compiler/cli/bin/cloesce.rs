@@ -59,8 +59,24 @@ impl CloesceConfig {
             root.join("cloesce.config.jsonc")
         };
 
-        let raw = std::fs::read_to_string(&config_path)
-            .map_err(|e| format!("Failed to read {}: {}", config_path.display(), e))?;
+        let raw = match std::fs::read_to_string(&config_path) {
+            Ok(contents) => contents,
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::NotFound) => {
+                tracing::warn!(
+                    "No cloesce config found at {}. Using defaults.",
+                    config_path.display()
+                );
+                "{}".to_string()
+            }
+            Err(e) => {
+                return Err(format!(
+                    "Failed to read cloesce config at {}: {}",
+                    config_path.display(),
+                    e
+                ));
+            }
+        };
+
         let stripped = json_comments::StripComments::new(raw.as_bytes());
         let parsed = serde_json::from_reader(stripped)
             .map_err(|e| format!("Failed to parse {}: {}", config_path.display(), e))?;
@@ -151,6 +167,7 @@ pub struct Cli {
 pub enum Command {
     Compile(CompileArgs),
     Migrate(MigrateArgs),
+    Version,
 }
 
 #[derive(Args)]
@@ -184,10 +201,23 @@ pub struct MigrateArgs {
     pub wrangler: Option<PathBuf>,
 }
 
+fn fetch_latest_version() -> Option<String> {
+    let response = ureq::get("https://api.github.com/repos/bens-schreiber/cloesce/releases/latest")
+        .header("User-Agent", "cloesce-cli")
+        .call()
+        .ok()?;
+    let json: serde_json::Value = response.into_body().read_json().ok()?;
+    let tag = json["tag_name"].as_str()?;
+    Some(tag.trim_start_matches('v').to_string())
+}
+
 fn main() {
     let subscriber = FmtSubscriber::builder().finish();
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
+
+    // Spawn a seperate thread so we don't impede compilation
+    let update_check = std::thread::spawn(fetch_latest_version);
 
     let cli = Cli::parse();
     let run = || {
@@ -200,10 +230,28 @@ fn main() {
                 compile::compile(args, config, sources)
             }
             Command::Migrate(args) => migrate::migrate(args, config),
+            Command::Version => {
+                println!("cloesce {}", env!("CARGO_PKG_VERSION"));
+                Ok(())
+            }
         }
     };
 
-    match panic::catch_unwind(run) {
+    let result = panic::catch_unwind(run);
+
+    let current = env!("CARGO_PKG_VERSION");
+    match update_check.join().ok().flatten() {
+        Some(latest) if latest != current => {
+            println!("A new version of cloesce is available: v{latest} (current: v{current})");
+            println!("To update, run: curl -fsSL https://cloesce.pages.dev/install.sh | sh");
+        }
+        Some(_) => {
+            // Current version is up to date, no need to print anything
+        }
+        None => println!("cloesce v{current}"),
+    }
+
+    match result {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) => {
             tracing::error!("An error occurred: {e}");
