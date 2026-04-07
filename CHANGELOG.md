@@ -2,7 +2,7 @@
 ### Added
 - Standalone Cloesce binary for Windows, Linux and MacOS
 - Distribution scripts for the standalone binary
-- `cloesce.config.json` file for configuring the new CLI
+- `cloesce.jsonc` file for configuring the new CLI
 - Environment support using the `--env` flag in the CLI
 - Support for config files for each environment via `cloesce.config.{env}.json` (e.g. `cloesce.config.production.json`)
 

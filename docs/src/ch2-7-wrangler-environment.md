@@ -5,14 +5,13 @@
 
 Cloesce requires an `env` to be defined in any schema that uses D1, KV, or R2 bindings, which is used to define the [Cloudflare Workers environment](https://developers.cloudflare.com/workers/configuration/environment-variables/) tailored to your application. 
 
-A `wrangler.jsonc` or `wrangler.toml` file is generated during compilation based on this class. Configure your preference in the `cloesce.config.ts` file:
-
-```typescript
-import { CloesceConfigOptions } from "cloesce";
-const config = {
-    // ...
-    wranglerConfigFormat: "jsonc", // or "toml"
-} satisfies CloesceConfigOptions;
+A `wrangler.jsonc` or `wrangler.toml` file is generated during compilation based on the `env` block. Configure your preference in the `cloesce.jsonc` file:
+```jsonc
+{
+    "src_paths": ["./src/schema"],
+    "workers_url": "http://localhost:5000/api",
+    "wrangler_config_format": "jsonc" // or "toml"
+}
 ```
 
 Currently, only D1 databases, R2 buckets, KV namespaces, and string environment variables are supported.

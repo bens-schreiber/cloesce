@@ -326,10 +326,10 @@ impl WranglerGenerator {
 
                 // Inherit top-level scalar fields when absent in the env block
                 for key in &["name", "compatibility_date", "main"] {
-                    if !merged.contains_key(*key) {
-                        if let Some(v) = val.get(*key) {
-                            merged.insert(key.to_string(), v.clone());
-                        }
+                    if !merged.contains_key(*key)
+                        && let Some(v) = val.get(*key)
+                    {
+                        merged.insert(key.to_string(), v.clone());
                     }
                 }
 
@@ -355,10 +355,10 @@ impl WranglerGenerator {
                 };
 
                 for key in &["name", "compatibility_date", "main"] {
-                    if !merged.contains_key(*key) {
-                        if let Some(v) = val.get(*key) {
-                            merged.insert(key.to_string(), v.clone());
-                        }
+                    if !merged.contains_key(*key)
+                        && let Some(v) = val.get(*key)
+                    {
+                        merged.insert(key.to_string(), v.clone());
                     }
                 }
 

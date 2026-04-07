@@ -54,9 +54,9 @@ impl CloesceConfig {
 
     fn load(root: &std::path::Path, env: Option<String>) -> Result<CloesceConfig, String> {
         let config_path = if let Some(env) = env.as_ref() {
-            root.join(format!("cloesce.config.{}.jsonc", env))
+            root.join(format!("{}.cloesce.jsonc", env))
         } else {
-            root.join("cloesce.config.jsonc")
+            root.join("cloesce.jsonc")
         };
 
         let raw = match std::fs::read_to_string(&config_path) {
@@ -80,6 +80,9 @@ impl CloesceConfig {
         let stripped = json_comments::StripComments::new(raw.as_bytes());
         let parsed = serde_json::from_reader(stripped)
             .map_err(|e| format!("Failed to parse {}: {}", config_path.display(), e))?;
+
+        tracing::info!("Loaded cloesce config from {}", config_path.display(),);
+
         Ok(CloesceConfig {
             parsed,
             root: root.to_path_buf(),
@@ -131,6 +134,8 @@ impl CloesceConfig {
                 }
             }
         }
+
+        tracing::info!("Found {} source files.", results.len());
         results
     }
 }
@@ -212,6 +217,7 @@ fn fetch_latest_version() -> Option<String> {
 }
 
 fn main() {
+    let start_time = std::time::Instant::now();
     let subscriber = FmtSubscriber::builder().finish();
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
@@ -220,16 +226,25 @@ fn main() {
     let update_check = std::thread::spawn(fetch_latest_version);
 
     let cli = Cli::parse();
-    let run = || {
+    let run = || -> Result<(), String> {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
         let config = CloesceConfig::load(&root, cli.env)?;
 
         match cli.command {
             Command::Compile(args) => {
                 let sources = config.collect_source(&root);
-                compile::compile(args, config, sources)
+                compile::compile(args, config, sources)?;
+
+                let elapsed = start_time.elapsed();
+                tracing::info!("Compilation completed in {:.2?}", elapsed);
+                Ok(())
             }
-            Command::Migrate(args) => migrate::migrate(args, config),
+            Command::Migrate(args) => {
+                let elapsed = start_time.elapsed();
+                migrate::migrate(args, config)?;
+                tracing::info!("Migration completed in {:.2?}", elapsed);
+                Ok(())
+            }
             Command::Version => {
                 println!("cloesce {}", env!("CARGO_PKG_VERSION"));
                 Ok(())
@@ -279,6 +294,7 @@ mod compile {
         config: CloesceConfig,
         target_paths: Vec<PathBuf>,
     ) -> Result<(), String> {
+        tracing::info!("Starting compilation with config: {:?}", config.parsed);
         if target_paths.is_empty() {
             return Err("No .clo / .cloesce source files found".to_string());
         }
@@ -346,6 +362,7 @@ mod compile {
                 open_file_or_create(&cidl_path).expect("Failed to create cidl output file");
             file.write_all(ast.to_json().as_bytes())
                 .expect("file to be written");
+            tracing::info!("Generated JSON CIDL at {}", cidl_path.display());
         };
 
         // Output Wrangler
@@ -362,6 +379,7 @@ mod compile {
             wrangler_file
                 .write_all(wrangler.as_bytes())
                 .expect("file to be written");
+            tracing::info!("Generated wrangler config at {}", wrangler_path.display());
         }
 
         // Output backend
@@ -371,6 +389,7 @@ mod compile {
                 open_file_or_create(&backend_path).expect("Failed to create backend output file");
             file.write_all(backend.as_bytes())
                 .expect("file to be written");
+            tracing::info!("Generated backend code at {}", backend_path.display());
         }
 
         // Output client
@@ -380,6 +399,7 @@ mod compile {
                 open_file_or_create(&client_path).expect("Failed to create client output file");
             file.write_all(client.as_bytes())
                 .expect("file to be written");
+            tracing::info!("Generated client code at {}", client_path.display());
         }
 
         Ok(())

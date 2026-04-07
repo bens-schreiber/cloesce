@@ -61,6 +61,6 @@ A simple project structure is created for you.
 ├── migrations/         # Database migration files
 ├── schema/
 │   └── schema.clo      # Cloesce schema definition
-├── cloesce.config.ts   # Cloesce configuration
+├── cloesce.jsonc       # Cloesce configuration
 └── package.json        # Project dependencies and scripts
 ```

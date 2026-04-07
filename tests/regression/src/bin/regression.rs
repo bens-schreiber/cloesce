@@ -136,8 +136,7 @@ fn create_cloesce_config(fixture: &Fixture) -> String {
 
     let domain = format!("http://localhost:{}/api", 5000 + port_seed);
     let config_source = format!(
-        r#"
-{{
+        r#"{{
     "src_paths": ["./"],
     "workers_url": "{}",
     "out_path": "."
@@ -146,12 +145,12 @@ fn create_cloesce_config(fixture: &Fixture) -> String {
         domain
     );
 
-    // Write the config to cloesce.config.jsonc in the fixture directory
+    // Write the config to cloesce.jsonc in the fixture directory
     let config_path = fixture
         .path
         .parent()
         .expect("fixture parent to exist")
-        .join("cloesce.config.jsonc");
+        .join("cloesce.jsonc");
     std::fs::write(&config_path, config_source).unwrap_or_else(|err| {
         panic!(
             "Failed to write config for fixture {}: {}",

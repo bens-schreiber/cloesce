@@ -2,9 +2,9 @@
 
 With your application built and your database migrated, you're ready to deploy your Cloesce application to Cloudflare Workers. Deployment is done through the Wrangler CLI.
 
-1. **Modify `cloesce.config.ts`**
+1. **Modify `cloesce.jsonc`**
    
-   Ensure your `cloesce.config.ts` file is correctly configured for production, including the production Worker URL.
+   Ensure your `cloesce.jsonc` file is correctly configured for production, including the production Worker URL.
 
 2. **Configure Wrangler bindings**
    
