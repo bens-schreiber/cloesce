@@ -19,6 +19,31 @@ import {
   WranglerConfigFormat,
 } from "./config.js";
 
+function toWasiPath(filePath: string, root: string): string {
+  const normalize = (value: string) => value.replace(/\\/g, "/");
+  const normalizedRoot = normalize(path.resolve(root));
+  const normalizedFile = normalize(path.resolve(root, filePath));
+
+  const rootKey =
+    process.platform === "win32"
+      ? normalizedRoot.toLowerCase()
+      : normalizedRoot;
+  const fileKey =
+    process.platform === "win32"
+      ? normalizedFile.toLowerCase()
+      : normalizedFile;
+
+  if (fileKey === rootKey) {
+    return ".";
+  }
+
+  if (fileKey.startsWith(`${rootKey}/`)) {
+    return normalizedFile.slice(normalizedRoot.length + 1);
+  }
+
+  return normalize(filePath);
+}
+
 function timestamp(): string {
   const d = new Date();
   return (
@@ -192,12 +217,13 @@ const cmds = subcommands({
           fs.mkdirSync(config.migrationsPath);
         }
 
+        const root = process.cwd();
         let wasmArgs = [
-          cidlPath,
+          toWasiPath(cidlPath, root),
           ...bindingArgs,
           migrationName,
-          wranglerConfigPath,
-          ".",
+          toWasiPath(wranglerConfigPath, root),
+          toWasiPath(".", root),
         ];
 
         const migrateConfig: WasmConfig = {
