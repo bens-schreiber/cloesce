@@ -73,7 +73,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Get-ChildItem -Path dist -Include *.zip,*.tar.gz -File | ForEach-Object {
+          Get-ChildItem -Path dist\* -Include *.zip,*.tar.gz -File | ForEach-Object {
             $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
             "$($hash.Hash)  $($_.Name)" | Out-File -FilePath "$($_.FullName).sha256" -Encoding ASCII
           }
