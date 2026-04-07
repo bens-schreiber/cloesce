@@ -35,6 +35,7 @@ impl Default for ParsedCloesceConfig {
 struct CloesceConfig {
     parsed: ParsedCloesceConfig,
     root: std::path::PathBuf,
+    env: Option<String>,
 }
 
 impl CloesceConfig {
@@ -51,8 +52,13 @@ impl CloesceConfig {
         self.cloesce_dir().join("cidl.json")
     }
 
-    fn load(root: &std::path::Path) -> Result<CloesceConfig, String> {
-        let config_path = root.join("cloesce.config.jsonc");
+    fn load(root: &std::path::Path, env: Option<String>) -> Result<CloesceConfig, String> {
+        let config_path = if let Some(env) = env.as_ref() {
+            root.join(format!("cloesce.config.{}.jsonc", env))
+        } else {
+            root.join("cloesce.config.jsonc")
+        };
+
         let raw = std::fs::read_to_string(&config_path)
             .map_err(|e| format!("Failed to read {}: {}", config_path.display(), e))?;
         let stripped = json_comments::StripComments::new(raw.as_bytes());
@@ -61,6 +67,7 @@ impl CloesceConfig {
         Ok(CloesceConfig {
             parsed,
             root: root.to_path_buf(),
+            env,
         })
     }
 
@@ -134,6 +141,10 @@ impl WranglerConfigFormat {
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
+
+    // Determine which environment to compile for.
+    #[arg(long)]
+    pub env: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -151,7 +162,7 @@ pub struct CompileArgs {
 }
 
 #[derive(Args)]
-#[command(name = "migrate", version = "0.0.3")]
+#[command(name = "migrate")]
 pub struct MigrateArgs {
     #[arg(long, conflicts_with = "all", required_unless_present = "all")]
     pub binding: Option<String>,
@@ -181,7 +192,7 @@ fn main() {
     let cli = Cli::parse();
     let run = || {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
-        let config = CloesceConfig::load(&root)?;
+        let config = CloesceConfig::load(&root, cli.env)?;
 
         match cli.command {
             Command::Compile(args) => {
@@ -262,10 +273,11 @@ mod compile {
         // Codegen
         let wrangler = {
             let mut generator = WranglerGenerator::from_path(&config.wrangler_path());
-            let mut spec = generator.as_spec();
+            let env = config.env.as_deref();
+            let mut spec = generator.as_spec(env);
 
             WranglerDefault::set_defaults(&mut spec, &ast, &config.parsed.migrations_path);
-            generator.generate(spec)
+            generator.generate(spec, env)
         };
 
         let backend = BackendGenerator::generate(&ast, &config.parsed.workers_url);
@@ -337,7 +349,7 @@ mod migrate {
         let wrangler_path = args.wrangler.unwrap_or_else(|| config.wrangler_path());
         let cidl_path = args.cidl.unwrap_or_else(|| config.cidl_path());
         let wrangler = WranglerGenerator::from_path(&wrangler_path);
-        let spec = wrangler.as_spec();
+        let spec = wrangler.as_spec(config.env.as_deref());
 
         if spec.d1_databases.is_empty() {
             // No D1 bindings, no migrations. Exit gracefully.

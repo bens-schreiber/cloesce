@@ -37,7 +37,8 @@ impl WranglerGenerator {
         }
     }
 
-    pub fn generate(&mut self, spec: WranglerSpec) -> String {
+    pub fn generate(&mut self, spec: WranglerSpec, env: Option<&str>) -> String {
+        // Top-level fields (name, compatibility_date, main) always go at root
         if let Some(name) = &spec.name {
             self.insert("name".into(), name.clone());
         }
@@ -58,8 +59,24 @@ impl WranglerGenerator {
                     panic!("Expected JSON root to be an object");
                 };
 
+                // When an env is specified, write bindings into env.<name> instead of root
+                let target: &mut serde_json::Map<String, JsonValue> = if let Some(env_name) = env {
+                    let env_map = root
+                        .entry("env".to_string())
+                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
+                        .as_object_mut()
+                        .expect("env must be an object");
+                    env_map
+                        .entry(env_name.to_string())
+                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
+                        .as_object_mut()
+                        .expect("env entry must be an object")
+                } else {
+                    root
+                };
+
                 if !spec.d1_databases.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("d1_databases".to_string())
                         .or_insert_with(|| JsonValue::Array(vec![]))
                         .as_array_mut()
@@ -98,7 +115,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.kv_namespaces.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("kv_namespaces".to_string())
                         .or_insert_with(|| JsonValue::Array(vec![]))
                         .as_array_mut()
@@ -124,7 +141,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.r2_buckets.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("r2_buckets".to_string())
                         .or_insert_with(|| JsonValue::Array(vec![]))
                         .as_array_mut()
@@ -150,7 +167,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.vars.is_empty() {
-                    root.insert(
+                    target.insert(
                         "vars".into(),
                         serde_json::to_value(&spec.vars).expect("JSON to serialize"),
                     );
@@ -163,8 +180,24 @@ impl WranglerGenerator {
                     panic!("Expected TOML root to be a table");
                 };
 
+                // When an env is specified, write bindings into env.<name> instead of root
+                let target: &mut toml::map::Map<String, TomlValue> = if let Some(env_name) = env {
+                    let env_map = root
+                        .entry("env")
+                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
+                        .as_table_mut()
+                        .expect("env must be a table");
+                    env_map
+                        .entry(env_name)
+                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
+                        .as_table_mut()
+                        .expect("env entry must be a table")
+                } else {
+                    root
+                };
+
                 if !spec.d1_databases.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("d1_databases")
                         .or_insert_with(|| TomlValue::Array(vec![]))
                         .as_array_mut()
@@ -202,7 +235,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.kv_namespaces.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("kv_namespaces")
                         .or_insert_with(|| TomlValue::Array(vec![]))
                         .as_array_mut()
@@ -225,7 +258,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.r2_buckets.is_empty() {
-                    let arr = root
+                    let arr = target
                         .entry("r2_buckets")
                         .or_insert_with(|| TomlValue::Array(vec![]))
                         .as_array_mut()
@@ -251,7 +284,7 @@ impl WranglerGenerator {
                 }
 
                 if !spec.vars.is_empty() {
-                    root.insert(
+                    target.insert(
                         "vars".into(),
                         TomlValue::try_from(&spec.vars).expect("TOML to serialize"),
                     );
@@ -267,14 +300,70 @@ impl WranglerGenerator {
         }
     }
 
-    /// Takes the entire Wrangler config and interprets only a [WranglerSpec]
-    pub fn as_spec(&self) -> WranglerSpec {
+    /// Takes the entire Wrangler config and interprets only a [WranglerSpec].
+    /// When `env` is specified, reads bindings from `env.<name>`, merging
+    /// top-level fields (name, compatibility_date, main) that are absent there.
+    pub fn as_spec(&self, env: Option<&str>) -> WranglerSpec {
         match self {
             WranglerGenerator::Json(val) => {
-                serde_json::from_value(val.clone()).expect("Failed to deserialize wrangler.json")
+                let Some(env_name) = env else {
+                    return serde_json::from_value(val.clone())
+                        .expect("Failed to deserialize wrangler.json");
+                };
+
+                // Start from the env-specific subobject, falling back to top-level
+                let env_val = val
+                    .get("env")
+                    .and_then(|e| e.get(env_name))
+                    .cloned()
+                    .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+
+                let mut merged = if let JsonValue::Object(map) = env_val {
+                    map
+                } else {
+                    serde_json::Map::new()
+                };
+
+                // Inherit top-level scalar fields when absent in the env block
+                for key in &["name", "compatibility_date", "main"] {
+                    if !merged.contains_key(*key) {
+                        if let Some(v) = val.get(*key) {
+                            merged.insert(key.to_string(), v.clone());
+                        }
+                    }
+                }
+
+                serde_json::from_value(JsonValue::Object(merged))
+                    .expect("Failed to deserialize wrangler.json env")
             }
             WranglerGenerator::Toml(val) => {
-                WranglerSpec::deserialize(val.clone()).expect("Failed to deserialize wrangler.toml")
+                let Some(env_name) = env else {
+                    return WranglerSpec::deserialize(val.clone())
+                        .expect("Failed to deserialize wrangler.toml");
+                };
+
+                let env_val = val
+                    .get("env")
+                    .and_then(|e| e.get(env_name))
+                    .cloned()
+                    .unwrap_or(TomlValue::Table(toml::Table::new()));
+
+                let mut merged = if let TomlValue::Table(map) = env_val {
+                    map
+                } else {
+                    toml::Table::new()
+                };
+
+                for key in &["name", "compatibility_date", "main"] {
+                    if !merged.contains_key(*key) {
+                        if let Some(v) = val.get(*key) {
+                            merged.insert(key.to_string(), v.clone());
+                        }
+                    }
+                }
+
+                WranglerSpec::deserialize(TomlValue::Table(merged))
+                    .expect("Failed to deserialize wrangler.toml env")
             }
         }
     }
