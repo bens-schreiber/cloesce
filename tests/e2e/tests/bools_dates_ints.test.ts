@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, withRes } from "../src/setup";
 import { Weather } from "../fixtures/bools_dates_ints/client";
-import config from "../fixtures/bools_dates_ints/cloesce.config";
+import config from "../fixtures/bools_dates_ints/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
   stopWrangler = await startWrangler(
     "./fixtures/bools_dates_ints",
-    config.workersUrl!,
+    config.workers_url!,
   );
 }, 30_000);
 
