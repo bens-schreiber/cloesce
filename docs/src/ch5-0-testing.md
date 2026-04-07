@@ -4,7 +4,7 @@ Cloesce Models and Services live as isolated units with no inherent connection t
 
 To write tests for Cloesce that utilize any ORM features, ensure you have:
 
-- Ran `npx cloesce compile` to generate the necessary files
+- Ran `cloesce compile` to generate the necessary files
 - Applied migrations for the Models being tested
 - Invoked `cloesce` to initialize the Cloesce runtime
 

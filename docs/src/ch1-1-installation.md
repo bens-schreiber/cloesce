@@ -19,13 +19,13 @@ curl -fsSL https://cloesce.pages.dev/install.sh | sh
 irm https://cloesce.pages.dev/install.ps1 | iex
 ```
 
-Verify the installation:
+### Verify Installation
 
 ```sh
 cloesce version
 ```
 
----
+## `create-cloesce` Template
 
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 

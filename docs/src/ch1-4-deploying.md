@@ -26,7 +26,7 @@ With your application built and your database migrated, you're ready to deploy y
    Run the compile command to generate the necessary files for deployment:
 
    ```bash
-   npx cloesce compile
+   cloesce compile
    ```
 
 4. **Deploy using Wrangler**

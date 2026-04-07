@@ -26,7 +26,7 @@ api HelloWorldService {
 
 
 
-After running `npx cloesce compile`, a backend method can be implemented for the `hello` API:
+After running `cloesce compile`, a backend method can be implemented for the `hello` API:
 ```typescript
 import * as Cloesce from "@cloesce/backend";
 
