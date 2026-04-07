@@ -76,7 +76,7 @@ package-cross:
 	mkdir -p dist
 	@if echo "$(TARGET)" | grep -q "windows"; then \
 		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce.exe dist/cloesce.exe; \
-		cd dist && zip $(ASSET).zip cloesce.exe && rm cloesce.exe; \
+		cd dist && 7z a $(ASSET).zip cloesce.exe && rm cloesce.exe; \
 		echo "CLOESCE: Packaged dist/$(ASSET).zip"; \
 	else \
 		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce dist/cloesce; \
