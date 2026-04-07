@@ -1,3 +1,11 @@
+# [0.3.1] - 2026-4-6
+### Added
+
+### Changed
+
+### Fixed
+- A bug where Windows could not run migrations due to file path issues.
+
 # [0.3.0] - 2026-4-6
 ### Added
 - Cloesce Language
