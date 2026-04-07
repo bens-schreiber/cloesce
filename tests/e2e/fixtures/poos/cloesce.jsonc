@@ -1,0 +1,5 @@
+{
+    "src_paths": ["./"],
+    "workers_url": "http://localhost:5005/api",
+    "out_path": "."
+}

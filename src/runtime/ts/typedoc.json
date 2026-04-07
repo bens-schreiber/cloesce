@@ -6,7 +6,6 @@
     "src/cidl.ts",
     "src/extractor/**/*",
     "src/global.d.ts",
-    "src/cli.ts",
     "src/common.ts",
     "src/router/crud.ts",
     "src/router/validator.ts",

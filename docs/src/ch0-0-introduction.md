@@ -14,7 +14,6 @@
 | IaC                  | ✅     |
 | SQL Migrations       | ✅     |
 | Runtime Validation   | ✅     |
-| Writing Glue         | ❌     |
 
 ## Contributing
 

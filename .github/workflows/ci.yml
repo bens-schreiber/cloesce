@@ -35,7 +35,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-          targets: wasm32-unknown-unknown, wasm32-wasip1
+          targets: wasm32-unknown-unknown
 
       - uses: actions/cache@v5
         with:

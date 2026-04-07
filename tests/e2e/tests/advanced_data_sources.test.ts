@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, withRes } from "../src/setup";
 import { Hamburger, Topping } from "../fixtures/adv_ds/client";
-import config from "../fixtures/adv_ds/cloesce.config";
+import config from "../fixtures/adv_ds/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  stopWrangler = await startWrangler("./fixtures/adv_ds", config.workersUrl!);
+  stopWrangler = await startWrangler("./fixtures/adv_ds", config.workers_url!);
 }, 30_000);
 
 afterAll(async () => {

@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, withRes } from "../src/setup";
 import { DB1Model, DB2Model } from "../fixtures/multiple_db/client";
-import config from "../fixtures/multiple_db/cloesce.config";
+import config from "../fixtures/multiple_db/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
   stopWrangler = await startWrangler(
     "./fixtures/multiple_db",
-    config.workersUrl!,
+    config.workers_url!,
   );
 }, 30_000);
 

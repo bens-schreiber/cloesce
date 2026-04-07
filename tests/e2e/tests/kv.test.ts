@@ -7,12 +7,12 @@ import {
   KValue,
   Paginated,
 } from "../fixtures/kv/client";
-import config from "../fixtures/kv/cloesce.config";
+import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  stopWrangler = await startWrangler("./fixtures/kv", config.workersUrl!);
+  stopWrangler = await startWrangler("./fixtures/kv", config.workers_url!);
 }, 30_000);
 
 afterAll(async () => {

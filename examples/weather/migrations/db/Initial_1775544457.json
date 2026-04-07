@@ -1,13 +1,13 @@
 {
-  "hash": 2806924698,
+  "hash": 14940836141014351143,
   "models": {
     "WeatherReport": {
-      "hash": 2431865963,
+      "hash": 7422976606755515433,
       "name": "WeatherReport",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 3808173647,
+          "hash": 6397878138472974760,
           "field": {
             "name": "id",
             "cidl_type": "Integer"
@@ -19,7 +19,7 @@
       ],
       "columns": [
         {
-          "hash": 2971345844,
+          "hash": 16671312646982238929,
           "field": {
             "name": "title",
             "cidl_type": "String"
@@ -29,7 +29,7 @@
           "composite_id": null
         },
         {
-          "hash": 3166529739,
+          "hash": 17301296087702549672,
           "field": {
             "name": "description",
             "cidl_type": "String"
@@ -41,7 +41,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 1957181309,
+          "hash": 15208662743300168546,
           "field": {
             "name": "weatherEntries",
             "cidl_type": {
@@ -64,12 +64,12 @@
       ]
     },
     "Weather": {
-      "hash": 3337042873,
+      "hash": 1015315907049628063,
       "name": "Weather",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 3808173647,
+          "hash": 6397878138472974760,
           "field": {
             "name": "id",
             "cidl_type": "Integer"
@@ -81,7 +81,7 @@
       ],
       "columns": [
         {
-          "hash": 4011520963,
+          "hash": 7870174905721178685,
           "field": {
             "name": "weatherReportId",
             "cidl_type": "Integer"
@@ -94,7 +94,7 @@
           "composite_id": null
         },
         {
-          "hash": 3583075662,
+          "hash": 271759643018812086,
           "field": {
             "name": "dateTime",
             "cidl_type": "DateIso"
@@ -104,7 +104,7 @@
           "composite_id": null
         },
         {
-          "hash": 1851928714,
+          "hash": 2151026909849323040,
           "field": {
             "name": "location",
             "cidl_type": "String"
@@ -114,7 +114,7 @@
           "composite_id": null
         },
         {
-          "hash": 3065958462,
+          "hash": 14090310185615507303,
           "field": {
             "name": "temperature",
             "cidl_type": "Integer"
@@ -124,7 +124,7 @@
           "composite_id": null
         },
         {
-          "hash": 3488932653,
+          "hash": 4254261415713781052,
           "field": {
             "name": "condition",
             "cidl_type": "String"
@@ -136,7 +136,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 1442272691,
+          "hash": 8417951033986697560,
           "field": {
             "name": "weatherReport",
             "cidl_type": {

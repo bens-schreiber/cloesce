@@ -9,14 +9,8 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-compiler-wasm && npm run copy-migrate-wasm && chmod +x dist/cli.js",
-    "copy-rs-orm-wasm": "cp ../../compiler/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
-    "copy-compiler-wasm": "cp ../../compiler/target/wasm32-wasip1/release/compile.wasm ./dist/compile.wasm",
-    "copy-migrate-wasm": "cp ../../compiler/target/wasm32-wasip1/release/migrate.wasm ./dist/migrate.wasm"
-  },
-  "dependencies": {
-    "cmd-ts": "^0.15.0",
-    "jiti": "^2.6.1"
+    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm",
+    "copy-rs-orm-wasm": "cp ../../compiler/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
@@ -34,9 +28,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
-  },
-  "bin": {
-    "cloesce": "dist/cli.js"
   },
   "typesVersions": {
     "*": {

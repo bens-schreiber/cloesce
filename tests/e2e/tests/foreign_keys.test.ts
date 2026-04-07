@@ -8,14 +8,14 @@ import {
   Course,
   B,
 } from "../fixtures/foreign_keys/client";
-import config from "../fixtures/foreign_keys/cloesce.config";
+import config from "../fixtures/foreign_keys/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
   stopWrangler = await startWrangler(
     "./fixtures/foreign_keys",
-    config.workersUrl!,
+    config.workers_url!,
   );
 }, 30_000);
 

@@ -7,7 +7,7 @@ edition = "2024"
 ast = { path = "../ast" }
 askama = "0.14.0"
 indexmap = { workspace = true }
-json_comments = "0.2.2"
+json_comments = { workspace = true }
 migrations = { path = "../migrations" }
 orm = { path = "../orm" }
 pathdiff = "0.2.3"

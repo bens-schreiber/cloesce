@@ -13,7 +13,6 @@
 | IaC                  | ✅     |
 | SQL Migrations       | ✅     |
 | Runtime Validation   | ✅     |
-| Writing Glue         | ❌     |
 
 ## How Easy can Full Stack Development Be?
 

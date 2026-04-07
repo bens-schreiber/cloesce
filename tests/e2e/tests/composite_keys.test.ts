@@ -5,14 +5,14 @@ import {
   Course,
   StudentCourse,
 } from "../fixtures/composite_keys/client";
-import config from "../fixtures/composite_keys/cloesce.config";
+import config from "../fixtures/composite_keys/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
   stopWrangler = await startWrangler(
     "./fixtures/composite_keys",
-    config.workersUrl!,
+    config.workers_url!,
   );
 }, 30_000);
 

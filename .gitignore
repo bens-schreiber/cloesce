@@ -342,7 +342,7 @@ tmp/
 .cloesce
 tmp.*
 examples/*/package-lock.json
-src/ts/package-lock.json
+src/runtime/ts/package-lock.json
 !docs/cidl.js
 
 # ----------- MDBOOK VVV  ----------- 

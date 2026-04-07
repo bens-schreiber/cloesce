@@ -9,9 +9,8 @@ DOCS_DIR := docs
 COMPILER_MANIFEST := $(COMPILER_DIR)/Cargo.toml
 REGRESSION_MANIFEST := $(REGRESSION_DIR)/Cargo.toml
 
-# WASM targets
+# WASM target (ORM only)
 WASM_TARGET := wasm32-unknown-unknown
-WASI_TARGET := wasm32-wasip1
 
 .PHONY: check-deps
 check-deps:
@@ -21,7 +20,6 @@ check-deps:
 	@command -v pandoc >/dev/null 2>&1 || echo "⚠️  pandoc not found (optional, for docs). Install pandoc: https://github.com/jgm/pandoc"
 	@command -v mdbook >/dev/null 2>&1 || echo "⚠️  mdbook not found (optional, for docs). Install mdbook: cargo install mdbook"
 	@rustup target list --installed | grep -q $(WASM_TARGET) || { echo "❌ $(WASM_TARGET) target not installed. Run: rustup target add $(WASM_TARGET)"; exit 1; }
-	@rustup target list --installed | grep -q $(WASI_TARGET) || { echo "❌ $(WASI_TARGET) target not installed. Run: rustup target add $(WASI_TARGET)"; exit 1; }
 	@echo "✅ All required dependencies found!"
 
 format:
@@ -44,6 +42,48 @@ format-check:
 	npx --prefix $(TS_DIR) oxlint . --deny-warnings
 	npx --prefix $(E2E_DIR) oxlint . --deny-warnings
 
+# Cross-compilation targets for release binaries
+CROSS_TARGETS := \
+	x86_64-unknown-linux-gnu \
+	aarch64-unknown-linux-gnu \
+	x86_64-apple-darwin \
+	aarch64-apple-darwin \
+	x86_64-pc-windows-msvc
+
+# Maps a Rust target triple to the release asset name
+define asset_name
+cloesce-compiler-$(subst x86_64-unknown-linux-gnu,x86_64-linux,$(subst aarch64-unknown-linux-gnu,aarch64-linux,$(subst x86_64-apple-darwin,x86_64-macos,$(subst aarch64-apple-darwin,aarch64-macos,$(subst x86_64-pc-windows-msvc,x86_64-windows,$(1))))))
+endef
+
+# Build a single cross-compile target: make build-cross TARGET=<triple> [USE_CROSS=1]
+.PHONY: build-cross
+build-cross:
+	@[ -n "$(TARGET)" ] || { echo "Usage: make build-cross TARGET=<triple> [USE_CROSS=1]"; exit 1; }
+	@echo "CLOESCE: Building CLI binaries for $(TARGET)..."
+	@if [ "$(USE_CROSS)" = "1" ]; then \
+		cross build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin cloesce; \
+	else \
+		cargo build --release --target $(TARGET) --manifest-path $(COMPILER_DIR)/cli/Cargo.toml --bin cloesce; \
+	fi
+
+# Package a single cross-compile target into a release archive.
+# Produces dist/<asset_name>.tar.gz (or .zip on Windows targets).
+# Usage: make package-cross TARGET=<triple>
+.PHONY: package-cross
+package-cross:
+	@[ -n "$(TARGET)" ] || { echo "Usage: make package-cross TARGET=<triple>"; exit 1; }
+	$(eval ASSET := $(call asset_name,$(TARGET)))
+	mkdir -p dist
+	@if echo "$(TARGET)" | grep -q "windows"; then \
+		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce.exe dist/cloesce.exe; \
+		cd dist && zip $(ASSET).zip cloesce.exe && rm cloesce.exe; \
+		echo "CLOESCE: Packaged dist/$(ASSET).zip"; \
+	else \
+		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce dist/cloesce; \
+		cd dist && tar -czf $(ASSET).tar.gz cloesce && rm cloesce; \
+		echo "CLOESCE: Packaged dist/$(ASSET).tar.gz"; \
+	fi
+
 .PHONY: build-src
 build-src:
 	@echo "CLOESCE: Installing dependencies for Rust and TypeScript code..."
@@ -51,7 +91,7 @@ build-src:
 	npm install --prefix $(E2E_DIR)
 
 	@echo "CLOESCE: Building Rust and TypeScript code..."
-	cargo build --target $(WASI_TARGET) --release --manifest-path $(COMPILER_DIR)/cli/Cargo.toml
+	cargo build --release --manifest-path $(COMPILER_DIR)/cli/Cargo.toml
 	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
 
 	npm run build --prefix $(TS_DIR)

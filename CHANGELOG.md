@@ -1,3 +1,16 @@
+# [0.3.2] - 2026-4-6
+### Added
+- Standalone Cloesce binary for Windows, Linux and MacOS
+- Distribution scripts for the standalone binary
+- `cloesce.jsonc` file for configuring the new CLI
+- Environment support using the `--env` flag in the CLI
+- Support for config files for each environment via `{env}.cloesce.jsonc` (e.g. `production.cloesce.jsonc`)
+
+### Changed
+- Removed NPM CLI for Cloesce in favor of the standalone binary
+
+### Fixed
+
 # [0.3.1] - 2026-4-6
 ### Added
 

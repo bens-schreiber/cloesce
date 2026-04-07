@@ -4,8 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "cloesce compile && wrangler build",
-    "migrate:cloesce": "cloesce migrate",
     "migrate:wrangler": "wrangler d1 migrations apply db",
     "start:dev": "wrangler dev --port 5000",
     "start:web": "vite",

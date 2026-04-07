@@ -1,38 +1,35 @@
-name: Publish from GitHub Release
+name: Publish npm package
 
 on:
-  release:
-    types: [published]
-
-permissions:
-  id-token: write
-  contents: read
+  workflow_dispatch:
 
 jobs:
-  publish:
+  publish-npm:
+    name: Publish to npm
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown, wasm32-wasip1
+          targets: wasm32-unknown-unknown
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org/
 
+      - name: Set version from latest release tag
+        run: |
+          LATEST_TAG=$(gh release view --json tagName -q .tagName)
+          VERSION=${LATEST_TAG#v}
+          npm version "$VERSION" --no-git-tag-version --allow-same-version --prefix src/runtime/ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Build
         run: make build-src
-
-      - name: Set version from tag
-        working-directory: src/runtime/ts
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
         working-directory: src/runtime/ts

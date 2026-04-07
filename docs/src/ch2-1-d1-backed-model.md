@@ -60,8 +60,8 @@ Notably, an `int` primary key is automatically set to `AUTOINCREMENT` in D1, so 
 The standard Cloesce compilation command does not perform database migrations. To create or update the D1 database schema based on your Model definitions, you need to run the migration command:
 
 ```bash
-npx cloesce compile # load the latest Model definitions
-npx cloesce migrate <d1-binding> <migration name>
+cloesce compile # load the latest Model definitions
+cloesce migrate <d1-binding> <migration name>
 ```
 
 Finally, these generated migrations must be applied to the actual D1 database using the Wrangler CLI:
