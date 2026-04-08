@@ -7,7 +7,7 @@ export class DB1Model {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model>>;
   static async $get(
@@ -35,7 +35,7 @@ export class DB1Model {
   }
   static $save(
     model: DeepPartial<DB1Model>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model>>;
   static async $save(
@@ -68,7 +68,7 @@ export class DB1Model {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model[]>>;
   static async $list(
@@ -108,7 +108,7 @@ export class DB2Model {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model>>;
   static async $get(
@@ -136,7 +136,7 @@ export class DB2Model {
   }
   static $save(
     model: DeepPartial<DB2Model>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model>>;
   static async $save(
@@ -169,7 +169,7 @@ export class DB2Model {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model[]>>;
   static async $list(

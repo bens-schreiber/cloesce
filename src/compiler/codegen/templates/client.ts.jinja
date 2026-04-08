@@ -105,7 +105,7 @@ export class {{ model.name }} {
 {%- if !ds.is_internal %}
   static $save(
     model: DeepPartial<{{ model.name }}>,
-    kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+    kind: "{{ ds.name }}",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
@@ -163,7 +163,7 @@ export class {{ model.name }} {
 {%- endfor %}
     },
 {%- endif %}
-  kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+  kind: "{{ ds.name }}",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
@@ -230,7 +230,7 @@ export class {{ model.name }} {
 {%- else %}
   args: {},
 {%- endif %}
-  kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+  kind: "{{ ds.name }}",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}

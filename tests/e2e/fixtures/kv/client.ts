@@ -11,7 +11,7 @@ export class D1BackedModel {
       id: number;
       keyParam: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
@@ -40,7 +40,7 @@ export class D1BackedModel {
   }
   static $save(
     model: DeepPartial<D1BackedModel>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
@@ -73,7 +73,7 @@ export class D1BackedModel {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
@@ -137,7 +137,7 @@ export class PaginatedKVModel {
     args: {
       id: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PaginatedKVModel>>;
   static async $get(
@@ -182,7 +182,7 @@ export class PureKVModel {
     args: {
       id: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureKVModel>>;
   static async $get(
@@ -210,7 +210,7 @@ export class PureKVModel {
   }
   static $save(
     model: DeepPartial<PureKVModel>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureKVModel>>;
   static async $save(

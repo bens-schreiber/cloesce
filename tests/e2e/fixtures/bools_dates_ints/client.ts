@@ -6,7 +6,7 @@ export class Weather {
   isRaining: boolean;
   static $save(
     model: DeepPartial<Weather>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Weather>>;
   static async $save(
@@ -38,7 +38,7 @@ export class Weather {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Weather>>;
   static async $get(

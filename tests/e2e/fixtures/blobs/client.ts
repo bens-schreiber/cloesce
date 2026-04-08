@@ -94,7 +94,7 @@ export class BlobHaver {
   }
   static $save(
     model: DeepPartial<BlobHaver>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver>>;
   static async $save(
@@ -126,7 +126,7 @@ export class BlobHaver {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver>>;
   static async $get(
@@ -157,7 +157,7 @@ export class BlobHaver {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver[]>>;
   static async $list(

@@ -116,7 +116,7 @@ source R2Only for Weather {
 
 Read more about how Models work in the [Models](./ch2-0-models.md) chapter.
 
-## API
+## Backend Implementation
 
 In `src/api/main.ts`, you will find all of the TypeScript API route handlers for the example application. These handlers extend generated API interfaces, and must be explicitly registered during application initialization.
 
