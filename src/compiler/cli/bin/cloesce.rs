@@ -14,35 +14,6 @@ use frontend::{
 use serde::Deserialize;
 use tracing_subscriber::FmtSubscriber;
 
-/// Fetches the latest released version of cloesce from the GitHub API (blocking).
-fn fetch_latest_version() -> Option<String> {
-    const GITHUB_RELEASE_API: &str =
-        "https://api.github.com/repos/bens-schreiber/cloesce/releases/latest";
-
-    let response = ureq::get(GITHUB_RELEASE_API)
-        .header("User-Agent", "cloesce-cli")
-        .call()
-        .ok()?;
-    let json: serde_json::Value = response.into_body().read_json().ok()?;
-    let tag = json["tag_name"].as_str()?;
-    Some(tag.trim_start_matches('v').to_string())
-}
-
-pub fn open_file_or_create(path: &Path) -> Result<File, String> {
-    let err = |e: std::io::Error| format!("Failed to open file {}: {}", path.display(), e);
-
-    match File::create(path) {
-        Ok(f) => Ok(f),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).map_err(err)?;
-            }
-            File::create(path).map_err(err)
-        }
-        Err(e) => Err(err(e)),
-    }
-}
-
 /// Direct values from the <env>.closce.jsonc file
 #[derive(Debug, Deserialize)]
 #[serde(default)]
@@ -202,17 +173,17 @@ impl WranglerConfigFormat {
 
 #[derive(Parser)]
 #[command(name = "cloesce")]
-pub struct Cli {
+struct Cli {
     #[command(subcommand)]
-    pub command: Command,
+    command: Command,
 
     // Determine which environment to compile for.
     #[arg(long)]
-    pub env: Option<String>,
+    env: Option<String>,
 }
 
 #[derive(Subcommand)]
-pub enum Command {
+enum Command {
     Compile,
     Migrate(MigrateArgs),
     Version,
@@ -220,20 +191,35 @@ pub enum Command {
 
 #[derive(Args)]
 #[command(name = "migrate")]
-pub struct MigrateArgs {
+struct MigrateArgs {
     #[arg(long, conflicts_with = "all", required_unless_present = "all")]
-    pub binding: Option<String>,
+    binding: Option<String>,
 
     #[arg(long, conflicts_with = "binding")]
-    pub all: bool,
+    all: bool,
 
-    pub name: String,
-
-    #[cfg(feature = "regression-tests")]
-    pub cidl: PathBuf,
+    name: String,
 
     #[cfg(feature = "regression-tests")]
-    pub wrangler: PathBuf,
+    cidl: PathBuf,
+
+    #[cfg(feature = "regression-tests")]
+    wrangler: PathBuf,
+}
+
+fn open_file_or_create(path: &Path) -> Result<File, String> {
+    let err = |e: std::io::Error| format!("Failed to open file {}: {}", path.display(), e);
+
+    match File::create(path) {
+        Ok(f) => Ok(f),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).map_err(err)?;
+            }
+            File::create(path).map_err(err)
+        }
+        Err(e) => Err(err(e)),
+    }
 }
 
 fn main() {
@@ -242,10 +228,18 @@ fn main() {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
 
-    // Spawn a seperate thread as to not impede the compiler
-    let update_check = std::thread::spawn(fetch_latest_version);
-
     let cli = Cli::parse();
+
+    // Spawn a separate thread as to not impede the compiler.
+    // `version` command will always force a fetch
+    let is_version_cmd = matches!(cli.command, Command::Version);
+    let update_check = if cfg!(debug_assertions) {
+        None
+    } else {
+        Some(std::thread::spawn(move || {
+            version::fetch_latest_version(is_version_cmd)
+        }))
+    };
     let run = || -> Result<(), String> {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
 
@@ -276,7 +270,7 @@ fn main() {
     let result = panic::catch_unwind(run);
 
     let current = env!("CARGO_PKG_VERSION");
-    match update_check.join().ok().flatten() {
+    match update_check.and_then(|h| h.join().ok()).flatten() {
         Some(latest) if latest != current => {
             println!(" ");
             println!("A new version of cloesce is available: v{latest} (current: v{current})");
@@ -753,5 +747,131 @@ mod migrate {
                 }
             }
         }
+    }
+}
+
+mod version {
+    use super::*;
+
+    /// Returns [None] if the cache is unavailable or invalid.
+    fn update_cache_path() -> Option<PathBuf> {
+        Some(dirs::cache_dir()?.join("cloesce").join("update_check"))
+    }
+
+    struct UpdateCache {
+        /// line 1: Unix timestamp of last fetch (seconds)
+        fetched_at: u64,
+
+        /// line 2: ETag from GitHub response (or [String::default])
+        etag: String,
+
+        /// line 3: version string (without leading 'v')
+        version: String,
+    }
+
+    impl UpdateCache {
+        fn load(path: &Path) -> Option<Self> {
+            let text = std::fs::read_to_string(path).ok()?;
+            let mut lines = text.splitn(3, '\n');
+            let fetched_at = lines.next()?.trim().parse::<u64>().ok()?;
+            let etag = lines.next()?.trim().to_string();
+            let version = lines.next()?.trim().to_string();
+            if version.is_empty() {
+                return None;
+            }
+            Some(Self {
+                fetched_at,
+                etag,
+                version,
+            })
+        }
+
+        fn save(&self, path: &Path) {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(
+                path,
+                format!("{}\n{}\n{}", self.fetched_at, self.etag, self.version),
+            );
+        }
+    }
+
+    fn now_secs() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
+
+    const GITHUB_RELEASE_API: &str =
+        "https://api.github.com/repos/bens-schreiber/cloesce/releases/latest";
+
+    const UPDATE_CHECK_INTERVAL_SECS: u64 = 3600; // 1 hour
+
+    /// Fetches the latest released version of cloesce, using a local cache to avoid
+    /// hitting the GitHub API rate limit.
+    ///
+    /// Blocking call.
+    ///
+    /// Returns [None] if the fetch failed and there is no valid cache, otherwise returns the version string (x.x.x)
+    ///
+    pub fn fetch_latest_version(force: bool) -> Option<String> {
+        let cache_path = update_cache_path();
+        let cached = cache_path.as_deref().and_then(UpdateCache::load);
+        let now = now_secs();
+
+        // Return cached value if it's fresh enough and we're not forcing.
+        if !force
+            && let Some(c) = &cached
+            && now.saturating_sub(c.fetched_at) < UPDATE_CHECK_INTERVAL_SECS
+        {
+            return Some(c.version.clone());
+        }
+
+        // Build the request, attaching If-None-Match when we have a cached ETag.
+        let mut req = ureq::get(GITHUB_RELEASE_API).header("User-Agent", "cloesce-cli");
+        if let Some(c) = &cached
+            && !c.etag.is_empty()
+        {
+            req = req.header("If-None-Match", c.etag.as_str());
+        }
+
+        let response = req.call().ok()?;
+
+        // 304 Not Modified, refresh timestamp
+        if response.status() == 304 {
+            if let (Some(c), Some(p)) = (cached, cache_path.as_deref()) {
+                let refreshed = UpdateCache {
+                    fetched_at: now,
+                    ..c
+                };
+                refreshed.save(p);
+                return Some(refreshed.version);
+            }
+            return None;
+        }
+
+        let etag = response
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        let json: serde_json::Value = response.into_body().read_json().ok()?;
+        let tag = json["tag_name"].as_str()?;
+        let version = tag.trim_start_matches('v').to_string();
+
+        if let Some(p) = cache_path.as_deref() {
+            UpdateCache {
+                fetched_at: now,
+                etag,
+                version: version.clone(),
+            }
+            .save(p);
+        }
+
+        Some(version)
     }
 }

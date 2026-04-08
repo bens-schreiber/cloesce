@@ -8,6 +8,7 @@ ariadne = { workspace = true }
 ast = { path = "../ast" }
 clap = { version = "4.5.60", features = ["derive"] }
 codegen = { path = "../codegen" }
+dirs = "6.0.0"
 frontend = { path = "../frontend" }
 json_comments = { workspace = true }
 migrations = { path = "../migrations" }
