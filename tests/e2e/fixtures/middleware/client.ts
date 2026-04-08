@@ -40,7 +40,7 @@ export class Foo {
   }
   static $save(
     model: DeepPartial<Foo>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Foo>>;
   static async $save(

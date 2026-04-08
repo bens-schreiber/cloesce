@@ -38,7 +38,7 @@ export class D1BackedModel {
       id: number;
       keyParam: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
@@ -67,7 +67,7 @@ export class D1BackedModel {
   }
   static $save(
     model: DeepPartial<D1BackedModel>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
@@ -100,7 +100,7 @@ export class D1BackedModel {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
@@ -194,7 +194,7 @@ export class PureR2Model {
     args: {
       id: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureR2Model>>;
   static async $get(

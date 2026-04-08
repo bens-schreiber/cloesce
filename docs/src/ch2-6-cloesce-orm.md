@@ -49,7 +49,7 @@ Always accessible is the Default Data Source (`User.DataSources.Default`), which
 
 ## Advanced ORM Usage
 
-Internally, Cloesce uses the `Orm` class to implement the generated methods described above. You can also use it directly for more advanced use cases, such as custom SQL queries or complex hydration scenarios.
+Internally, Cloesce uses the `Orm` class to implement the generated methods described above. You may use it directly, or use the generated methods in the namespace of each backend Model, which are more convenient.
 
 ### select
 
@@ -109,4 +109,4 @@ Orm.select(Boss.Meta, "SELECT * FROM Boss WHERE name = 'Alice'", Boss.DataSource
 
 ### hydrate
 
-`Orm.hydrate` takes a base set of Model instances (e.g. from `map`) and fetches any additional KV or R2 properties to return fully populated Model instances.
+`Orm.hydrate` takes a base set of Model instances (e.g. from `map`) and fetches any KV or R2 properties to return fully populated Model instances. Additionally, it instantiates objects like Dates and blobs according to the Model definition.

@@ -29,7 +29,7 @@ export class CrudHaver {
   }
   static $save(
     model: DeepPartial<CrudHaver>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver>>;
   static async $save(
@@ -61,7 +61,7 @@ export class CrudHaver {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver>>;
   static async $get(
@@ -92,7 +92,7 @@ export class CrudHaver {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver[]>>;
   static async $list(
@@ -132,7 +132,7 @@ export class Parent {
   children: Child[];
   static $save(
     model: DeepPartial<Parent>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
   static $save(
@@ -169,7 +169,7 @@ export class Parent {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
   static $get(
@@ -207,7 +207,7 @@ export class Parent {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent[]>>;
   static $list(

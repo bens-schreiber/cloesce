@@ -1,5 +1,6 @@
 # [0.3.3] - 2026-4-8
 ### Added
+- `map`, `select` and `hydrate` methods generated in the namespace of each backend Model for convenience.
 
 ### Changed
 - CLI print output standardized

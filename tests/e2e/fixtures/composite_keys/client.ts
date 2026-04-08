@@ -8,7 +8,7 @@ export class Course {
     args: {
       id: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course>>;
   static async $get(
@@ -39,7 +39,7 @@ export class Course {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course[]>>;
   static async $list(
@@ -68,7 +68,7 @@ export class Course {
   }
   static $save(
     model: DeepPartial<Course>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course>>;
   static async $save(
@@ -123,7 +123,7 @@ export class Student {
       id: number;
       name: string;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static async $get(
@@ -165,7 +165,7 @@ export class Student {
       lastSeen_name: string;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student[]>>;
   static async $list(
@@ -202,7 +202,7 @@ export class Student {
   ): Promise<HttpResult<Student>>;
   static $save(
     model: DeepPartial<Student>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static async $save(
@@ -251,7 +251,7 @@ export class StudentCourse {
       studentName: string;
       courseId: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
   static $get(
@@ -295,7 +295,7 @@ export class StudentCourse {
       lastSeen_courseId: number;
       limit: number;
     },
-  kind: "Default" = "Default",
+  kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse[]>>;
   static $list(
@@ -336,7 +336,7 @@ export class StudentCourse {
   }
   static $save(
     model: DeepPartial<StudentCourse>,
-    kind: "Default" = "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
   static $save(
