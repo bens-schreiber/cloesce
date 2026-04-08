@@ -14,26 +14,27 @@ pub enum WranglerGenerator {
 }
 
 impl WranglerGenerator {
-    pub fn from_path(path: &Path) -> Self {
-        let contents = std::fs::read_to_string(path).expect("Failed to open wrangler file");
+    // Generic string error is sufficient because this is only used in the CLI,
+    // which doesn't need to distinguish error types
+    pub fn from_contents(contents: String, path: &Path) -> Result<WranglerGenerator, String> {
         let extension = path
             .extension()
             .and_then(|e| e.to_str())
-            .expect("Missing or invalid extension");
+            .ok_or("Wrangler file extension is not valid UTF-8".to_string())?;
 
         match extension {
             "json" | "jsonc" => {
                 let contents_no_comments = json_comments::StripComments::new(contents.as_bytes());
                 let val: JsonValue = serde_json::from_reader(contents_no_comments)
                     .unwrap_or(JsonValue::Object(serde_json::Map::new()));
-                WranglerGenerator::Json(val)
+                Ok(WranglerGenerator::Json(val))
             }
             "toml" => {
                 let val: TomlValue =
                     toml::from_str(&contents).unwrap_or(TomlValue::Table(toml::Table::new()));
-                WranglerGenerator::Toml(val)
+                Ok(WranglerGenerator::Toml(val))
             }
-            other => panic!("Unsupported wrangler file extension: {other}"),
+            other => Err(format!("Unsupported wrangler file extension: {other}")),
         }
     }
 
@@ -303,12 +304,11 @@ impl WranglerGenerator {
     /// Takes the entire Wrangler config and interprets only a [WranglerSpec].
     /// When `env` is specified, reads bindings from `env.<name>`, merging
     /// top-level fields (name, compatibility_date, main) that are absent there.
-    pub fn as_spec(&self, env: Option<&str>) -> WranglerSpec {
+    pub fn as_spec(&self, env: Option<&str>) -> Result<WranglerSpec, Box<dyn std::error::Error>> {
         match self {
             WranglerGenerator::Json(val) => {
                 let Some(env_name) = env else {
-                    return serde_json::from_value(val.clone())
-                        .expect("Failed to deserialize wrangler.json");
+                    return Ok(serde_json::from_value(val.clone())?);
                 };
 
                 // Start from the env-specific subobject, falling back to top-level
@@ -333,13 +333,12 @@ impl WranglerGenerator {
                     }
                 }
 
-                serde_json::from_value(JsonValue::Object(merged))
-                    .expect("Failed to deserialize wrangler.json env")
+                let res = serde_json::from_value(JsonValue::Object(merged))?;
+                Ok(res)
             }
             WranglerGenerator::Toml(val) => {
                 let Some(env_name) = env else {
-                    return WranglerSpec::deserialize(val.clone())
-                        .expect("Failed to deserialize wrangler.toml");
+                    return Ok(WranglerSpec::deserialize(val.clone())?);
                 };
 
                 let env_val = val
@@ -362,8 +361,8 @@ impl WranglerGenerator {
                     }
                 }
 
-                WranglerSpec::deserialize(TomlValue::Table(merged))
-                    .expect("Failed to deserialize wrangler.toml env")
+                let res = WranglerSpec::deserialize(TomlValue::Table(merged))?;
+                Ok(res)
             }
         }
     }

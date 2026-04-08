@@ -5,12 +5,16 @@ use compiler_test::src_to_ast;
 fn test_serialize_wrangler_spec() {
     // Empty TOML
     {
-        WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(None);
+        WranglerGenerator::Toml(toml::from_str("").unwrap())
+            .as_spec(None)
+            .unwrap();
     }
 
     // Empty JSON
     {
-        WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(None);
+        WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+            .as_spec(None)
+            .unwrap();
     }
 }
 
@@ -33,13 +37,16 @@ fn generates_default_wrangler_value() {
     // Act
     let specs = vec![
         {
-            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
         {
-            let mut spec =
-                WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
@@ -77,13 +84,16 @@ fn generates_default_d1_wrangler_values() {
     // Act
     let specs = vec![
         {
-            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "my-migrations");
             spec
         },
         {
-            let mut spec =
-                WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "my-migrations");
             spec
         },
@@ -127,13 +137,16 @@ fn generates_default_kv_wrangler_values() {
     // Act
     let specs = vec![
         {
-            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
         {
-            let mut spec =
-                WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(None);
+            let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                .as_spec(None)
+                .unwrap();
             WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
@@ -173,8 +186,9 @@ fn handles_d1_database_with_missing_values() {
     );
 
     // Act
-    let mut spec =
-        WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap()).as_spec(None);
+    let mut spec = WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap())
+        .as_spec(None)
+        .unwrap();
     WranglerDefault::set_defaults(&mut spec, &ast, "default-migrations");
 
     // Assert
@@ -219,8 +233,9 @@ fn env_reads_from_env_block_and_falls_back_to_root() {
         migrations_dir = "migrations/DB"
     "#;
 
-    let toml_spec =
-        WranglerGenerator::Toml(toml::from_str(toml_src).unwrap()).as_spec(Some("staging"));
+    let toml_spec = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap())
+        .as_spec(Some("staging"))
+        .unwrap();
     assert_eq!(
         toml_spec.name.as_deref(),
         Some("my-worker"),
@@ -232,7 +247,9 @@ fn env_reads_from_env_block_and_falls_back_to_root() {
         Some("staging-id")
     );
 
-    let toml_root_spec = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap()).as_spec(None);
+    let toml_root_spec = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap())
+        .as_spec(None)
+        .unwrap();
     assert_eq!(
         toml_root_spec.d1_databases[0].database_id.as_deref(),
         Some("prod-id")
@@ -254,8 +271,9 @@ fn env_reads_from_env_block_and_falls_back_to_root() {
         }
     }"#;
 
-    let json_spec =
-        WranglerGenerator::Json(serde_json::from_str(json_src).unwrap()).as_spec(Some("staging"));
+    let json_spec = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap())
+        .as_spec(Some("staging"))
+        .unwrap();
     assert_eq!(
         json_spec.name.as_deref(),
         Some("my-worker"),
@@ -268,8 +286,9 @@ fn env_reads_from_env_block_and_falls_back_to_root() {
     );
 
     // Verify top-level spec is unaffected
-    let json_root_spec =
-        WranglerGenerator::Json(serde_json::from_str(json_src).unwrap()).as_spec(None);
+    let json_root_spec = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap())
+        .as_spec(None)
+        .unwrap();
     assert_eq!(
         json_root_spec.d1_databases[0].database_id.as_deref(),
         Some("prod-id")
@@ -309,7 +328,7 @@ fn env_generate_writes_into_env_block() {
         "#;
 
         let mut generator = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap());
-        let mut spec = generator.as_spec(Some("staging"));
+        let mut spec = generator.as_spec(Some("staging")).unwrap();
         WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
         let output = generator.generate(spec, Some("staging"));
 
@@ -318,7 +337,9 @@ fn env_generate_writes_into_env_block() {
             "expected env.staging section in TOML output:\n{output}"
         );
 
-        let root_spec = WranglerGenerator::Toml(toml::from_str(&output).unwrap()).as_spec(None);
+        let root_spec = WranglerGenerator::Toml(toml::from_str(&output).unwrap())
+            .as_spec(None)
+            .unwrap();
         assert_eq!(
             root_spec.d1_databases[0].database_id.as_deref(),
             Some("prod-id")
@@ -329,8 +350,9 @@ fn env_generate_writes_into_env_block() {
         );
 
         // Staging env reads back the generated values
-        let staging_spec =
-            WranglerGenerator::Toml(toml::from_str(&output).unwrap()).as_spec(Some("staging"));
+        let staging_spec = WranglerGenerator::Toml(toml::from_str(&output).unwrap())
+            .as_spec(Some("staging"))
+            .unwrap();
         assert!(staging_spec.d1_databases[0].database_id.is_some());
         assert!(staging_spec.kv_namespaces[0].id.is_some());
     }
@@ -348,7 +370,7 @@ fn env_generate_writes_into_env_block() {
         }"#;
 
         let mut generator = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap());
-        let mut spec = generator.as_spec(Some("staging"));
+        let mut spec = generator.as_spec(Some("staging")).unwrap();
         WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
         let output = generator.generate(spec, Some("staging"));
 
@@ -363,7 +385,8 @@ fn env_generate_writes_into_env_block() {
         assert_eq!(output_val["kv_namespaces"][0]["id"], "prod-cache-id");
 
         let staging_spec = WranglerGenerator::Json(serde_json::from_str(&output).unwrap())
-            .as_spec(Some("staging"));
+            .as_spec(Some("staging"))
+            .unwrap();
         assert!(staging_spec.d1_databases[0].database_id.is_some());
         assert!(staging_spec.kv_namespaces[0].id.is_some());
     }

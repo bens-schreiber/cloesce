@@ -49,12 +49,11 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
 
-    // Build compiler
     tracing::info!("Building compiler...");
     let compiler_dir = project_root.join("src/compiler");
     let cmd = Command::new("cargo")
         .current_dir(&compiler_dir)
-        .args(["build", "--release"])
+        .args(["build", "--features", "regression-tests", "--release"])
         .status();
     match cmd {
         Ok(status) if status.success() => {}

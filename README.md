@@ -83,7 +83,7 @@ Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app f
 Before building, ensure you have the required dependencies installed:
 
 **Required:**
-- [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` and `wasm32-wasip1` targets)
+- [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` target)
 - [Node.js](https://nodejs.org/) and npm
 
 **Optional:**

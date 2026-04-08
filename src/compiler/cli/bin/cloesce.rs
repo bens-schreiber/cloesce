@@ -1,7 +1,12 @@
-use std::{io::Write, panic, path::PathBuf};
+use std::{
+    collections::VecDeque,
+    fs::File,
+    io::Write,
+    panic,
+    path::{Path, PathBuf},
+};
 
 use clap::{Args, Parser, Subcommand};
-use cli::open_file_or_create;
 use frontend::{
     fmt::DisplayError,
     lexer::{CloesceLexer, LexTarget},
@@ -9,6 +14,36 @@ use frontend::{
 use serde::Deserialize;
 use tracing_subscriber::FmtSubscriber;
 
+/// Fetches the latest released version of cloesce from the GitHub API (blocking).
+fn fetch_latest_version() -> Option<String> {
+    const GITHUB_RELEASE_API: &str =
+        "https://api.github.com/repos/bens-schreiber/cloesce/releases/latest";
+
+    let response = ureq::get(GITHUB_RELEASE_API)
+        .header("User-Agent", "cloesce-cli")
+        .call()
+        .ok()?;
+    let json: serde_json::Value = response.into_body().read_json().ok()?;
+    let tag = json["tag_name"].as_str()?;
+    Some(tag.trim_start_matches('v').to_string())
+}
+
+pub fn open_file_or_create(path: &Path) -> Result<File, String> {
+    let err = |e: std::io::Error| format!("Failed to open file {}: {}", path.display(), e);
+
+    match File::create(path) {
+        Ok(f) => Ok(f),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).map_err(err)?;
+            }
+            File::create(path).map_err(err)
+        }
+        Err(e) => Err(err(e)),
+    }
+}
+
+/// Direct values from the <env>.closce.jsonc file
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 struct ParsedCloesceConfig {
@@ -34,25 +69,31 @@ impl Default for ParsedCloesceConfig {
 
 struct CloesceConfig {
     parsed: ParsedCloesceConfig,
-    root: std::path::PathBuf,
+    root: PathBuf,
     env: Option<String>,
 }
 
 impl CloesceConfig {
-    fn cloesce_dir(&self) -> std::path::PathBuf {
+    /// The directory of the generated output files.
+    /// Defaults to <root>/.cloesce
+    fn cloesce_dir(&self) -> PathBuf {
         self.root.join(&self.parsed.out_path)
     }
 
-    fn wrangler_path(&self) -> std::path::PathBuf {
+    /// The path to the wrangler config file to read from and write to.
+    /// Defaults to <root>/wrangler.toml or <root>/wrangler.jsonc depending on the wrangler_config_format field in the config.
+    fn wrangler_path(&self) -> PathBuf {
         self.root
             .join(self.parsed.wrangler_config_format.wrangler_file_name())
     }
 
-    fn cidl_path(&self) -> std::path::PathBuf {
+    /// The path to the generated CIDL file (a merkle-hashed JSON snapshot of the AST).
+    #[allow(dead_code)]
+    fn cidl_path(&self) -> PathBuf {
         self.cloesce_dir().join("cidl.json")
     }
 
-    fn load(root: &std::path::Path, env: Option<String>) -> Result<CloesceConfig, String> {
+    fn load(root: &Path, env: Option<String>) -> Result<CloesceConfig, String> {
         let config_path = if let Some(env) = env.as_ref() {
             root.join(format!("{}.cloesce.jsonc", env))
         } else {
@@ -81,8 +122,6 @@ impl CloesceConfig {
         let parsed = serde_json::from_reader(stripped)
             .map_err(|e| format!("Failed to parse {}: {}", config_path.display(), e))?;
 
-        tracing::info!("Loaded cloesce config from {}", config_path.display(),);
-
         Ok(CloesceConfig {
             parsed,
             root: root.to_path_buf(),
@@ -90,8 +129,9 @@ impl CloesceConfig {
         })
     }
 
-    fn collect_source(&self, root: &std::path::Path) -> Vec<PathBuf> {
-        fn is_source(path: &std::path::Path) -> bool {
+    /// Scans the `src_paths` directories for `.clo` and `.cloesce` files,
+    fn collect_sources(&self, root: &Path) -> Vec<PathBuf> {
+        fn is_source(path: &Path) -> bool {
             matches!(
                 path.extension().and_then(|e| e.to_str()),
                 Some("cloesce") | Some("clo")
@@ -100,10 +140,13 @@ impl CloesceConfig {
 
         let mut results = Vec::new();
         for p in &self.parsed.src_paths {
-            let full = if std::path::Path::new(p).is_absolute() {
-                PathBuf::from(p)
-            } else {
-                root.join(p)
+            let full = {
+                let p = Path::new(p);
+                if p.is_absolute() {
+                    p.to_path_buf()
+                } else {
+                    root.to_path_buf().join(p)
+                }
             };
 
             if !full.exists() {
@@ -118,7 +161,7 @@ impl CloesceConfig {
                 continue;
             }
 
-            let mut queue = std::collections::VecDeque::new();
+            let mut queue = VecDeque::new();
             queue.push_back(full);
             while let Some(dir) = queue.pop_front() {
                 let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -170,17 +213,9 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    Compile(CompileArgs),
+    Compile,
     Migrate(MigrateArgs),
     Version,
-}
-
-#[derive(Args)]
-#[command(name = "compile")]
-pub struct CompileArgs {
-    // For the Cloesce regression tests. Prefixes files with "out.".
-    #[arg(long)]
-    pub snap: bool,
 }
 
 #[derive(Args)]
@@ -192,56 +227,43 @@ pub struct MigrateArgs {
     #[arg(long, conflicts_with = "binding")]
     pub all: bool,
 
-    #[arg(long)]
-    pub fixed: bool,
-
     pub name: String,
 
-    /// Override the CIDL input path (defaults to config-derived path)
-    #[arg(long)]
-    pub cidl: Option<PathBuf>,
+    #[cfg(feature = "regression-tests")]
+    pub cidl: PathBuf,
 
-    /// Override the wrangler config path (defaults to config-derived path)
-    #[arg(long)]
-    pub wrangler: Option<PathBuf>,
-}
-
-fn fetch_latest_version() -> Option<String> {
-    let response = ureq::get("https://api.github.com/repos/bens-schreiber/cloesce/releases/latest")
-        .header("User-Agent", "cloesce-cli")
-        .call()
-        .ok()?;
-    let json: serde_json::Value = response.into_body().read_json().ok()?;
-    let tag = json["tag_name"].as_str()?;
-    Some(tag.trim_start_matches('v').to_string())
+    #[cfg(feature = "regression-tests")]
+    pub wrangler: PathBuf,
 }
 
 fn main() {
     let start_time = std::time::Instant::now();
-    let subscriber = FmtSubscriber::builder().finish();
+    let subscriber = FmtSubscriber::builder().without_time().finish();
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
 
-    // Spawn a seperate thread so we don't impede compilation
+    // Spawn a seperate thread as to not impede the compiler
     let update_check = std::thread::spawn(fetch_latest_version);
 
     let cli = Cli::parse();
     let run = || -> Result<(), String> {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
-        let config = CloesceConfig::load(&root, cli.env)?;
 
         match cli.command {
-            Command::Compile(args) => {
-                let sources = config.collect_source(&root);
-                compile::compile(args, config, sources)?;
+            Command::Compile => {
+                let config = CloesceConfig::load(&root, cli.env)?;
+                let sources = config.collect_sources(&root);
+                compile::compile(config, sources)?;
 
                 let elapsed = start_time.elapsed();
                 tracing::info!("Compilation completed in {:.2?}", elapsed);
                 Ok(())
             }
             Command::Migrate(args) => {
-                let elapsed = start_time.elapsed();
+                let config = CloesceConfig::load(&root, cli.env)?;
                 migrate::migrate(args, config)?;
+
+                let elapsed = start_time.elapsed();
                 tracing::info!("Migration completed in {:.2?}", elapsed);
                 Ok(())
             }
@@ -251,17 +273,23 @@ fn main() {
             }
         }
     };
-
     let result = panic::catch_unwind(run);
 
     let current = env!("CARGO_PKG_VERSION");
     match update_check.join().ok().flatten() {
         Some(latest) if latest != current => {
+            println!(" ");
             println!("A new version of cloesce is available: v{latest} (current: v{current})");
-            println!("To update, run: curl -fsSL https://cloesce.pages.dev/install.sh | sh");
+            println!(" ");
+            println!("To update, run:");
+            println!("  curl -fsSL https://cloesce.pages.dev/install.sh | sh    # MacOS/Linux");
+            println!(
+                "  irm https://cloesce.pages.dev/install.ps1 | iex         # Windows PowerShell"
+            );
+            println!(" ");
         }
         Some(_) => {
-            // Current version is up to date, no need to print anything
+            // Current version is up to date
         }
         None => println!("cloesce v{current}"),
     }
@@ -269,11 +297,16 @@ fn main() {
     match result {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) => {
-            tracing::error!("An error occurred: {e}");
+            tracing::error!("{e}");
             std::process::exit(1);
         }
         Err(e) => {
-            tracing::error!("An uncaught error occurred: {:?}", e);
+            const CLOESCE_GITHUB_ISSUES: &str = "https://github.com/bens-schreiber/cloesce/pulls";
+
+            tracing::error!(
+                "An uncaught error occurred. Open an issue at {CLOESCE_GITHUB_ISSUES}: \n{:?}",
+                e
+            );
             std::process::abort();
         }
     }
@@ -289,25 +322,51 @@ mod compile {
 
     use super::*;
 
-    pub fn compile(
-        args: CompileArgs,
-        config: CloesceConfig,
-        target_paths: Vec<PathBuf>,
-    ) -> Result<(), String> {
+    pub fn compile(config: CloesceConfig, target_paths: Vec<PathBuf>) -> Result<(), String> {
         tracing::info!("Starting compilation with config: {:?}", config.parsed);
         if target_paths.is_empty() {
-            return Err("No .clo / .cloesce source files found".to_string());
+            return Err("No cloesce source files found".into());
         }
+
+        // Load wrangler first to catch any errors before more expensive compilation steps
+        let (mut wrangler, mut wrangler_spec) = {
+            let wrangler_contents =
+                std::fs::read_to_string(config.wrangler_path()).map_err(|e| {
+                    format!(
+                        "Failed to read wrangler config at {}: {}",
+                        config.wrangler_path().display(),
+                        e
+                    )
+                })?;
+
+            let generator =
+                WranglerGenerator::from_contents(wrangler_contents, &config.wrangler_path())?;
+            let env = config.env.as_deref();
+            let spec = generator.as_spec(env).map_err(|e| {
+                format!(
+                    "Failed to process wrangler config {}: {}",
+                    config.wrangler_path().display(),
+                    e
+                )
+            })?;
+
+            (generator, spec)
+        };
 
         // Lexing
         let sources = target_paths
             .into_iter()
             .map(|p| {
                 let src = std::fs::read_to_string(&p)
-                    .unwrap_or_else(|_| panic!("Failed to read source file: {}", p.display()));
-                (src, p)
+                    .map_err(|e| format!("Failed to read source file {}: {}", p.display(), e))?;
+
+                Ok((src, p))
             })
-            .collect::<Vec<(String, PathBuf)>>();
+            .collect::<Result<Vec<(String, PathBuf)>, String>>()
+            .map_err(|e| {
+                tracing::error!("{}", e);
+                "Failed to read source files".to_string()
+            })?;
 
         let lexed = CloesceLexer::lex(sources.iter().map(|(src, path)| LexTarget {
             src: src.as_str(),
@@ -315,14 +374,14 @@ mod compile {
         }));
         if lexed.has_errors() {
             lexed.display_error(&lexed.file_table);
-            return Err("lexing failed".to_string());
+            return Err("lexing failed".into());
         }
 
         // Parsing
         let parse = CloesceParser::parse(&lexed.results, &lexed.file_table);
         if parse.has_errors() {
             parse.display_error(&lexed.file_table);
-            return Err("parsing failed".to_string());
+            return Err("parsing failed".into());
         }
 
         // Semantic
@@ -331,26 +390,26 @@ mod compile {
             for error in &errors {
                 error.display_error(&lexed.file_table);
             }
-            return Err("semantic analysis failed".to_string());
+            return Err("semantic analysis failed".into());
         }
 
         // Codegen
         let wrangler = {
-            let mut generator = WranglerGenerator::from_path(&config.wrangler_path());
-            let env = config.env.as_deref();
-            let mut spec = generator.as_spec(env);
-
-            WranglerDefault::set_defaults(&mut spec, &ast, &config.parsed.migrations_path);
-            generator.generate(spec, env)
+            WranglerDefault::set_defaults(&mut wrangler_spec, &ast, &config.parsed.migrations_path);
+            wrangler.generate(wrangler_spec, config.env.as_deref())
         };
 
         let backend = BackendGenerator::generate(&ast, &config.parsed.workers_url);
         let client = ClientGenerator::generate(&ast, &config.parsed.workers_url);
 
         let output_name = |name: &str| {
-            if args.snap {
+            #[cfg(feature = "regression-tests")]
+            {
                 format!("out.{}", name)
-            } else {
+            }
+
+            #[cfg(not(feature = "regression-tests"))]
+            {
                 name.to_string()
             }
         };
@@ -358,47 +417,71 @@ mod compile {
         // Output CIDL
         {
             let cidl_path = config.cloesce_dir().join(output_name("cidl.json"));
-            let mut file =
-                open_file_or_create(&cidl_path).expect("Failed to create cidl output file");
+            let mut file = open_file_or_create(&cidl_path)?;
+
             file.write_all(ast.to_json().as_bytes())
-                .expect("file to be written");
+                .map_err(|e| format!("Failed to write CIDL file {}: {}", cidl_path.display(), e))?;
             tracing::info!("Generated JSON CIDL at {}", cidl_path.display());
         };
 
         // Output Wrangler
         {
-            let wrangler_path = if args.snap {
-                config.cloesce_dir().join(output_name(
-                    config.parsed.wrangler_config_format.wrangler_file_name(),
-                ))
-            } else {
-                config.wrangler_path()
+            let out_wrangler_path = {
+                #[cfg(feature = "regression-tests")]
+                {
+                    let name = config.parsed.wrangler_config_format.wrangler_file_name();
+                    config.cloesce_dir().join(format!("out.{}", name))
+                }
+
+                #[cfg(not(feature = "regression-tests"))]
+                {
+                    config.wrangler_path()
+                }
             };
-            let mut wrangler_file =
-                open_file_or_create(&wrangler_path).expect("Failed to create wrangler output file");
-            wrangler_file
+            let mut out_wrangler_file = open_file_or_create(&out_wrangler_path)?;
+
+            out_wrangler_file
                 .write_all(wrangler.as_bytes())
-                .expect("file to be written");
-            tracing::info!("Generated wrangler config at {}", wrangler_path.display());
+                .map_err(|e| {
+                    format!(
+                        "Failed to write wrangler file {}: {}",
+                        out_wrangler_path.display(),
+                        e
+                    )
+                })?;
+            tracing::info!(
+                "Generated wrangler config at {}",
+                out_wrangler_path.display()
+            );
         }
 
         // Output backend
         {
-            let backend_path = config.cloesce_dir().join(output_name("backend.ts")); // TODO: hardcoded to ts
-            let mut file =
-                open_file_or_create(&backend_path).expect("Failed to create backend output file");
-            file.write_all(backend.as_bytes())
-                .expect("file to be written");
+            let backend_path = config.cloesce_dir().join(output_name("backend.ts"));
+            let mut file = open_file_or_create(&backend_path)?;
+
+            file.write_all(backend.as_bytes()).map_err(|e| {
+                format!(
+                    "Failed to write backend file {}: {}",
+                    backend_path.display(),
+                    e
+                )
+            })?;
             tracing::info!("Generated backend code at {}", backend_path.display());
         }
 
         // Output client
         {
-            let client_path = config.cloesce_dir().join(output_name("client.ts")); // TODO: hardcoded to ts
-            let mut file =
-                open_file_or_create(&client_path).expect("Failed to create client output file");
-            file.write_all(client.as_bytes())
-                .expect("file to be written");
+            let client_path = config.cloesce_dir().join(output_name("client.ts"));
+            let mut file = open_file_or_create(&client_path)?;
+
+            file.write_all(client.as_bytes()).map_err(|e| {
+                format!(
+                    "Failed to write client file {}: {}",
+                    client_path.display(),
+                    e
+                )
+            })?;
             tracing::info!("Generated client code at {}", client_path.display());
         }
 
@@ -414,13 +497,39 @@ mod migrate {
     use super::*;
 
     pub fn migrate(args: MigrateArgs, config: CloesceConfig) -> Result<(), String> {
-        let wrangler_path = args.wrangler.unwrap_or_else(|| config.wrangler_path());
-        let cidl_path = args.cidl.unwrap_or_else(|| config.cidl_path());
-        let wrangler = WranglerGenerator::from_path(&wrangler_path);
-        let spec = wrangler.as_spec(config.env.as_deref());
+        let (wrangler_path, cidl_path) = {
+            #[cfg(feature = "regression-tests")]
+            {
+                (args.wrangler, args.cidl)
+            }
+
+            #[cfg(not(feature = "regression-tests"))]
+            {
+                (config.wrangler_path(), config.cidl_path())
+            }
+        };
+
+        let spec = {
+            let wrangler_contents = std::fs::read_to_string(&wrangler_path).map_err(|e| {
+                format!(
+                    "Failed to read wrangler config at {}: {}",
+                    wrangler_path.display(),
+                    e
+                )
+            })?;
+
+            WranglerGenerator::from_contents(wrangler_contents, &wrangler_path)?
+                .as_spec(config.env.as_deref())
+                .map_err(|e| {
+                    format!(
+                        "Failed to process wrangler config {}: {}",
+                        wrangler_path.display(),
+                        e
+                    )
+                })?
+        };
 
         if spec.d1_databases.is_empty() {
-            // No D1 bindings, no migrations. Exit gracefully.
             tracing::warn!("No D1 bindings found in the wrangler config. Nothing to migrate.");
             return Ok(());
         }
@@ -440,96 +549,131 @@ mod migrate {
         };
 
         for current_binding in bindings {
-            // Binding should exist in the wrangler config and be of type D1
-            let db = spec
-                .d1_databases
-                .iter()
-                .find(|db| db.binding.as_deref() == Some(current_binding.as_str()));
+            let db = {
+                // Binding should exist in the wrangler config and be of type D1
+                let d1_database = spec
+                    .d1_databases
+                    .iter()
+                    .find(|db| db.binding.as_deref() == Some(current_binding.as_str()));
 
-            let db = match db {
-                Some(db) => db,
-                None => {
-                    return Err(format!(
-                        "No D1 database binding named '{}' found in the wrangler config.",
-                        current_binding
-                    ));
+                match d1_database {
+                    Some(db) => db,
+                    None => {
+                        return Err(format!(
+                            "No D1 database binding named '{}' found in the wrangler config.",
+                            current_binding
+                        ));
+                    }
                 }
             };
 
             let migrations_dir = config
                 .root
                 .join(db.migrations_dir.as_deref().unwrap_or("migrations"));
+            std::fs::create_dir_all(&migrations_dir).map_err(|e| {
+                format!(
+                    "Failed to create migrations directory {}: {}",
+                    migrations_dir.display(),
+                    e
+                )
+            })?;
 
-            std::fs::create_dir_all(&migrations_dir)
-                .expect("Failed to create migrations directory");
-            let mut entries: Vec<PathBuf> = std::fs::read_dir(&migrations_dir)
-                .expect("Failed to read migrations directory")
-                .filter_map(|e| e.ok().map(|d| d.path()))
-                .collect();
+            // The last migrated CIDL and SQL files are the most recent timestamped files
+            // within the migrations directory.
+            let (last_migrated_cidl_path, mut migrated_cidl_file, mut migrated_sql_file) = {
+                let mut dir_entries = std::fs::read_dir(&migrations_dir)
+                    .map_err(|e| {
+                        format!(
+                            "Failed to read migrations directory {}: {}",
+                            migrations_dir.display(),
+                            e
+                        )
+                    })?
+                    .filter_map(|e| e.ok().map(|d| d.path()))
+                    .collect::<Vec<_>>();
+                dir_entries.sort();
 
-            // Last migrated CIDL file is the last .json file in the migrations dir
-            entries.sort();
-            let last_migrated_cidl_path = if args.fixed {
-                None
-            } else {
-                entries
-                    .iter()
-                    .rfind(|p| {
-                        p.extension()
-                            .and_then(|e| e.to_str())
-                            .map(|ext| ext.eq_ignore_ascii_case("json"))
-                            .unwrap_or(false)
+                let last_migrated_cidl_path = {
+                    #[cfg(feature = "regression-tests")]
+                    {
+                        None
+                    }
+
+                    #[cfg(not(feature = "regression-tests"))]
+                    {
+                        dir_entries
+                            .iter()
+                            .rfind(|p| {
+                                p.extension()
+                                    .and_then(|e| e.to_str())
+                                    .map(|ext| ext.eq_ignore_ascii_case("json"))
+                                    .unwrap_or(false)
+                            })
+                            .cloned()
+                    }
+                };
+
+                let file_stem = {
+                    #[cfg(feature = "regression-tests")]
+                    {
+                        args.name.to_string()
+                    }
+
+                    #[cfg(not(feature = "regression-tests"))]
+                    {
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .expect("Time went backwards")
+                            .as_secs();
+
+                        format!("{timestamp}_{}", args.name)
+                    }
+                };
+
+                (
+                    last_migrated_cidl_path,
+                    open_file_or_create(&migrations_dir.join(format!("{}.json", file_stem)))?,
+                    open_file_or_create(&migrations_dir.join(format!("{}.sql", file_stem)))?,
+                )
+            };
+
+            let lm_contents = last_migrated_cidl_path
+                .map(|p: PathBuf| {
+                    std::fs::read_to_string(&p).map_err(|e| {
+                        format!(
+                            "Failed to read last migrated CIDL file {}: {}",
+                            p.display(),
+                            e
+                        )
                     })
-                    .cloned()
-            };
-
-            let file_stem = if args.fixed {
-                args.name.to_string()
-            } else {
-                let timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs();
-
-                format!("{}_{timestamp}", args.name)
-            };
-
-            let migrated_cidl_path = migrations_dir.join(format!("{file_stem}.json"));
-            let migrated_sql_path = migrations_dir.join(format!("{file_stem}.sql"));
-
-            tracing::info!(
-                "Starting migration for binding '{}' ({})",
-                current_binding,
-                migrated_sql_path.display()
-            );
-
-            let mut migrated_cidl_file = open_file_or_create(&migrated_cidl_path)
-                .expect("Failed to create migrated CIDL file");
-            let mut migrated_sql_file = open_file_or_create(&migrated_sql_path)
-                .expect("Failed to create migrated SQL file");
-
-            let lm_ast_contents = last_migrated_cidl_path
-                .map(|p| std::fs::read_to_string(&p).map_err(|e| e.to_string()))
+                })
                 .transpose()?;
-            let lm_ast = lm_ast_contents
+
+            let lm_ast: Option<MigrationsAst> = lm_contents
                 .as_deref()
                 .map(MigrationsAst::from_json)
                 .transpose()?;
 
+            let ast_contents = std::fs::read_to_string(&cidl_path)
+                .map_err(|e| format!("Failed to read CIDL file {}: {}", cidl_path.display(), e))?;
+
             // Migrate only the models with the specified D1 binding
-            let ast_contents = std::fs::read_to_string(&cidl_path).map_err(|e| e.to_string())?;
-            let mut ast = MigrationsAst::from_json(&ast_contents)?;
-            ast.models
-                .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
+            let ast = {
+                let mut ast = MigrationsAst::from_json(&ast_contents)?;
+                ast.models
+                    .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
+
+                ast
+            };
 
             let generated_sql = MigrationsGenerator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
 
             migrated_cidl_file
                 .write_all(ast.to_json().as_bytes())
-                .expect("Could not write to file");
+                .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
             migrated_sql_file
                 .write_all(generated_sql.as_bytes())
-                .expect("Could not write to file");
+                .map_err(|e| format!("Failed to write migrated SQL file: {e}"))?;
 
             tracing::info!("Finished migration for binding '{}'.", current_binding);
         }

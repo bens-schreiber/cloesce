@@ -1,7 +1,7 @@
 # Summary
 
 [The Cloesce Language](./ch0-0-introduction.md)
-[LLMs, TypeDoc and VS Code](./ch0-1-typedoc.md)
+[Resources](./ch0-1-resources.md)
 
 - [Getting Started](./ch1-0-getting-started.md)
     - [Installation](./ch1-1-installation.md)

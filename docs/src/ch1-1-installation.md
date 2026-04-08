@@ -3,41 +3,39 @@
 > [!NOTE]
 > Cloesce supports only TypeScript compilation as of v0.3.0. Support for additional languages will be added in future releases.
 
-## Installing the Cloesce CLI
+## Installing the Compiler
 
-The `cloesce` CLI provides the `compile`, `migrate`, and `version` subcommands used in your project scripts.
-
-### Linux and macOS
+**Linux and macOS**
 
 ```sh
 curl -fsSL https://cloesce.pages.dev/install.sh | sh
 ```
 
-### Windows (PowerShell)
+**Windows (PowerShell)**
 
 ```powershell
 irm https://cloesce.pages.dev/install.ps1 | iex
 ```
 
-### Verify Installation
+Then verify the installation:
 
 ```sh
 cloesce version
 ```
 
-## `create-cloesce` Template
+## Starting a New Project
 
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 
 This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
 
-## Prerequisites
+### Prerequisites
 
 1. Sign up for a [Cloudflare account](https://dash.cloudflare.com/sign-up/workers-and-pages) (*not necessary for local development*)
 2. Install [Node.js](https://nodejs.org/) (version `16.17.0` or later)
 
 
-## create-cloesce
+### create-cloesce
 
 To create a new Cloesce project using the `create-cloesce` template, run the following command in your terminal:
 
@@ -56,11 +54,11 @@ A simple project structure is created for you.
 
 ├── src/
 │   ├── api/            # API route handlers
-│   └── web/            # Frontend web assets
+│   ├── web/            # Frontend web assets
+│   └── schema/
+│       └── schema.clo  # Cloesce schema definition
 ├── test/               # Unit tests for example Models
 ├── migrations/         # Database migration files
-├── schema/
-│   └── schema.clo      # Cloesce schema definition
 ├── cloesce.jsonc       # Cloesce configuration
 └── package.json        # Project dependencies and scripts
 ```

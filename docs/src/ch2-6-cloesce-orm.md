@@ -51,7 +51,7 @@ Always accessible is the Default Data Source (`User.DataSources.Default`), which
 
 Internally, Cloesce uses the `Orm` class to implement the generated methods described above. You can also use it directly for more advanced use cases, such as custom SQL queries or complex hydration scenarios.
 
-### `select`
+### select
 
 `Orm.select` generates a SQL `SELECT` statement with the necessary `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an Include Tree.
 
@@ -103,10 +103,10 @@ LEFT JOIN "Cat" AS "Cat_3"
 Orm.select(Boss.Meta, "SELECT * FROM Boss WHERE name = 'Alice'", Boss.DataSources.WithAll.include);
 ```
 
-## `map`
+### map
 
 `Orm.map` takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.
 
-## `hydrate`
+### hydrate
 
 `Orm.hydrate` takes a base set of Model instances (e.g. from `map`) and fetches any additional KV or R2 properties to return fully populated Model instances.

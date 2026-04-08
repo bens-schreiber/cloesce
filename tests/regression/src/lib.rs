@@ -130,7 +130,7 @@ impl Fixture {
 
         let cmd = self.run_command(
             Command::new(compiler_dir.join("target/release/cloesce"))
-                .args(["compile", "--snap"])
+                .arg("compile")
                 .current_dir(fixture_dir),
         );
 
@@ -182,10 +182,8 @@ impl Fixture {
 
         let res = self.run_command(
             Command::new(compiler_dir.join("target/release/cloesce"))
-                .args(["migrate", "--fixed", "--all", "out.Initial"])
-                .arg("--cidl")
+                .args(["migrate", "--all", "out.Initial"])
                 .arg(cidl)
-                .arg("--wrangler")
                 .arg(wrangler_path)
                 .current_dir(fixture_root),
         );

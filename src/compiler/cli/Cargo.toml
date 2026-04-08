@@ -22,5 +22,6 @@ ureq = { version = "3.3.0", features = ["json"] }
 name = "cloesce"
 path = "bin/cloesce.rs"
 
-[lib]
-doctest = false
+
+[features]
+regression-tests = []
