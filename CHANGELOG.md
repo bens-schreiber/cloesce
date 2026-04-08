@@ -1,3 +1,15 @@
+# [0.3.3] - 2026-4-8
+### Added
+
+### Changed
+- CLI print output standardized
+- Converted most `except` calls involving file system operations in CLI to display user-friendly error messages.
+- Feature gated regression test specific args
+
+### Fixed
+- Miscellaneous bug fixes in the CLI
+- Timestamp name bug in the migrations CLI
+
 # [0.3.2] - 2026-4-6
 ### Added
 - Standalone Cloesce binary for Windows, Linux and MacOS
