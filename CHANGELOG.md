@@ -1,3 +1,13 @@
+# [0.3.4] - 2026-4-8
+### Added
+
+### Changed
+- Version checking (via GitHub API) is no longer run every command, instead using a cached value that is updated once an hour.
+- `version` command always fetches the latest version from the GitHub API, ignoring the cache.
+
+### Fixed
+- GitHub API rate limit issues
+
 # [0.3.3] - 2026-4-8
 ### Added
 - `map`, `select` and `hydrate` methods generated in the namespace of each backend Model for convenience.
