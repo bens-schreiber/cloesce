@@ -753,12 +753,9 @@ mod migrate {
 mod version {
     use super::*;
 
-    /// Returns [None] if the cache is unavailable or invalid.
-    fn update_cache_path() -> Option<PathBuf> {
-        Some(dirs::cache_dir()?.join("cloesce").join("update_check"))
-    }
-
     struct UpdateCache {
+        path: PathBuf,
+
         /// line 1: Unix timestamp of last fetch (seconds)
         fetched_at: u64,
 
@@ -770,8 +767,13 @@ mod version {
     }
 
     impl UpdateCache {
-        fn load(path: &Path) -> Option<Self> {
-            let text = std::fs::read_to_string(path).ok()?;
+        fn path() -> Option<PathBuf> {
+            Some(dirs::cache_dir()?.join("cloesce").join("update_check"))
+        }
+
+        fn load() -> Option<Self> {
+            let path = Self::path()?;
+            let text = std::fs::read_to_string(&path).ok()?;
             let mut lines = text.splitn(3, '\n');
             let fetched_at = lines.next()?.trim().parse::<u64>().ok()?;
             let etag = lines.next()?.trim().to_string();
@@ -780,20 +782,35 @@ mod version {
                 return None;
             }
             Some(Self {
+                path,
                 fetched_at,
                 etag,
                 version,
             })
         }
 
-        fn save(&self, path: &Path) {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
+        fn save(&self) {
+            if let Some(parent) = self.path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                tracing::error!(
+                    "Failed to create cache directory {}: {}",
+                    parent.display(),
+                    e
+                );
+                return;
             }
-            let _ = std::fs::write(
-                path,
+
+            if let Err(e) = std::fs::write(
+                &self.path,
                 format!("{}\n{}\n{}", self.fetched_at, self.etag, self.version),
-            );
+            ) {
+                tracing::error!(
+                    "Failed to write update cache file {}: {}",
+                    self.path.display(),
+                    e
+                );
+            }
         }
     }
 
@@ -817,8 +834,7 @@ mod version {
     /// Returns [None] if the fetch failed and there is no valid cache, otherwise returns the version string (x.x.x)
     ///
     pub fn fetch_latest_version(force: bool) -> Option<String> {
-        let cache_path = update_cache_path();
-        let cached = cache_path.as_deref().and_then(UpdateCache::load);
+        let cached = UpdateCache::load();
         let now = now_secs();
 
         // Return cached value if it's fresh enough and we're not forcing.
@@ -841,12 +857,12 @@ mod version {
 
         // 304 Not Modified, refresh timestamp
         if response.status() == 304 {
-            if let (Some(c), Some(p)) = (cached, cache_path.as_deref()) {
+            if let Some(c) = cached {
                 let refreshed = UpdateCache {
                     fetched_at: now,
                     ..c
                 };
-                refreshed.save(p);
+                refreshed.save();
                 return Some(refreshed.version);
             }
             return None;
@@ -863,13 +879,11 @@ mod version {
         let tag = json["tag_name"].as_str()?;
         let version = tag.trim_start_matches('v').to_string();
 
-        if let Some(p) = cache_path.as_deref() {
-            UpdateCache {
-                fetched_at: now,
-                etag,
-                version: version.clone(),
-            }
-            .save(p);
+        if let Some(mut cache) = cached {
+            cache.etag = etag;
+            cache.fetched_at = now;
+            cache.version = version.clone();
+            cache.save();
         }
 
         Some(version)

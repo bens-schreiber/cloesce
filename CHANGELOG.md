@@ -2,7 +2,7 @@
 ### Added
 
 ### Changed
-- Version checking (via GitHub API) is no longer ran every command, instead using a cached value that is updated once an hour.
+- Version checking (via GitHub API) is no longer run every command, instead using a cached value that is updated once an hour.
 - `version` command always fetches the latest version from the GitHub API, ignoring the cache.
 
 ### Fixed
