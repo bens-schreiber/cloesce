@@ -582,7 +582,7 @@ fn model_block_foreign_with_nav() {
 }
 
 #[test]
-fn model_block_primary_foreign() {
+fn model_block_foreign_primary() {
     // Act
     let ast = lex_and_parse(
         r#"
@@ -595,7 +595,7 @@ fn model_block_primary_foreign() {
 
         [use d1_a]
         model PassportEntry {
-            primary foreign(Person::id) {
+            foreign(Person::id) primary {
                 personId
             }
         }
@@ -620,7 +620,7 @@ fn model_block_primary_foreign() {
 }
 
 #[test]
-fn model_block_unique_foreign() {
+fn model_block_foreign_unique() {
     // Act
     let ast = lex_and_parse(
         r#"
@@ -637,7 +637,7 @@ fn model_block_unique_foreign() {
                 id: int
             }
 
-            unique foreign(Company::id) {
+            foreign(Company::id) unique {
                 companyId
             }
 
