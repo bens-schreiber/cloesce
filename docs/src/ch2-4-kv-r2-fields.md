@@ -37,12 +37,45 @@ model Settings {
         allSettings: json
     }
 }
-
 ```
 
 The above model has no D1 backing, and is purely stored in KV. A `keyfield` is a special type of field that is not stored anywhere, and is used only for constructing the key for KV entries. In this case, the `settingsId` field is used to construct the key for both the `data` and `allSettings` fields.
 
 The `data` field is of type `json`, which means that the value stored in KV will be JSON. The `allSettings` field is marked as `paginated`, which means that it will fetch all entries in the `settings/` prefix and return them as a paginated list (fetching 1000 entries at a time, the maximum allowed by Cloudflare).
+
+Multiple KV and R2 fields can also be grouped into a `paginated` block, which marks all of them as paginated:
+
+```cloesce
+model Settings {
+    keyfield {
+        settingsId
+    }
+
+    kv(myNamespace, "settings/{settingsId}") {
+        data: json
+    }
+
+    paginated {
+        kv(myNamespace, "settings/") {
+            allSettings: json
+        }
+
+        kv(myNamespace, "archive/") {
+            archivedSettings: json
+        }
+    }
+
+    // or, use infix syntax, equivalent to the above:
+    //
+    // kv(myNamespace, "settings/{settingsId}") paginated {
+    //     allSettings: json
+    // }
+    //
+    // kv(myNamespace, "archive/") paginated {
+    //     archivedSettings: json
+    // }
+}
+```
 
 [Data Source Include Trees](./ch2-3-data-sources.md) can be used with any KV field as well to specify which fields to include when fetching data.
 
