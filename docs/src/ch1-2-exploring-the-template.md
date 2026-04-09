@@ -93,7 +93,7 @@ model Weather {
         nav { weatherReport }
     }
     
-    r2(bucket, "weather/photos/{id}.jpg") {
+    r2 (bucket, "weather/photos/{id}.jpg") {
         photo
     }
 

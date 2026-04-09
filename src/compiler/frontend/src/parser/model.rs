@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use chumsky::prelude::*;
 
 use ast::CrudKind;
@@ -403,6 +405,12 @@ fn map_model<'src>(
                             fields.push(sym);
                         }
                         PrimaryItem::Foreign(pf) => {
+                            if matches!(pf.block.qualifier, Some(ForeignQualifier::Primary)).not() {
+                                // `drain_foreign` will push to primary fields if the qual is primary,
+                                // but if not we need to do it here
+                                primary_fields.extend(pf.block.fields.iter().map(|f| f.name));
+                            }
+
                             foreign_blocks.push(drain_foreign(
                                 model_name,
                                 pf,
