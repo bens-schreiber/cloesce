@@ -237,7 +237,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
 
             for (field, (_, adj_field_name)) in fk.fields.iter().zip(&fk.adj) {
                 let is_pk = model_block.primary_fields.contains(&field.name);
-                if is_pk && fk.optional {
+                if is_pk && fk.is_optional() {
                     self.sink
                         .push(SemanticError::NullablePrimaryKey { column: field });
                     continue;
@@ -261,7 +261,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     });
                 }
 
-                if !fk.optional {
+                if !fk.is_optional() {
                     // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                     // Dog must come before Person
                     self.graph
@@ -277,7 +277,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     hash: 0,
                     field: Field {
                         name: field.name.into(),
-                        cidl_type: if fk.optional {
+                        cidl_type: if fk.is_optional() {
                             CidlType::nullable(adj_field_sym.cidl_type.clone())
                         } else {
                             adj_field_sym.cidl_type.clone()

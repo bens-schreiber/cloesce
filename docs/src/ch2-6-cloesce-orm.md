@@ -27,18 +27,18 @@ model User {
         id: int
     }
 
-    name: string;
+    name: string
 }
 
-source ByName {
+source ByName for User {
     include { }
 
     sql get(name: string) {
-        SELECT * FROM User WHERE name = $name
+        "SELECT * FROM User WHERE name = $name"
     }
 
     sql list(lastName: string, limit: int) {
-        SELECT * FROM User WHERE name > $lastName ORDER BY name LIMIT $limit
+        "SELECT * FROM User WHERE name > $lastName ORDER BY name LIMIT $limit"
     }
 }
 ```
@@ -68,9 +68,9 @@ model Boss {
 
 source WithAll for Boss {
     include {
-        persons: {
-            dogs: {},
-            cats: {}
+        persons {
+            dogs,
+            cats
         }
     }
 }

@@ -1,3 +1,12 @@
+# [0.3.5] - 2026-4-9
+### Added
+
+### Changed
+- Standardized "infix notation" for primary, unique, optional, paginated
+- Allow block form of `optional` and `paginated` modifiers in addition to infix
+
+### Fixed
+
 # [0.3.4] - 2026-4-8
 ### Added
 

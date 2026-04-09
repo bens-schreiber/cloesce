@@ -52,9 +52,17 @@ model Person {
         id: int
     }
 
-    foreign (Person::id) optional {
-        parentId
+    optional {
+        foreign (Person::id) {
+            parentId
+        }
     }
+
+    // or use infix, equivalent to the above:
+    //
+    // foreign (Person::id) optional {
+    //     parentId
+    // }
 }
 ```
 
@@ -168,20 +176,35 @@ CREATE TABLE IF NOT EXISTS "CourseStudent" (
 
 ## Composite Keys
 
-A Model can have a composite primary key by using the `@PrimaryKey` decorator on multiple fields. A primary key may also be a foreign key.
+A Model can have a composite primary key by listing multiple fields in a `primary` block. A primary key may also be a foreign key.
 
 ```cloesce
 [use db]
 model Enrollment {
-    primary foreign (Student::id) {
-        studentId
-        nav { student }
+    primary {
+        foreign (Student::id) {
+            studentId
+            nav { student }
+        }
+
+        foreign (Course::id) {
+            courseId
+            nav { course }
+        }
     }
 
-    primary foreign (Course::id) {
-        courseId
-        nav { course }
-    }
+    // or use infix, equivalent to the above:
+    //
+    // foreign (Student::id) primary {
+    //     studentId
+    //     nav { student }
+    // }
+    //
+    // foreign (Course::id) primary {
+    //     courseId
+    //     nav { course }
+    //
+    // }
 }
 
 [use db]
@@ -225,7 +248,7 @@ In this example, the `Dog` Model has a composite foreign key consisting of `owne
 
 ## Unique Constraints
 
-Cloesce supports adding unique constraints to any column or foreign key. By default, a primary key is unique. Any field within a unique block is apart of the same unique constraint.
+Cloesce supports adding unique constraints to any column or foreign key. By default, a primary key is unique. Any field within a unique block is part of the same unique constraint.
 
 ```cloesce
 [use db]
@@ -238,7 +261,8 @@ model User {
         email: string
     }
 
-    unique foreign (Group::id) {
+    // infix syntax also supported:
+    foreign (Group::id) unique {
         groupId
     }
 

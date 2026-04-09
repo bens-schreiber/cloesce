@@ -45,7 +45,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     });
 
     // include { ... }
-    let include_tree = just(Token::Include).ignore_then(
+    let include_tree = just(Token::Ident("include")).ignore_then(
         include_entry
             .separated_by(just(Token::Comma))
             .allow_trailing()
@@ -83,13 +83,13 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql get(...) { ... }
     let get_method = just(Token::Sql)
-        .then_ignore(just(Token::Get))
+        .then_ignore(just(Token::Ident("get")))
         .ignore_then(method_params())
         .then(sql_block.clone());
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
-        .then_ignore(just(Token::List))
+        .then_ignore(just(Token::Ident("list")))
         .ignore_then(
             named_parameter()
                 .separated_by(just(Token::Comma))
@@ -109,7 +109,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     internal_decorator
         .or_not()
         .then(just(Token::Source).ignore_then(select! { Token::Ident(name) => name }))
-        .then_ignore(just(Token::For))
+        .then_ignore(just(Token::Ident("for")))
         .then(select! { Token::Ident(model) => model })
         .then(
             include_tree

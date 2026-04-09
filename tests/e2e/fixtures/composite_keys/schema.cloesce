@@ -41,16 +41,20 @@ model Course {
 
 [use db, get, list, save]
 model StudentCourse {
-    primary foreign(Student::id, Student::name) {
-        studentId
-        studentName
-        nav { student }
+    primary {
+        foreign(Student::id, Student::name) {
+            studentId
+            studentName
+            nav { student }
+        }
+
+        foreign(Course::id) {
+            courseId
+            nav { course }
+        }
     }
 
-    primary foreign(Course::id) {
-        courseId
-        nav { course }
-    }
+
 }
 
 source Default for StudentCourse {

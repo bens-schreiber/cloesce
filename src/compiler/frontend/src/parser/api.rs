@@ -129,13 +129,13 @@ fn parameter<'tokens, 'src: 'tokens>()
 
 fn http_verb<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, HttpVerb, Extra<'tokens, 'src>> {
-    choice((
-        just(Token::Get).map(|_| HttpVerb::Get),
-        just(Token::Post).map(|_| HttpVerb::Post),
-        just(Token::Put).map(|_| HttpVerb::Put),
-        just(Token::Patch).map(|_| HttpVerb::Patch),
-        just(Token::Delete).map(|_| HttpVerb::Delete),
-    ))
+    select! {
+        Token::Ident("get") => HttpVerb::Get,
+        Token::Ident("post") => HttpVerb::Post,
+        Token::Ident("put") => HttpVerb::Put,
+        Token::Ident("patch") => HttpVerb::Patch,
+        Token::Ident("delete") => HttpVerb::Delete,
+    }
 }
 
 fn map_method<'src>(method: PendingApiMethod<'src>, namespace: &'src str) -> ApiBlockMethod<'src> {
