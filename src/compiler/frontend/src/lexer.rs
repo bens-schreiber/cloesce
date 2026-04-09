@@ -16,8 +16,6 @@ pub enum Token<'src> {
     Model,
     #[token("source")]
     Source,
-    #[token("for")]
-    For,
     #[token("service")]
     Service,
     #[token("inject")]
@@ -28,38 +26,6 @@ pub enum Token<'src> {
     Poo,
     #[token("sql")]
     Sql,
-    #[token("get")]
-    Get,
-    #[token("post")]
-    Post,
-    #[token("put")]
-    Put,
-    #[token("patch")]
-    Patch,
-    #[token("delete")]
-    Delete,
-    #[token("save")]
-    Save,
-    #[token("list")]
-    List,
-    #[token("include")]
-    Include,
-    #[token("nav")]
-    Nav,
-    #[token("primary")]
-    Primary,
-    #[token("foreign")]
-    Foreign,
-    #[token("unique")]
-    Unique,
-    #[token("use")]
-    Use,
-    #[token("keyfield")]
-    Keyfield,
-    #[token("paginated")]
-    Paginated,
-    #[token("optional")]
-    Optional,
     #[token("self")]
     SelfToken,
 
