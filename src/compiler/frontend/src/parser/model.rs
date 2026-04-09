@@ -100,9 +100,12 @@ enum ForeignQualifier {
 }
 
 /// `foreign(AdjModel::field1, ...) [primary|optional|unique] { localField ... nav { navName } }`
-fn foreign_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, (Option<ForeignQualifier>, ParsedForeign<'src>), Extra<'tokens, 'src>>
-{
+fn foreign_block<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    TokenInput<'tokens, 'src>,
+    (Option<ForeignQualifier>, ParsedForeign<'src>),
+    Extra<'tokens, 'src>,
+> {
     let adj_ref = select! { Token::Ident(model_name) => model_name }
         .then_ignore(just(Token::DoubleColon))
         .then(select! { Token::Ident(field_name) => field_name });
@@ -396,10 +399,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         unique_block,
         // infix foreign: `foreign(X::y) [primary|optional|unique] { ... }`
         foreign_block().map(|(qualifier, pf)| match qualifier {
-            Some(ForeignQualifier::Primary) => ModelItem::Primary(
-                pf.block.span,
-                vec![PrimaryItem::Foreign(pf)],
-            ),
+            Some(ForeignQualifier::Primary) => {
+                ModelItem::Primary(pf.block.span, vec![PrimaryItem::Foreign(pf)])
+            }
             Some(ForeignQualifier::Optional) => ModelItem::Optional(vec![pf]),
             Some(ForeignQualifier::Unique) => {
                 let span = pf.block.span;
