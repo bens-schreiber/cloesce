@@ -3,8 +3,8 @@ use chumsky::prelude::*;
 use ast::CrudKind;
 
 use crate::{
-    ForeignBlock, KvBlock, ModelBlock, NavigationBlock, R2Block, Symbol, SymbolKind,
-    UniqueConstraint, UseTag,
+    ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, NavigationBlock, R2Block, Symbol,
+    SymbolKind, UniqueConstraint, UseTag,
     lexer::Token,
     parser::{Extra, Span, TokenInput, cidl_type},
 };
@@ -30,34 +30,15 @@ enum PaginatedItem<'src> {
 }
 
 enum ModelItem<'src> {
-    /// `primary { field: type ... }`
     Primary(Span, Vec<PrimaryItem<'src>>),
-
-    /// `optional { foreign(...) { ... } ... }`
     Optional(Vec<ParsedForeign<'src>>),
-
-    /// `unique { ... }`
     Unique(Span, Vec<UniqueItem<'src>>),
-
-    /// `foreign(...) primary|optional|unique { ... }` (infix)
     Foreign(ParsedForeign<'src>),
-
-    /// Regular field `name: type`
     Field(Symbol<'src>),
-
-    /// `kv(binding, "format") [paginated] { name: type }`
     Kv(KvBlock<'src>),
-
-    /// `r2(binding, "format") [paginated] { name }`
     R2(R2Block<'src>),
-
-    /// `paginated { r2(...) { ... } kv(...) { ... } }`
     Paginated(Vec<PaginatedItem<'src>>),
-
-    /// `nav(AdjModel::field1, ...) { name }`
     Nav(NavigationBlock<'src>),
-
-    /// `keyfield { f1 f2 f3 }`
     KeyField(Vec<Symbol<'src>>),
 }
 
@@ -78,7 +59,7 @@ fn typed_field<'tokens, 'src: 'tokens>()
 }
 
 /// `nav { navName }`
-fn inner_nav_block<'tokens, 'src: 'tokens>()
+fn foreign_nav_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
     just(Token::Ident("nav")).ignore_then(
         select! { Token::Ident(name) => name }
@@ -92,20 +73,9 @@ fn inner_nav_block<'tokens, 'src: 'tokens>()
     )
 }
 
-#[derive(Clone)]
-enum ForeignQualifier {
-    Primary,
-    Optional,
-    Unique,
-}
-
 /// `foreign(AdjModel::field1, ...) [primary|optional|unique] { localField ... nav { navName } }`
-fn foreign_block<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    TokenInput<'tokens, 'src>,
-    (Option<ForeignQualifier>, ParsedForeign<'src>),
-    Extra<'tokens, 'src>,
-> {
+fn foreign_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParsedForeign<'src>, Extra<'tokens, 'src>> {
     let adj_ref = select! { Token::Ident(model_name) => model_name }
         .then_ignore(just(Token::DoubleColon))
         .then(select! { Token::Ident(field_name) => field_name });
@@ -128,7 +98,7 @@ fn foreign_block<'tokens, 'src: 'tokens>() -> impl Parser<
         .then(qualifier)
         .then(
             choice((
-                inner_nav_block().map(|nav| (None::<Symbol<'src>>, Some(nav))),
+                foreign_nav_block().map(|nav| (None::<Symbol<'src>>, Some(nav))),
                 select! { Token::Ident(name) => name }
                     .map_with(|name, e| Symbol {
                         span: e.span(),
@@ -153,27 +123,17 @@ fn foreign_block<'tokens, 'src: 'tokens>() -> impl Parser<
                     nav = Some(n);
                 }
             }
-            let optional = matches!(qualifier, Some(ForeignQualifier::Optional));
-            (
-                qualifier,
-                ParsedForeign {
-                    block: ForeignBlock {
-                        span: e.span(),
-                        adj: adj_refs,
-                        fields,
-                        optional,
-                    },
-                    nav,
-                },
-            )
-        })
-}
 
-/// Bare foreign block with no qualifier — used inside `optional { }` and `unique { }` where the
-/// qualifier is implied by the enclosing block.
-fn bare_foreign_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParsedForeign<'src>, Extra<'tokens, 'src>> {
-    foreign_block().map(|(_, pf)| pf)
+            ParsedForeign {
+                block: ForeignBlock {
+                    span: e.span(),
+                    adj: adj_refs,
+                    fields,
+                    qualifier,
+                },
+                nav,
+            }
+        })
 }
 
 /// `kv(binding, "key/format/{id}") paginated { ident: cidl_type }`
@@ -246,46 +206,6 @@ fn use_item<'tokens, 'src: 'tokens>()
     }
 }
 
-/// Parses a block of the form:
-///
-///```cloesce
-/// [use d1_binding, get, save, list]
-/// model ModelName {
-///   field1: int
-///
-///   // primary key block — typed fields, nested primary blocks, and primary foreign refs
-///   primary {
-///     id: int
-///     foreign(AdjModel::refField) primary { localField }
-///   }
-///
-///   // optional block — only foreign refs (all are nullable)
-///   optional {
-///     foreign(Bar::id) { barId }
-///   }
-///
-///   // unique constraint block — typed fields and/or foreign refs
-///   unique { email: string }
-///   unique { foreign(AdjModel::refField) { localField } }
-///
-///   // infix notation: qualifier comes after the parens, before the body
-///   foreign(AdjModel::refField) optional { localField }
-///   foreign(AdjModel::refField) primary { localField }
-///   foreign(AdjModel::refField) unique  { localField }
-///   foreign(AdjModel::refField) { localField nav { navName } }
-///
-///   // paginated block — only r2/kv sub-blocks
-///   paginated {
-///     r2(bucketBinding, "format/{id}") { field1 }
-///     kv(namespaceBinding, "format/{id}") { field1: type }
-///   }
-///
-///   // standalone r2/kv (infix paginated qualifier)
-///   r2(bucketBinding, "format/{id}") paginated { field1 }
-///   kv(namespaceBinding, "format/{id}") paginated { field1: type }
-///   kv(namespaceBinding, "format/{id}") { field1: type }
-/// }
-/// ```
 pub fn model_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ModelBlock<'src>, Extra<'tokens, 'src>> {
     // [use d1, get, save, list]
@@ -303,7 +223,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     // `primary { typed_fields... foreign(...) { ... } }`
     let primary_block = just(Token::Ident("primary")).ignore_then(
         choice((
-            bare_foreign_block().map(PrimaryItem::Foreign),
+            foreign_block().map(PrimaryItem::Foreign),
             typed_field().map(PrimaryItem::Field),
         ))
         .repeated()
@@ -313,7 +233,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
 
     // `optional { foreign(...) { ... } ... }` — all contained foreigners are nullable
     let optional_block = just(Token::Ident("optional")).ignore_then(
-        bare_foreign_block()
+        foreign_block()
             .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -323,7 +243,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     let unique_block = just(Token::Ident("unique"))
         .ignore_then(
             choice((
-                bare_foreign_block().map(UniqueItem::Foreign),
+                foreign_block().map(UniqueItem::Foreign),
                 typed_field().map(UniqueItem::Field),
             ))
             .repeated()
@@ -397,18 +317,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         primary_block.map_with(|items, e| ModelItem::Primary(e.span(), items)),
         optional_block.map(ModelItem::Optional),
         unique_block,
-        // infix foreign: `foreign(X::y) [primary|optional|unique] { ... }`
-        foreign_block().map(|(qualifier, pf)| match qualifier {
-            Some(ForeignQualifier::Primary) => {
-                ModelItem::Primary(pf.block.span, vec![PrimaryItem::Foreign(pf)])
-            }
-            Some(ForeignQualifier::Optional) => ModelItem::Optional(vec![pf]),
-            Some(ForeignQualifier::Unique) => {
-                let span = pf.block.span;
-                ModelItem::Unique(span, vec![UniqueItem::Foreign(pf)])
-            }
-            None => ModelItem::Foreign(pf),
-        }),
+        foreign_block().map(ModelItem::Foreign),
         paginated_block.map(ModelItem::Paginated),
         nav_block,
         kv_block().map(ModelItem::Kv),
@@ -494,18 +403,29 @@ fn map_model<'src>(
                             fields.push(sym);
                         }
                         PrimaryItem::Foreign(pf) => {
-                            for sym in &pf.block.fields {
-                                primary_fields.push(sym.name);
-                            }
-                            foreign_blocks.push(drain_nav(model_name, pf, &mut navigation_blocks));
+                            foreign_blocks.push(drain_foreign(
+                                model_name,
+                                pf,
+                                &mut navigation_blocks,
+                                &mut primary_fields,
+                                &mut unique_constraints,
+                            ));
                         }
                     }
                 }
             }
             ModelItem::Optional(pfs) => {
-                for mut pf in pfs {
-                    pf.block.optional = true;
-                    foreign_blocks.push(drain_nav(model_name, pf, &mut navigation_blocks));
+                for pf in pfs {
+                    let mut drained = drain_foreign(
+                        model_name,
+                        pf,
+                        &mut navigation_blocks,
+                        &mut primary_fields,
+                        &mut unique_constraints,
+                    );
+
+                    drained.qualifier = Some(ForeignQualifier::Optional);
+                    foreign_blocks.push(drained);
                 }
             }
             ModelItem::Unique(span, unique_items) => {
@@ -516,7 +436,13 @@ fn map_model<'src>(
                             for sym in &pf.block.fields {
                                 constraint_names.push(sym.name);
                             }
-                            foreign_blocks.push(drain_nav(model_name, pf, &mut navigation_blocks));
+                            foreign_blocks.push(drain_foreign(
+                                model_name,
+                                pf,
+                                &mut navigation_blocks,
+                                &mut primary_fields,
+                                &mut unique_constraints,
+                            ));
                         }
                         UniqueItem::Field(mut sym) => {
                             sym.parent_name = model_name.into();
@@ -531,7 +457,13 @@ fn map_model<'src>(
                 });
             }
             ModelItem::Foreign(pf) => {
-                foreign_blocks.push(drain_nav(model_name, pf, &mut navigation_blocks));
+                foreign_blocks.push(drain_foreign(
+                    model_name,
+                    pf,
+                    &mut navigation_blocks,
+                    &mut primary_fields,
+                    &mut unique_constraints,
+                ));
             }
             ModelItem::Field(mut sym) => {
                 sym.parent_name = model_name.into();
@@ -585,15 +517,36 @@ fn map_model<'src>(
     }
 }
 
-fn drain_nav<'src>(
+fn drain_foreign<'src>(
     parent_name: &'src str,
     pf: ParsedForeign<'src>,
     navigation_blocks: &mut Vec<NavigationBlock<'src>>,
+    primary_fields: &mut Vec<&'src str>,
+    unique_constraints: &mut Vec<UniqueConstraint<'src>>,
 ) -> ForeignBlock<'src> {
     let mut block = pf.block;
+    let mut unique_constraint = UniqueConstraint {
+        span: block.span,
+        fields: Vec::new(),
+    };
     for sym in &mut block.fields {
         sym.parent_name = parent_name.into();
+
+        match block.qualifier {
+            Some(ForeignQualifier::Primary) => {
+                primary_fields.push(sym.name);
+            }
+            Some(ForeignQualifier::Unique) => {
+                unique_constraint.fields.push(sym.name);
+            }
+            _ => {}
+        }
     }
+
+    if !unique_constraint.fields.is_empty() {
+        unique_constraints.push(unique_constraint);
+    }
+
     if let Some(mut nav) = pf.nav {
         nav.parent_name = parent_name.into();
         navigation_blocks.push(NavigationBlock {

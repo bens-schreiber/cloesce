@@ -143,6 +143,13 @@ pub struct NavigationBlock<'src> {
     pub is_one_to_one: bool,
 }
 
+#[derive(Clone)]
+pub enum ForeignQualifier {
+    Primary,
+    Optional,
+    Unique,
+}
+
 pub struct ForeignBlock<'src> {
     pub span: Span,
 
@@ -152,8 +159,13 @@ pub struct ForeignBlock<'src> {
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
 
-    // optional foreign(...) means all fields are nullable
-    pub optional: bool,
+    pub qualifier: Option<ForeignQualifier>,
+}
+
+impl ForeignBlock<'_> {
+    pub fn is_optional(&self) -> bool {
+        matches!(self.qualifier, Some(ForeignQualifier::Optional))
+    }
 }
 
 /// `kv(binding, "key/format/{id}") { name: type }`

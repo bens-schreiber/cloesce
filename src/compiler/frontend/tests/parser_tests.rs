@@ -765,6 +765,174 @@ fn model_block_use_tags() {
 }
 
 #[test]
+fn model_block_optional_block_form() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Post {
+            primary {
+                id: int
+            }
+
+            optional {
+                foreign(Author::id) unique { authorId }
+                foreign(Category::id) { categoryId }
+            }
+
+            authorId: int
+            categoryId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let post = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Post")
+        .expect("Post model to be present");
+
+    assert_eq!(post.foreign_blocks.len(), 2);
+
+    let author_fb = post
+        .foreign_blocks
+        .iter()
+        .find(|fb| fb.adj == vec![("Author", "id")])
+        .expect("Author foreign block to be present");
+    assert!(
+        author_fb.is_optional(),
+        "foreign block inside optional {{ }} should have optional == true"
+    );
+    assert_eq!(
+        author_fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["authorId"]
+    );
+
+    let category_fb = post
+        .foreign_blocks
+        .iter()
+        .find(|fb| fb.adj == vec![("Category", "id")])
+        .expect("Category foreign block to be present");
+    assert!(
+        category_fb.is_optional(),
+        "foreign block inside optional {{ }} should have optional == true"
+    );
+    assert_eq!(
+        category_fb
+            .fields
+            .iter()
+            .map(|s| s.name)
+            .collect::<Vec<_>>(),
+        vec!["categoryId"]
+    );
+
+    // Should match infix form
+    let infix_ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Post {
+            primary {
+                id: int
+            }
+
+            foreign(Author::id) optional { authorId }
+            foreign(Category::id) optional { categoryId }
+
+            authorId: int
+            categoryId: int
+        }
+        "#,
+    );
+
+    let infix_post = infix_ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Post")
+        .expect("Post model (infix) to be present");
+
+    assert_eq!(
+        post.foreign_blocks.len(),
+        infix_post.foreign_blocks.len(),
+        "block form and infix form should produce the same number of foreign blocks"
+    );
+    for fb in &infix_post.foreign_blocks {
+        assert!(
+            fb.is_optional(),
+            "infix optional foreign block should also have optional == true"
+        );
+    }
+}
+
+#[test]
+fn model_block_paginated_block_form() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        model Cache {
+            field: string
+
+            paginated {
+                kv(ns, "key_{field}") { value: json }
+                r2(bucket, "obj_{field}") { obj }
+            }
+        }
+        "#,
+    );
+
+    // Assert
+    let cache = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Cache")
+        .expect("Cache model to be present");
+
+    assert_eq!(cache.kvs.len(), 1);
+    assert_eq!(cache.r2s.len(), 1);
+
+    let kv = &cache.kvs[0];
+    assert_eq!(kv.env_binding, "ns");
+    assert_eq!(kv.key_format, "key_{field}");
+    assert_eq!(kv.field.name, "value");
+    assert!(
+        kv.is_paginated,
+        "kv inside paginated {{ }} should have is_paginated == true"
+    );
+
+    let r2 = &cache.r2s[0];
+    assert_eq!(r2.env_binding, "bucket");
+    assert_eq!(r2.key_format, "obj_{field}");
+    assert_eq!(r2.field.name, "obj");
+    assert!(
+        r2.is_paginated,
+        "r2 inside paginated {{ }} should have is_paginated == true"
+    );
+
+    // Should match infix form
+    let infix_ast = lex_and_parse(
+        r#"
+        model Cache {
+            field: string
+
+            kv(ns, "key_{field}") paginated { value: json }
+            r2(bucket, "obj_{field}") paginated { obj }
+        }
+        "#,
+    );
+
+    let infix_cache = infix_ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Cache")
+        .expect("Cache model (infix) to be present");
+
+    assert_eq!(infix_cache.kvs.len(), 1);
+    assert_eq!(infix_cache.r2s.len(), 1);
+    assert!(infix_cache.kvs[0].is_paginated);
+    assert!(infix_cache.r2s[0].is_paginated);
+}
+
+#[test]
 fn model_block_nav() {
     // Act
     let ast = lex_and_parse(
@@ -819,4 +987,38 @@ fn model_block_nav() {
         "top level nav should not be one-to-oen"
     );
     assert_eq!(top_nav.adj, vec![("Weather", "weatherReportId")]);
+}
+
+#[test]
+fn foreign_passes_inline_qualifier() {
+    let ast = lex_and_parse(
+        r#"
+        model Foo {
+            unique {
+                foreign(Org::id) optional {
+                    orgId
+                }
+                role: string
+            }
+
+            optional {
+                foreign(Org::id) unique {
+                    orgId
+                }
+            }
+        }
+    "#,
+    );
+
+    let foo = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Foo")
+        .expect("Foo model to be present");
+
+    assert_eq!(foo.unique_constraints.len(), 2);
+    assert_eq!(foo.unique_constraints[0].fields, vec!["orgId", "role"]);
+    assert_eq!(foo.unique_constraints[1].fields, vec!["orgId"]);
+    assert_eq!(foo.foreign_blocks.len(), 2);
+    assert!(foo.foreign_blocks[0].is_optional());
 }
