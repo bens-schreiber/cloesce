@@ -1,6 +1,6 @@
 # Summary
 
-[The Cloesce Language](./ch0-0-introduction.md)
+[The Cloesce Schema Language](./ch0-0-introduction.md)
 [Resources](./ch0-1-resources.md)
 
 - [Getting Started](./ch1-0-getting-started.md)
