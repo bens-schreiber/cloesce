@@ -3,7 +3,7 @@
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
 > support across any language. The syntax and features described here are subject to change as the project evolves.
 
-**Cloesce** is an interface definition language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From a simple schema, Cloesce supports features like:
+**Cloesce** is a schema language (or IDL) that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). It provides a single source of truth for your application, with a single language to define:
 
 | Feature              | Status |
 |----------------------|--------|
@@ -16,7 +16,7 @@
 
 ## How Easy can Full Stack Development Be?
 
-```rs
+```
 env {
     d1 { db }
     kv { namespace }
