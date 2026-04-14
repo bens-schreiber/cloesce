@@ -52,11 +52,14 @@ fn foreign_block<'tokens, 'src: 'tokens>()
     ))
     .or_not();
 
-    let field = select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
-        span: e.span(),
-        name,
-        ..Default::default()
-    });
+    let field = just(Token::Ident("nav"))
+        .not()
+        .ignore_then(select! { Token::Ident(name) => name })
+        .map_with(|name, e| Symbol {
+            span: e.span(),
+            name,
+            ..Default::default()
+        });
 
     just(Token::Ident("foreign"))
         .ignore_then(
@@ -85,7 +88,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
 
 /// `kv (binding, "key/format/{id}") paginated { ident: cidl_type }`
 fn kv_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, PaginatedBlockKind<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvBlock<'src>, Extra<'tokens, 'src>> {
     just(Token::Ident("kv"))
         .ignore_then(
             select! { Token::Ident(name) => name }
@@ -95,20 +98,20 @@ fn kv_block<'tokens, 'src: 'tokens>()
         )
         .then(just(Token::Ident("paginated")).or_not())
         .then(typed_field().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map_with(|(((env_binding, key_format), paginated), field), e| {
-            PaginatedBlockKind::Kv(KvBlock {
+        .map_with(
+            |(((env_binding, key_format), paginated), field), e| KvBlock {
                 span: e.span(),
                 env_binding,
                 key_format,
                 field,
                 is_paginated: paginated.is_some(),
-            })
-        })
+            },
+        )
 }
 
 /// `r2(binding, "key/format/{id}") paginated { ident }`
 fn r2_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, PaginatedBlockKind<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2Block<'src>, Extra<'tokens, 'src>> {
     just(Token::Ident("r2"))
         .ignore_then(
             select! { Token::Ident(name) => name }
@@ -126,15 +129,15 @@ fn r2_block<'tokens, 'src: 'tokens>()
                 })
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(((env_binding, key_format), paginated), field), e| {
-            PaginatedBlockKind::R2(R2Block {
+        .map_with(
+            |(((env_binding, key_format), paginated), field), e| R2Block {
                 span: e.span(),
                 env_binding,
                 key_format,
                 field,
                 is_paginated: paginated.is_some(),
-            })
-        })
+            },
+        )
 }
 
 fn use_item<'tokens, 'src: 'tokens>()
@@ -259,17 +262,29 @@ pub fn model_block<'tokens, 'src: 'tokens>()
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
     let paginated_block = just(Token::Ident("paginated")).ignore_then(
-        choice((kv_block(), r2_block()))
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map_with(|blocks, e| ModelBlockKind::Paginated {
-                span: e.span(),
-                blocks,
-            }),
+        choice((
+            kv_block().map(PaginatedBlockKind::Kv),
+            r2_block().map(PaginatedBlockKind::R2),
+        ))
+        .repeated()
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .map_with(|blocks, e| ModelBlockKind::Paginated {
+            span: e.span(),
+            blocks,
+        }),
     );
 
+    let kv = kv_block().map(ModelBlockKind::Kv);
+    let r2 = r2_block().map(ModelBlockKind::R2);
+    let foreign = foreign_block().map(ModelBlockKind::Foreign);
+    let column = typed_field().map(ModelBlockKind::Column);
+
     let sub_blocks = choice((
+        foreign,
+        kv,
+        r2,
+        column,
         nav_block,
         keyfield_block,
         paginated_block,
