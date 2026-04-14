@@ -1,18 +1,10 @@
-use ast::CidlType;
 use chumsky::prelude::*;
 
 use crate::{
-    Span, Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
+    AstBlockKind, EnvBlock, EnvBlockKind, Symbol,
     lexer::Token,
     parser::{Extra, TokenInput, cidl_type},
 };
-
-enum BindingBlock<'src> {
-    D1(Vec<(&'src str, Span)>),
-    R2(Vec<(&'src str, Span)>),
-    Kv(Vec<(&'src str, Span)>),
-    Vars(Vec<((&'src str, Span), CidlType<'src>)>),
-}
 
 /// Parses a block of the form:
 ///
@@ -23,56 +15,73 @@ enum BindingBlock<'src> {
 ///     kv { store }
 ///
 ///     vars {
-///         var1: string
-///         var2: int
+///         var1
+///         var2
 ///     }
 /// }
 /// ```
 pub fn env_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, WranglerEnvBlock<'src>, Extra<'tokens, 'src>> {
-    // ident (with span)
-    let ident = select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span()));
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
+    let ident = select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
+        span: e.span(),
+        name,
+        ..Default::default()
+    });
 
     // d1 { ident* }
-    let d1_sub = just(Token::D1).ignore_then(
-        ident
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-    );
+    let d1 = just(Token::Ident("d1"))
+        .ignore_then(
+            ident
+                .clone()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|symbols| EnvBlockKind::D1 { symbols });
 
     // r2 { ident* }
-    let r2_sub = just(Token::R2).ignore_then(
-        ident
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-    );
+    let r2 = just(Token::Ident("r2"))
+        .ignore_then(
+            ident
+                .clone()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|symbols| EnvBlockKind::R2 { symbols });
 
     // kv { ident* }
-    let kv_sub = just(Token::Kv).ignore_then(
-        ident
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-    );
+    let kv = just(Token::Ident("kv"))
+        .ignore_then(
+            ident
+                .clone()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|symbols| EnvBlockKind::Kv { symbols });
 
     // vars { ident: cidl_type* }
-    let var_entry = ident.then_ignore(just(Token::Colon)).then(cidl_type());
+    let var = select! { Token::Ident(name) => name }
+        .map_with(|name, e| (name, e.span()))
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type())
+        .map(|((name, span), ty)| Symbol {
+            span,
+            name,
+            cidl_type: ty,
+            ..Default::default()
+        });
 
-    let vars_sub = just(Token::Vars).ignore_then(
-        var_entry
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-    );
+    let vars = just(Token::Ident("vars"))
+        .ignore_then(
+            var.repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|symbols| EnvBlockKind::Var { symbols });
 
-    let sub_block = choice((
-        d1_sub.map(BindingBlock::D1),
-        r2_sub.map(BindingBlock::R2),
-        kv_sub.map(BindingBlock::Kv),
-        vars_sub.map(BindingBlock::Vars),
-    ));
+    let sub_block = choice((d1, r2, kv, vars));
 
     // env { sub_block* }
     just(Token::Env)
@@ -82,69 +91,14 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|sub_blocks, e| {
-            let mut block = WranglerEnvBlock {
+        .map_with(|blocks, e| {
+            let span = e.span();
+            AstBlockKind::Env(EnvBlock {
                 symbol: Symbol {
-                    span: e.span(),
-                    kind: SymbolKind::WranglerEnvDecl,
+                    span,
                     ..Default::default()
                 },
-                d1_bindings: Vec::new(),
-                kv_bindings: Vec::new(),
-                r2_bindings: Vec::new(),
-                vars: Vec::new(),
-            };
-            for sub in sub_blocks {
-                match sub {
-                    BindingBlock::D1(names) => {
-                        for (name, span) in names {
-                            block.d1_bindings.push(Symbol {
-                                span,
-                                name,
-                                kind: SymbolKind::WranglerEnvBinding {
-                                    kind: WranglerEnvBindingKind::D1,
-                                },
-                                ..Default::default()
-                            });
-                        }
-                    }
-                    BindingBlock::R2(names) => {
-                        for (name, span) in names {
-                            block.r2_bindings.push(Symbol {
-                                span,
-                                name,
-                                kind: SymbolKind::WranglerEnvBinding {
-                                    kind: WranglerEnvBindingKind::R2,
-                                },
-                                ..Default::default()
-                            });
-                        }
-                    }
-                    BindingBlock::Kv(names) => {
-                        for (name, span) in names {
-                            block.kv_bindings.push(Symbol {
-                                span,
-                                name,
-                                kind: SymbolKind::WranglerEnvBinding {
-                                    kind: WranglerEnvBindingKind::Kv,
-                                },
-                                ..Default::default()
-                            });
-                        }
-                    }
-                    BindingBlock::Vars(entries) => {
-                        for ((name, span), cidl_type) in entries {
-                            block.vars.push(Symbol {
-                                span,
-                                name,
-                                cidl_type,
-                                kind: SymbolKind::WranglerEnvVar,
-                                ..Default::default()
-                            });
-                        }
-                    }
-                }
-            }
-            block
+                blocks,
+            })
         })
 }

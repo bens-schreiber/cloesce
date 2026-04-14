@@ -2,7 +2,7 @@
 
 use ast::{CidlType, Field, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
-use frontend::{SymbolKind, WranglerEnvBindingKind};
+use frontend::{EnvBindingKind, SymbolKind};
 use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -91,8 +91,8 @@ fn wrangler_duplicate_symbol() {
     assert_eq!(second.name, "my_d1");
     assert!(matches!(
         second.kind,
-        SymbolKind::WranglerEnvBinding {
-            kind: WranglerEnvBindingKind::D1
+        SymbolKind::EnvBinding {
+            kind: EnvBindingKind::D1
         }
     ));
 }

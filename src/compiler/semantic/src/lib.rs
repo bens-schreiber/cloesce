@@ -34,12 +34,12 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             SymbolKind::ModelDecl => format!("model::{}", symbol.name),
             SymbolKind::PlainOldObjectDecl => format!("poo::{}", symbol.name),
             SymbolKind::ServiceDecl => format!("service::{}", symbol.name),
-            SymbolKind::WranglerEnvDecl => "wrangler_env".into(),
+            SymbolKind::EnvDecl => "wrangler_env".into(),
             SymbolKind::InjectDecl => format!("inject::{}", symbol.name),
 
             // Scoped
-            SymbolKind::WranglerEnvVar => format!("wrangler_env::var::{}", symbol.name),
-            SymbolKind::WranglerEnvBinding { kind } => {
+            SymbolKind::EnvVar => format!("wrangler_env::var::{}", symbol.name),
+            SymbolKind::EnvBinding { kind } => {
                 format!("wrangler_env::{}::{}", kind, symbol.name)
             }
             SymbolKind::ModelField => {

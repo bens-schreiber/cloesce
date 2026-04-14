@@ -5,7 +5,7 @@ use chumsky::prelude::*;
 use ast::IncludeTree;
 
 use crate::{
-    DataSourceBlock, DataSourceBlockMethod, Symbol, SymbolKind,
+    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, Symbol,
     lexer::Token,
     parser::{Extra, TokenInput, cidl_type},
 };
@@ -20,7 +20,7 @@ use crate::{
 /// }
 /// ```
 pub fn data_source_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, DataSourceBlock<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident | ident { ... }
     let include_entry = recursive(|entry| {
         select! { Token::Ident(name) => name }
@@ -63,7 +63,6 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 name,
                 span,
                 cidl_type,
-                kind: SymbolKind::DataSourceMethodParam,
                 ..Default::default()
             })
     };
@@ -132,11 +131,10 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                     raw_sql,
                 });
 
-                DataSourceBlock {
+                AstBlockKind::DataSource(DataSourceBlock {
                     symbol: Symbol {
                         name,
                         span: e.span(),
-                        kind: SymbolKind::DataSourceDecl,
                         parent_name: Cow::Borrowed(model),
                         ..Default::default()
                     },
@@ -145,7 +143,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                     get,
                     list,
                     is_internal: is_internal.is_some(),
-                }
+                })
             },
         )
 }

@@ -10,17 +10,14 @@ use chumsky::extra;
 use chumsky::input::MappedInput;
 use chumsky::prelude::*;
 
+use crate::AstBlockKind;
 use crate::FileTable;
 use crate::Span;
 use crate::Symbol;
-use crate::SymbolKind;
 use crate::lexer::LexedFile;
 use crate::lexer::SpannedToken;
 use crate::lexer::Token;
-use crate::{
-    ApiBlock, DataSourceBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
-    ServiceBlock, WranglerEnvBlock,
-};
+use crate::{InjectBlock, ParseAst, PlainOldObjectBlock, ServiceBlock};
 
 type TokenInput<'tokens, 'src> =
     MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
@@ -68,44 +65,20 @@ impl CloesceParser {
     }
 }
 
-enum Global<'src> {
-    Env(WranglerEnvBlock<'src>),
-    Model(ModelBlock<'src>),
-    Api(ApiBlock<'src>),
-    Service(ServiceBlock<'src>),
-    Poo(PlainOldObjectBlock<'src>),
-    DataSource(DataSourceBlock<'src>),
-    Inject(InjectBlock<'src>),
-}
-
 fn parser<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParseAst<'src>, Extra<'tokens, 'src>> {
     choice((
-        env::env_block().map(Global::Env),
-        model::model_block().map(Global::Model),
-        api::api_block().map(Global::Api),
-        data_source::data_source_block().map(Global::DataSource),
-        service_block().map(Global::Service),
-        poo_block().map(Global::Poo),
-        inject_block().map(Global::Inject),
+        env::env_block(),
+        model::model_block().map(AstBlockKind::Model),
+        api::api_block(),
+        data_source::data_source_block(),
+        service_block(),
+        poo_block(),
+        inject_block(),
     ))
     .repeated()
     .collect::<Vec<_>>()
-    .map(|items| {
-        let mut ast = ParseAst::default();
-        for item in items {
-            match item {
-                Global::Env(env) => ast.wrangler_envs.push(env),
-                Global::Model(model) => ast.models.push(model),
-                Global::Api(api) => ast.apis.push(api),
-                Global::Service(service) => ast.services.push(service),
-                Global::Poo(poo) => ast.poos.push(poo),
-                Global::DataSource(ds) => ast.sources.push(ds),
-                Global::Inject(block) => ast.injects.push(block),
-            }
-        }
-        ast
-    })
+    .map(|blocks| ParseAst { blocks })
 }
 
 /// Parses a block of the form:
@@ -118,8 +91,7 @@ fn parser<'tokens, 'src: 'tokens>()
 /// }
 /// ```
 fn poo_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, PlainOldObjectBlock<'src>, Extra<'tokens, 'src>>
-{
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident: cidl_type
     let poo_field = select! { Token::Ident(name) => name }
         .then_ignore(just(Token::Colon))
@@ -128,7 +100,6 @@ fn poo_block<'tokens, 'src: 'tokens>()
             name,
             cidl_type: ty,
             span: e.span(),
-            kind: SymbolKind::PlainOldObjectField,
             parent_name: Cow::Borrowed(name),
         });
 
@@ -146,15 +117,14 @@ fn poo_block<'tokens, 'src: 'tokens>()
                 field.parent_name = Cow::Borrowed(name);
             }
 
-            PlainOldObjectBlock {
+            AstBlockKind::PlainOldObject(PlainOldObjectBlock {
                 symbol: Symbol {
                     name,
                     span: e.span(),
-                    kind: SymbolKind::PlainOldObjectDecl,
                     ..Default::default()
                 },
                 fields,
-            }
+            })
         })
 }
 
@@ -168,7 +138,7 @@ fn poo_block<'tokens, 'src: 'tokens>()
 /// }
 /// ```
 fn inject_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, InjectBlock<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     just(Token::Inject)
         .ignore_then(
             select! { Token::Ident(name) => name }
@@ -177,21 +147,23 @@ fn inject_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|fields, e| InjectBlock {
-            symbol: Symbol {
-                kind: SymbolKind::InjectDecl,
-                span: e.span(),
-                ..Default::default()
-            },
-            fields: fields
+        .map_with(|fields, e| {
+            let symbols = fields
                 .into_iter()
                 .map(|(field_name, span)| Symbol {
                     span,
                     name: field_name,
-                    kind: SymbolKind::InjectDecl,
                     ..Default::default()
                 })
-                .collect(),
+                .collect();
+
+            AstBlockKind::Inject(InjectBlock {
+                symbol: Symbol {
+                    span: e.span(),
+                    ..Default::default()
+                },
+                symbols,
+            })
         })
 }
 
@@ -204,7 +176,7 @@ fn inject_block<'tokens, 'src: 'tokens>()
 /// }
 /// ```
 pub fn service_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ServiceBlock<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident: InjectedService
     let attribute = select! { Token::Ident(var_name) => var_name }
         .map_with(|name, e| (name, e.span()))
@@ -227,20 +199,18 @@ pub fn service_block<'tokens, 'src: 'tokens>()
                     span,
                     name: field_name,
                     cidl_type,
-                    kind: SymbolKind::ServiceField,
                     parent_name: Cow::Borrowed(name),
                 })
                 .collect();
 
-            ServiceBlock {
+            AstBlockKind::Service(ServiceBlock {
                 symbol: Symbol {
                     span,
                     name,
-                    kind: SymbolKind::ServiceDecl,
                     ..Default::default()
                 },
                 fields,
-            }
+            })
         })
 }
 

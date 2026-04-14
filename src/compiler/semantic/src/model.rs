@@ -7,7 +7,7 @@ use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
     NavigationFieldKind,
 };
-use frontend::{ModelBlock, NavigationBlock, Span, Symbol, WranglerEnvBindingKind};
+use frontend::{EnvBindingKind, ModelBlock, NavigationBlock, Span, Symbol};
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap};
 
@@ -135,8 +135,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
 
             let Some(binding_symbol) = table.resolve(
                 tag,
-                SymbolKind::WranglerEnvBinding {
-                    kind: WranglerEnvBindingKind::D1,
+                SymbolKind::EnvBinding {
+                    kind: EnvBindingKind::D1,
                 },
                 None,
             ) else {
@@ -533,11 +533,11 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         let validate_binding = |sink: &mut ErrorSink<'src, 'p>,
                                 env_binding: &'src str,
                                 span: Span,
-                                expected: WranglerEnvBindingKind|
+                                expected: EnvBindingKind|
          -> Option<&'src str> {
             if let Some(binding_sym) = table.resolve(
                 env_binding,
-                SymbolKind::WranglerEnvBinding {
+                SymbolKind::EnvBinding {
                     kind: expected.clone(),
                 },
                 None,
@@ -546,11 +546,11 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             }
 
             let err = match expected {
-                WranglerEnvBindingKind::Kv => SemanticError::KvInvalidBinding {
+                EnvBindingKind::Kv => SemanticError::KvInvalidBinding {
                     span,
                     binding: env_binding,
                 },
-                WranglerEnvBindingKind::R2 => SemanticError::R2InvalidBinding {
+                EnvBindingKind::R2 => SemanticError::R2InvalidBinding {
                     span,
                     binding: env_binding,
                 },
@@ -610,12 +610,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         };
 
         for kv in &model_block.kvs {
-            let binding_name = validate_binding(
-                &mut self.sink,
-                kv.env_binding,
-                kv.span,
-                WranglerEnvBindingKind::Kv,
-            );
+            let binding_name =
+                validate_binding(&mut self.sink, kv.env_binding, kv.span, EnvBindingKind::Kv);
 
             let Ok(format_parameters) = validate_key_format(&mut self.sink, kv.span, kv.key_format)
             else {
@@ -649,12 +645,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         }
 
         for r2 in &model_block.r2s {
-            let binding_name = validate_binding(
-                &mut self.sink,
-                r2.env_binding,
-                r2.span,
-                WranglerEnvBindingKind::R2,
-            );
+            let binding_name =
+                validate_binding(&mut self.sink, r2.env_binding, r2.span, EnvBindingKind::R2);
 
             let Ok(format_parameters) = validate_key_format(&mut self.sink, r2.span, r2.key_format)
             else {

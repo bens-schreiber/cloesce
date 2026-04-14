@@ -30,52 +30,10 @@ impl<'src> FileTable<'src> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum WranglerEnvBindingKind {
+pub enum EnvBindingKind {
     D1,
     R2,
     Kv,
-}
-
-impl std::fmt::Display for WranglerEnvBindingKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WranglerEnvBindingKind::D1 => write!(f, "D1"),
-            WranglerEnvBindingKind::R2 => write!(f, "R2"),
-            WranglerEnvBindingKind::Kv => write!(f, "Kv"),
-        }
-    }
-}
-
-#[derive(Clone, Default, Debug)]
-pub enum SymbolKind {
-    ModelDecl,
-
-    /// Encompasses every single unique symbol declared within a model block.
-    ModelField,
-
-    WranglerEnvDecl,
-    WranglerEnvBinding {
-        kind: WranglerEnvBindingKind,
-    },
-    WranglerEnvVar,
-
-    PlainOldObjectDecl,
-    PlainOldObjectField,
-
-    ApiDecl,
-    ApiMethodDecl,
-    ApiMethodParam,
-
-    DataSourceDecl,
-    DataSourceMethodParam,
-
-    ServiceDecl,
-    ServiceField,
-
-    InjectDecl,
-
-    #[default]
-    Null,
 }
 
 pub type FileId = u16;
@@ -93,8 +51,6 @@ pub struct Symbol<'src> {
     /// which are often just references to other symbols
     pub parent_name: Cow<'src, str>,
 
-    pub kind: SymbolKind,
-
     pub span: Span,
 }
 
@@ -105,14 +61,20 @@ pub struct ApiBlock<'src> {
     pub methods: Vec<ApiBlockMethod<'src>>,
 }
 
+pub enum ApiBlockMethodParamKind<'src> {
+    SelfParam {
+        symbol: Symbol<'src>,
+        data_source: Option<&'src str>,
+    },
+    Field(Symbol<'src>),
+}
+
 pub struct ApiBlockMethod<'src> {
     pub symbol: Symbol<'src>,
 
-    pub is_static: bool,
     pub http_verb: HttpVerb,
-    pub data_source: Option<&'src str>,
     pub return_type: CidlType<'src>,
-    pub parameters: Vec<Symbol<'src>>,
+    pub parameters: Vec<ApiBlockMethodParamKind<'src>>,
 }
 
 pub struct DataSourceBlockMethod<'src> {
@@ -139,8 +101,6 @@ pub struct NavigationBlock<'src> {
 
     // { navName }
     pub field: Symbol<'src>,
-
-    pub is_one_to_one: bool,
 }
 
 #[derive(Clone)]
@@ -158,6 +118,8 @@ pub struct ForeignBlock<'src> {
 
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
+
+    pub nav: Option<Symbol<'src>>,
 
     pub qualifier: Option<ForeignQualifier>,
 }
@@ -188,47 +150,72 @@ pub struct KvBlock<'src> {
 pub struct R2Block<'src> {
     pub span: Span,
 
-    /// The R2 bucket binding name
+    /// R2 bucket binding name
     pub env_binding: &'src str,
 
-    /// The key format string, e.g. `"weather/photos/{id}.jpg"`
+    /// bucket key format string, e.g. `"weather/photos/{id}.jpg"`
     pub key_format: &'src str,
 
-    /// The single field name (no type)
+    /// has no type
     pub field: Symbol<'src>,
 
     // [paginated]
     pub is_paginated: bool,
 }
 
-pub struct UniqueConstraint<'src> {
-    pub span: Span,
-    pub fields: Vec<&'src str>,
+pub enum UseTagParamKind<'src> {
+    Crud(CrudKind),
+    EnvBinding(&'src str),
 }
 
-#[derive(Clone, Debug)]
 pub struct UseTag<'src> {
     pub span: Span,
-    pub cruds: Vec<CrudKind>,
-    pub env_bindings: Vec<&'src str>,
+    pub params: Vec<UseTagParamKind<'src>>,
+}
+
+pub enum SqlBlockKind<'src> {
+    Column(Symbol<'src>),
+    Foreign(ForeignBlock<'src>),
+}
+
+pub enum PaginatedBlockKind<'src> {
+    R2(R2Block<'src>),
+    Kv(KvBlock<'src>),
+}
+
+pub enum ModelBlockKind<'src> {
+    Column(Symbol<'src>),
+    Foreign(ForeignBlock<'src>),
+    Navigation(NavigationBlock<'src>),
+    Kv(KvBlock<'src>),
+    R2(R2Block<'src>),
+    Primary {
+        span: Span,
+        blocks: Vec<SqlBlockKind<'src>>,
+    },
+    KeyField {
+        span: Span,
+        fields: Vec<Symbol<'src>>,
+    },
+    Unique {
+        span: Span,
+        blocks: Vec<SqlBlockKind<'src>>,
+    },
+    Paginated {
+        span: Span,
+        blocks: Vec<PaginatedBlockKind<'src>>,
+    },
+    Optional {
+        span: Span,
+        blocks: Vec<SqlBlockKind<'src>>,
+    },
 }
 
 pub struct ModelBlock<'src> {
     pub symbol: Symbol<'src>,
-    pub use_tag: Option<UseTag<'src>>,
+    pub use_tags: Vec<UseTag<'src>>,
 
-    /// All typed identifiers e.g., `id: int`.
-    pub typed_idents: Vec<Symbol<'src>>,
-
-    /// The names of the primary key fields, in order. Subset of `fields`.
-    pub primary_fields: Vec<&'src str>,
-
-    pub key_fields: Vec<Symbol<'src>>,
-    pub unique_constraints: Vec<UniqueConstraint<'src>>,
-    pub kvs: Vec<KvBlock<'src>>,
-    pub r2s: Vec<R2Block<'src>>,
-    pub navigation_blocks: Vec<NavigationBlock<'src>>,
-    pub foreign_blocks: Vec<ForeignBlock<'src>>,
+    pub blocks: Vec<ModelBlockKind<'src>>,
 }
 
 pub struct ServiceBlock<'src> {
@@ -241,39 +228,41 @@ pub struct PlainOldObjectBlock<'src> {
     pub fields: Vec<Symbol<'src>>,
 }
 
-pub struct WranglerEnvBlock<'src> {
+pub enum EnvBlockKind<'src> {
+    D1 { symbols: Vec<Symbol<'src>> },
+    R2 { symbols: Vec<Symbol<'src>> },
+    Kv { symbols: Vec<Symbol<'src>> },
+    Var { symbols: Vec<Symbol<'src>> },
+}
+
+pub struct EnvBlock<'src> {
     pub symbol: Symbol<'src>,
-    pub d1_bindings: Vec<Symbol<'src>>,
-    pub kv_bindings: Vec<Symbol<'src>>,
-    pub r2_bindings: Vec<Symbol<'src>>,
-    pub vars: Vec<Symbol<'src>>,
+    pub blocks: Vec<EnvBlockKind<'src>>,
 }
 
 pub struct InjectBlock<'src> {
     pub symbol: Symbol<'src>,
-    pub fields: Vec<Symbol<'src>>,
+    pub symbols: Vec<Symbol<'src>>,
+}
+
+pub enum AstBlockKind<'src> {
+    Api(ApiBlock<'src>),
+    DataSource(DataSourceBlock<'src>),
+    Model(ModelBlock<'src>),
+    Service(ServiceBlock<'src>),
+    PlainOldObject(PlainOldObjectBlock<'src>),
+    Env(EnvBlock<'src>),
+    Inject(InjectBlock<'src>),
 }
 
 /// An IR for the raw parsed structure of a Cloesce project
 #[derive(Default)]
 pub struct ParseAst<'src> {
-    pub wrangler_envs: Vec<WranglerEnvBlock<'src>>,
-    pub models: Vec<ModelBlock<'src>>,
-    pub apis: Vec<ApiBlock<'src>>,
-    pub sources: Vec<DataSourceBlock<'src>>,
-    pub services: Vec<ServiceBlock<'src>>,
-    pub poos: Vec<PlainOldObjectBlock<'src>>,
-    pub injects: Vec<InjectBlock<'src>>,
+    pub blocks: Vec<AstBlockKind<'src>>,
 }
 
 impl<'src> ParseAst<'src> {
-    fn merge(&mut self, other: ParseAst<'src>) {
-        self.wrangler_envs.extend(other.wrangler_envs);
-        self.models.extend(other.models);
-        self.apis.extend(other.apis);
-        self.sources.extend(other.sources);
-        self.services.extend(other.services);
-        self.poos.extend(other.poos);
-        self.injects.extend(other.injects);
+    fn merge(&mut self, mut other: ParseAst<'src>) {
+        self.blocks.append(&mut other.blocks);
     }
 }

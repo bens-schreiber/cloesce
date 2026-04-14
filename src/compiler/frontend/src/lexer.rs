@@ -29,16 +29,6 @@ pub enum Token<'src> {
     #[token("self")]
     SelfToken,
 
-    // Environment binding types
-    #[token("d1")]
-    D1,
-    #[token("r2")]
-    R2,
-    #[token("kv")]
-    Kv,
-    #[token("vars")]
-    Vars,
-
     // Punctuation
     #[token("{")]
     LBrace,
