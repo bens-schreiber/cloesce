@@ -9,7 +9,7 @@ use ast::{
 };
 use frontend::{
     EnvBindingKind, ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, R2Block, SqlBlockKind, SpdSlice, Symbol,
+    PaginatedBlockKind, R2Block, SpdSlice, SqlBlockKind, Symbol,
 };
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, vec};

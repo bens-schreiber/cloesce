@@ -1,6 +1,4 @@
-use ast::{CidlType, HttpVerb};
-
-use sqlformat::{FormatOptions, QueryParams};
+use ast::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBlock,
@@ -9,32 +7,29 @@ use crate::{
     ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 
-/// Format a `ParseAst` back into a canonical Cloesce source string.
-pub fn format(ast: &ParseAst<'_>, comment_map: &CommentMap<'_>) -> String {
-    let mut f = Formatter::new(comment_map);
-    f.format_ast(ast);
-    f.finish()
+trait Format<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>);
 }
 
-struct Formatter<'a> {
-    comment_map: &'a CommentMap<'a>,
+pub struct Formatter<'src> {
+    comment_map: &'src CommentMap<'src>,
+    src: &'src str,
     out: String,
 
-    /// Byte offset of the end of the last AST node emitted
+    /// Byte offset of the end of the last AST node emitted.
     cursor: usize,
 }
 
-impl<'a> Formatter<'a> {
-    fn new(comment_map: &'a CommentMap<'a>) -> Self {
-        Self {
+impl<'src> Formatter<'src> {
+    pub fn format(ast: &ParseAst<'_>, comment_map: &'src CommentMap<'_>, src: &'src str) -> String {
+        let mut f = Self {
             comment_map,
-            out: String::new(),
+            src,
+            out: String::with_capacity(src.len()),
             cursor: 0,
-        }
-    }
-
-    fn finish(self) -> String {
-        self.out
+        };
+        ast.fmt(&mut f);
+        f.out
     }
 
     fn push(&mut self, s: &str) {
@@ -51,354 +46,407 @@ impl<'a> Formatter<'a> {
         }
     }
 
-    /// Emit any comments that fall between `self.cursor` and `node_start`.
-    fn emit_comments_before(&mut self, node_start: usize, indent_depth: usize) {
-        let prev_end = self.cursor;
-        let comments: Vec<(usize, &str)> = self
-            .comment_map
-            .between(prev_end, node_start)
-            .iter()
-            .copied()
-            .collect();
-        for (_, text) in comments {
-            self.indent(indent_depth);
-            self.push(text);
-            self.newline();
-        }
-    }
-
-    /// Advance the source cursor past a node that ends at `end`.
-    fn advance(&mut self, end: usize) {
-        if end > self.cursor {
-            self.cursor = end;
-        }
-    }
-
-    fn format_ast(&mut self, ast: &ParseAst<'_>) {
-        let mut first = true;
-        for spd in &ast.blocks {
-            self.emit_comments_before(spd.span.start, 0);
-            self.advance(spd.span.start);
-            if !first {
-                // blank line between top level blocks
+    /// Emit leading comments between `self.cursor` and `node_start.
+    fn emit_leading_comments(&mut self, node_start: usize, indent_depth: usize) {
+        let comments: Vec<(usize, &str)> =
+            self.comment_map.between(self.cursor, node_start).to_vec();
+        for (offset, text) in comments {
+            // A leading comment either has a newline between the cursor and its
+            // start, or it sits at the very beginning of the file (nothing
+            // precedes it, so it can't be trailing anything).
+            let gap = &self.src[self.cursor..offset];
+            let is_leading = gap.is_empty() || gap.contains('\n');
+            if is_leading {
+                self.indent(indent_depth);
+                self.push(text);
                 self.newline();
             }
+            self.cursor = offset + text.len();
+        }
+        if node_start > self.cursor {
+            self.cursor = node_start;
+        }
+    }
+
+    /// If there is a comment on the same source line immediately after `after`,
+    /// emit it inline (` // ...`) and advance the cursor past it.
+    fn emit_trailing_comment(&mut self, after: usize) {
+        // Find the first comment whose offset >= after
+        let lo = self
+            .comment_map
+            .entries
+            .partition_point(|(off, _)| *off < after);
+        if let Some(&(offset, text)) = self.comment_map.entries.get(lo) {
+            // Only inline if there's no newline between `after` and the comment
+            let gap = self.src.get(after..offset).unwrap_or("");
+            if !gap.contains('\n') {
+                self.push(" ");
+                self.push(text);
+                self.cursor = offset + text.len();
+            }
+        }
+    }
+
+    /// Emit leading comments, emit any trailing comment, then emit a newline.
+    fn emit_spd<T: Format<'src>>(&mut self, spd: &'src Spd<T>, indent_depth: usize) {
+        self.emit_leading_comments(spd.span.start, indent_depth);
+        spd.block.fmt(self);
+        self.emit_trailing_comment(spd.span.end);
+        self.newline();
+        if spd.span.end > self.cursor {
+            self.cursor = spd.span.end;
+        }
+    }
+
+    /// emit leading comments, emit any trailing comment, then emit a newline.
+    fn emit_sym(
+        &mut self,
+        sym: &'src Symbol<'src>,
+        indent_depth: usize,
+        f: impl FnOnce(&mut Self),
+    ) {
+        self.emit_leading_comments(sym.span.start, indent_depth);
+        f(self);
+        self.emit_trailing_comment(sym.span.end);
+        self.newline();
+        if sym.span.end > self.cursor {
+            self.cursor = sym.span.end;
+        }
+    }
+}
+
+impl<'src> Format<'src> for ParseAst<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        let mut first = true;
+        for spd in &self.blocks {
+            f.emit_leading_comments(spd.span.start, 0);
+            if !first {
+                f.newline();
+            }
             first = false;
-            self.format_block(&spd.block);
-            self.advance(spd.span.end);
+            spd.block.fmt(f);
+            if spd.span.end > f.cursor {
+                f.cursor = spd.span.end;
+            }
         }
-
         // trailing comments after the last block
-        let eof = usize::MAX;
-        self.emit_comments_before(eof, 0);
+        f.emit_leading_comments(usize::MAX, 0);
     }
+}
 
-    fn format_block(&mut self, block: &AstBlockKind<'_>) {
-        match block {
-            AstBlockKind::Model(b) => self.format_model(b),
-            AstBlockKind::Api(b) => self.format_api(b),
-            AstBlockKind::DataSource(b) => self.format_data_source(b),
-            AstBlockKind::Service(b) => self.format_service(b),
-            AstBlockKind::PlainOldObject(b) => self.format_poo(b),
-            AstBlockKind::Env(blocks) => self.format_env(blocks),
-            AstBlockKind::Inject(b) => self.format_inject(b),
+impl<'src> Format<'src> for AstBlockKind<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        match self {
+            AstBlockKind::Model(b) => b.fmt(f),
+            AstBlockKind::Api(b) => b.fmt(f),
+            AstBlockKind::DataSource(b) => b.fmt(f),
+            AstBlockKind::Service(b) => b.fmt(f),
+            AstBlockKind::PlainOldObject(b) => b.fmt(f),
+            AstBlockKind::Env(blocks) => blocks.as_slice().fmt(f),
+            AstBlockKind::Inject(b) => b.fmt(f),
         }
     }
+}
 
-    fn format_model(&mut self, b: &ModelBlock<'_>) {
-        for tag in &b.use_tags {
-            self.emit_comments_before(tag.span.start, 0);
-            self.format_use_tag(&tag.block);
-            self.newline();
-            self.advance(tag.span.end);
+impl<'src> Format<'src> for ModelBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        for tag in &self.use_tags {
+            f.emit_spd(tag, 0);
         }
-        self.push("model ");
-        self.push(b.symbol.name);
+        f.push("model ");
+        f.push(self.symbol.name);
 
-        if b.blocks.is_empty() {
-            // Compact form for empty model blocks
-            self.push(" {}");
-            self.newline();
+        if self.blocks.is_empty() {
+            f.push(" {}");
+            f.newline();
             return;
         }
 
-        self.push(" {");
-        self.newline();
-
-        for spd in &b.blocks {
-            self.emit_comments_before(spd.span.start, 1);
-            self.indent(1);
-            self.format_model_block_kind(&spd.block);
-            self.newline();
-            self.advance(spd.span.end);
+        f.push(" {");
+        f.newline();
+        for spd in &self.blocks {
+            f.emit_leading_comments(spd.span.start, 1);
+            f.indent(1);
+            spd.block.fmt(f);
+            f.emit_trailing_comment(spd.span.end);
+            f.newline();
+            if spd.span.end > f.cursor {
+                f.cursor = spd.span.end;
+            }
         }
-
-        self.push("}");
-        self.newline();
+        f.push("}");
+        f.newline();
     }
+}
 
-    fn format_use_tag(&mut self, tag: &UseTag<'_>) {
-        self.push("[use ");
-        let params: Vec<String> = tag
+impl<'src> Format<'src> for UseTag<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("[use ");
+        let params: Vec<String> = self
             .params
             .iter()
             .map(|p| match p {
-                UseTagParamKind::Crud(spd) => format_crud(&spd.block),
+                UseTagParamKind::Crud(spd) => spd.block.to_keyword().to_string(),
                 UseTagParamKind::EnvBinding(b) => b.name.to_string(),
             })
             .collect();
-        self.push(&params.join(", "));
-        self.push("]");
+        f.push(&params.join(", "));
+        f.push("]");
     }
+}
 
-    fn format_model_block_kind(&mut self, item: &ModelBlockKind<'_>) {
-        match item {
-            ModelBlockKind::Column(sym) => self.format_typed_field(sym),
-            ModelBlockKind::Foreign(fb) => self.format_foreign(fb),
-            ModelBlockKind::Navigation(nb) => self.format_navigation(nb),
-            ModelBlockKind::Kv(kv) => self.format_kv(kv),
-            ModelBlockKind::R2(r2) => self.format_r2(r2),
-            ModelBlockKind::Primary(blocks) => {
-                if blocks.is_empty() {
-                    self.push("primary {}");
-                } else {
-                    self.push("primary {");
-                    self.newline();
-                    self.format_sql_blocks(blocks, 2);
-                    self.indent(1);
-                    self.push("}");
-                }
-            }
-            ModelBlockKind::Unique(blocks) => {
-                if blocks.is_empty() {
-                    self.push("unique {}");
-                } else {
-                    self.push("unique {");
-                    self.newline();
-                    self.format_sql_blocks(blocks, 2);
-                    self.indent(1);
-                    self.push("}");
-                }
-            }
-            ModelBlockKind::Optional(blocks) => {
-                if blocks.is_empty() {
-                    self.push("optional {}");
-                } else {
-                    self.push("optional {");
-                    self.newline();
-                    self.format_sql_blocks(blocks, 2);
-                    self.indent(1);
-                    self.push("}");
-                }
-            }
+impl<'src> Format<'src> for ModelBlockKind<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        match self {
+            ModelBlockKind::Column(sym) => fmt_typed_field(sym, f),
+            ModelBlockKind::Foreign(fb) => fb.fmt(f),
+            ModelBlockKind::Navigation(nb) => nb.fmt(f),
+            ModelBlockKind::Kv(kv) => kv.fmt(f),
+            ModelBlockKind::R2(r2) => r2.fmt(f),
+            ModelBlockKind::Primary(blocks) => fmt_sql_block_group("primary", blocks, f),
+            ModelBlockKind::Unique(blocks) => fmt_sql_block_group("unique", blocks, f),
+            ModelBlockKind::Optional(blocks) => fmt_sql_block_group("optional", blocks, f),
             ModelBlockKind::Paginated(blocks) => {
                 if blocks.is_empty() {
-                    self.push("paginated {}");
+                    f.push("paginated {}");
                 } else {
-                    self.push("paginated {");
-                    self.newline();
+                    f.push("paginated {");
+                    f.newline();
                     for pb in blocks {
-                        self.indent(2);
+                        f.indent(2);
                         match pb {
-                            PaginatedBlockKind::R2(r2) => self.format_r2(r2),
-                            PaginatedBlockKind::Kv(kv) => self.format_kv(kv),
+                            PaginatedBlockKind::R2(r2) => r2.fmt(f),
+                            PaginatedBlockKind::Kv(kv) => kv.fmt(f),
                         }
-                        self.newline();
+                        f.newline();
                     }
-                    self.indent(1);
-                    self.push("}");
+                    f.indent(1);
+                    f.push("}");
                 }
             }
             ModelBlockKind::KeyField(fields) => {
                 if fields.is_empty() {
-                    self.push("keyfield {}");
+                    f.push("keyfield {}");
                 } else {
-                    self.push("keyfield {");
-                    self.newline();
-                    for f in fields {
-                        self.indent(2);
-                        self.push(f.name);
-                        self.newline();
+                    f.push("keyfield {");
+                    f.newline();
+                    for sym in fields {
+                        f.indent(2);
+                        f.push(sym.name);
+                        f.newline();
                     }
-                    self.indent(1);
-                    self.push("}");
+                    f.indent(1);
+                    f.push("}");
                 }
             }
         }
     }
+}
 
-    fn format_sql_blocks(&mut self, blocks: &[SqlBlockKind<'_>], depth: usize) {
-        for b in blocks {
-            self.indent(depth);
-            match b {
-                SqlBlockKind::Column(sym) => self.format_typed_field(sym),
-                SqlBlockKind::Foreign(fb) => self.format_foreign(fb),
-            }
-            self.newline();
-        }
-    }
+impl<'src> Format<'src> for ForeignBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("foreign (");
+        f.push(&fmt_adj(&self.adj));
+        f.push(")");
 
-    fn format_foreign(&mut self, fb: &ForeignBlock<'_>) {
-        self.push("foreign (");
-        let adj: Vec<String> = fb
-            .adj
-            .iter()
-            .map(|(m, f)| format!("{}::{}", m.name, f.name))
-            .collect();
-        self.push(&adj.join(", "));
-        self.push(")");
-
-        if let Some(q) = &fb.qualifier {
-            self.push(" ");
-            self.push(match q {
+        if let Some(q) = &self.qualifier {
+            f.push(" ");
+            f.push(match q {
                 ForeignQualifier::Primary => "primary",
                 ForeignQualifier::Optional => "optional",
                 ForeignQualifier::Unique => "unique",
             });
         }
 
-        self.push(" {");
-        self.newline();
-        for field in &fb.fields {
-            self.indent(2);
-            self.push(field.name);
-            self.newline();
+        f.push(" {");
+        f.newline();
+        for field in &self.fields {
+            f.indent(2);
+            f.push(field.name);
+            f.newline();
         }
-        if let Some(nav) = &fb.nav {
-            self.indent(2);
-            self.push("nav { ");
-            self.push(nav.name);
-            self.push(" }");
-            self.newline();
+        if let Some(nav) = &self.nav {
+            f.indent(2);
+            f.push("nav { ");
+            f.push(nav.name);
+            f.push(" }");
+            f.newline();
         }
-        self.indent(1);
-        self.push("}");
+        f.indent(1);
+        f.push("}");
     }
+}
 
-    fn format_navigation(&mut self, nb: &NavigationBlock<'_>) {
-        self.push("nav (");
-        let adj: Vec<String> = nb
-            .adj
-            .iter()
-            .map(|(m, f)| format!("{}::{}", m.name, f.name))
-            .collect();
-        self.push(&adj.join(", "));
-        self.push(") {");
-        self.newline();
-        self.indent(2);
-        self.push(nb.symbol.name);
-        self.newline();
-        self.indent(1);
-        self.push("}");
+impl<'src> Format<'src> for NavigationBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("nav (");
+        f.push(&fmt_adj(&self.adj));
+        f.push(") {");
+        f.newline();
+        f.indent(2);
+        f.push(self.symbol.name);
+        f.newline();
+        f.indent(1);
+        f.push("}");
     }
+}
 
-    fn format_kv(&mut self, kv: &KvBlock<'_>) {
-        self.push("kv (");
-        self.push(kv.env_binding.name);
-        self.push(", \"");
-        self.push(kv.key_format);
-        self.push("\"");
-        self.push(")");
-        if kv.is_paginated {
-            self.push(" paginated");
+impl<'src> Format<'src> for KvBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("kv (");
+        f.push(self.env_binding.name);
+        f.push(", \"");
+        f.push(self.key_format);
+        f.push("\")");
+        if self.is_paginated {
+            f.push(" paginated");
         }
-        self.push(" {");
-        self.newline();
-        self.indent(2);
-        self.format_typed_field(&kv.field);
-        self.newline();
-        self.indent(1);
-        self.push("}");
+        f.push(" {");
+        f.newline();
+        f.indent(2);
+        fmt_typed_field(&self.field, f);
+        f.newline();
+        f.indent(1);
+        f.push("}");
     }
+}
 
-    fn format_r2(&mut self, r2: &R2Block<'_>) {
-        self.push("r2 (");
-        self.push(r2.env_binding.name);
-        self.push(", \"");
-        self.push(r2.key_format);
-        self.push("\"");
-        self.push(")");
-        if r2.is_paginated {
-            self.push(" paginated");
+impl<'src> Format<'src> for R2Block<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("r2 (");
+        f.push(self.env_binding.name);
+        f.push(", \"");
+        f.push(self.key_format);
+        f.push("\")");
+        if self.is_paginated {
+            f.push(" paginated");
         }
-        self.push(" {");
-        self.newline();
-        self.indent(2);
-        self.push(r2.field.name);
-        self.newline();
-        self.indent(1);
-        self.push("}");
+        f.push(" {");
+        f.newline();
+        f.indent(2);
+        f.push(self.field.name);
+        f.newline();
+        f.indent(1);
+        f.push("}");
     }
+}
 
-    fn format_api(&mut self, b: &ApiBlock<'_>) {
-        self.push("api ");
-        self.push(b.symbol.name);
+impl<'src> Format<'src> for ApiBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("api ");
+        f.push(self.symbol.name);
 
-        if b.methods.is_empty() {
-            // Compact form for empty api blocks
-            self.push(" {}");
-            self.newline();
+        if self.methods.is_empty() {
+            f.push(" {}");
+            f.newline();
             return;
         }
 
-        self.push(" {");
-        self.newline();
-
-        for spd in &b.methods {
-            self.emit_comments_before(spd.span.start, 1);
-            self.advance(spd.span.start);
-            self.indent(1);
-            self.format_api_method(&spd.block);
-            self.newline();
-            self.advance(spd.span.end);
+        f.push(" {");
+        f.newline();
+        for spd in &self.methods {
+            f.emit_leading_comments(spd.span.start, 1);
+            f.indent(1);
+            spd.block.fmt(f);
+            f.emit_trailing_comment(spd.span.end);
+            f.newline();
+            if spd.span.end > f.cursor {
+                f.cursor = spd.span.end;
+            }
         }
-
-        self.push("}");
-        self.newline();
+        f.push("}");
+        f.newline();
     }
+}
 
-    fn format_api_method(&mut self, m: &ApiBlockMethod<'_>) {
-        self.push(format_http_verb(m.http_verb));
-        self.push(" ");
-        self.push(m.symbol.name);
-        self.push("(");
+impl<'src> Format<'src> for ApiBlockMethod<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push(self.http_verb.to_keyword());
+        f.push(" ");
+        f.push(self.symbol.name);
+        f.push("(");
 
-        let params: Vec<String> = m
+        let params: Vec<String> = self
             .parameters
             .iter()
             .map(|spd| match &spd.block {
                 ApiBlockMethodParamKind::SelfParam {
                     symbol: _,
                     data_source,
-                } => {
-                    if let Some(ds) = data_source {
-                        format!("[source {}] self", ds.name)
-                    } else {
-                        "self".to_string()
-                    }
-                }
+                } => match data_source {
+                    Some(ds) => format!("[source {}] self", ds.name),
+                    None => "self".to_string(),
+                },
                 ApiBlockMethodParamKind::Field(sym) => {
-                    format!("{}: {}", sym.name, format_cidl_type(&sym.cidl_type))
+                    format!("{}: {}", sym.name, fmt_cidl_type(&sym.cidl_type))
                 }
             })
             .collect();
 
-        self.push(&params.join(", "));
-        self.push(") -> ");
-        self.push(&format_cidl_type(&m.return_type));
+        f.push(&params.join(", "));
+        f.push(") -> ");
+        f.push(&fmt_cidl_type(&self.return_type));
     }
+}
 
-    /// Format one level of a parsed include tree at `depth`.
-    /// Entries whose subtree is empty are leaf nodes — emitted inline (comma-separated).
-    /// Entries with children are branch nodes — emitted with a braced block.
-    fn format_include_tree(&mut self, tree: &ParsedIncludeTree<'_>, depth: usize) {
-        let leaves: Vec<&str> = tree
+impl<'src> Format<'src> for DataSourceBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        if self.is_internal {
+            f.push("[internal]");
+            f.newline();
+        }
+
+        f.push("source ");
+        f.push(self.symbol.name);
+        f.push(" for ");
+        f.push(self.model.name);
+        f.push(" {");
+        f.newline();
+
+        if self.tree.0.is_empty() {
+            f.indent(1);
+            f.push("include {}");
+            f.newline();
+        } else {
+            f.indent(1);
+            f.push("include {");
+            f.newline();
+            self.tree.fmt_at(f, 2);
+            f.indent(1);
+            f.push("}");
+            f.newline();
+        }
+
+        for (label, spd) in [("get", &self.get), ("list", &self.list)] {
+            if let Some(spd) = spd {
+                f.indent(1);
+                f.push("sql ");
+                f.push(label);
+                f.push("(");
+                f.push(&fmt_sql_params(&spd.block.parameters));
+                f.push(") {");
+                f.newline();
+                fmt_sql_string(spd.block.raw_sql, 2, f);
+                f.indent(1);
+                f.push("}");
+                f.newline();
+            }
+        }
+
+        f.push("}");
+        f.newline();
+    }
+}
+
+impl ParsedIncludeTree<'_> {
+    fn fmt_at(&self, f: &mut Formatter<'_>, depth: usize) {
+        let leaves: Vec<&str> = self
             .0
             .iter()
             .filter(|(_, v)| v.0.is_empty())
             .map(|(k, _)| k.name)
             .collect();
-        let branches: Vec<(&str, &ParsedIncludeTree<'_>)> = tree
+        let branches: Vec<(&str, &ParsedIncludeTree<'_>)> = self
             .0
             .iter()
             .filter(|(_, v)| !v.0.is_empty())
@@ -406,291 +454,217 @@ impl<'a> Formatter<'a> {
             .collect();
 
         if !leaves.is_empty() {
-            self.indent(depth);
-            self.push(&leaves.join(", "));
-            self.newline();
+            f.indent(depth);
+            f.push(&leaves.join(", "));
+            f.newline();
         }
 
         for (name, subtree) in branches {
-            self.indent(depth);
-            self.push(name);
-            self.push(" {");
-            self.newline();
-            self.format_include_tree(subtree, depth + 1);
-            self.indent(depth);
-            self.push("}");
-            self.newline();
+            f.indent(depth);
+            f.push(name);
+            f.push(" {");
+            f.newline();
+            subtree.fmt_at(f, depth + 1);
+            f.indent(depth);
+            f.push("}");
+            f.newline();
         }
     }
+}
 
-    fn format_data_source(&mut self, b: &DataSourceBlock<'_>) {
-        if b.is_internal {
-            self.push("[internal]");
-            self.newline();
-        }
-
-        self.push("source ");
-        self.push(b.symbol.name);
-        self.push(" for ");
-        self.push(b.model.name);
-        self.push(" {");
-        self.newline();
-
-        // Compact `include {}` when there are no entries; otherwise render
-        // the full multi-line include tree.
-        if b.tree.0.is_empty() {
-            self.indent(1);
-            self.push("include {}");
-            self.newline();
-        } else {
-            self.indent(1);
-            self.push("include {");
-            self.newline();
-            self.format_include_tree(&b.tree, 2);
-            self.indent(1);
-            self.push("}");
-            self.newline();
-        }
-
-        if let Some(spd) = &b.get {
-            self.indent(1);
-            self.push("sql get(");
-            let params: Vec<String> = spd
-                .block
-                .parameters
-                .iter()
-                .map(|p| format!("{}: {}", p.name, format_cidl_type(&p.cidl_type)))
-                .collect();
-            self.push(&params.join(", "));
-            self.push(") {");
-            self.newline();
-            self.format_sql_string(spd.block.raw_sql, 2);
-            self.indent(1);
-            self.push("}");
-            self.newline();
-        }
-
-        if let Some(spd) = &b.list {
-            self.indent(1);
-            self.push("sql list(");
-            let params: Vec<String> = spd
-                .block
-                .parameters
-                .iter()
-                .map(|p| format!("{}: {}", p.name, format_cidl_type(&p.cidl_type)))
-                .collect();
-            self.push(&params.join(", "));
-            self.push(") {");
-            self.newline();
-            self.format_sql_string(spd.block.raw_sql, 2);
-            self.indent(1);
-            self.push("}");
-            self.newline();
-        }
-
-        self.push("}");
-        self.newline();
+impl<'src> Format<'src> for ServiceBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("service ");
+        f.push(self.symbol.name);
+        fmt_symbol_block(&self.fields, f);
     }
+}
 
-    fn format_service(&mut self, b: &ServiceBlock<'_>) {
-        self.push("service ");
-        self.push(b.symbol.name);
+impl<'src> Format<'src> for PlainOldObjectBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        f.push("poo ");
+        f.push(self.symbol.name);
+        fmt_symbol_block(&self.fields, f);
+    }
+}
 
-        if b.fields.is_empty() {
-            // Compact form for empty service blocks
-            self.push(" {}");
-            self.newline();
+impl<'src> Format<'src> for [Spd<EnvBlock<'src>>] {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        if self.is_empty() {
+            f.push("env {}");
+            f.newline();
             return;
         }
 
-        self.push(" {");
-        self.newline();
+        f.push("env {");
+        f.newline();
 
-        for field in &b.fields {
-            self.emit_comments_before(field.span.start, 1);
-            self.indent(1);
-            self.format_typed_field(field);
-            self.newline();
-            self.advance(field.span.end);
-        }
-
-        self.push("}");
-        self.newline();
-    }
-
-    fn format_poo(&mut self, b: &PlainOldObjectBlock<'_>) {
-        self.push("poo ");
-        self.push(b.symbol.name);
-
-        if b.fields.is_empty() {
-            // Compact form for empty poo blocks
-            self.push(" {}");
-            self.newline();
-            return;
-        }
-
-        self.push(" {");
-        self.newline();
-
-        for field in &b.fields {
-            self.emit_comments_before(field.span.start, 1);
-            self.indent(1);
-            self.format_typed_field(field);
-            self.newline();
-            self.advance(field.span.end);
-        }
-
-        self.push("}");
-        self.newline();
-    }
-
-    fn format_env(&mut self, blocks: &[Spd<EnvBlock<'_>>]) {
-        if blocks.is_empty() {
-            // Compact form for completely empty env blocks
-            self.push("env {}");
-            self.newline();
-            return;
-        }
-
-        self.push("env {");
-        self.newline();
-
-        for spd in blocks {
-            self.emit_comments_before(spd.span.start, 1);
-            self.advance(spd.span.start);
-            self.indent(1);
-            match &spd.block.kind {
-                EnvBlockKind::D1 => {
-                    self.push("d1 { ");
-                    self.push(
-                        &spd.block
-                            .symbols
-                            .iter()
-                            .map(|s| s.name)
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    );
-                    self.push(" }");
-                }
-                EnvBlockKind::R2 => {
-                    self.push("r2 { ");
-                    self.push(
-                        &spd.block
-                            .symbols
-                            .iter()
-                            .map(|s| s.name)
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    );
-                    self.push(" }");
-                }
-                EnvBlockKind::Kv => {
-                    self.push("kv { ");
-                    self.push(
-                        &spd.block
-                            .symbols
-                            .iter()
-                            .map(|s| s.name)
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    );
-                    self.push(" }");
-                }
-                EnvBlockKind::Var => {
-                    self.push("vars {");
-                    self.newline();
-                    for sym in &spd.block.symbols {
-                        self.emit_comments_before(sym.span.start, 2);
-                        self.indent(2);
-                        self.format_typed_field(sym);
-                        self.newline();
-                        self.advance(sym.span.end);
-                    }
-                    self.indent(1);
-                    self.push("}");
-                }
+        for spd in self {
+            f.emit_leading_comments(spd.span.start, 1);
+            f.indent(1);
+            spd.block.fmt(f);
+            f.emit_trailing_comment(spd.span.end);
+            f.newline();
+            if spd.span.end > f.cursor {
+                f.cursor = spd.span.end;
             }
-            self.newline();
-            self.advance(spd.span.end);
         }
 
-        self.push("}");
-        self.newline();
+        f.push("}");
+        f.newline();
     }
+}
 
-    fn format_inject(&mut self, b: &InjectBlock<'_>) {
-        if b.symbols.is_empty() {
-            // Compact form for empty inject blocks
-            self.push("inject {}");
-            self.newline();
-            return;
-        }
-
-        self.push("inject {");
-        self.newline();
-
-        for sym in &b.symbols {
-            self.emit_comments_before(sym.span.start, 1);
-            self.indent(1);
-            self.push(sym.name);
-            self.newline();
-            self.advance(sym.span.end);
-        }
-
-        self.push("}");
-        self.newline();
-    }
-
-    fn format_typed_field(&mut self, sym: &Symbol<'_>) {
-        self.push(sym.name);
-        self.push(": ");
-        self.push(&format_cidl_type(&sym.cidl_type));
-    }
-
-    /// Format a raw SQL string as a quoted, potentially multi-line string
-    /// with indentation aligned to the given depth.
-    ///
-    /// The opening and closing quotation marks are always placed on their
-    /// own lines (for non-empty SQL), with the SQL content in between.
-    fn format_sql_string(&mut self, raw_sql: &str, indent_depth: usize) {
-        let formatted = format_sql(raw_sql);
-        let mut lines = formatted.lines();
-
-        match lines.next() {
-            Some(first) => {
-                // Opening quote on its own line
-                self.indent(indent_depth);
-                self.push("\"");
-                self.newline();
-
-                // First line of SQL content
-                self.indent(indent_depth);
-                self.push(first);
-                self.newline();
-
-                // Subsequent SQL lines, each on their own line
-                for line in lines {
-                    self.indent(indent_depth);
-                    self.push(line);
-                    self.newline();
+impl<'src> Format<'src> for EnvBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        match &self.kind {
+            EnvBlockKind::D1 => fmt_env_inline("d1", &self.symbols, f),
+            EnvBlockKind::R2 => fmt_env_inline("r2", &self.symbols, f),
+            EnvBlockKind::Kv => fmt_env_inline("kv", &self.symbols, f),
+            EnvBlockKind::Var => {
+                f.push("vars {");
+                f.newline();
+                for sym in &self.symbols {
+                    f.emit_sym(sym, 2, |f| {
+                        f.indent(2);
+                        fmt_typed_field(sym, f);
+                    });
                 }
-
-                // Closing quote on its own line
-                self.indent(indent_depth);
-                self.push("\"");
-                self.newline();
-            }
-            None => {
-                // Empty SQL string: keep as a simple "" literal
-                self.indent(indent_depth);
-                self.push("\"\"");
-                self.newline();
+                f.indent(1);
+                f.push("}");
             }
         }
     }
 }
 
-fn format_cidl_type(ty: &CidlType<'_>) -> String {
+impl<'src> Format<'src> for InjectBlock<'src> {
+    fn fmt(&'src self, f: &mut Formatter<'src>) {
+        if self.symbols.is_empty() {
+            f.push("inject {}");
+            f.newline();
+            return;
+        }
+
+        f.push("inject {");
+        f.newline();
+        for sym in &self.symbols {
+            f.emit_sym(sym, 1, |f| {
+                f.indent(1);
+                f.push(sym.name);
+            });
+        }
+        f.push("}");
+        f.newline();
+    }
+}
+
+/// Format a typed `name: Type` field.
+fn fmt_typed_field(sym: &Symbol<'_>, f: &mut Formatter<'_>) {
+    f.push(sym.name);
+    f.push(": ");
+    f.push(&fmt_cidl_type(&sym.cidl_type));
+}
+
+fn fmt_symbol_block<'src>(fields: &'src [Symbol<'src>], f: &mut Formatter<'src>) {
+    if fields.is_empty() {
+        f.push(" {}");
+        f.newline();
+        return;
+    }
+    f.push(" {");
+    f.newline();
+    for field in fields {
+        f.emit_sym(field, 1, |f| {
+            f.indent(1);
+            fmt_typed_field(field, f);
+        });
+    }
+    f.push("}");
+    f.newline();
+}
+
+fn fmt_sql_block_group<'src>(
+    keyword: &str,
+    blocks: &'src [SqlBlockKind<'src>],
+    f: &mut Formatter<'src>,
+) {
+    if blocks.is_empty() {
+        f.push(keyword);
+        f.push(" {}");
+    } else {
+        f.push(keyword);
+        f.push(" {");
+        f.newline();
+        for b in blocks {
+            f.indent(2);
+            match b {
+                SqlBlockKind::Column(sym) => fmt_typed_field(sym, f),
+                SqlBlockKind::Foreign(fb) => fb.fmt(f),
+            }
+            f.newline();
+        }
+        f.indent(1);
+        f.push("}");
+    }
+}
+
+fn fmt_env_inline(keyword: &str, symbols: &[Symbol<'_>], f: &mut Formatter<'_>) {
+    f.push(keyword);
+    f.push(" { ");
+    f.push(
+        &symbols
+            .iter()
+            .map(|s| s.name)
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    f.push(" }");
+}
+
+fn fmt_sql_params(params: &[Symbol<'_>]) -> String {
+    params
+        .iter()
+        .map(|p| format!("{}: {}", p.name, fmt_cidl_type(&p.cidl_type)))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Places each quotation mark on its own line with the SQL body indented.
+/// Each line is trimmed before re-indenting so the formatter owns all indentation.
+fn fmt_sql_string(raw_sql: &str, indent_depth: usize, f: &mut Formatter<'_>) {
+    let lines: Vec<&str> = raw_sql
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    if lines.is_empty() {
+        f.indent(indent_depth);
+        f.push("\"\"");
+        f.newline();
+    } else {
+        f.indent(indent_depth);
+        f.push("\"");
+        f.newline();
+        for line in lines {
+            f.indent(indent_depth);
+            f.push(line);
+            f.newline();
+        }
+        f.indent(indent_depth);
+        f.push("\"");
+        f.newline();
+    }
+}
+
+/// Format a list of `(model, field)` adjacency pairs as `Model::field, …`.
+fn fmt_adj(adj: &[(Symbol<'_>, Symbol<'_>)]) -> String {
+    adj.iter()
+        .map(|(m, field)| format!("{}::{}", m.name, field.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn fmt_cidl_type(ty: &CidlType<'_>) -> String {
     match ty {
         CidlType::Void => "void".into(),
         CidlType::Integer => "int".into(),
@@ -703,43 +677,41 @@ fn format_cidl_type(ty: &CidlType<'_>) -> String {
         CidlType::Json => "json".into(),
         CidlType::R2Object => "R2Object".into(),
         CidlType::Env => "env".into(),
-        CidlType::Inject { name } => name.to_string(),
-        CidlType::Object { name } => name.to_string(),
-        CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Inject { name }
+        | CidlType::Object { name }
+        | CidlType::UnresolvedReference { name } => name.to_string(),
         CidlType::Partial { object_name } => format!("Partial<{}>", object_name),
         CidlType::DataSource { model_name } => format!("DataSource<{}>", model_name),
-        CidlType::Array(inner) => format!("Array<{}>", format_cidl_type(inner)),
-        CidlType::HttpResult(inner) => format!("HttpResult<{}>", format_cidl_type(inner)),
-        CidlType::Nullable(inner) => format!("Option<{}>", format_cidl_type(inner)),
-        CidlType::Paginated(inner) => format!("Paginated<{}>", format_cidl_type(inner)),
-        CidlType::KvObject(inner) => format!("KvObject<{}>", format_cidl_type(inner)),
+        CidlType::Array(inner) => format!("Array<{}>", fmt_cidl_type(inner)),
+        CidlType::HttpResult(inner) => format!("HttpResult<{}>", fmt_cidl_type(inner)),
+        CidlType::Nullable(inner) => format!("Option<{}>", fmt_cidl_type(inner)),
+        CidlType::Paginated(inner) => format!("Paginated<{}>", fmt_cidl_type(inner)),
+        CidlType::KvObject(inner) => format!("KvObject<{}>", fmt_cidl_type(inner)),
     }
 }
 
-fn format_sql(input: &str) -> String {
-    let opts = FormatOptions::<'_> {
-        lines_between_queries: 2,
-        ..FormatOptions::default()
-    };
-
-    sqlformat::format(input, &QueryParams::None, &opts)
+trait ToKeyword {
+    fn to_keyword(&self) -> &'static str;
 }
 
-fn format_http_verb(verb: HttpVerb) -> &'static str {
-    match verb {
-        HttpVerb::Get => "get",
-        HttpVerb::Post => "post",
-        HttpVerb::Put => "put",
-        HttpVerb::Delete => "delete",
-        HttpVerb::Patch => "patch",
+impl ToKeyword for HttpVerb {
+    fn to_keyword(&self) -> &'static str {
+        match self {
+            HttpVerb::Get => "get",
+            HttpVerb::Post => "post",
+            HttpVerb::Put => "put",
+            HttpVerb::Delete => "delete",
+            HttpVerb::Patch => "patch",
+        }
     }
 }
 
-fn format_crud(k: &ast::CrudKind) -> String {
-    use ast::CrudKind;
-    match k {
-        CrudKind::Get => "get".into(),
-        CrudKind::List => "list".into(),
-        CrudKind::Save => "save".into(),
+impl ToKeyword for CrudKind {
+    fn to_keyword(&self) -> &'static str {
+        match self {
+            CrudKind::Get => "get",
+            CrudKind::List => "list",
+            CrudKind::Save => "save",
+        }
     }
 }

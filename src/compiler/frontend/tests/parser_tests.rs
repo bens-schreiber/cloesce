@@ -13,18 +13,6 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
             .all(|((m, f), (em, ef))| m.name == *em && f.name == *ef)
 }
 
-macro_rules! expect_block {
-    ($iter:expr, $pat:pat => $out:expr, $msg:literal) => {{
-        $iter
-            .iter()
-            .find_map(|b| match &b.block {
-                $pat => Some($out),
-                _ => None,
-            })
-            .expect($msg)
-    }};
-}
-
 #[test]
 fn env_block() {
     // Act
@@ -348,7 +336,11 @@ fn service_block() {
 
     let create_block = api_blocks
         .iter()
-        .find(|a| a.methods.iter().any(|m| m.block.symbol.name == "createItem"))
+        .find(|a| {
+            a.methods
+                .iter()
+                .any(|m| m.block.symbol.name == "createItem")
+        })
         .expect("block with createItem");
     let create = create_block
         .methods
@@ -378,12 +370,10 @@ fn service_block() {
         .unwrap();
     assert_eq!(list.block.http_verb, HttpVerb::Get);
     // has a SelfParam means it's an instance method
-    assert!(
-        list.block
-            .parameters
-            .iter()
-            .any(|p| matches!(&p.block, frontend::ApiBlockMethodParamKind::SelfParam { .. }))
-    );
+    assert!(list.block.parameters.iter().any(|p| matches!(
+        &p.block,
+        frontend::ApiBlockMethodParamKind::SelfParam { .. }
+    )));
     assert_eq!(list.block.return_type, CidlType::array(CidlType::String));
 }
 
@@ -813,9 +803,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.block {
-            ModelBlockKind::KeyField(fields) => {
-                Some(fields.iter().map(|s| s.name).collect())
-            }
+            ModelBlockKind::KeyField(fields) => Some(fields.iter().map(|s| s.name).collect()),
             _ => None,
         })
         .unwrap();

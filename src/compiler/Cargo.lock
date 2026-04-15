@@ -703,7 +703,6 @@ dependencies = [
  "chumsky",
  "compiler-test",
  "logos",
- "sqlformat",
 ]
 
 [[package]]

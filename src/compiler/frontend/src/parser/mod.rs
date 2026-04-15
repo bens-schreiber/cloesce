@@ -127,7 +127,9 @@ fn poo_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(symbol, fields)| AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields }))
+        .map(|(symbol, fields)| {
+            AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields })
+        })
 }
 
 /// Parses a block of the form:

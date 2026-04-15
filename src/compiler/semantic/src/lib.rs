@@ -1,6 +1,8 @@
 use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingKind, EnvBlock, EnvBlockKind, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice, Symbol
+    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingKind, EnvBlock,
+    EnvBlockKind, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd,
+    SpdSlice, Symbol,
 };
 use indexmap::IndexMap;
 

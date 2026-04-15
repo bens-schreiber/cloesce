@@ -172,12 +172,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                     .delimited_by(just(Token::LParen), just(Token::RParen)),
             )
             .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-            .map(|(adj, field)| {
-                ModelBlockKind::Navigation(NavigationBlock {
-                    adj,
-                    symbol: field,
-                })
-            })
+            .map(|(adj, field)| ModelBlockKind::Navigation(NavigationBlock { adj, symbol: field }))
     };
 
     // `keyfield { ident* }`

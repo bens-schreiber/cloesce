@@ -35,9 +35,12 @@ pub fn api_block<'tokens, 'src: 'tokens>()
         .map(|(symbol, methods)| AstBlockKind::Api(ApiBlock { symbol, methods }))
 }
 
-fn method<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, crate::Spd<ApiBlockMethod<'src>>, Extra<'tokens, 'src>>
-{
+fn method<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    TokenInput<'tokens, 'src>,
+    crate::Spd<ApiBlockMethod<'src>>,
+    Extra<'tokens, 'src>,
+> {
     http_verb()
         .then(symbol())
         .then(
@@ -49,17 +52,22 @@ fn method<'tokens, 'src: 'tokens>()
         )
         .then_ignore(just(Token::Arrow))
         .then(cidl_type())
-        .map_spanned(|(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
-            symbol,
-            http_verb,
-            return_type,
-            parameters,
-        })
+        .map_spanned(
+            |(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
+                symbol,
+                http_verb,
+                return_type,
+                parameters,
+            },
+        )
 }
 
-fn parameter<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, crate::Spd<ApiBlockMethodParamKind<'src>>, Extra<'tokens, 'src>>
-{
+fn parameter<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    TokenInput<'tokens, 'src>,
+    crate::Spd<ApiBlockMethodParamKind<'src>>,
+    Extra<'tokens, 'src>,
+> {
     // [source DataSourceName]
     let source_tag = just(Token::LBracket)
         .ignore_then(just(Token::Source))

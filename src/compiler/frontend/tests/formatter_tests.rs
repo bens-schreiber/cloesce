@@ -4,7 +4,7 @@ use compiler_test::COMPREHENSIVE_SRC;
 use frontend::{
     ParseAst,
     err::DisplayError,
-    formatter,
+    formatter::Formatter,
     lexer::{CloesceLexer, LexResult, LexTarget},
     parser::CloesceParser,
 };
@@ -34,15 +34,15 @@ fn lex_parse<'src>(src: &str) -> (ParseAst<'_>, LexResult<'_>) {
 fn format_non_lossy() {
     // Arrange
     let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
+
     let comment_map = &lex_result.results[0].comment_map;
 
     // Act
-    let formatted = formatter::format(&parse_ast, comment_map);
-    let (reparse_ast, relex_result) = lex_parse(&formatted);
-
-    panic!("{}", formatted);
+    let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
+    let (reparse_ast, _) = lex_parse(&formatted);
 
     // Assert
+    // TODO: not sure the best way to test this, do we really want to implement `PartialEq` on the AST?
     assert_eq!(
         parse_ast.blocks.len(),
         reparse_ast.blocks.len(),
@@ -51,19 +51,55 @@ fn format_non_lossy() {
 }
 
 #[test]
-fn format_consistent() {
+fn format_idempotent() {
     // Arrange
     let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
     let comment_map = &lex_result.results[0].comment_map;
 
     // Act
-    let formatted = formatter::format(&parse_ast, comment_map);
+    let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
     let (reparse_ast, relex_result) = lex_parse(&formatted);
-    let reformatted = formatter::format(&reparse_ast, &relex_result.results[0].comment_map);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
 
     // Assert
     assert_eq!(
         formatted, reformatted,
         "formatting should be consistent on already formatted code"
+    );
+}
+
+#[test]
+fn format_leading_trailing_comments() {
+    // Arrange
+    let src = r#"
+// Leading comment for A
+model A {
+    // Leading comment for field1
+    field1: string // Trailing comment for field1
+    // Leading comment for field2
+    field2: int // Trailing comment for field2
+}
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+
+    // Act
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (reparse_ast, relex_result) = lex_parse(&formatted);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
+
+    // Assert
+    assert_eq!(
+        formatted, reformatted,
+        "formatting should preserve leading and trailing comments"
     );
 }

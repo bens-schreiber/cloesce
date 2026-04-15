@@ -69,14 +69,20 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::Ident("get")))
         .ignore_then(method_params())
         .then(sql_block.clone())
-        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod { parameters, raw_sql });
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
+            parameters,
+            raw_sql,
+        });
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("list")))
         .ignore_then(method_params())
         .then(sql_block)
-        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod { parameters, raw_sql });
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
+            parameters,
+            raw_sql,
+        });
 
     // [internal]
     let internal_decorator = just(Token::LBracket)
