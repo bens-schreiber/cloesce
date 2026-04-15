@@ -570,7 +570,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
         expected_str!(
             sql,
-            r#"INSERT INTO "User" ("dog_id", "first_name", "age", "favorite_color", "id") SELECT 0, "first_name", "age", "favorite_color", "id" FROM "User_"#
+            r#"INSERT INTO "User" ("first_name", "age", "favorite_color", "dog_id", "id") SELECT "first_name", "age", "favorite_color", 0, "id" FROM "User_"#
         );
         expected_str!(sql, r#"DROP TABLE "User_"#);
 

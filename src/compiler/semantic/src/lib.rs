@@ -216,15 +216,18 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         });
                     }
 
-                    for method in [&data_source_block.list, &data_source_block.get]
-                        .into_iter()
-                        .flatten()
+                    for (method_name, method) in [
+                        ("list", &data_source_block.list),
+                        ("get", &data_source_block.get),
+                    ]
+                    .into_iter()
+                    .filter_map(|(n, m)| m.as_ref().map(|m| (n, m)))
                     {
                         for param in &method.parameters {
                             if let Some(first) = st.data_source_method_params.insert(
                                 SymbolKind::DataSourceMethodParam {
                                     model: data_source_block.model,
-                                    method: data_source_block.symbol.name,
+                                    method: method_name,
                                     name: param.name,
                                 },
                                 param,

@@ -467,7 +467,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         if let Some(nav) = &fk.nav {
             let nav_block = NavigationBlock {
                 span: nav.span,
-                adj: vec![(adj_model_name, fk.adj.first().unwrap().1)],
+                adj: fk.adj.clone(),
                 field: nav.clone(),
             };
 

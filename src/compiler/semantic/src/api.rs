@@ -68,8 +68,8 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
-        let data_source = if table.models.contains_key(namespace) {
-            Some(data_source_name.unwrap_or("Defalult"))
+        let data_source = if table.models.contains_key(namespace) && !is_static {
+            Some(data_source_name.unwrap_or("Default"))
         } else {
             None
         };
