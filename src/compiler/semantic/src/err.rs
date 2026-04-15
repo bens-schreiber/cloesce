@@ -222,22 +222,12 @@ impl<'src, 'p> ErrorSink<'src, 'p> {
         self.errors.push(kind);
     }
 
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
     pub fn drain(&mut self) -> Vec<SemanticError<'src, 'p>> {
         std::mem::take(&mut self.errors)
     }
 
     pub fn extend(&mut self, other: Vec<SemanticError<'src, 'p>>) {
         self.errors.extend(other);
-    }
-
-    /// Push a fatal error, drain everything, and return as Err payload
-    pub fn bail(&mut self, kind: SemanticError<'src, 'p>) -> Vec<SemanticError<'src, 'p>> {
-        self.push(kind);
-        self.drain()
     }
 
     /// Returns Err if any errors were accumulated

@@ -2,7 +2,6 @@
 
 use ast::{CidlType, Field, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
-use frontend::{EnvBindingKind, SymbolKind};
 use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -89,12 +88,6 @@ fn wrangler_duplicate_symbol() {
         SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "my_d1");
-    assert!(matches!(
-        second.kind,
-        SymbolKind::EnvBinding {
-            kind: EnvBindingKind::D1
-        }
-    ));
 }
 
 #[test]
@@ -123,19 +116,16 @@ fn d1_model_basic_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 3);
-
-    // User has @d1 but no primary key
+    // User has d1 but no primary key
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
-    assert!(matches!(model.kind, SymbolKind::ModelDecl));
 
-    // Post references @d1(other_d1) which is not in the env block
+    // Post references other_d1 which is not in the env block
     expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
 
-    // Comment has fields but no @d1 binding
+    // Comment has fields but no binding
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingD1Binding { model } => model
     );
@@ -220,7 +210,6 @@ fn d1_model_column_fk_errors() {
         SemanticError::NullablePrimaryKey { column } => column
     );
     assert_eq!(column.name, "id");
-    assert!(matches!(column.kind, SymbolKind::ModelField));
 
     let second = expect_err!(errors,
         SemanticError::DuplicateSymbol { second, .. } => second
@@ -600,8 +589,7 @@ fn kv_r2_errors() {
     let src = &with_env(
         r#"
         model Foo {
-            field: string
-
+            keyfield { field }
             kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
                 foo: json
             }

@@ -120,14 +120,14 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             |(((is_internal, name), model), ((include_entries, get_method), list_method)), e| {
                 let tree = IncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
 
-                let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
+                let get = get_method.map(|(parameters, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: set_params_parent(model, "get", params, name),
+                    parameters,
                     raw_sql,
                 });
-                let list = list_method.map(|(params, raw_sql)| DataSourceBlockMethod {
+                let list = list_method.map(|(parameters, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: set_params_parent(model, "list", params, name),
+                    parameters,
                     raw_sql,
                 });
 
@@ -135,7 +135,6 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                     symbol: Symbol {
                         name,
                         span: e.span(),
-                        parent_name: Cow::Borrowed(model),
                         ..Default::default()
                     },
                     model,
@@ -146,20 +145,4 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 })
             },
         )
-}
-
-fn set_params_parent<'src>(
-    model: &str,
-    method: &str,
-    params: Vec<Symbol<'src>>,
-    name: &str,
-) -> Vec<Symbol<'src>> {
-    let parent = format!("{model}::{name}::{method}");
-    params
-        .into_iter()
-        .map(|mut p| {
-            p.parent_name = Cow::Owned(parent.clone());
-            p
-        })
-        .collect()
 }

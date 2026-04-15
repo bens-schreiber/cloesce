@@ -3,8 +3,6 @@ mod data_source;
 mod env;
 mod model;
 
-use std::borrow::Cow;
-
 use ast::CidlType;
 use chumsky::extra;
 use chumsky::input::MappedInput;
@@ -100,7 +98,6 @@ fn poo_block<'tokens, 'src: 'tokens>()
             name,
             cidl_type: ty,
             span: e.span(),
-            parent_name: Cow::Borrowed(name),
         });
 
     // poo MyObject { ... }
@@ -112,11 +109,7 @@ fn poo_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(name, mut fields), e| {
-            for field in &mut fields {
-                field.parent_name = Cow::Borrowed(name);
-            }
-
+        .map_with(|(name, fields), e| {
             AstBlockKind::PlainOldObject(PlainOldObjectBlock {
                 symbol: Symbol {
                     name,
@@ -199,7 +192,6 @@ pub fn service_block<'tokens, 'src: 'tokens>()
                     span,
                     name: field_name,
                     cidl_type,
-                    parent_name: Cow::Borrowed(name),
                 })
                 .collect();
 

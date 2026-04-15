@@ -7,9 +7,12 @@ use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
     NavigationFieldKind,
 };
-use frontend::{EnvBindingKind, ModelBlock, NavigationBlock, Span, Symbol};
+use frontend::{
+    EnvBindingKind, ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, PaginatedBlockKind, R2Block, Span, SqlBlockKind, Symbol,
+};
 use indexmap::IndexMap;
-use std::collections::{BTreeMap, HashMap};
+use std::{collections::BTreeMap, vec};
 
 #[derive(Default)]
 pub struct ModelAnalysis<'src, 'p> {
@@ -21,58 +24,35 @@ pub struct ModelAnalysis<'src, 'p> {
 impl<'src, 'p> ModelAnalysis<'src, 'p> {
     pub fn analyze(
         mut self,
-        model_blocks: BTreeMap<&'src str, &'p ModelBlock<'src>>,
-        table: &mut SymbolTable<'src, 'p>,
+        table: &SymbolTable<'src, 'p>,
     ) -> BatchResult<'src, 'p, IndexMap<&'src str, Model<'src>>> {
         let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
 
-        for &model_block in model_blocks.values() {
-            let mut model = Model {
-                name: model_block.symbol.name,
-                ..Default::default()
+        for &model_block in table.models.values() {
+            let (cruds, env_bindings) = model_block.partition_use_tags();
+
+            let builder = ModelBuilder::new(model_block);
+            let Some(mut model) = builder.build(&mut self, env_bindings, table) else {
+                continue;
             };
 
-            // If any D1 properties occur, treat the model as a D1 model
-            let has_tag = model_block
-                .use_tag
-                .as_ref()
-                .is_some_and(|tag| !tag.env_bindings.is_empty());
-            if has_tag
-                || !model_block.foreign_blocks.is_empty()
-                || !model_block.navigation_blocks.is_empty()
-                || !model_block.primary_fields.is_empty()
-            {
-                self.d1_properties(&mut model, model_block, &model_blocks, table);
+            // Validate CRUD operations — List requires a D1 binding
+            for crud in &cruds {
+                ensure!(
+                    !matches!(crud, CrudKind::List) || model.d1_binding.is_some(),
+                    self.sink,
+                    SemanticError::UnsupportedCrudOperation {
+                        model: &model_block.symbol
+                    }
+                );
             }
 
-            // If any KV/R2 properties occur, validate them and set the model's KV/R2 fields
-            if !model_block.kvs.is_empty()
-                || !model_block.r2s.is_empty()
-                || !model_block.key_fields.is_empty()
-            {
-                self.kv_r2_properties(&mut model, model_block, table);
-            }
-
-            // Validate CRUD
-            if let Some(tag) = &model_block.use_tag {
-                for crud in &tag.cruds {
-                    ensure!(
-                        !matches!(crud, CrudKind::List) || model.d1_binding.is_some(),
-                        self.sink,
-                        SemanticError::UnsupportedCrudOperation {
-                            model: &model_block.symbol
-                        }
-                    );
-                }
-
-                model.cruds = tag.cruds.clone(); // note: cruds are deduped in parser
-            }
-
+            model.cruds = cruds.into_iter().cloned().collect();
             models.insert(model.name, model);
         }
 
         // Topologically sort models based on FK relationships
-        match kahns(self.graph, self.in_degree, model_blocks.len()) {
+        match kahns(self.graph, self.in_degree, table.models.len()) {
             Ok(rank) => {
                 models.sort_by(|a_name, _, b_name, _| {
                     let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
@@ -88,277 +68,421 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         self.sink.finish()?;
         Ok(models)
     }
+}
 
-    /// Validates and sets all D1-related properties of a model
-    fn d1_properties(
-        &mut self,
-        model: &mut Model<'src>,
-        model_block: &'p ModelBlock<'src>,
-        model_blocks: &BTreeMap<&'src str, &'p ModelBlock<'src>>,
-        table: &mut SymbolTable<'src, 'p>,
-    ) {
-        let model_name = model_block.symbol.name;
-        let model_symbol = &model_block.symbol;
+struct ModelBuilder<'src, 'p> {
+    name: &'src str,
+    symbol: &'p Symbol<'src>,
+    model: &'p ModelBlock<'src>,
 
-        self.graph.entry(model_name).or_default();
-        self.in_degree.entry(model_name).or_insert(0);
+    has_defined_pk: bool,
+    unique_seed: usize,
+    composite_seed: usize,
+    primary_columns: Vec<Column<'src>>,
+    columns: Vec<Column<'src>>,
+    navigation_fields: Vec<NavigationField<'src>>,
+    kv_fields: Vec<KvR2Field<'src>>,
+    r2_fields: Vec<KvR2Field<'src>>,
+    key_fields: Vec<&'src str>,
+}
 
-        // All D1 models require a binding
-        let binding_symbol = {
-            let use_tag_bindings = model_block
-                .use_tag
-                .as_ref()
-                .map(|tag| tag.env_bindings.clone());
+impl<'src, 'p> ModelBuilder<'src, 'p> {
+    pub fn new(model_block: &'p ModelBlock<'src>) -> Self {
+        Self {
+            name: model_block.symbol.name,
+            symbol: &model_block.symbol,
+            model: model_block,
 
-            let Some(bindings) = use_tag_bindings else {
-                self.sink.push(SemanticError::D1ModelMissingD1Binding {
-                    model: model_symbol,
-                });
-                return;
-            };
+            has_defined_pk: false,
+            unique_seed: 0,
+            composite_seed: 0,
+            primary_columns: Vec::new(),
+            columns: Vec::new(),
+            navigation_fields: Vec::new(),
+            kv_fields: Vec::new(),
+            r2_fields: Vec::new(),
+            key_fields: Vec::new(),
+        }
+    }
+}
 
-            if bindings.is_empty() {
-                self.sink.push(SemanticError::D1ModelMissingD1Binding {
-                    model: model_symbol,
-                });
-                return;
+impl<'src, 'p> ModelBuilder<'src, 'p> {
+    fn build(
+        mut self,
+        ma: &mut ModelAnalysis<'src, 'p>,
+        env_bindings: Vec<&'src str>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> Option<Model<'src>> {
+        ma.graph.entry(self.name).or_default();
+        ma.in_degree.entry(self.name).or_insert(0);
+
+        // Models with SQL columns require a D1 binding
+        let has_sql_blocks = self.model.blocks.iter().any(|b| {
+            matches!(
+                b,
+                ModelBlockKind::Column(_)
+                    | ModelBlockKind::Foreign(_)
+                    | ModelBlockKind::Primary { .. }
+                    | ModelBlockKind::Unique { .. }
+                    | ModelBlockKind::Optional { .. }
+            )
+        });
+
+        // Resolve D1 binding if SQL content is present or an
+        // environment bindings are present
+        let binding_symbol = if has_sql_blocks || !env_bindings.is_empty() {
+            if env_bindings.is_empty() {
+                ma.sink
+                    .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });
+                return None;
             }
 
-            if bindings.len() > 1 {
-                self.sink.push(SemanticError::D1ModelMultipleD1Bindings {
-                    model: model_symbol,
-                    bindings,
+            if env_bindings.len() > 1 {
+                ma.sink.push(SemanticError::D1ModelMultipleD1Bindings {
+                    model: self.symbol,
+                    bindings: env_bindings,
                 });
-                return;
+                return None;
             }
-            let tag = bindings[0];
 
-            let Some(binding_symbol) = table.resolve(
-                tag,
-                SymbolKind::EnvBinding {
-                    kind: EnvBindingKind::D1,
-                },
-                None,
-            ) else {
-                self.sink.push(SemanticError::D1ModelInvalidD1Binding {
-                    model: model_symbol,
-                    binding: tag,
+            let name = env_bindings[0];
+            let Some(sym) = table.env_bindings.get(&SymbolKind::EnvBinding {
+                kind: EnvBindingKind::D1,
+                name,
+            }) else {
+                ma.sink.push(SemanticError::D1ModelInvalidD1Binding {
+                    model: self.symbol,
+                    binding: name,
                 });
-                return;
+                return None;
             };
 
-            binding_symbol
+            Some(*sym)
+        } else {
+            None
         };
 
-        // At least one primary key must be defined
-        ensure!(
-            !model_block.primary_fields.is_empty(),
-            self.sink,
-            SemanticError::D1ModelMissingPrimaryKey {
-                model: model_symbol,
-            }
-        );
+        for block in &self.model.blocks {
+            match block {
+                ModelBlockKind::Column(symbol) => {
+                    self.column(ma, symbol, FieldQualifiers::default());
+                }
+                ModelBlockKind::Foreign(fk) => {
+                    self.foreign(
+                        ma,
+                        table,
+                        binding_symbol.unwrap(),
+                        fk,
+                        FieldQualifiers::default(),
+                    );
+                }
+                ModelBlockKind::Primary { blocks, .. } => {
+                    let qual = FieldQualifiers {
+                        is_primary: true,
+                        ..Default::default()
+                    };
 
-        // Unique constraints
-        let mut unique_info: HashMap<&str, Vec<usize>> = HashMap::new();
-        for (constraint_idx, constraint) in model_block.unique_constraints.iter().enumerate() {
-            for &column in &constraint.fields {
-                unique_info.entry(column).or_default().push(constraint_idx);
+                    for block in blocks {
+                        match block {
+                            SqlBlockKind::Column(symbol) => {
+                                self.column(ma, symbol, qual.clone());
+                            }
+                            SqlBlockKind::Foreign(foreign_block) => self.foreign(
+                                ma,
+                                table,
+                                binding_symbol.unwrap(),
+                                foreign_block,
+                                qual.clone(),
+                            ),
+                        }
+                    }
+                }
+                ModelBlockKind::Unique { blocks, .. } => {
+                    let qual = FieldQualifiers {
+                        unique_ids: vec![self.unique_seed],
+                        ..Default::default()
+                    };
+                    self.unique_seed += 1;
+
+                    for block in blocks {
+                        match block {
+                            SqlBlockKind::Column(symbol) => {
+                                self.column(ma, symbol, qual.clone());
+                            }
+                            SqlBlockKind::Foreign(foreign_block) => self.foreign(
+                                ma,
+                                table,
+                                binding_symbol.unwrap(),
+                                foreign_block,
+                                qual.clone(),
+                            ),
+                        }
+                    }
+                }
+                ModelBlockKind::Optional { blocks, .. } => {
+                    let qual = FieldQualifiers {
+                        is_optional: true,
+                        ..Default::default()
+                    };
+
+                    for block in blocks {
+                        match block {
+                            SqlBlockKind::Column(symbol) => {
+                                self.column(ma, symbol, qual.clone());
+                            }
+                            SqlBlockKind::Foreign(foreign_block) => self.foreign(
+                                ma,
+                                table,
+                                binding_symbol.unwrap(),
+                                foreign_block,
+                                qual.clone(),
+                            ),
+                        }
+                    }
+                }
+                ModelBlockKind::Navigation(navigation_block) => {
+                    self.nav(ma, binding_symbol.unwrap(), navigation_block, false, table)
+                }
+                ModelBlockKind::Kv(kv_block) => {
+                    self.kv_field(ma, table, kv_block);
+                }
+                ModelBlockKind::R2(r2_block) => {
+                    self.r2_field(ma, table, r2_block);
+                }
+                ModelBlockKind::KeyField { fields, .. } => {
+                    for field in fields {
+                        self.key_fields.push(field.name);
+                    }
+                }
+                ModelBlockKind::Paginated { blocks, .. } => {
+                    for block in blocks {
+                        match block {
+                            PaginatedBlockKind::Kv(kv_block) => {
+                                self.kv_field(ma, table, kv_block);
+                            }
+                            PaginatedBlockKind::R2(r2_block) => {
+                                self.r2_field(ma, table, r2_block);
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Build foreign keys
-        let mut columns = Vec::new();
-        let mut primary_columns = Vec::new();
-        let mut composite_counter = 0usize;
-        for fk in &model_block.foreign_blocks {
-            let adj_model_name = fk.adj.first().map(|(m, _)| *m).unwrap_or("");
+        if binding_symbol.is_some() && !self.has_defined_pk {
+            ma.sink
+                .push(SemanticError::D1ModelMissingPrimaryKey { model: self.symbol });
+            return None;
+        }
 
-            // Check that the adjacent model exists
-            let Some(adj_model_block) = model_blocks.get(adj_model_name) else {
-                self.sink.push(SemanticError::UnresolvedSymbol {
+        Some(Model {
+            hash: 0,
+            name: self.name,
+            d1_binding: binding_symbol.map(|s| s.name),
+            primary_columns: self.primary_columns,
+            columns: self.columns,
+            kv_fields: self.kv_fields,
+            r2_fields: self.r2_fields,
+            navigation_fields: self.navigation_fields,
+            key_fields: self.key_fields,
+            ..Default::default()
+        })
+    }
+
+    fn column(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p>,
+        symbol: &'p Symbol<'src>,
+        qual: FieldQualifiers,
+    ) {
+        self.has_defined_pk |= qual.is_primary;
+        let cidl_type = if qual.is_optional {
+            CidlType::nullable(symbol.cidl_type.clone())
+        } else {
+            symbol.cidl_type.clone()
+        };
+
+        if !is_valid_sql_type(&cidl_type) {
+            ma.sink
+                .push(SemanticError::InvalidColumnType { column: symbol });
+            return;
+        }
+
+        if qual.is_primary && cidl_type.is_nullable() {
+            ma.sink
+                .push(SemanticError::NullablePrimaryKey { column: symbol });
+            return;
+        }
+
+        let col = Column {
+            hash: 0,
+            field: Field {
+                name: symbol.name.into(),
+                cidl_type,
+            },
+            foreign_key_reference: None,
+            unique_ids: qual.unique_ids,
+            composite_id: None,
+        };
+
+        if qual.is_primary {
+            self.primary_columns.push(col);
+        } else {
+            self.columns.push(col);
+        }
+    }
+
+    fn foreign(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p>,
+        table: &SymbolTable<'src, 'p>,
+        binding_symbol: &'p Symbol<'src>,
+        fk: &'p ForeignBlock<'src>,
+        mut qual: FieldQualifiers,
+    ) {
+        // Add to qualifiers
+        qual.is_optional |= fk.is_optional();
+        qual.is_primary |= matches!(fk.qualifier, Some(ForeignQualifier::Primary));
+        if matches!(fk.qualifier, Some(ForeignQualifier::Unique)) {
+            qual.unique_ids.push(self.unique_seed);
+            self.unique_seed += 1;
+        }
+        self.has_defined_pk |= qual.is_primary;
+
+        // Check that the adjacent model exists
+        let adj_model_name = fk.adj.first().map(|(m, _)| *m).unwrap_or("");
+        let Some(adj_model_block) = table.models.get(adj_model_name) else {
+            ma.sink.push(SemanticError::UnresolvedSymbol {
+                span: fk.span,
+                name: adj_model_name,
+            });
+            return;
+        };
+
+        if adj_model_name == self.name {
+            ma.sink.push(SemanticError::ForeignKeyReferencesSelf {
+                model: self.symbol,
+                foreign_key: fk.span,
+            });
+            return;
+        }
+
+        // Must belong to the same database
+        let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
+        if Some(binding_symbol.name) != adj_binding {
+            ma.sink
+                .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
                     span: fk.span,
-                    name: adj_model_name,
+                    binding: adj_binding.unwrap_or("no binding"),
                 });
-                continue;
-            };
-
-            if adj_model_name == model_name {
-                self.sink.push(SemanticError::ForeignKeyReferencesSelf {
-                    model: &model_block.symbol,
-                    foreign_key: fk.span,
-                });
-                continue;
-            }
-
-            // Must belong to the same database
-            let adj_binding = adj_model_block
-                .use_tag
-                .as_ref()
-                .and_then(|tag| tag.env_bindings.first().copied());
-            if Some(binding_symbol.name) != adj_binding {
-                self.sink
-                    .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
-                        span: fk.span,
-                        binding: adj_binding.unwrap_or("no binding"),
-                    });
-                continue;
-            }
-
-            // All adj entries must reference the same model
-            if let Some((inconsistent_model, _)) = fk.adj.iter().find(|(m, _)| *m != adj_model_name)
-            {
-                self.sink.push(SemanticError::InconsistentModelAdjacency {
-                    span: fk.span,
-                    first_model: adj_model_name,
-                    second_model: inconsistent_model,
-                });
-                continue;
-            }
-
-            // Number of adj references must match number of local fields
-            if fk.adj.len() != fk.fields.len() {
-                self.sink
-                    .push(SemanticError::ForeignKeyInconsistentFieldAdj {
-                        span: fk.span,
-                        adj_count: fk.adj.len(),
-                        field_count: fk.fields.len(),
-                    });
-                continue;
-            }
-
-            let composite_id = if fk.adj.len() > 1 {
-                let id = composite_counter;
-                composite_counter += 1;
-                Some(id)
-            } else {
-                None
-            };
-
-            for (field, (_, adj_field_name)) in fk.fields.iter().zip(&fk.adj) {
-                let is_pk = model_block.primary_fields.contains(&field.name);
-                if is_pk && fk.is_optional() {
-                    self.sink
-                        .push(SemanticError::NullablePrimaryKey { column: field });
-                    continue;
-                }
-
-                // Validate the field from the adjacent model
-                let Some(adj_field_sym) =
-                    table.resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
-                else {
-                    self.sink.push(SemanticError::UnresolvedSymbol {
-                        span: fk.span,
-                        name: adj_field_name,
-                    });
-                    continue;
-                };
-
-                if !is_valid_sql_type(&adj_field_sym.cidl_type) {
-                    self.sink.push(SemanticError::ForeignKeyInvalidColumnType {
-                        span: fk.span,
-                        field: adj_field_sym,
-                    });
-                }
-
-                if !fk.is_optional() {
-                    // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
-                    // Dog must come before Person
-                    self.graph
-                        .entry(adj_model_name)
-                        .or_default()
-                        .push(model_name);
-                    *self.in_degree.entry(model_name).or_insert(0) += 1;
-                }
-
-                let unique_ids = unique_info.remove(field.name).unwrap_or_default();
-
-                let col = Column {
-                    hash: 0,
-                    field: Field {
-                        name: field.name.into(),
-                        cidl_type: if fk.is_optional() {
-                            CidlType::nullable(adj_field_sym.cidl_type.clone())
-                        } else {
-                            adj_field_sym.cidl_type.clone()
-                        },
-                    },
-                    foreign_key_reference: Some(ForeignKeyReference {
-                        model_name: adj_model_name,
-                        column_name: adj_field_name,
-                    }),
-                    unique_ids,
-                    composite_id,
-                };
-
-                if is_pk {
-                    primary_columns.push(col);
-                } else {
-                    columns.push(col);
-                }
-            }
+            return;
         }
 
-        // Build Navigation properties
-        let mut navigation_properties = Vec::new();
-        for nav in &model_block.navigation_blocks {
-            if let Some(nav) = self.nav(binding_symbol, model_block, nav, table, model_blocks) {
-                navigation_properties.push(nav);
-            }
+        // All adj entries must reference the same model
+        if let Some((inconsistent_model, _)) = fk.adj.iter().find(|(m, _)| *m != adj_model_name) {
+            ma.sink.push(SemanticError::InconsistentModelAdjacency {
+                span: fk.span,
+                first_model: adj_model_name,
+                second_model: inconsistent_model,
+            });
+            return;
         }
 
-        // Build Column structs
-        for field in &model_block.typed_idents {
-            if !is_valid_sql_type(&field.cidl_type) {
-                self.sink
-                    .push(SemanticError::InvalidColumnType { column: field });
-                continue;
-            }
+        // Number of adj references must match number of local fields
+        if fk.adj.len() != fk.fields.len() {
+            ma.sink.push(SemanticError::ForeignKeyInconsistentFieldAdj {
+                span: fk.span,
+                adj_count: fk.adj.len(),
+                field_count: fk.fields.len(),
+            });
+            return;
+        }
 
-            let is_pk = model_block.primary_fields.contains(&field.name);
-            if is_pk && field.cidl_type.is_nullable() {
-                self.sink
+        let composite_id = if fk.adj.len() > 1 {
+            let id = self.composite_seed;
+            self.composite_seed += 1;
+            Some(id)
+        } else {
+            None
+        };
+
+        for (field, (_, adj_field_name)) in fk.fields.iter().zip(&fk.adj) {
+            if qual.is_primary && fk.is_optional() {
+                ma.sink
                     .push(SemanticError::NullablePrimaryKey { column: field });
                 continue;
             }
 
-            let unique_ids_val = unique_info.remove(field.name).unwrap_or_default();
+            // Validate the field from the adjacent model
+            let Some(adj_field_sym) = table.model_fields.get(&SymbolKind::ModelField {
+                model: adj_model_name,
+                name: adj_field_name,
+            }) else {
+                ma.sink.push(SemanticError::UnresolvedSymbol {
+                    span: fk.span,
+                    name: adj_field_name,
+                });
+                continue;
+            };
+
+            if !is_valid_sql_type(&adj_field_sym.cidl_type) {
+                ma.sink.push(SemanticError::ForeignKeyInvalidColumnType {
+                    span: fk.span,
+                    field: adj_field_sym,
+                });
+            }
+
+            if !fk.is_optional() {
+                // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
+                // Dog must come before Person
+                ma.graph.entry(adj_model_name).or_default().push(self.name);
+                *ma.in_degree.entry(self.name).or_insert(0) += 1;
+            }
 
             let col = Column {
                 hash: 0,
                 field: Field {
                     name: field.name.into(),
-                    cidl_type: field.cidl_type.clone(),
+                    cidl_type: if fk.is_optional() {
+                        CidlType::nullable(adj_field_sym.cidl_type.clone())
+                    } else {
+                        adj_field_sym.cidl_type.clone()
+                    },
                 },
-                foreign_key_reference: None,
-                unique_ids: unique_ids_val,
-                composite_id: None,
+                foreign_key_reference: Some(ForeignKeyReference {
+                    model_name: adj_model_name,
+                    column_name: adj_field_name,
+                }),
+                unique_ids: qual.unique_ids.clone(),
+                composite_id,
             };
 
-            if is_pk {
-                primary_columns.push(col);
+            if qual.is_primary {
+                self.primary_columns.push(col);
             } else {
-                columns.push(col);
+                self.columns.push(col);
             }
         }
 
-        // Set D1 model properties
-        model.d1_binding = Some(binding_symbol.name);
-        model.columns = columns;
-        model.primary_columns = primary_columns;
-        model.navigation_fields = navigation_properties;
+        if let Some(nav) = &fk.nav {
+            let nav_block = NavigationBlock {
+                span: nav.span,
+                adj: vec![(adj_model_name, fk.adj.first().unwrap().1)],
+                field: nav.clone(),
+            };
+
+            self.nav(ma, binding_symbol, &nav_block, true, table);
+        }
     }
 
     fn nav(
         &mut self,
+        ma: &mut ModelAnalysis<'src, 'p>,
         binding_symbol: &'p Symbol<'src>,
-        model_block: &'p ModelBlock<'src>,
-        nav: &'p NavigationBlock<'src>,
-        table: &mut SymbolTable<'src, 'p>,
-        model_blocks: &BTreeMap<&'src str, &'p ModelBlock<'src>>,
-    ) -> Option<NavigationField<'src>> {
-        let model_name = model_block.symbol.name;
-
+        nav: &NavigationBlock<'src>,
+        is_one_to_one: bool,
+        table: &SymbolTable<'src, 'p>,
+    ) {
         // Validate all referenced fields exist on the same adj model
         let mut referenced_field_names = Vec::new();
         {
@@ -366,7 +490,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             let adj_model_name = nav.adj.first().map(|(m, _)| *m).unwrap_or("");
             for (ref_model_name, ref_field_name) in &nav.adj {
                 if *ref_model_name != adj_model_name {
-                    self.sink.push(SemanticError::InconsistentModelAdjacency {
+                    ma.sink.push(SemanticError::InconsistentModelAdjacency {
                         span: nav.span,
                         first_model: adj_model_name,
                         second_model: ref_model_name,
@@ -375,15 +499,15 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     continue;
                 }
 
-                if table
-                    .resolve(ref_field_name, SymbolKind::ModelField, Some(ref_model_name))
-                    .is_some()
-                {
+                if table.model_fields.contains_key(&SymbolKind::ModelField {
+                    model: adj_model_name,
+                    name: *ref_field_name,
+                }) {
                     referenced_field_names.push(*ref_field_name);
                     continue;
                 }
 
-                self.sink.push(SemanticError::UnresolvedSymbol {
+                ma.sink.push(SemanticError::UnresolvedSymbol {
                     span: nav.span,
                     name: ref_field_name,
                 });
@@ -391,30 +515,27 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 continue;
             }
             if !all_valid {
-                return None;
+                return;
             }
         }
 
-        let adj_model_block = model_blocks.get(nav.adj.first().unwrap().0).unwrap();
+        let adj_model_block = table.models.get(nav.adj.first().unwrap().0).unwrap();
 
         // Must belong to the same database
-        let adj_binding = adj_model_block
-            .use_tag
-            .as_ref()
-            .and_then(|tag| tag.env_bindings.first().copied());
+        let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
         if Some(binding_symbol.name) != adj_binding {
-            self.sink
+            ma.sink
                 .push(SemanticError::NavigationReferencesDifferentDatabase {
                     span: nav.span,
                     binding: adj_binding.unwrap_or("no binding"),
                 });
-            return None;
+            return;
         }
 
         // For 1:1: check if `model` has a FK whose adj fields match nav.adj fields
         // (both sides reference the same adj model fields)
         let matching_fk_by_adj = |model: &'p ModelBlock<'src>, name: &'src str| {
-            model.foreign_blocks.iter().find(|fb| {
+            model.foreign_blocks().find(|fb| {
                 fb.adj.first().map(|(m, _)| *m == name).unwrap_or(false)
                     && fb.adj.len() == nav.adj.len()
                     && fb
@@ -428,7 +549,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         // For 1:M: check if `model` has a FK pointing to `name` whose local fields match nav.adj field names
         // nav(Post::authorId) means Post's local field "authorId" is the FK column
         let matching_fk_by_local_fields = |model: &'p ModelBlock<'src>, name: &'src str| {
-            model.foreign_blocks.iter().find(|fb| {
+            model.foreign_blocks().find(|fb| {
                 fb.adj.first().map(|(m, _)| *m == name).unwrap_or(false)
                     && fb.fields.len() == nav.adj.len()
                     && fb
@@ -439,13 +560,13 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             })
         };
 
-        if nav.is_one_to_one {
+        if is_one_to_one {
             // A foreign key must exist on this model that references the adjacent model
             // because of the parser syntax.
-            let foreign_key = matching_fk_by_adj(model_block, adj_model_block.symbol.name).unwrap();
+            let foreign_key = matching_fk_by_adj(self.model, adj_model_block.symbol.name).unwrap();
 
             // Foreign key has already been validated for 1:1 navs
-            return Some(NavigationField {
+            self.navigation_fields.push(NavigationField {
                 hash: 0,
                 field: Field {
                     name: nav.field.name.into(),
@@ -462,11 +583,12 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                         .collect::<Vec<_>>(),
                 },
             });
+            return;
         }
 
-        if matching_fk_by_local_fields(adj_model_block, model_block.symbol.name).is_some() {
+        if matching_fk_by_local_fields(adj_model_block, self.name).is_some() {
             // If the adjacent fields form a foreign key to this model, it's 1:M
-            return Some(NavigationField {
+            self.navigation_fields.push(NavigationField {
                 hash: 0,
                 field: Field {
                     name: nav.field.name.into(),
@@ -479,37 +601,36 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     columns: referenced_field_names,
                 },
             });
+            return;
         }
 
         // If the adjacent model has a reciprocal nav that references back to this model, it's a Many:Many nav.
         // Each side references the other model's PK fields (which may differ in name for composite PKs),
         // so we only check that the reciprocal nav points back to the current model.
         let matching_reciprocal_nav_count = adj_model_block
-            .navigation_blocks
-            .iter()
+            .navigation_blocks()
             .filter(|adj_nav| {
-                !adj_nav.is_one_to_one
-                    && adj_nav
-                        .adj
-                        .first()
-                        .map(|(m, _)| *m == model_name)
-                        .unwrap_or(false)
+                adj_nav
+                    .adj
+                    .first()
+                    .map(|(m, _)| *m == self.name)
+                    .unwrap_or(false)
             })
             .count();
 
         if matching_reciprocal_nav_count == 0 {
-            self.sink
+            ma.sink
                 .push(SemanticError::NavigationMissingReciprocalM2M { span: nav.span });
-            return None;
+            return;
         }
 
         if matching_reciprocal_nav_count > 1 {
-            self.sink
+            ma.sink
                 .push(SemanticError::NavigationAmbiguousM2M { span: nav.span });
-            return None;
+            return;
         }
 
-        Some(NavigationField {
+        self.navigation_fields.push(NavigationField {
             hash: 0,
             field: Field {
                 name: nav.field.name.into(),
@@ -522,157 +643,184 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         })
     }
 
-    /// Validates and sets all KV/R2-related properties of a model
-    fn kv_r2_properties(
+    fn kv_field(
         &mut self,
-        model: &mut Model<'src>,
-        model_block: &'p ModelBlock<'src>,
+        ma: &mut ModelAnalysis<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
+        kv: &'p KvBlock<'src>,
     ) {
-        // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
-        let validate_binding = |sink: &mut ErrorSink<'src, 'p>,
-                                env_binding: &'src str,
-                                span: Span,
-                                expected: EnvBindingKind|
-         -> Option<&'src str> {
-            if let Some(binding_sym) = table.resolve(
-                env_binding,
-                SymbolKind::EnvBinding {
-                    kind: expected.clone(),
-                },
-                None,
-            ) {
-                return Some(binding_sym.name);
-            }
+        let binding_name = Self::validate_binding(
+            &mut ma.sink,
+            table,
+            kv.env_binding,
+            kv.span,
+            EnvBindingKind::Kv,
+        );
 
-            let err = match expected {
-                EnvBindingKind::Kv => SemanticError::KvInvalidBinding {
-                    span,
-                    binding: env_binding,
-                },
-                EnvBindingKind::R2 => SemanticError::R2InvalidBinding {
-                    span,
-                    binding: env_binding,
-                },
-                _ => SemanticError::UnresolvedSymbol {
-                    span,
-                    name: env_binding,
-                },
-            };
-            sink.push(err);
-            None
+        let Ok(format_parameters) =
+            Self::validate_key_format(&mut ma.sink, self.model, kv.span, kv.key_format)
+        else {
+            return;
         };
 
-        // Extracts variables from a formatted string, then validates that they
-        // correspond to fields on the models that are of valid SQLite types.
-        // Returns the parameters to create a key format
-        let validate_key_format = |sink: &mut ErrorSink<'src, 'p>,
-                                   span: Span,
-                                   format: &'src str|
-         -> Result<Vec<Field<'src>>, ()> {
-            let vars = match extract_braced(format) {
-                Ok(vars) => vars,
-                Err(reason) => {
-                    sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
+        let mut resolved_type = match resolve_cidl_type(&kv.field, &kv.field.cidl_type, table) {
+            Ok(t) => t,
+            Err(err) => {
+                ma.sink.push(err);
+                return;
+            }
+        };
+
+        resolved_type = CidlType::KvObject(Box::new(resolved_type));
+
+        if kv.is_paginated {
+            resolved_type = CidlType::paginated(resolved_type)
+        }
+
+        self.kv_fields.push(KvR2Field {
+            field: Field {
+                name: kv.field.name.into(),
+                cidl_type: resolved_type,
+            },
+            format: kv.key_format,
+            binding: binding_name.unwrap_or_default(),
+            format_parameters,
+            list_prefix: kv.is_paginated,
+        });
+    }
+
+    fn r2_field(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p>,
+        table: &SymbolTable<'src, 'p>,
+        r2: &'p R2Block<'src>,
+    ) {
+        let binding_name = Self::validate_binding(
+            &mut ma.sink,
+            table,
+            r2.env_binding,
+            r2.span,
+            EnvBindingKind::R2,
+        );
+
+        let Ok(format_parameters) =
+            Self::validate_key_format(&mut ma.sink, self.model, r2.span, r2.key_format)
+        else {
+            return;
+        };
+
+        self.r2_fields.push(KvR2Field {
+            field: Field {
+                name: r2.field.name.into(),
+                cidl_type: if r2.is_paginated {
+                    CidlType::paginated(CidlType::R2Object)
+                } else {
+                    CidlType::R2Object
+                },
+            },
+            format: r2.key_format,
+            binding: binding_name.unwrap_or_default(),
+            format_parameters,
+            list_prefix: r2.is_paginated,
+        });
+    }
+
+    // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
+    fn validate_binding(
+        sink: &mut ErrorSink<'src, 'p>,
+        table: &SymbolTable<'src, 'p>,
+        env_binding: &'src str,
+        span: Span,
+        expected: EnvBindingKind,
+    ) -> Option<&'src str> {
+        if let Some(binding_sym) = table.env_bindings.get(&SymbolKind::EnvBinding {
+            kind: expected.clone(),
+            name: env_binding,
+        }) {
+            return Some(binding_sym.name);
+        }
+
+        let err = match expected {
+            EnvBindingKind::Kv => SemanticError::KvInvalidBinding {
+                span,
+                binding: env_binding,
+            },
+            EnvBindingKind::R2 => SemanticError::R2InvalidBinding {
+                span,
+                binding: env_binding,
+            },
+            _ => SemanticError::UnresolvedSymbol {
+                span,
+                name: env_binding,
+            },
+        };
+        sink.push(err);
+        None
+    }
+
+    // Extracts variables from a formatted string, then validates that they
+    // correspond to fields on the model that are of valid SQLite types or are key_fields.
+    // Returns the parameters to create a key format.
+    fn validate_key_format(
+        sink: &mut ErrorSink<'src, 'p>,
+        model_block: &'p ModelBlock<'src>,
+        span: Span,
+        format: &'src str,
+    ) -> Result<Vec<Field<'src>>, ()> {
+        let vars = match extract_braced(format) {
+            Ok(vars) => vars,
+            Err(reason) => {
+                sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
+                return Err(());
+            }
+        };
+
+        let key_field_names: Vec<&'src str> = model_block
+            .blocks
+            .iter()
+            .flat_map(|b| match b {
+                ModelBlockKind::KeyField { fields, .. } => {
+                    fields.iter().map(|f| f.name).collect::<Vec<_>>()
+                }
+                _ => vec![],
+            })
+            .collect();
+
+        let mut parameters = vec![];
+        for var in vars {
+            let column = model_block
+                .sql_symbols()
+                .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
+            let is_key_field = key_field_names.iter().any(|&n| n == var);
+
+            match (column, is_key_field) {
+                (Some(col), _) => parameters.push(Field {
+                    name: col.name.into(),
+                    cidl_type: col.cidl_type.clone(),
+                }),
+                (None, true) => parameters.push(Field {
+                    name: var.into(),
+                    cidl_type: CidlType::String,
+                }),
+                (None, false) => {
+                    sink.push(SemanticError::KvR2UnknownKeyVariable {
+                        span,
+                        variable: var,
+                    });
                     return Err(());
                 }
-            };
-
-            let mut parameters = vec![];
-            for var in vars {
-                // Look through typed fields and key_fields for a matching name
-                let column = model_block
-                    .typed_idents
-                    .iter()
-                    .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
-                let key_field = model_block.key_fields.iter().find(|f| f.name == var);
-
-                match (column, key_field) {
-                    (Some(col), _) => parameters.push(Field {
-                        name: col.name.into(),
-                        cidl_type: col.cidl_type.clone(),
-                    }),
-                    (None, Some(kf)) => parameters.push(Field {
-                        name: kf.name.into(),
-                        cidl_type: CidlType::String,
-                    }),
-                    (None, None) => {
-                        sink.push(SemanticError::KvR2UnknownKeyVariable {
-                            span,
-                            variable: var,
-                        });
-                        return Err(());
-                    }
-                }
             }
-
-            Ok(parameters)
-        };
-
-        for kv in &model_block.kvs {
-            let binding_name =
-                validate_binding(&mut self.sink, kv.env_binding, kv.span, EnvBindingKind::Kv);
-
-            let Ok(format_parameters) = validate_key_format(&mut self.sink, kv.span, kv.key_format)
-            else {
-                continue;
-            };
-
-            let mut resolved_type = match resolve_cidl_type(&kv.field, &kv.field.cidl_type, table) {
-                Ok(t) => t,
-                Err(err) => {
-                    self.sink.push(err);
-                    continue;
-                }
-            };
-
-            resolved_type = CidlType::KvObject(Box::new(resolved_type));
-
-            if kv.is_paginated {
-                resolved_type = CidlType::paginated(resolved_type)
-            }
-
-            model.kv_fields.push(KvR2Field {
-                field: Field {
-                    name: kv.field.name.into(),
-                    cidl_type: resolved_type,
-                },
-                format: kv.key_format,
-                binding: binding_name.unwrap_or_default(),
-                format_parameters,
-                list_prefix: kv.is_paginated,
-            });
         }
 
-        for r2 in &model_block.r2s {
-            let binding_name =
-                validate_binding(&mut self.sink, r2.env_binding, r2.span, EnvBindingKind::R2);
-
-            let Ok(format_parameters) = validate_key_format(&mut self.sink, r2.span, r2.key_format)
-            else {
-                continue;
-            };
-
-            model.r2_fields.push(KvR2Field {
-                field: Field {
-                    name: r2.field.name.into(),
-                    cidl_type: if r2.is_paginated {
-                        CidlType::paginated(CidlType::R2Object)
-                    } else {
-                        CidlType::R2Object
-                    },
-                },
-                format: r2.key_format,
-                binding: binding_name.unwrap_or_default(),
-                format_parameters,
-                list_prefix: r2.is_paginated,
-            });
-        }
-
-        for kf in &model_block.key_fields {
-            model.key_fields.push(kf.name);
-        }
+        Ok(parameters)
     }
+}
+
+#[derive(Default, Clone)]
+struct FieldQualifiers {
+    is_optional: bool,
+    is_primary: bool,
+    unique_ids: Vec<usize>,
 }
 
 /// Extracts braced variables from a format string.

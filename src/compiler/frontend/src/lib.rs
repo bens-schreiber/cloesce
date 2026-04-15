@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use ast::{CidlType, CrudKind, HttpVerb, IncludeTree};
 use chumsky::span::SimpleSpan;
@@ -29,7 +29,7 @@ impl<'src> FileTable<'src> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum EnvBindingKind {
     D1,
     R2,
@@ -45,11 +45,6 @@ pub struct Symbol<'src> {
 
     /// [CidlType::default()] for symbols with no type
     pub cidl_type: CidlType<'src>,
-
-    /// [String::default()] for symbols with no parent
-    /// Uses a [Cow] to avoid unnecessary allocations for symbols with parents,
-    /// which are often just references to other symbols
-    pub parent_name: Cow<'src, str>,
 
     pub span: Span,
 }
@@ -211,11 +206,101 @@ pub enum ModelBlockKind<'src> {
     },
 }
 
+impl<'src> ModelBlockKind<'src> {
+    pub fn symbols(&self) -> Vec<&Symbol<'src>> {
+        match self {
+            ModelBlockKind::Column(symbol) => vec![symbol],
+            ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
+            ModelBlockKind::Navigation(navigation_block) => vec![&navigation_block.field],
+            ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
+            ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
+            ModelBlockKind::Primary { blocks, .. }
+            | ModelBlockKind::Unique { blocks, .. }
+            | ModelBlockKind::Optional { blocks, .. } => blocks
+                .iter()
+                .flat_map(|block| match block {
+                    SqlBlockKind::Column(symbol) => vec![symbol],
+                    SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
+                })
+                .collect(),
+            ModelBlockKind::KeyField { fields, .. } => fields.iter().collect(),
+            ModelBlockKind::Paginated { blocks, .. } => blocks
+                .iter()
+                .flat_map(|block| match block {
+                    PaginatedBlockKind::Kv(kv_block) => vec![&kv_block.field],
+                    PaginatedBlockKind::R2(r2_block) => vec![&r2_block.field],
+                })
+                .collect(),
+        }
+    }
+}
+
 pub struct ModelBlock<'src> {
     pub symbol: Symbol<'src>,
     pub use_tags: Vec<UseTag<'src>>,
 
     pub blocks: Vec<ModelBlockKind<'src>>,
+}
+
+impl<'src> ModelBlock<'src> {
+    pub fn partition_use_tags(&self) -> (Vec<&CrudKind>, Vec<&'src str>) {
+        let mut crud_tags = Vec::new();
+        let mut env_binding_tags = Vec::new();
+
+        for tag in &self.use_tags {
+            for param in &tag.params {
+                match param {
+                    UseTagParamKind::Crud(crud_kind) => crud_tags.push(crud_kind),
+                    UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(*binding),
+                }
+            }
+        }
+
+        (crud_tags, env_binding_tags)
+    }
+
+    /// Iterate over all foreign blocks, be they top level or nested in primary/unique/optional blocks
+    pub fn foreign_blocks(&self) -> impl Iterator<Item = &ForeignBlock<'src>> {
+        self.blocks.iter().flat_map(|block| match block {
+            ModelBlockKind::Foreign(foreign_block) => vec![foreign_block],
+            ModelBlockKind::Primary { blocks, .. }
+            | ModelBlockKind::Unique { blocks, .. }
+            | ModelBlockKind::Optional { blocks, .. } => blocks
+                .iter()
+                .filter_map(|b| match b {
+                    SqlBlockKind::Foreign(foreign_block) => Some(foreign_block),
+                    _ => None,
+                })
+                .collect(),
+            _ => vec![],
+        })
+    }
+
+    /// Iterate over navigation blocks (not including those in foreign blocks)
+    pub fn navigation_blocks(&self) -> impl Iterator<Item = &NavigationBlock<'src>> {
+        self.blocks.iter().filter_map(|block| match block {
+            ModelBlockKind::Navigation(navigation_block) => Some(navigation_block),
+            _ => None,
+        })
+    }
+
+    /// Iterate over all SQL column blocks, be they top level or nested in primary/unique/optional blocks
+    pub fn sql_symbols(&self) -> impl Iterator<Item = &Symbol<'src>> {
+        self.blocks.iter().flat_map(|block| match block {
+            ModelBlockKind::Column(symbol) => vec![symbol],
+            ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
+            ModelBlockKind::Primary { blocks, .. }
+            | ModelBlockKind::Unique { blocks, .. }
+            | ModelBlockKind::Optional { blocks, .. } => blocks
+                .iter()
+                .filter_map(|b| match b {
+                    SqlBlockKind::Column(symbol) => Some(symbol),
+                    SqlBlockKind::Foreign(_) => None,
+                })
+                .collect(),
+            _ => vec![],
+        })
+    }
 }
 
 pub struct ServiceBlock<'src> {

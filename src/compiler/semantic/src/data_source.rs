@@ -4,7 +4,7 @@ use ast::{
     CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
     NavigationFieldKind,
 };
-use frontend::{DataSourceBlock, DataSourceBlockMethod, Symbol, SymbolKind};
+use frontend::{DataSourceBlockMethod, Symbol};
 use indexmap::IndexMap;
 use orm::select::SelectModel;
 
@@ -17,24 +17,18 @@ use crate::{
 pub struct DataSourceAnalysis;
 impl<'src, 'p> DataSourceAnalysis {
     pub fn analyze(
-        data_source_blocks: &'p [DataSourceBlock<'src>],
         models: &IndexMap<&'src str, Model>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Vec<(&'src str, DataSource<'src>)> {
         let mut res = Vec::new();
 
-        for ds in data_source_blocks {
+        for ds in table.data_sources.values() {
             // Validate the model reference
-            let Some(model_sym) = table.resolve(ds.model, SymbolKind::ModelDecl, None) else {
+            let Some(model_sym) = table.models.get(ds.model).map(|m| &m.symbol) else {
                 sink.push(SemanticError::DataSourceUnknownModelReference { source: &ds.symbol });
                 continue;
             };
-
-            if !matches!(model_sym.kind, SymbolKind::ModelDecl) {
-                sink.push(SemanticError::DataSourceUnknownModelReference { source: &ds.symbol });
-                continue;
-            }
 
             let model_name = model_sym.name;
             let Some(model) = models.get(model_name) else {

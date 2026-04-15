@@ -1,11 +1,11 @@
 use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
-use frontend::{ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Symbol, SymbolKind};
+use frontend::{
+    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingKind, EnvBlock,
+    EnvBlockKind, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Symbol,
+};
 use indexmap::IndexMap;
 
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap, VecDeque},
-};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::{
     api::ApiAnalysis,
@@ -22,223 +22,282 @@ pub mod err;
 pub mod fmt;
 mod model;
 
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SymbolKind<'src> {
+    // Scoped
+    EnvVar(&'src str),
+    EnvBinding {
+        kind: EnvBindingKind,
+        name: &'src str,
+    },
+    ModelField {
+        model: &'src str,
+        name: &'src str,
+    },
+    PlainOldObjectField {
+        poo: &'src str,
+        name: &'src str,
+    },
+    ServiceField {
+        service: &'src str,
+        name: &'src str,
+    },
+    ApiMethodDecl {
+        namespace: &'src str,
+        name: &'src str,
+    },
+    ApiMethodParam {
+        namespace: &'src str,
+        method: &'src str,
+        name: &'src str,
+    },
+    DataSourceDecl {
+        model: &'src str,
+        name: &'src str,
+    },
+    DataSourceMethodParam {
+        model: &'src str,
+        method: &'src str,
+        name: &'src str,
+    },
+}
+
+type SymbolLookup<'src, 'p> = HashMap<SymbolKind<'src>, &'p Symbol<'src>>;
+
 #[derive(Default)]
 pub struct SymbolTable<'src, 'p> {
-    table: HashMap<String, &'p Symbol<'src>>,
+    models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
+    poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
+    services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
+    envs: Vec<&'p EnvBlock<'src>>,
+    injects: Vec<&'p InjectBlock<'src>>,
+    data_sources: BTreeMap<SymbolKind<'src>, &'p DataSourceBlock<'src>>,
+    apis: Vec<&'p ApiBlock<'src>>,
+
+    env_vars: SymbolLookup<'src, 'p>,
+    env_bindings: SymbolLookup<'src, 'p>,
+    model_fields: SymbolLookup<'src, 'p>,
+    poo_fields: SymbolLookup<'src, 'p>,
+    service_fields: SymbolLookup<'src, 'p>,
+    api_method_decls: SymbolLookup<'src, 'p>,
+    api_method_params: SymbolLookup<'src, 'p>,
+    data_source_method_params: SymbolLookup<'src, 'p>,
 }
 
 impl<'src, 'p> SymbolTable<'src, 'p> {
-    fn key(&self, symbol: &Symbol<'src>) -> String {
-        match &symbol.kind {
-            // Global
-            SymbolKind::ModelDecl => format!("model::{}", symbol.name),
-            SymbolKind::PlainOldObjectDecl => format!("poo::{}", symbol.name),
-            SymbolKind::ServiceDecl => format!("service::{}", symbol.name),
-            SymbolKind::EnvDecl => "wrangler_env".into(),
-            SymbolKind::InjectDecl => format!("inject::{}", symbol.name),
-
-            // Scoped
-            SymbolKind::EnvVar => format!("wrangler_env::var::{}", symbol.name),
-            SymbolKind::EnvBinding { kind } => {
-                format!("wrangler_env::{}::{}", kind, symbol.name)
-            }
-            SymbolKind::ModelField => {
-                let model_name = &symbol.parent_name;
-                format!("model::{model_name}::{}", symbol.name)
-            }
-            SymbolKind::PlainOldObjectField => {
-                let poo_name = &symbol.parent_name;
-                format!("poo::{poo_name}::{}", symbol.name)
-            }
-            SymbolKind::ServiceField => {
-                let service_name = &symbol.parent_name;
-                format!("service::{service_name}::{}", symbol.name)
-            }
-            SymbolKind::ApiMethodDecl => {
-                let namespace = &symbol.parent_name;
-                format!("api::{}::{}", namespace, symbol.name)
-            }
-            SymbolKind::ApiMethodParam => {
-                let namespace_method = &symbol.parent_name; // namespace::method
-                format!("api::{namespace_method}::{}", symbol.name)
-            }
-            SymbolKind::DataSourceDecl => {
-                let model = &symbol.parent_name;
-                format!("datasource::{model}::{}", symbol.name)
-            }
-            SymbolKind::DataSourceMethodParam => {
-                // model::datasource::method
-                // where method is "get" or "list"
-                let model_datasource_method = &symbol.parent_name;
-                format!("datasource::{model_datasource_method}::{}", symbol.name)
-            }
-
-            _ => panic!(
-                "unexpected symbol kind in key generation: {:?}",
-                symbol.kind
-            ),
-        }
-    }
-
-    /// Resolves a name to a symbol
-    fn resolve(
-        &self,
-        name: &str,
-        kind: SymbolKind,
-        parent_name: Option<&str>,
-    ) -> Option<&'p Symbol<'src>> {
-        let key = self.key(&Symbol {
-            name,
-            kind: kind.clone(),
-            parent_name: Cow::Borrowed(parent_name.unwrap_or("")),
-            ..Default::default()
-        });
-
-        self.table.get(&key).copied()
-    }
-
-    /// Creates a [SymbolTable] from a [ParseAst], catching [CompilerErrorKind::DuplicateSymbol]'s
-    fn from_parse(
-        parse: &'p ParseAst<'src>,
-        sink: &mut ErrorSink<'src, 'p>,
-    ) -> SymbolTable<'src, 'p> {
+    /// Creates a [SymbolTable] from a [ParseAst], catching [SemanticError::DuplicateSymbol]'s
+    fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
         let mut st = SymbolTable::default();
         let mut global_names = HashMap::new();
 
-        let mut insert_global_name = |sink: &mut ErrorSink<'src, 'p>, symbol: &'p Symbol<'src>| {
-            if let Some(existing) = global_names.insert(symbol.name, symbol) {
+        let mut insert_global = |sink: &mut ErrorSink<'src, 'p>, symbol: &'p Symbol<'src>| {
+            if let Some(first) = global_names.insert(symbol.name, symbol) {
                 sink.push(SemanticError::DuplicateSymbol {
-                    first: existing,
+                    first,
                     second: symbol,
                 });
-
-                return false;
             }
-
-            true
         };
 
-        let insert_symbol = |st: &mut SymbolTable<'src, 'p>,
-                             sink: &mut ErrorSink<'src, 'p>,
-                             symbol: &'p Symbol<'src>| {
-            if let Some(existing) = st.table.insert(st.key(symbol), symbol) {
-                sink.push(SemanticError::DuplicateSymbol {
-                    first: existing,
-                    second: symbol,
-                });
+        for block in &parse.blocks {
+            match block {
+                AstBlockKind::Model(model_block) => {
+                    insert_global(sink, &model_block.symbol);
+                    st.models.insert(model_block.symbol.name, model_block);
 
-                return false;
-            }
-
-            true
-        };
-
-        for env in &parse.wrangler_envs {
-            insert_symbol(&mut st, sink, &env.symbol);
-
-            for b in &env.d1_bindings {
-                if insert_symbol(&mut st, sink, b) {
-                    insert_global_name(sink, b);
+                    for sub_block in &model_block.blocks {
+                        let symbols = sub_block.symbols();
+                        for symbol in symbols {
+                            if let Some(first) = st.model_fields.insert(
+                                SymbolKind::ModelField {
+                                    model: model_block.symbol.name,
+                                    name: symbol.name,
+                                },
+                                symbol,
+                            ) {
+                                sink.push(SemanticError::DuplicateSymbol {
+                                    first,
+                                    second: symbol,
+                                });
+                            }
+                        }
+                    }
                 }
-            }
+                AstBlockKind::PlainOldObject(plain_old_object_block) => {
+                    insert_global(sink, &plain_old_object_block.symbol);
+                    st.poos
+                        .insert(plain_old_object_block.symbol.name, plain_old_object_block);
 
-            for b in &env.r2_bindings {
-                if insert_symbol(&mut st, sink, b) {
-                    insert_global_name(sink, b);
+                    for field in &plain_old_object_block.fields {
+                        if let Some(first) = st.poo_fields.insert(
+                            SymbolKind::PlainOldObjectField {
+                                poo: plain_old_object_block.symbol.name,
+                                name: field.name,
+                            },
+                            field,
+                        ) {
+                            sink.push(SemanticError::DuplicateSymbol {
+                                first,
+                                second: field,
+                            });
+                        }
+                    }
                 }
-            }
+                AstBlockKind::Service(service_block) => {
+                    insert_global(sink, &service_block.symbol);
+                    st.services.insert(service_block.symbol.name, service_block);
 
-            for b in &env.kv_bindings {
-                if insert_symbol(&mut st, sink, b) {
-                    insert_global_name(sink, b);
+                    for field in &service_block.fields {
+                        if let Some(first) = st.service_fields.insert(
+                            SymbolKind::ServiceField {
+                                service: service_block.symbol.name,
+                                name: field.name,
+                            },
+                            field,
+                        ) {
+                            sink.push(SemanticError::DuplicateSymbol {
+                                first,
+                                second: field,
+                            });
+                        }
+                    }
                 }
-            }
+                AstBlockKind::Api(api_block) => {
+                    st.apis.push(api_block);
+                    for method in &api_block.methods {
+                        if let Some(first) = st.api_method_decls.insert(
+                            SymbolKind::ApiMethodDecl {
+                                namespace: api_block.symbol.name,
+                                name: method.symbol.name,
+                            },
+                            &method.symbol,
+                        ) {
+                            sink.push(SemanticError::DuplicateSymbol {
+                                first,
+                                second: &method.symbol,
+                            });
+                        }
 
-            for var in &env.vars {
-                if insert_symbol(&mut st, sink, var) {
-                    insert_global_name(sink, var);
+                        for param in &method.parameters {
+                            let (symbol, name) = match param {
+                                ApiBlockMethodParamKind::SelfParam { symbol, .. } => {
+                                    (symbol, "self")
+                                }
+                                ApiBlockMethodParamKind::Field(symbol) => (symbol, symbol.name),
+                            };
+
+                            if let Some(first) = st.api_method_params.insert(
+                                SymbolKind::ApiMethodParam {
+                                    namespace: api_block.symbol.name,
+                                    method: method.symbol.name,
+                                    name,
+                                },
+                                symbol,
+                            ) {
+                                sink.push(SemanticError::DuplicateSymbol {
+                                    first,
+                                    second: symbol,
+                                });
+                            }
+                        }
+                    }
                 }
-            }
-        }
+                AstBlockKind::DataSource(data_source_block) => {
+                    if let Some(first) = st.data_sources.insert(
+                        SymbolKind::DataSourceDecl {
+                            model: data_source_block.model,
+                            name: data_source_block.symbol.name,
+                        },
+                        &data_source_block,
+                    ) {
+                        sink.push(SemanticError::DuplicateSymbol {
+                            first: &first.symbol,
+                            second: &data_source_block.symbol,
+                        });
+                    }
 
-        for model in &parse.models {
-            if insert_symbol(&mut st, sink, &model.symbol) {
-                insert_global_name(sink, &model.symbol);
-            }
-
-            for field in &model.typed_idents {
-                insert_symbol(&mut st, sink, field);
-            }
-
-            for kv in &model.kvs {
-                insert_symbol(&mut st, sink, &kv.field);
-            }
-
-            for r2 in &model.r2s {
-                insert_symbol(&mut st, sink, &r2.field);
-            }
-
-            for kf in &model.key_fields {
-                insert_symbol(&mut st, sink, kf);
-            }
-
-            for nav in &model.navigation_blocks {
-                insert_symbol(&mut st, sink, &nav.field);
-            }
-
-            for foreign in &model.foreign_blocks {
-                for field in &foreign.fields {
-                    insert_symbol(&mut st, sink, field);
+                    for method in [&data_source_block.list, &data_source_block.get]
+                        .into_iter()
+                        .flatten()
+                    {
+                        for param in &method.parameters {
+                            if let Some(first) = st.data_source_method_params.insert(
+                                SymbolKind::DataSourceMethodParam {
+                                    model: data_source_block.model,
+                                    method: data_source_block.symbol.name,
+                                    name: param.name,
+                                },
+                                param,
+                            ) {
+                                sink.push(SemanticError::DuplicateSymbol {
+                                    first,
+                                    second: param,
+                                });
+                            }
+                        }
+                    }
                 }
-            }
-        }
-
-        for api in &parse.apis {
-            for method in &api.methods {
-                insert_symbol(&mut st, sink, &method.symbol);
-
-                for param in &method.parameters {
-                    insert_symbol(&mut st, sink, param);
+                AstBlockKind::Env(env_block) => {
+                    st.envs.push(env_block);
+                    for block in &env_block.blocks {
+                        match block {
+                            EnvBlockKind::D1 { symbols } => {
+                                for symbol in symbols {
+                                    insert_global(sink, symbol);
+                                    st.env_bindings.insert(
+                                        SymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::D1,
+                                            name: symbol.name,
+                                        },
+                                        symbol,
+                                    );
+                                }
+                            }
+                            EnvBlockKind::R2 { symbols } => {
+                                for symbol in symbols {
+                                    insert_global(sink, symbol);
+                                    st.env_bindings.insert(
+                                        SymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::R2,
+                                            name: symbol.name,
+                                        },
+                                        symbol,
+                                    );
+                                }
+                            }
+                            EnvBlockKind::Kv { symbols } => {
+                                for symbol in symbols {
+                                    insert_global(sink, symbol);
+                                    st.env_bindings.insert(
+                                        SymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::Kv,
+                                            name: symbol.name,
+                                        },
+                                        symbol,
+                                    );
+                                }
+                            }
+                            EnvBlockKind::Var { symbols } => {
+                                for symbol in symbols {
+                                    if let Some(first) = st
+                                        .env_bindings
+                                        .insert(SymbolKind::EnvVar(symbol.name), symbol)
+                                    {
+                                        sink.push(SemanticError::DuplicateSymbol {
+                                            first,
+                                            second: symbol,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        }
-
-        for poo in &parse.poos {
-            if insert_symbol(&mut st, sink, &poo.symbol) {
-                insert_global_name(sink, &poo.symbol);
-            }
-
-            for field in &poo.fields {
-                insert_symbol(&mut st, sink, field);
-            }
-        }
-
-        for source in &parse.sources {
-            if insert_symbol(&mut st, sink, &source.symbol) {
-                insert_global_name(sink, &source.symbol);
-            }
-
-            for method in [&source.list, &source.get].into_iter().flatten() {
-                for param in &method.parameters {
-                    insert_symbol(&mut st, sink, param);
-                }
-            }
-        }
-
-        for service in &parse.services {
-            if insert_symbol(&mut st, sink, &service.symbol) {
-                insert_global_name(sink, &service.symbol);
-            }
-
-            for field in &service.fields {
-                insert_symbol(&mut st, sink, field);
-            }
-        }
-
-        for inject in &parse.injects {
-            for field in &inject.fields {
-                if insert_symbol(&mut st, sink, field) {
-                    insert_global_name(sink, field);
+                AstBlockKind::Inject(inject_block) => {
+                    st.injects.push(inject_block);
+                    for symbol in &inject_block.symbols {
+                        insert_global(sink, symbol);
+                    }
                 }
             }
         }
@@ -251,32 +310,22 @@ pub struct SemanticAnalysis;
 impl<'src, 'p> SemanticAnalysis {
     pub fn analyze(parse: &'p ParseAst<'src>) -> (CloesceAst<'src>, Vec<SemanticError<'src, 'p>>) {
         let mut sink = ErrorSink::new();
-        let mut table = SymbolTable::from_parse(parse, &mut sink);
+        let table = SymbolTable::from_parse(parse, &mut sink);
 
-        let wrangler_env = Self::wrangler(parse, &mut sink);
+        let wrangler_env = Self::wrangler(&table, &mut sink);
 
-        let mut models = {
-            let model_blocks = parse
-                .models
-                .iter()
-                .map(|m| (m.symbol.name, m))
-                .collect::<BTreeMap<&str, &ModelBlock>>();
-
-            match ModelAnalysis::default().analyze(model_blocks, &mut table) {
-                Ok(models) => models,
-                Err(errs) => {
-                    sink.extend(errs);
-                    IndexMap::new()
-                }
+        let mut models = match ModelAnalysis::default().analyze(&table) {
+            Ok(models) => models,
+            Err(errs) => {
+                sink.extend(errs);
+                IndexMap::default()
             }
         };
 
-        let data_source_map =
-            DataSourceAnalysis::analyze(&parse.sources, &models, &table, &mut sink);
+        let data_source_map = DataSourceAnalysis::analyze(&models, &table, &mut sink);
+        let poos = Self::poos(&table, &mut sink);
 
-        let poos = Self::poos(&parse.poos, &table, &mut sink);
-
-        let api_map = match ApiAnalysis::default().analyze(parse, &table) {
+        let api_map = match ApiAnalysis::default().analyze(&table) {
             Ok(apis) => apis,
             Err(errs) => {
                 sink.extend(errs);
@@ -284,7 +333,7 @@ impl<'src, 'p> SemanticAnalysis {
             }
         };
 
-        let mut services = Self::services(&parse.services, &table, &mut sink);
+        let mut services = Self::services(&table, &mut sink);
 
         // Merge API methods into their respective namespaces
         for (namespace, apis) in api_map {
@@ -302,10 +351,10 @@ impl<'src, 'p> SemanticAnalysis {
             }
         }
 
-        let injects = parse
+        let injects = table
             .injects
             .iter()
-            .flat_map(|i| i.fields.iter().map(|f| f.name))
+            .flat_map(|i| i.symbols.iter().map(|f| f.name))
             .collect();
 
         let mut ast = CloesceAst {
@@ -329,36 +378,51 @@ impl<'src, 'p> SemanticAnalysis {
     }
 
     fn wrangler(
-        parse: &'p ParseAst<'src>,
+        table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<WranglerEnv<'src>> {
-        let Some(parsed_env) = parse.wrangler_envs.first() else {
+        if table.env_bindings.is_empty() {
             ensure!(
-                parse.models.is_empty(),
+                table.models.is_empty(),
                 sink,
                 SemanticError::MissingWranglerEnvBlock
             );
-
             return None;
         };
 
+        let mut d1_bindings = Vec::new();
+        let mut r2_bindings = Vec::new();
+        let mut kv_bindings = Vec::new();
+        for (symbol_kind, _) in &table.env_bindings {
+            if let SymbolKind::EnvBinding { kind, name } = symbol_kind {
+                match kind {
+                    EnvBindingKind::D1 => d1_bindings.push(*name),
+                    EnvBindingKind::R2 => r2_bindings.push(*name),
+                    EnvBindingKind::Kv => kv_bindings.push(*name),
+                }
+            } else {
+                unreachable!("only EnvBinding kinds should be in env_bindings")
+            }
+        }
+
+        let vars = table
+            .env_vars
+            .values()
+            .map(|symbol| Field {
+                name: symbol.name.into(),
+                cidl_type: symbol.cidl_type.clone(),
+            })
+            .collect();
+
         Some(WranglerEnv {
-            d1_bindings: parsed_env.d1_bindings.iter().map(|b| b.name).collect(),
-            kv_bindings: parsed_env.kv_bindings.iter().map(|b| b.name).collect(),
-            r2_bindings: parsed_env.r2_bindings.iter().map(|b| b.name).collect(),
-            vars: parsed_env
-                .vars
-                .iter()
-                .map(|v| Field {
-                    name: v.name.into(),
-                    cidl_type: v.cidl_type.clone(),
-                })
-                .collect(),
+            d1_bindings,
+            r2_bindings,
+            kv_bindings,
+            vars,
         })
     }
 
     fn poos(
-        poo_blocks: &'p [PlainOldObjectBlock<'src>],
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> BTreeMap<&'src str, PlainOldObject<'src>> {
@@ -368,7 +432,7 @@ impl<'src, 'p> SemanticAnalysis {
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
-        for poo in poo_blocks {
+        for poo in table.poos.values() {
             let poo_name = poo.symbol.name;
             let mut fields = Vec::new();
             graph.entry(poo_name).or_default();
@@ -384,15 +448,9 @@ impl<'src, 'p> SemanticAnalysis {
                 };
 
                 match resolved_type.root_type() {
-                    CidlType::Object { name, .. } => {
-                        if let Some(ref_sym) =
-                            table.resolve(name, SymbolKind::PlainOldObjectDecl, None)
-                            && (matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
-                                && !field.cidl_type.is_nullable())
-                        {
-                            graph.entry(name).or_default().push(poo_name);
-                            in_degree.entry(poo_name).and_modify(|d| *d += 1);
-                        }
+                    CidlType::Object { name, .. } if table.poos.get(name).is_some() => {
+                        graph.entry(name).or_default().push(poo_name);
+                        in_degree.entry(poo_name).and_modify(|d| *d += 1);
                     }
                     CidlType::Stream | CidlType::Void => {
                         sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
@@ -417,7 +475,7 @@ impl<'src, 'p> SemanticAnalysis {
             );
         }
 
-        match kahns(graph, in_degree, poo_blocks.len()) {
+        match kahns(graph, in_degree, table.poos.len()) {
             Ok(_) => res,
             Err(err) => {
                 sink.push(err);
@@ -427,7 +485,6 @@ impl<'src, 'p> SemanticAnalysis {
     }
 
     fn services(
-        service_blocks: &'p [ServiceBlock<'src>],
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> IndexMap<&'src str, Service<'src>> {
@@ -437,7 +494,7 @@ impl<'src, 'p> SemanticAnalysis {
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
-        for service in service_blocks {
+        for service in table.services.values() {
             let service_name = service.symbol.name;
             let mut fields = Vec::new();
             graph.entry(service_name).or_default();
@@ -468,7 +525,7 @@ impl<'src, 'p> SemanticAnalysis {
             );
         }
 
-        match kahns(graph, in_degree, service_blocks.len()) {
+        match kahns(graph, in_degree, table.services.len()) {
             Ok(_) => res,
             Err(err) => {
                 sink.push(err);
@@ -489,19 +546,30 @@ fn resolve_cidl_type<'src, 'p>(
 ) -> Result<CidlType<'src>, SemanticError<'src, 'p>> {
     match cidl_type {
         CidlType::UnresolvedReference { name } => {
-            if let Some(sym) = table.resolve(name, SymbolKind::ModelDecl, None) {
-                return Ok(CidlType::Object { name: sym.name });
+            if let Some(sym) = table.models.get(name) {
+                return Ok(CidlType::Object {
+                    name: sym.symbol.name,
+                });
             }
 
-            if let Some(sym) = table.resolve(name, SymbolKind::PlainOldObjectDecl, None) {
-                return Ok(CidlType::Object { name: sym.name });
+            if let Some(sym) = table.poos.get(name) {
+                return Ok(CidlType::Object {
+                    name: sym.symbol.name,
+                });
             }
 
-            if let Some(sym) = table.resolve(name, SymbolKind::ServiceDecl, None) {
-                return Ok(CidlType::Inject { name: sym.name });
+            if let Some(sym) = table.services.get(name) {
+                return Ok(CidlType::Inject {
+                    name: sym.symbol.name,
+                });
             }
 
-            if let Some(sym) = table.resolve(name, SymbolKind::InjectDecl, None) {
+            if let Some(sym) = table
+                .injects
+                .iter()
+                .flat_map(|i| i.symbols.iter())
+                .find(|s| s.name == *name)
+            {
                 return Ok(CidlType::Inject { name: sym.name });
             }
 
@@ -511,9 +579,8 @@ fn resolve_cidl_type<'src, 'p>(
             })
         }
         CidlType::DataSource { model_name } => {
-            let valid = table
-                .resolve(model_name, SymbolKind::ModelDecl, None)
-                .is_some();
+            let valid = table.models.get(model_name).is_some();
+
             if !valid {
                 return Err(SemanticError::UnresolvedSymbol {
                     span: symbol.span,
@@ -523,12 +590,8 @@ fn resolve_cidl_type<'src, 'p>(
             Ok(cidl_type.clone())
         }
         CidlType::Partial { object_name } => {
-            let valid = table
-                .resolve(object_name, SymbolKind::PlainOldObjectDecl, None)
-                .is_some()
-                || table
-                    .resolve(object_name, SymbolKind::ModelDecl, None)
-                    .is_some();
+            let valid =
+                table.models.get(object_name).is_some() || table.poos.get(object_name).is_some();
 
             if !valid {
                 return Err(SemanticError::UnresolvedSymbol {

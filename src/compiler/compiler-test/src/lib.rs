@@ -7,7 +7,7 @@ use frontend::{
     lexer::{CloesceLexer, LexTarget},
     parser::CloesceParser,
 };
-// use semantic::SemanticAnalysis;
+use semantic::SemanticAnalysis;
 
 /// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
 /// Ensures that some expr is present in another expr.
@@ -46,33 +46,33 @@ pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
     result.ast
 }
 
-// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
-// panicking if any step fails.
-// pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
-//     let source = LexTarget {
-//         src,
-//         path: PathBuf::from("<test>"),
-//     };
+/// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
+/// panicking if any step fails.
+pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
+    let source = LexTarget {
+        src,
+        path: PathBuf::from("<test>"),
+    };
 
-//     let lexed = CloesceLexer::lex(vec![source]);
-//     if lexed.has_errors() {
-//         lexed.display_error(&lexed.file_table);
-//         panic!("lexing should succeed");
-//     }
+    let lexed = CloesceLexer::lex(vec![source]);
+    if lexed.has_errors() {
+        lexed.display_error(&lexed.file_table);
+        panic!("lexing should succeed");
+    }
 
-//     let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
-//     if result.has_errors() {
-//         result.display_error(&lexed.file_table);
-//         panic!("parse should succeed");
-//     }
+    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
+    if result.has_errors() {
+        result.display_error(&lexed.file_table);
+        panic!("parse should succeed");
+    }
 
-//     let (result, errors) = SemanticAnalysis::analyze(&result.ast);
-//     if !errors.is_empty() {
-//         for error in &errors {
-//             error.display_error(&lexed.file_table);
-//         }
-//         panic!("semantic analysis should succeed");
-//     }
+    let (result, errors) = SemanticAnalysis::analyze(&result.ast);
+    if !errors.is_empty() {
+        for error in &errors {
+            error.display_error(&lexed.file_table);
+        }
+        panic!("semantic analysis should succeed");
+    }
 
-//     result
-// }
+    result
+}
