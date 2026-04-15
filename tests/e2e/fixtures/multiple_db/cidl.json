@@ -2,8 +2,8 @@
   "hash": 5303730850516668862,
   "wrangler_env": {
     "d1_bindings": [
-      "db1",
-      "db2"
+      "db2",
+      "db1"
     ],
     "kv_bindings": [],
     "r2_bindings": [],

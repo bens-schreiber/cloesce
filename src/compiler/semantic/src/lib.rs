@@ -56,7 +56,7 @@ pub enum SymbolKind<'src> {
         name: &'src str,
     },
     DataSourceMethodParam {
-        model: &'src str,
+        data_source: &'src str,
         method: &'src str,
         name: &'src str,
     },
@@ -167,7 +167,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     for method in &api_block.methods {
                         if let Some(first) = st.api_method_decls.insert(
                             SymbolKind::ApiMethodDecl {
-                                namespace: api_block.symbol.name,
+                                namespace: api_block.namespace,
                                 name: method.symbol.name,
                             },
                             &method.symbol,
@@ -188,7 +188,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
 
                             if let Some(first) = st.api_method_params.insert(
                                 SymbolKind::ApiMethodParam {
-                                    namespace: api_block.symbol.name,
+                                    namespace: api_block.namespace,
                                     method: method.symbol.name,
                                     name,
                                 },
@@ -208,7 +208,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             model: data_source_block.model,
                             name: data_source_block.symbol.name,
                         },
-                        &data_source_block,
+                        data_source_block,
                     ) {
                         sink.push(SemanticError::DuplicateSymbol {
                             first: &first.symbol,
@@ -226,7 +226,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         for param in &method.parameters {
                             if let Some(first) = st.data_source_method_params.insert(
                                 SymbolKind::DataSourceMethodParam {
-                                    model: data_source_block.model,
+                                    data_source: data_source_block.symbol.name,
                                     method: method_name,
                                     name: param.name,
                                 },
@@ -282,9 +282,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             }
                             EnvBlockKind::Var { symbols } => {
                                 for symbol in symbols {
-                                    if let Some(first) = st
-                                        .env_bindings
-                                        .insert(SymbolKind::EnvVar(symbol.name), symbol)
+                                    if let Some(first) =
+                                        st.env_vars.insert(SymbolKind::EnvVar(symbol.name), symbol)
                                     {
                                         sink.push(SemanticError::DuplicateSymbol {
                                             first,
@@ -396,7 +395,7 @@ impl<'src, 'p> SemanticAnalysis {
         let mut d1_bindings = Vec::new();
         let mut r2_bindings = Vec::new();
         let mut kv_bindings = Vec::new();
-        for (symbol_kind, _) in &table.env_bindings {
+        for symbol_kind in table.env_bindings.keys() {
             if let SymbolKind::EnvBinding { kind, name } = symbol_kind {
                 match kind {
                     EnvBindingKind::D1 => d1_bindings.push(*name),
@@ -451,7 +450,7 @@ impl<'src, 'p> SemanticAnalysis {
                 };
 
                 match resolved_type.root_type() {
-                    CidlType::Object { name, .. } if table.poos.get(name).is_some() => {
+                    CidlType::Object { name, .. } if table.poos.contains_key(name) => {
                         graph.entry(name).or_default().push(poo_name);
                         in_degree.entry(poo_name).and_modify(|d| *d += 1);
                     }
@@ -512,6 +511,13 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 };
 
+                if let CidlType::Inject { name } = resolved_type {
+                    if table.services.contains_key(name) {
+                        graph.entry(name).or_default().push(service_name);
+                        in_degree.entry(service_name).and_modify(|d| *d += 1);
+                    }
+                }
+
                 fields.push(Field {
                     name: field.name.into(),
                     cidl_type: resolved_type,
@@ -529,7 +535,10 @@ impl<'src, 'p> SemanticAnalysis {
         }
 
         match kahns(graph, in_degree, table.services.len()) {
-            Ok(_) => res,
+            Ok(rank) => {
+                res.sort_by(|a, _, b, _| rank[a].cmp(&rank[b]));
+                res
+            }
             Err(err) => {
                 sink.push(err);
                 IndexMap::new()
@@ -582,7 +591,7 @@ fn resolve_cidl_type<'src, 'p>(
             })
         }
         CidlType::DataSource { model_name } => {
-            let valid = table.models.get(model_name).is_some();
+            let valid = table.models.contains_key(model_name);
 
             if !valid {
                 return Err(SemanticError::UnresolvedSymbol {
@@ -594,7 +603,7 @@ fn resolve_cidl_type<'src, 'p>(
         }
         CidlType::Partial { object_name } => {
             let valid =
-                table.models.get(object_name).is_some() || table.poos.get(object_name).is_some();
+                table.models.contains_key(object_name) || table.poos.contains_key(object_name);
 
             if !valid {
                 return Err(SemanticError::UnresolvedSymbol {

@@ -63,7 +63,6 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 name,
                 span,
                 cidl_type,
-                ..Default::default()
             })
     };
 

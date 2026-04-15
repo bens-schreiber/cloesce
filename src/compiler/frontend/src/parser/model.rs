@@ -20,7 +20,6 @@ fn typed_field<'tokens, 'src: 'tokens>()
             span,
             name,
             cidl_type,
-            ..Default::default()
         })
 }
 

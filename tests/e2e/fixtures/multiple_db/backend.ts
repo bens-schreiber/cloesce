@@ -6,8 +6,8 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
-    db1: D1Database;
     db2: D1Database;
+    db1: D1Database;
 }
 export namespace DB1Model {
     export const Tag = "DB1Model";

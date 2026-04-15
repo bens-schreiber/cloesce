@@ -32,7 +32,6 @@ pub fn env_block<'tokens, 'src: 'tokens>()
     let d1 = just(Token::Ident("d1"))
         .ignore_then(
             ident
-                .clone()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -43,7 +42,6 @@ pub fn env_block<'tokens, 'src: 'tokens>()
     let r2 = just(Token::Ident("r2"))
         .ignore_then(
             ident
-                .clone()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -54,7 +52,6 @@ pub fn env_block<'tokens, 'src: 'tokens>()
     let kv = just(Token::Ident("kv"))
         .ignore_then(
             ident
-                .clone()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -70,7 +67,6 @@ pub fn env_block<'tokens, 'src: 'tokens>()
             span,
             name,
             cidl_type: ty,
-            ..Default::default()
         });
 
     let vars = just(Token::Ident("vars"))

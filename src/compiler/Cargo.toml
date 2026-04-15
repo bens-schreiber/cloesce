@@ -1,13 +1,13 @@
 [workspace]
 members = [
-    # "cli",
-    # "ast",
+    "cli",
+    "ast",
     "frontend",
     "semantic",
-    # "codegen",
+    "codegen",
     "compiler-test",
-    # "migrations",
-    # "orm",
+    "migrations",
+    "orm",
 ]
 resolver = "3"
 

@@ -104,7 +104,6 @@ fn parameter<'tokens, 'src: 'tokens>()
                 name,
                 span,
                 cidl_type: ty,
-                ..Default::default()
             })
         });
 

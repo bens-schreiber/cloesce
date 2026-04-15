@@ -501,7 +501,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
                 if table.model_fields.contains_key(&SymbolKind::ModelField {
                     model: adj_model_name,
-                    name: *ref_field_name,
+                    name: ref_field_name,
                 }) {
                     referenced_field_names.push(*ref_field_name);
                     continue;
@@ -791,7 +791,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             let column = model_block
                 .sql_symbols()
                 .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
-            let is_key_field = key_field_names.iter().any(|&n| n == var);
+            let is_key_field = key_field_names.contains(&var);
 
             match (column, is_key_field) {
                 (Some(col), _) => parameters.push(Field {
