@@ -6,7 +6,7 @@ use crate::{
     ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, NavigationBlock,
     PaginatedBlockKind, R2Block, SqlBlockKind, Symbol, UseTag, UseTagParamKind,
     lexer::Token,
-    parser::{Extra, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// `nav { navName }`
@@ -48,8 +48,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
                 .then(foreign_nav_block().or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((adj, qualifier), (fields, nav)), e| ForeignBlock {
-            span: e.span(),
+        .map(|((adj, qualifier), (fields, nav))| ForeignBlock {
             adj,
             qualifier,
             fields,
@@ -69,15 +68,12 @@ fn kv_block<'tokens, 'src: 'tokens>()
         )
         .then(just(Token::Ident("paginated")).or_not())
         .then(typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map_with(
-            |(((env_binding, key_format), paginated), field), e| KvBlock {
-                span: e.span(),
-                env_binding,
-                key_format,
-                field,
-                is_paginated: paginated.is_some(),
-            },
-        )
+        .map(|(((env_binding, key_format), paginated), field)| KvBlock {
+            env_binding,
+            key_format,
+            field,
+            is_paginated: paginated.is_some(),
+        })
 }
 
 /// `r2(binding, "key/format/{id}") paginated { ident }`
@@ -92,25 +88,25 @@ fn r2_block<'tokens, 'src: 'tokens>()
         )
         .then(just(Token::Ident("paginated")).or_not())
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map_with(
-            |(((env_binding, key_format), paginated), field), e| R2Block {
-                span: e.span(),
-                env_binding,
-                key_format,
-                field,
-                is_paginated: paginated.is_some(),
-            },
-        )
+        .map(|(((env_binding, key_format), paginated), field)| R2Block {
+            env_binding,
+            key_format,
+            field,
+            is_paginated: paginated.is_some(),
+        })
 }
 
 fn use_item<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseTagParamKind<'src>, Extra<'tokens, 'src>> {
-    select! {
-        Token::Ident("get") => UseTagParamKind::Crud(CrudKind::Get),
-        Token::Ident("save") => UseTagParamKind::Crud(CrudKind::Save),
-        Token::Ident("list") => UseTagParamKind::Crud(CrudKind::List),
+    let crud = select! {
+        Token::Ident("get") => CrudKind::Get,
+        Token::Ident("save") => CrudKind::Save,
+        Token::Ident("list") => CrudKind::List,
     }
-    .or(symbol().map(UseTagParamKind::EnvBinding))
+    .map_spanned(|k| k)
+    .map(UseTagParamKind::Crud);
+
+    crud.or(symbol().map(UseTagParamKind::EnvBinding))
 }
 
 pub fn model_block<'tokens, 'src: 'tokens>()
@@ -125,10 +121,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map_with(|params, e| UseTag {
-            span: e.span(),
-            params,
-        });
+        .map_spanned(|params| UseTag { params });
 
     let choice_sql = || {
         choice((
@@ -143,10 +136,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map_with(|blocks, e| ModelBlockKind::Primary {
-                span: e.span(),
-                blocks,
-            }),
+            .map(ModelBlockKind::Primary),
     );
 
     // `optional { foreign(...) { ... } ... }` — all contained foreigners are nullable
@@ -155,10 +145,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map_with(|blocks, e| ModelBlockKind::Optional {
-                span: e.span(),
-                blocks,
-            }),
+            .map(ModelBlockKind::Optional),
     );
 
     // `unique { foreign(...) { ... } | typed_symbol ... }`
@@ -167,10 +154,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map_with(|blocks, e| ModelBlockKind::Unique {
-                span: e.span(),
-                blocks,
-            }),
+            .map(ModelBlockKind::Unique),
     );
 
     // `nav(AdjModel::field1, AdjModel::field2) { ident }`
@@ -188,11 +172,10 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                     .delimited_by(just(Token::LParen), just(Token::RParen)),
             )
             .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-            .map_with(|(adj, field), e| {
+            .map(|(adj, field)| {
                 ModelBlockKind::Navigation(NavigationBlock {
-                    span: e.span(),
                     adj,
-                    field,
+                    symbol: field,
                 })
             })
     };
@@ -205,10 +188,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|fields, e| ModelBlockKind::KeyField {
-            span: e.span(),
-            fields,
-        });
+        .map(ModelBlockKind::KeyField);
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
     let paginated_block = just(Token::Ident("paginated")).ignore_then(
@@ -219,10 +199,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         .repeated()
         .collect::<Vec<_>>()
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
-        .map_with(|blocks, e| ModelBlockKind::Paginated {
-            span: e.span(),
-            blocks,
-        }),
+        .map(ModelBlockKind::Paginated),
     );
 
     let kv = kv_block().map(ModelBlockKind::Kv);
@@ -250,13 +227,13 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         .then(symbol())
         .then(
             sub_blocks
+                .map_spanned(|k| k)
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((use_tags, symbol), blocks), e| ModelBlock {
+        .map(|((use_tags, symbol), blocks)| ModelBlock {
             symbol,
-            span: e.span(),
             use_tags,
             blocks,
         })

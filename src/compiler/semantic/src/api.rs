@@ -4,7 +4,7 @@ use crate::{
     resolve_cidl_type,
 };
 use ast::{ApiMethod, CidlType, Field, HttpVerb, MediaType};
-use frontend::{ApiBlockMethod, ApiBlockMethodParamKind};
+use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice};
 
 #[derive(Default)]
 pub struct ApiAnalysis<'src, 'p> {
@@ -35,7 +35,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             };
 
             let mut methods = Vec::new();
-            for method in &api_block.methods {
+            for method in api_block.methods.blocks() {
                 if let Some(api_method) = self.method(namespace, method, table) {
                     methods.push(api_method);
                 }
@@ -139,8 +139,8 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut has_stream = false;
         let mut data_source_symbol = None;
         let mut is_static = true;
-        for param_kind in &method.parameters {
-            let param = match param_kind {
+        for param in method.parameters.blocks() {
+            let param = match param {
                 ApiBlockMethodParamKind::SelfParam { data_source, .. } => {
                     is_static = false;
                     data_source_symbol = data_source.clone();
@@ -206,7 +206,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     has_stream = true;
                     let required_params = method
                         .parameters
-                        .iter()
+                        .blocks()
                         .filter(|p| {
                             let ApiBlockMethodParamKind::Field(symbol) = p else {
                                 return false;

@@ -9,7 +9,7 @@ use ast::{
 };
 use frontend::{
     EnvBindingKind, ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, R2Block, SqlBlockKind, Symbol,
+    PaginatedBlockKind, R2Block, SqlBlockKind, SpdSlice, Symbol,
 };
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, vec};
@@ -117,14 +117,14 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         ma.in_degree.entry(self.name).or_insert(0);
 
         // Models with SQL columns require a D1 binding
-        let has_sql_blocks = self.model.blocks.iter().any(|b| {
+        let has_sql_blocks = self.model.blocks.blocks().any(|b| {
             matches!(
                 b,
                 ModelBlockKind::Column(_)
                     | ModelBlockKind::Foreign(_)
-                    | ModelBlockKind::Primary { .. }
-                    | ModelBlockKind::Unique { .. }
-                    | ModelBlockKind::Optional { .. }
+                    | ModelBlockKind::Primary(_)
+                    | ModelBlockKind::Unique(_)
+                    | ModelBlockKind::Optional(_)
             )
         });
 
@@ -162,7 +162,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             None
         };
 
-        for block in &self.model.blocks {
+        for block in self.model.blocks.blocks() {
             match block {
                 ModelBlockKind::Column(symbol) => {
                     self.column(ma, symbol, FieldQualifiers::default());
@@ -176,7 +176,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         FieldQualifiers::default(),
                     );
                 }
-                ModelBlockKind::Primary { blocks, .. } => {
+                ModelBlockKind::Primary(blocks) => {
                     let qual = FieldQualifiers {
                         is_primary: true,
                         ..Default::default()
@@ -197,7 +197,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Unique { blocks, .. } => {
+                ModelBlockKind::Unique(blocks) => {
                     let qual = FieldQualifiers {
                         unique_ids: vec![self.unique_seed],
                         ..Default::default()
@@ -219,7 +219,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Optional { blocks, .. } => {
+                ModelBlockKind::Optional(blocks) => {
                     let qual = FieldQualifiers {
                         is_optional: true,
                         ..Default::default()
@@ -244,7 +244,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     ma,
                     binding_symbol.unwrap(),
                     &navigation_block.adj,
-                    &navigation_block.field,
+                    &navigation_block.symbol,
                     false,
                     table,
                 ),
@@ -254,12 +254,12 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 ModelBlockKind::R2(r2_block) => {
                     self.r2_field(ma, table, r2_block);
                 }
-                ModelBlockKind::KeyField { fields, .. } => {
+                ModelBlockKind::KeyField(fields) => {
                     for field in fields {
                         self.key_fields.push(field.name);
                     }
                 }
-                ModelBlockKind::Paginated { blocks, .. } => {
+                ModelBlockKind::Paginated(blocks) => {
                     for block in blocks {
                         match block {
                             PaginatedBlockKind::Kv(kv_block) => {
@@ -395,7 +395,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         // Number of adj references must match number of local fields
         if fk.adj.len() != fk.fields.len() {
             ma.sink.push(SemanticError::ForeignKeyInconsistentFieldAdj {
-                span: fk.span,
+                span: fk.adj.first().unwrap().0.span,
                 adj_count: fk.adj.len(),
                 field_count: fk.fields.len(),
             });
@@ -745,9 +745,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
         let key_field_names: Vec<&'src str> = model_block
             .blocks
-            .iter()
+            .blocks()
             .flat_map(|b| match b {
-                ModelBlockKind::KeyField { fields, .. } => {
+                ModelBlockKind::KeyField(fields) => {
                     fields.iter().map(|f| f.name).collect::<Vec<_>>()
                 }
                 _ => vec![],

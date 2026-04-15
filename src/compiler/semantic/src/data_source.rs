@@ -84,11 +84,11 @@ impl<'src, 'p> DataSourceAnalysis {
             let list = ds
                 .list
                 .as_ref()
-                .and_then(|m| Self::method(&ds.symbol, m, sink));
+                .and_then(|spd| Self::method(&ds.symbol, &spd.block, sink));
             let get = ds
                 .get
                 .as_ref()
-                .and_then(|m| Self::method(&ds.symbol, m, sink));
+                .and_then(|spd| Self::method(&ds.symbol, &spd.block, sink));
 
             res.push((
                 model_sym.name,

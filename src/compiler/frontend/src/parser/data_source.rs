@@ -5,7 +5,7 @@ use chumsky::prelude::*;
 use crate::{
     AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree,
     lexer::Token,
-    parser::{Extra, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -68,13 +68,15 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     let get_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("get")))
         .ignore_then(method_params())
-        .then(sql_block.clone());
+        .then(sql_block.clone())
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod { parameters, raw_sql });
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("list")))
         .ignore_then(method_params())
-        .then(sql_block);
+        .then(sql_block)
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod { parameters, raw_sql });
 
     // [internal]
     let internal_decorator = just(Token::LBracket)
@@ -94,25 +96,13 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 .then(list_method.or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(
-            |(((is_internal, symbol), model), ((include_entries, get_method), list_method)), e| {
+        .map(
+            |(((is_internal, symbol), model), ((include_entries, get), list))| {
                 let tree =
                     ParsedIncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
 
-                let get = get_method.map(|(parameters, raw_sql)| DataSourceBlockMethod {
-                    span: e.span(),
-                    parameters,
-                    raw_sql,
-                });
-                let list = list_method.map(|(parameters, raw_sql)| DataSourceBlockMethod {
-                    span: e.span(),
-                    parameters,
-                    raw_sql,
-                });
-
                 AstBlockKind::DataSource(DataSourceBlock {
                     symbol,
-                    span: e.span(),
                     model,
                     tree,
                     get,

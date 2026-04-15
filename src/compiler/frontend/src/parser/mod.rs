@@ -15,12 +15,36 @@ use crate::Symbol;
 use crate::lexer::LexedFile;
 use crate::lexer::SpannedToken;
 use crate::lexer::Token;
-use crate::{InjectBlock, ParseAst, PlainOldObjectBlock, ServiceBlock};
+use crate::{InjectBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd};
 
 type TokenInput<'tokens, 'src> =
     MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
 
 type Extra<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, Span>>;
+
+trait MapSpanned<'tokens, 'src: 'tokens, O>:
+    Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
+{
+    fn map_spanned<F, T>(
+        self,
+        f: F,
+    ) -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<T>, Extra<'tokens, 'src>>
+    where
+        F: Fn(O) -> T,
+    {
+        self.try_map(move |out, span: Span| {
+            Ok(Spd {
+                block: f(out),
+                span,
+            })
+        })
+    }
+}
+
+impl<'tokens, 'src: 'tokens, P, O> MapSpanned<'tokens, 'src, O> for P where
+    P: Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
+{
+}
 
 pub struct ParserResult<'src, 'tokens> {
     pub ast: ParseAst<'src>,
@@ -74,6 +98,7 @@ fn parser<'tokens, 'src: 'tokens>()
         poo_block(),
         inject_block(),
     ))
+    .map_spanned(|block| block)
     .repeated()
     .collect::<Vec<_>>()
     .map(|blocks| ParseAst { blocks })
@@ -102,13 +127,7 @@ fn poo_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(symbol, fields), e| {
-            AstBlockKind::PlainOldObject(PlainOldObjectBlock {
-                symbol,
-                span: e.span(),
-                fields,
-            })
-        })
+        .map(|(symbol, fields)| AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields }))
 }
 
 /// Parses a block of the form:
@@ -129,12 +148,7 @@ fn inject_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|symbols, e| {
-            AstBlockKind::Inject(InjectBlock {
-                span: e.span(),
-                symbols,
-            })
-        })
+        .map(|symbols| AstBlockKind::Inject(InjectBlock { symbols }))
 }
 
 /// Parses a block of the form:
@@ -159,13 +173,7 @@ pub fn service_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(symbol, fields), e| {
-            AstBlockKind::Service(ServiceBlock {
-                symbol,
-                span: e.span(),
-                fields,
-            })
-        })
+        .map(|(symbol, fields)| AstBlockKind::Service(ServiceBlock { symbol, fields }))
 }
 
 /// Parses an identifier and captures its name + span info into a `Symbol`.

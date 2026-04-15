@@ -1,7 +1,6 @@
 use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingKind, EnvBlock,
-    EnvBlockKind, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Symbol,
+    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingKind, EnvBlock, EnvBlockKind, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice, Symbol
 };
 use indexmap::IndexMap;
 
@@ -68,7 +67,7 @@ pub struct SymbolTable<'src, 'p> {
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
     services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
-    envs: Vec<&'p EnvBlock<'src>>,
+    envs: Vec<&'p Vec<Spd<EnvBlock<'src>>>>,
     injects: Vec<&'p InjectBlock<'src>>,
     data_sources: BTreeMap<SymbolKind<'src>, &'p DataSourceBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
@@ -98,13 +97,13 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             }
         };
 
-        for block in &parse.blocks {
+        for block in parse.blocks.blocks() {
             match block {
                 AstBlockKind::Model(model_block) => {
                     insert_global(sink, &model_block.symbol);
                     st.models.insert(model_block.symbol.name, model_block);
 
-                    for sub_block in &model_block.blocks {
+                    for sub_block in model_block.blocks.blocks() {
                         let symbols = sub_block.symbols();
                         for symbol in symbols {
                             if let Some(first) = st.model_fields.insert(
@@ -163,7 +162,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 }
                 AstBlockKind::Api(api_block) => {
                     st.apis.push(api_block);
-                    for method in &api_block.methods {
+                    for method in api_block.methods.blocks() {
                         if let Some(first) = st.api_method_decls.insert(
                             SymbolKind::ApiMethodDecl {
                                 namespace: api_block.symbol.name,
@@ -177,7 +176,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             });
                         }
 
-                        for param in &method.parameters {
+                        for param in method.parameters.blocks() {
                             let (symbol, name) = match param {
                                 ApiBlockMethodParamKind::SelfParam { symbol, .. } => {
                                     (symbol, "self")
@@ -220,7 +219,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         ("get", &data_source_block.get),
                     ]
                     .into_iter()
-                    .filter_map(|(n, m)| m.as_ref().map(|m| (n, m)))
+                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.block)))
                     {
                         for param in &method.parameters {
                             if let Some(first) = st.data_source_method_params.insert(
@@ -239,12 +238,12 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         }
                     }
                 }
-                AstBlockKind::Env(env_block) => {
-                    st.envs.push(env_block);
-                    for block in &env_block.blocks {
-                        match block {
-                            EnvBlockKind::D1 { symbols, .. } => {
-                                for symbol in symbols {
+                AstBlockKind::Env(env_blocks) => {
+                    st.envs.push(env_blocks);
+                    for env_block in env_blocks.blocks() {
+                        match &env_block.kind {
+                            EnvBlockKind::D1 => {
+                                for symbol in &env_block.symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
                                         SymbolKind::EnvBinding {
@@ -255,8 +254,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::R2 { symbols, .. } => {
-                                for symbol in symbols {
+                            EnvBlockKind::R2 => {
+                                for symbol in &env_block.symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
                                         SymbolKind::EnvBinding {
@@ -267,8 +266,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::Kv { symbols, .. } => {
-                                for symbol in symbols {
+                            EnvBlockKind::Kv => {
+                                for symbol in &env_block.symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
                                         SymbolKind::EnvBinding {
@@ -279,8 +278,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::Var { symbols, .. } => {
-                                for symbol in symbols {
+                            EnvBlockKind::Var => {
+                                for symbol in &env_block.symbols {
                                     if let Some(first) =
                                         st.env_vars.insert(SymbolKind::EnvVar(symbol.name), symbol)
                                     {

@@ -13,6 +13,36 @@ pub mod parser;
 
 pub type Span = SimpleSpan<usize, FileId>;
 
+/// A spanned block
+pub struct Spd<T> {
+    pub block: T,
+    pub span: Span,
+}
+
+pub trait SpdSlice<T> {
+    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    where
+        T: 'a;
+}
+
+impl<T> SpdSlice<T> for [Spd<T>] {
+    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    where
+        T: 'a,
+    {
+        self.iter().map(|spd| &spd.block)
+    }
+}
+
+impl<T> SpdSlice<T> for Vec<Spd<T>> {
+    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    where
+        T: 'a,
+    {
+        self.iter().map(|spd| &spd.block)
+    }
+}
+
 pub struct FileTable<'src> {
     table: HashMap<FileId, (&'src str, PathBuf)>,
 }
@@ -54,32 +84,33 @@ pub struct Symbol<'src> {
 }
 
 pub struct ApiBlock<'src> {
+    /// The symbol for the API's name, e.g. `ApiName` in `api ApiName { ... }`
     pub symbol: Symbol<'src>,
-    pub span: Span,
 
-    pub methods: Vec<ApiBlockMethod<'src>>,
+    pub methods: Vec<Spd<ApiBlockMethod<'src>>>,
 }
 
 pub enum ApiBlockMethodParamKind<'src> {
     SelfParam {
+        /// The symbol for the `self` parameter, e.g. `self`
         symbol: Symbol<'src>,
+
+        /// A data source block if tagged, e.g. `[source MySource] self`
         data_source: Option<Symbol<'src>>,
     },
     Field(Symbol<'src>),
 }
 
 pub struct ApiBlockMethod<'src> {
+    /// The symbol for the method name, e.g. `getUser` in `post getUser(...) { ... }`
     pub symbol: Symbol<'src>,
-    pub span: Span,
 
     pub http_verb: HttpVerb,
     pub return_type: CidlType<'src>,
-    pub parameters: Vec<ApiBlockMethodParamKind<'src>>,
+    pub parameters: Vec<Spd<ApiBlockMethodParamKind<'src>>>,
 }
 
 pub struct DataSourceBlockMethod<'src> {
-    pub span: Span,
-
     pub parameters: Vec<Symbol<'src>>,
     pub raw_sql: &'src str,
 }
@@ -87,24 +118,24 @@ pub struct DataSourceBlockMethod<'src> {
 pub struct ParsedIncludeTree<'src>(pub BTreeMap<Symbol<'src>, ParsedIncludeTree<'src>>);
 
 pub struct DataSourceBlock<'src> {
+    /// The symbol for the data source itself, e.g. `SourceName`
     pub symbol: Symbol<'src>,
-    pub span: Span,
 
+    /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
+
     pub tree: ParsedIncludeTree<'src>,
-    pub list: Option<DataSourceBlockMethod<'src>>,
-    pub get: Option<DataSourceBlockMethod<'src>>,
+    pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
+    pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub is_internal: bool,
 }
 
 pub struct NavigationBlock<'src> {
-    pub span: Span,
-
-    // nav(AdjModel::field1, AdjModel::field2, ...)
+    // nav (AdjModel::field1, AdjModel::field2, ...)
     pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
 
     // { navName }
-    pub field: Symbol<'src>,
+    pub symbol: Symbol<'src>,
 }
 
 #[derive(Clone)]
@@ -115,14 +146,19 @@ pub enum ForeignQualifier {
 }
 
 pub struct ForeignBlock<'src> {
-    pub span: Span,
-
     // foreign(AdjModel::field1, AdjModel::field2, ...)
     pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
 
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
 
+    /// Nav field to the adjacent model, ex:
+    /// ```cloesce
+    /// foreign (...) {
+    ///     ...
+    ///     nav { navSymbol }
+    /// }
+    /// ```
     pub nav: Option<Symbol<'src>>,
 
     pub qualifier: Option<ForeignQualifier>,
@@ -136,8 +172,6 @@ impl ForeignBlock<'_> {
 
 /// `kv(binding, "key/format/{id}") { name: type }`
 pub struct KvBlock<'src> {
-    pub span: Span,
-
     /// The KV namespace binding name
     pub env_binding: Symbol<'src>,
 
@@ -152,8 +186,6 @@ pub struct KvBlock<'src> {
 
 /// `r2(binding, "key/format/{id}") { name }`
 pub struct R2Block<'src> {
-    pub span: Span,
-
     /// R2 bucket binding name
     pub env_binding: Symbol<'src>,
 
@@ -168,12 +200,11 @@ pub struct R2Block<'src> {
 }
 
 pub enum UseTagParamKind<'src> {
-    Crud(CrudKind),
+    Crud(Spd<CrudKind>),
     EnvBinding(Symbol<'src>),
 }
 
 pub struct UseTag<'src> {
-    pub span: Span,
     pub params: Vec<UseTagParamKind<'src>>,
 }
 
@@ -193,26 +224,11 @@ pub enum ModelBlockKind<'src> {
     Navigation(NavigationBlock<'src>),
     Kv(KvBlock<'src>),
     R2(R2Block<'src>),
-    Primary {
-        span: Span,
-        blocks: Vec<SqlBlockKind<'src>>,
-    },
-    KeyField {
-        span: Span,
-        fields: Vec<Symbol<'src>>,
-    },
-    Unique {
-        span: Span,
-        blocks: Vec<SqlBlockKind<'src>>,
-    },
-    Paginated {
-        span: Span,
-        blocks: Vec<PaginatedBlockKind<'src>>,
-    },
-    Optional {
-        span: Span,
-        blocks: Vec<SqlBlockKind<'src>>,
-    },
+    Primary(Vec<SqlBlockKind<'src>>),
+    KeyField(Vec<Symbol<'src>>),
+    Unique(Vec<SqlBlockKind<'src>>),
+    Paginated(Vec<PaginatedBlockKind<'src>>),
+    Optional(Vec<SqlBlockKind<'src>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
@@ -220,20 +236,20 @@ impl<'src> ModelBlockKind<'src> {
         match self {
             ModelBlockKind::Column(symbol) => vec![symbol],
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Navigation(navigation_block) => vec![&navigation_block.field],
+            ModelBlockKind::Navigation(navigation_block) => vec![&navigation_block.symbol],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
             ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
-            ModelBlockKind::Primary { blocks, .. }
-            | ModelBlockKind::Unique { blocks, .. }
-            | ModelBlockKind::Optional { blocks, .. } => blocks
+            ModelBlockKind::Primary(blocks)
+            | ModelBlockKind::Unique(blocks)
+            | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
                 .flat_map(|block| match block {
                     SqlBlockKind::Column(symbol) => vec![symbol],
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
                 .collect(),
-            ModelBlockKind::KeyField { fields, .. } => fields.iter().collect(),
-            ModelBlockKind::Paginated { blocks, .. } => blocks
+            ModelBlockKind::KeyField(fields) => fields.iter().collect(),
+            ModelBlockKind::Paginated(blocks) => blocks
                 .iter()
                 .flat_map(|block| match block {
                     PaginatedBlockKind::Kv(kv_block) => vec![&kv_block.field],
@@ -245,11 +261,11 @@ impl<'src> ModelBlockKind<'src> {
 }
 
 pub struct ModelBlock<'src> {
+    /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
-    pub span: Span,
-    pub use_tags: Vec<UseTag<'src>>,
 
-    pub blocks: Vec<ModelBlockKind<'src>>,
+    pub use_tags: Vec<Spd<UseTag<'src>>>,
+    pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }
 
 impl<'src> ModelBlock<'src> {
@@ -258,9 +274,9 @@ impl<'src> ModelBlock<'src> {
         let mut env_binding_tags = Vec::new();
 
         for tag in &self.use_tags {
-            for param in &tag.params {
+            for param in &tag.block.params {
                 match param {
-                    UseTagParamKind::Crud(crud_kind) => crud_tags.push(crud_kind),
+                    UseTagParamKind::Crud(spd) => crud_tags.push(&spd.block),
                     UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(binding),
                 }
             }
@@ -271,14 +287,14 @@ impl<'src> ModelBlock<'src> {
 
     /// Iterate over all foreign blocks, be they top level or nested in primary/unique/optional blocks
     pub fn foreign_blocks(&self) -> impl Iterator<Item = &ForeignBlock<'src>> {
-        self.blocks.iter().flat_map(|block| match block {
+        self.blocks.iter().flat_map(|spd| match &spd.block {
             ModelBlockKind::Foreign(foreign_block) => vec![foreign_block],
-            ModelBlockKind::Primary { blocks, .. }
-            | ModelBlockKind::Unique { blocks, .. }
-            | ModelBlockKind::Optional { blocks, .. } => blocks
+            ModelBlockKind::Primary(blocks)
+            | ModelBlockKind::Unique(blocks)
+            | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
                 .filter_map(|b| match b {
-                    SqlBlockKind::Foreign(foreign_block) => Some(foreign_block),
+                    SqlBlockKind::Foreign(fb) => Some(fb),
                     _ => None,
                 })
                 .collect(),
@@ -288,7 +304,7 @@ impl<'src> ModelBlock<'src> {
 
     /// Iterate over navigation blocks (not including those in foreign blocks)
     pub fn navigation_blocks(&self) -> impl Iterator<Item = &NavigationBlock<'src>> {
-        self.blocks.iter().filter_map(|block| match block {
+        self.blocks.iter().filter_map(|spd| match &spd.block {
             ModelBlockKind::Navigation(navigation_block) => Some(navigation_block),
             _ => None,
         })
@@ -296,12 +312,12 @@ impl<'src> ModelBlock<'src> {
 
     /// Iterate over all SQL column blocks, be they top level or nested in primary/unique/optional blocks
     pub fn sql_symbols(&self) -> impl Iterator<Item = &Symbol<'src>> {
-        self.blocks.iter().flat_map(|block| match block {
+        self.blocks.iter().flat_map(|spd| match &spd.block {
             ModelBlockKind::Column(symbol) => vec![symbol],
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Primary { blocks, .. }
-            | ModelBlockKind::Unique { blocks, .. }
-            | ModelBlockKind::Optional { blocks, .. } => blocks
+            ModelBlockKind::Primary(blocks)
+            | ModelBlockKind::Unique(blocks)
+            | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
                 .filter_map(|b| match b {
                     SqlBlockKind::Column(symbol) => Some(symbol),
@@ -314,43 +330,32 @@ impl<'src> ModelBlock<'src> {
 }
 
 pub struct ServiceBlock<'src> {
+    /// The symbol for the service name, e.g. `MyAppService` in `service MyAppService { ... }`
     pub symbol: Symbol<'src>,
-    pub span: Span,
+
     pub fields: Vec<Symbol<'src>>,
 }
 
 pub struct PlainOldObjectBlock<'src> {
+    /// The symbol for the POO name, e.g. `MyPoo` in `poo MyPoo { ... }`
     pub symbol: Symbol<'src>,
-    pub span: Span,
+
     pub fields: Vec<Symbol<'src>>,
 }
 
-pub enum EnvBlockKind<'src> {
-    D1 {
-        span: Span,
-        symbols: Vec<Symbol<'src>>,
-    },
-    R2 {
-        span: Span,
-        symbols: Vec<Symbol<'src>>,
-    },
-    Kv {
-        span: Span,
-        symbols: Vec<Symbol<'src>>,
-    },
-    Var {
-        span: Span,
-        symbols: Vec<Symbol<'src>>,
-    },
+pub enum EnvBlockKind {
+    D1,
+    R2,
+    Kv,
+    Var,
 }
 
 pub struct EnvBlock<'src> {
-    pub span: Span,
-    pub blocks: Vec<EnvBlockKind<'src>>,
+    pub symbols: Vec<Symbol<'src>>,
+    pub kind: EnvBlockKind,
 }
 
 pub struct InjectBlock<'src> {
-    pub span: Span,
     pub symbols: Vec<Symbol<'src>>,
 }
 
@@ -360,14 +365,14 @@ pub enum AstBlockKind<'src> {
     Model(ModelBlock<'src>),
     Service(ServiceBlock<'src>),
     PlainOldObject(PlainOldObjectBlock<'src>),
-    Env(EnvBlock<'src>),
+    Env(Vec<Spd<EnvBlock<'src>>>),
     Inject(InjectBlock<'src>),
 }
 
 /// An IR for the raw parsed structure of a Cloesce project
 #[derive(Default)]
 pub struct ParseAst<'src> {
-    pub blocks: Vec<AstBlockKind<'src>>,
+    pub blocks: Vec<Spd<AstBlockKind<'src>>>,
 }
 
 impl<'src> ParseAst<'src> {

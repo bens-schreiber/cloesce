@@ -5,7 +5,7 @@ use ast::{CidlType, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, TokenInput, cidl_type, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, cidl_type, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -32,17 +32,12 @@ pub fn api_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(symbol, methods), e| {
-            AstBlockKind::Api(ApiBlock {
-                symbol,
-                span: e.span(),
-                methods,
-            })
-        })
+        .map(|(symbol, methods)| AstBlockKind::Api(ApiBlock { symbol, methods }))
 }
 
 fn method<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ApiBlockMethod<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, crate::Spd<ApiBlockMethod<'src>>, Extra<'tokens, 'src>>
+{
     http_verb()
         .then(symbol())
         .then(
@@ -54,19 +49,16 @@ fn method<'tokens, 'src: 'tokens>()
         )
         .then_ignore(just(Token::Arrow))
         .then(cidl_type())
-        .map_with(
-            |(((http_verb, symbol), parameters), return_type), e| ApiBlockMethod {
-                span: e.span(),
-                symbol,
-                http_verb,
-                return_type,
-                parameters,
-            },
-        )
+        .map_spanned(|(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
+            symbol,
+            http_verb,
+            return_type,
+            parameters,
+        })
 }
 
 fn parameter<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ApiBlockMethodParamKind<'src>, Extra<'tokens, 'src>>
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, crate::Spd<ApiBlockMethodParamKind<'src>>, Extra<'tokens, 'src>>
 {
     // [source DataSourceName]
     let source_tag = just(Token::LBracket)
@@ -78,7 +70,7 @@ fn parameter<'tokens, 'src: 'tokens>()
     let self_parameter = source_tag
         .or_not()
         .then(just(Token::SelfToken).map_with(|_, e| e.span()))
-        .map(|(data_source, span)| ApiBlockMethodParamKind::SelfParam {
+        .map_spanned(|(data_source, span)| ApiBlockMethodParamKind::SelfParam {
             symbol: Symbol {
                 span,
                 name: "self",
@@ -87,7 +79,7 @@ fn parameter<'tokens, 'src: 'tokens>()
             data_source,
         });
 
-    self_parameter.or(typed_symbol().map(ApiBlockMethodParamKind::Field))
+    self_parameter.or(typed_symbol().map_spanned(ApiBlockMethodParamKind::Field))
 }
 
 fn http_verb<'tokens, 'src: 'tokens>()

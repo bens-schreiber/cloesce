@@ -6,7 +6,7 @@ use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBlock,
     EnvBlockKind, ForeignBlock, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
     NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
-    ServiceBlock, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 
 /// Format a `ParseAst` back into a canonical Cloesce source string.
@@ -76,17 +76,16 @@ impl<'a> Formatter<'a> {
 
     fn format_ast(&mut self, ast: &ParseAst<'_>) {
         let mut first = true;
-        for block in &ast.blocks {
-            let start = block_start(block);
-            self.emit_comments_before(start, 0);
-            self.advance(start);
+        for spd in &ast.blocks {
+            self.emit_comments_before(spd.span.start, 0);
+            self.advance(spd.span.start);
             if !first {
                 // blank line between top level blocks
                 self.newline();
             }
             first = false;
-            self.format_block(block);
-            self.advance(block_end(block));
+            self.format_block(&spd.block);
+            self.advance(spd.span.end);
         }
 
         // trailing comments after the last block
@@ -101,7 +100,7 @@ impl<'a> Formatter<'a> {
             AstBlockKind::DataSource(b) => self.format_data_source(b),
             AstBlockKind::Service(b) => self.format_service(b),
             AstBlockKind::PlainOldObject(b) => self.format_poo(b),
-            AstBlockKind::Env(b) => self.format_env(b),
+            AstBlockKind::Env(blocks) => self.format_env(blocks),
             AstBlockKind::Inject(b) => self.format_inject(b),
         }
     }
@@ -109,7 +108,7 @@ impl<'a> Formatter<'a> {
     fn format_model(&mut self, b: &ModelBlock<'_>) {
         for tag in &b.use_tags {
             self.emit_comments_before(tag.span.start, 0);
-            self.format_use_tag(tag);
+            self.format_use_tag(&tag.block);
             self.newline();
             self.advance(tag.span.end);
         }
@@ -126,13 +125,12 @@ impl<'a> Formatter<'a> {
         self.push(" {");
         self.newline();
 
-        for item in &b.blocks {
-            let start = model_block_kind_start(item);
-            self.emit_comments_before(start, 1);
+        for spd in &b.blocks {
+            self.emit_comments_before(spd.span.start, 1);
             self.indent(1);
-            self.format_model_block_kind(item);
+            self.format_model_block_kind(&spd.block);
             self.newline();
-            self.advance(model_block_kind_end(item));
+            self.advance(spd.span.end);
         }
 
         self.push("}");
@@ -145,7 +143,7 @@ impl<'a> Formatter<'a> {
             .params
             .iter()
             .map(|p| match p {
-                UseTagParamKind::Crud(k) => format_crud(k),
+                UseTagParamKind::Crud(spd) => format_crud(&spd.block),
                 UseTagParamKind::EnvBinding(b) => b.name.to_string(),
             })
             .collect();
@@ -160,7 +158,7 @@ impl<'a> Formatter<'a> {
             ModelBlockKind::Navigation(nb) => self.format_navigation(nb),
             ModelBlockKind::Kv(kv) => self.format_kv(kv),
             ModelBlockKind::R2(r2) => self.format_r2(r2),
-            ModelBlockKind::Primary { blocks, .. } => {
+            ModelBlockKind::Primary(blocks) => {
                 if blocks.is_empty() {
                     self.push("primary {}");
                 } else {
@@ -171,7 +169,7 @@ impl<'a> Formatter<'a> {
                     self.push("}");
                 }
             }
-            ModelBlockKind::Unique { blocks, .. } => {
+            ModelBlockKind::Unique(blocks) => {
                 if blocks.is_empty() {
                     self.push("unique {}");
                 } else {
@@ -182,7 +180,7 @@ impl<'a> Formatter<'a> {
                     self.push("}");
                 }
             }
-            ModelBlockKind::Optional { blocks, .. } => {
+            ModelBlockKind::Optional(blocks) => {
                 if blocks.is_empty() {
                     self.push("optional {}");
                 } else {
@@ -193,7 +191,7 @@ impl<'a> Formatter<'a> {
                     self.push("}");
                 }
             }
-            ModelBlockKind::Paginated { blocks, .. } => {
+            ModelBlockKind::Paginated(blocks) => {
                 if blocks.is_empty() {
                     self.push("paginated {}");
                 } else {
@@ -211,7 +209,7 @@ impl<'a> Formatter<'a> {
                     self.push("}");
                 }
             }
-            ModelBlockKind::KeyField { fields, .. } => {
+            ModelBlockKind::KeyField(fields) => {
                 if fields.is_empty() {
                     self.push("keyfield {}");
                 } else {
@@ -288,7 +286,7 @@ impl<'a> Formatter<'a> {
         self.push(") {");
         self.newline();
         self.indent(2);
-        self.push(nb.field.name);
+        self.push(nb.symbol.name);
         self.newline();
         self.indent(1);
         self.push("}");
@@ -346,13 +344,13 @@ impl<'a> Formatter<'a> {
         self.push(" {");
         self.newline();
 
-        for method in &b.methods {
-            self.emit_comments_before(method.span.start, 1);
-            self.advance(method.span.start);
+        for spd in &b.methods {
+            self.emit_comments_before(spd.span.start, 1);
+            self.advance(spd.span.start);
             self.indent(1);
-            self.format_api_method(method);
+            self.format_api_method(&spd.block);
             self.newline();
-            self.advance(method.span.end);
+            self.advance(spd.span.end);
         }
 
         self.push("}");
@@ -368,7 +366,7 @@ impl<'a> Formatter<'a> {
         let params: Vec<String> = m
             .parameters
             .iter()
-            .map(|p| match p {
+            .map(|spd| match &spd.block {
                 ApiBlockMethodParamKind::SelfParam {
                     symbol: _,
                     data_source,
@@ -454,10 +452,11 @@ impl<'a> Formatter<'a> {
             self.newline();
         }
 
-        if let Some(get) = &b.get {
+        if let Some(spd) = &b.get {
             self.indent(1);
             self.push("sql get(");
-            let params: Vec<String> = get
+            let params: Vec<String> = spd
+                .block
                 .parameters
                 .iter()
                 .map(|p| format!("{}: {}", p.name, format_cidl_type(&p.cidl_type)))
@@ -465,16 +464,17 @@ impl<'a> Formatter<'a> {
             self.push(&params.join(", "));
             self.push(") {");
             self.newline();
-            self.format_sql_string(get.raw_sql, 2);
+            self.format_sql_string(spd.block.raw_sql, 2);
             self.indent(1);
             self.push("}");
             self.newline();
         }
 
-        if let Some(list) = &b.list {
+        if let Some(spd) = &b.list {
             self.indent(1);
             self.push("sql list(");
-            let params: Vec<String> = list
+            let params: Vec<String> = spd
+                .block
                 .parameters
                 .iter()
                 .map(|p| format!("{}: {}", p.name, format_cidl_type(&p.cidl_type)))
@@ -482,7 +482,7 @@ impl<'a> Formatter<'a> {
             self.push(&params.join(", "));
             self.push(") {");
             self.newline();
-            self.format_sql_string(list.raw_sql, 2);
+            self.format_sql_string(spd.block.raw_sql, 2);
             self.indent(1);
             self.push("}");
             self.newline();
@@ -544,34 +544,27 @@ impl<'a> Formatter<'a> {
         self.newline();
     }
 
-    fn format_env(&mut self, b: &EnvBlock<'_>) {
-        self.push("env");
-
-        if b.blocks.is_empty() {
+    fn format_env(&mut self, blocks: &[Spd<EnvBlock<'_>>]) {
+        if blocks.is_empty() {
             // Compact form for completely empty env blocks
-            self.push(" {}");
+            self.push("env {}");
             self.newline();
             return;
         }
 
-        self.push(" {");
+        self.push("env {");
         self.newline();
 
-        for sub in &b.blocks {
-            let (sub_start, sub_end) = match sub {
-                EnvBlockKind::D1 { span, .. }
-                | EnvBlockKind::R2 { span, .. }
-                | EnvBlockKind::Kv { span, .. }
-                | EnvBlockKind::Var { span, .. } => (span.start, span.end),
-            };
-            self.emit_comments_before(sub_start, 1);
-            self.advance(sub_start);
+        for spd in blocks {
+            self.emit_comments_before(spd.span.start, 1);
+            self.advance(spd.span.start);
             self.indent(1);
-            match sub {
-                EnvBlockKind::D1 { symbols, .. } => {
+            match &spd.block.kind {
+                EnvBlockKind::D1 => {
                     self.push("d1 { ");
                     self.push(
-                        &symbols
+                        &spd.block
+                            .symbols
                             .iter()
                             .map(|s| s.name)
                             .collect::<Vec<_>>()
@@ -579,10 +572,11 @@ impl<'a> Formatter<'a> {
                     );
                     self.push(" }");
                 }
-                EnvBlockKind::R2 { symbols, .. } => {
+                EnvBlockKind::R2 => {
                     self.push("r2 { ");
                     self.push(
-                        &symbols
+                        &spd.block
+                            .symbols
                             .iter()
                             .map(|s| s.name)
                             .collect::<Vec<_>>()
@@ -590,10 +584,11 @@ impl<'a> Formatter<'a> {
                     );
                     self.push(" }");
                 }
-                EnvBlockKind::Kv { symbols, .. } => {
+                EnvBlockKind::Kv => {
                     self.push("kv { ");
                     self.push(
-                        &symbols
+                        &spd.block
+                            .symbols
                             .iter()
                             .map(|s| s.name)
                             .collect::<Vec<_>>()
@@ -601,10 +596,10 @@ impl<'a> Formatter<'a> {
                     );
                     self.push(" }");
                 }
-                EnvBlockKind::Var { symbols, .. } => {
+                EnvBlockKind::Var => {
                     self.push("vars {");
                     self.newline();
-                    for sym in symbols {
+                    for sym in &spd.block.symbols {
                         self.emit_comments_before(sym.span.start, 2);
                         self.indent(2);
                         self.format_typed_field(sym);
@@ -616,7 +611,7 @@ impl<'a> Formatter<'a> {
                 }
             }
             self.newline();
-            self.advance(sub_end);
+            self.advance(spd.span.end);
         }
 
         self.push("}");
@@ -746,59 +741,5 @@ fn format_crud(k: &ast::CrudKind) -> String {
         CrudKind::Get => "get".into(),
         CrudKind::List => "list".into(),
         CrudKind::Save => "save".into(),
-    }
-}
-
-fn block_start(b: &AstBlockKind<'_>) -> usize {
-    match b {
-        AstBlockKind::Model(b) => b.span.start,
-        AstBlockKind::Api(b) => b.span.start,
-        AstBlockKind::DataSource(b) => b.span.start,
-        AstBlockKind::Service(b) => b.span.start,
-        AstBlockKind::PlainOldObject(b) => b.span.start,
-        AstBlockKind::Env(b) => b.span.start,
-        AstBlockKind::Inject(b) => b.span.start,
-    }
-}
-
-fn block_end(b: &AstBlockKind<'_>) -> usize {
-    match b {
-        AstBlockKind::Model(b) => b.span.end,
-        AstBlockKind::Api(b) => b.span.end,
-        AstBlockKind::DataSource(b) => b.span.end,
-        AstBlockKind::Service(b) => b.span.end,
-        AstBlockKind::PlainOldObject(b) => b.span.end,
-        AstBlockKind::Env(b) => b.span.end,
-        AstBlockKind::Inject(b) => b.span.end,
-    }
-}
-
-fn model_block_kind_start(item: &ModelBlockKind<'_>) -> usize {
-    match item {
-        ModelBlockKind::Column(s) => s.span.start,
-        ModelBlockKind::Foreign(fb) => fb.span.start,
-        ModelBlockKind::Navigation(nb) => nb.span.start,
-        ModelBlockKind::Kv(kv) => kv.span.start,
-        ModelBlockKind::R2(r2) => r2.span.start,
-        ModelBlockKind::Primary { span, .. } => span.start,
-        ModelBlockKind::KeyField { span, .. } => span.start,
-        ModelBlockKind::Unique { span, .. } => span.start,
-        ModelBlockKind::Paginated { span, .. } => span.start,
-        ModelBlockKind::Optional { span, .. } => span.start,
-    }
-}
-
-fn model_block_kind_end(item: &ModelBlockKind<'_>) -> usize {
-    match item {
-        ModelBlockKind::Column(s) => s.span.end,
-        ModelBlockKind::Foreign(fb) => fb.span.end,
-        ModelBlockKind::Navigation(nb) => nb.span.end,
-        ModelBlockKind::Kv(kv) => kv.span.end,
-        ModelBlockKind::R2(r2) => r2.span.end,
-        ModelBlockKind::Primary { span, .. } => span.end,
-        ModelBlockKind::KeyField { span, .. } => span.end,
-        ModelBlockKind::Unique { span, .. } => span.end,
-        ModelBlockKind::Paginated { span, .. } => span.end,
-        ModelBlockKind::Optional { span, .. } => span.end,
     }
 }

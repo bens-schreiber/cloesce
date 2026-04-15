@@ -3,7 +3,7 @@ use chumsky::prelude::*;
 use crate::{
     AstBlockKind, EnvBlock, EnvBlockKind,
     lexer::Token,
-    parser::{Extra, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -30,9 +30,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|symbols, e| EnvBlockKind::D1 {
-            span: e.span(),
+        .map_spanned(|symbols| EnvBlock {
             symbols,
+            kind: EnvBlockKind::D1,
         });
 
     // r2 { ident* }
@@ -43,9 +43,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|symbols, e| EnvBlockKind::R2 {
-            span: e.span(),
+        .map_spanned(|symbols| EnvBlock {
             symbols,
+            kind: EnvBlockKind::R2,
         });
 
     // kv { ident* }
@@ -56,9 +56,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|symbols, e| EnvBlockKind::Kv {
-            span: e.span(),
+        .map_spanned(|symbols| EnvBlock {
             symbols,
+            kind: EnvBlockKind::Kv,
         });
 
     let vars = just(Token::Ident("vars"))
@@ -68,9 +68,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|symbols, e| EnvBlockKind::Var {
-            span: e.span(),
+        .map_spanned(|symbols| EnvBlock {
             symbols,
+            kind: EnvBlockKind::Var,
         });
 
     let sub_block = choice((d1, r2, kv, vars));
@@ -83,8 +83,5 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|blocks, e| {
-            let span = e.span();
-            AstBlockKind::Env(EnvBlock { span, blocks })
-        })
+        .map(AstBlockKind::Env)
 }
