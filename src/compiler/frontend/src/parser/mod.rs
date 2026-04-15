@@ -91,31 +91,21 @@ fn parser<'tokens, 'src: 'tokens>()
 fn poo_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident: cidl_type
-    let poo_field = select! { Token::Ident(name) => name }
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type())
-        .map_with(|(name, ty), e| Symbol {
-            name,
-            cidl_type: ty,
-            span: e.span(),
-        });
+    let poo_field = typed_symbol();
 
     // poo MyObject { ... }
     just(Token::Poo)
-        .ignore_then(select! { Token::Ident(name) => name })
+        .ignore_then(symbol())
         .then(
             poo_field
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(name, fields), e| {
+        .map_with(|(symbol, fields), e| {
             AstBlockKind::PlainOldObject(PlainOldObjectBlock {
-                symbol: Symbol {
-                    name,
-                    span: e.span(),
-                    ..Default::default()
-                },
+                symbol,
+                span: e.span(),
                 fields,
             })
         })
@@ -134,27 +124,14 @@ fn inject_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     just(Token::Inject)
         .ignore_then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| (name, e.span()))
+            symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|fields, e| {
-            let symbols = fields
-                .into_iter()
-                .map(|(field_name, span)| Symbol {
-                    span,
-                    name: field_name,
-                    ..Default::default()
-                })
-                .collect();
-
+        .map_with(|symbols, e| {
             AstBlockKind::Inject(InjectBlock {
-                symbol: Symbol {
-                    span: e.span(),
-                    ..Default::default()
-                },
+                span: e.span(),
                 symbols,
             })
         })
@@ -171,38 +148,50 @@ fn inject_block<'tokens, 'src: 'tokens>()
 pub fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident: InjectedService
-    let attribute = select! { Token::Ident(var_name) => var_name }
-        .map_with(|name, e| (name, e.span()))
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type());
+    let attribute = typed_symbol();
 
     // service ServiceName { ... }
     just(Token::Service)
-        .ignore_then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
+        .ignore_then(symbol())
         .then(
             attribute
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((name, span), fields)| {
-            let fields = fields
-                .into_iter()
-                .map(|((field_name, span), cidl_type)| Symbol {
-                    span,
-                    name: field_name,
-                    cidl_type,
-                })
-                .collect();
-
+        .map_with(|(symbol, fields), e| {
             AstBlockKind::Service(ServiceBlock {
-                symbol: Symbol {
-                    span,
-                    name,
-                    ..Default::default()
-                },
+                symbol,
+                span: e.span(),
                 fields,
             })
+        })
+}
+
+/// Parses an identifier and captures its name + span info into a `Symbol`.
+///
+/// Does not capture cidl type (sets to [CidlType::default()])
+fn symbol<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
+    select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
+        span: e.span(),
+        name,
+        cidl_type: CidlType::default(),
+    })
+}
+
+/// Parses a block of the form:
+/// ```cloesce
+/// ident: cidl_type
+/// ```
+fn typed_symbol<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
+    symbol()
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type())
+        .map(|(symbol, cidl_type)| Symbol {
+            cidl_type,
+            ..symbol
         })
 }
 

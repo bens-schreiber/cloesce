@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Args, Parser, Subcommand};
 use frontend::{
-    fmt::DisplayError,
+    err::DisplayError,
     lexer::{CloesceLexer, LexTarget},
 };
 use serde::Deserialize;

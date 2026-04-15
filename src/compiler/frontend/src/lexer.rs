@@ -69,9 +69,12 @@ pub enum Token<'src> {
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]
     Ident(&'src str),
 
-    // Skip whitespace and comments
+    // Comments
+    #[regex(r"//[^\n]*", |lex| lex.slice(), allow_greedy = true)]
+    Comment(&'src str),
+
+    // Skip whitespace
     #[regex(r"[ \t\r\n]+", logos::skip)]
-    #[regex(r"//[^\n]*", logos::skip, allow_greedy = true)]
     Error,
 }
 
@@ -84,14 +87,34 @@ pub struct LexTarget<'src> {
 }
 
 pub type SpannedToken<'src> = Spanned<Token<'src>, Span>;
+
+pub struct CommentMap<'src> {
+    /// Each entry is `(start_byte_offset, comment_text)` including the `//` prefix.
+    pub entries: Vec<(usize, &'src str)>,
+}
+
+impl<'src> CommentMap<'src> {
+    /// Return all comments whose start offset is in `[prev_end, node_start)`.
+    pub fn between(&self, prev_end: usize, node_start: usize) -> &[(usize, &'src str)] {
+        let lo = self.entries.partition_point(|(off, _)| *off < prev_end);
+        let hi = self.entries.partition_point(|(off, _)| *off < node_start);
+        &self.entries[lo..hi]
+    }
+}
+
 pub struct LexedFile<'src> {
     /// The list of tokens produced by lexing the source string.
-    /// Each token is annotated with it a file span, along with the file ID
+    /// Each token is annotated with it a file span, along with the file ID.
+    ///
+    /// Comment tokens have been removed; see `comment_map`.
     pub tokens: Vec<SpannedToken<'src>>,
 
     /// The file ID assigned to this source file, used for error reporting.
     /// Unique across all lexed files.
     pub file_id: FileId,
+
+    /// All comments found in the source, ordered by byte offset.
+    pub comment_map: CommentMap<'src>,
 }
 
 pub struct LexResult<'src> {
@@ -112,12 +135,19 @@ pub struct LexError {
 
 pub struct CloesceLexer;
 impl<'src> CloesceLexer {
-    fn lex_file(src: &'src str, file_id: FileId) -> (Vec<SpannedToken<'src>>, Vec<LexError>) {
+    fn lex_file(
+        src: &'src str,
+        file_id: FileId,
+    ) -> (Vec<SpannedToken<'src>>, CommentMap<'src>, Vec<LexError>) {
         let mut tokens = Vec::new();
+        let mut comments = Vec::new();
         let mut error_spans: Vec<Range<usize>> = Vec::new();
 
         for (result, span) in Token::lexer(src).spanned() {
             match result {
+                Ok(Token::Comment(text)) => {
+                    comments.push((span.start, text));
+                }
                 Ok(token) => tokens.push(Spanned {
                     inner: token,
                     span: SimpleSpan {
@@ -138,7 +168,7 @@ impl<'src> CloesceLexer {
             })
             .collect();
 
-        (tokens, errors)
+        (tokens, CommentMap { entries: comments }, errors)
     }
 
     pub fn lex(targets: impl IntoIterator<Item = LexTarget<'src>>) -> LexResult<'src> {
@@ -155,8 +185,12 @@ impl<'src> CloesceLexer {
 
             file_table.table.insert(file_id, (source.src, source.path));
 
-            let (tokens, errs) = Self::lex_file(source.src, file_id);
-            results.push(LexedFile { tokens, file_id });
+            let (tokens, comment_map, errs) = Self::lex_file(source.src, file_id);
+            results.push(LexedFile {
+                tokens,
+                file_id,
+                comment_map,
+            });
             errors.extend(errs);
         }
 

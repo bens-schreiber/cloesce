@@ -32,6 +32,7 @@ impl std::fmt::Display for Token<'_> {
             Token::StringLit(s) => write!(f, "\"{s}\""),
             Token::Ident(s) => write!(f, "{s}"),
             Token::SelfToken => write!(f, "self"),
+            Token::Comment(s) => write!(f, "{s}"),
             Token::Error => write!(f, "<error>"),
         }
     }

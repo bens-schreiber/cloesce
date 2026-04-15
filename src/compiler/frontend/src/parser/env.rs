@@ -1,9 +1,9 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, EnvBlock, EnvBlockKind, Symbol,
+    AstBlockKind, EnvBlock, EnvBlockKind,
     lexer::Token,
-    parser::{Extra, TokenInput, cidl_type},
+    parser::{Extra, TokenInput, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -22,60 +22,56 @@ use crate::{
 /// ```
 pub fn env_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    let ident = select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
-        span: e.span(),
-        name,
-        ..Default::default()
-    });
-
     // d1 { ident* }
     let d1 = just(Token::Ident("d1"))
         .ignore_then(
-            ident
+            symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|symbols| EnvBlockKind::D1 { symbols });
+        .map_with(|symbols, e| EnvBlockKind::D1 {
+            span: e.span(),
+            symbols,
+        });
 
     // r2 { ident* }
     let r2 = just(Token::Ident("r2"))
         .ignore_then(
-            ident
+            symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|symbols| EnvBlockKind::R2 { symbols });
+        .map_with(|symbols, e| EnvBlockKind::R2 {
+            span: e.span(),
+            symbols,
+        });
 
     // kv { ident* }
     let kv = just(Token::Ident("kv"))
         .ignore_then(
-            ident
+            symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|symbols| EnvBlockKind::Kv { symbols });
-
-    // vars { ident: cidl_type* }
-    let var = select! { Token::Ident(name) => name }
-        .map_with(|name, e| (name, e.span()))
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type())
-        .map(|((name, span), ty)| Symbol {
-            span,
-            name,
-            cidl_type: ty,
+        .map_with(|symbols, e| EnvBlockKind::Kv {
+            span: e.span(),
+            symbols,
         });
 
     let vars = just(Token::Ident("vars"))
         .ignore_then(
-            var.repeated()
+            typed_symbol()
+                .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|symbols| EnvBlockKind::Var { symbols });
+        .map_with(|symbols, e| EnvBlockKind::Var {
+            span: e.span(),
+            symbols,
+        });
 
     let sub_block = choice((d1, r2, kv, vars));
 
@@ -89,12 +85,6 @@ pub fn env_block<'tokens, 'src: 'tokens>()
         )
         .map_with(|blocks, e| {
             let span = e.span();
-            AstBlockKind::Env(EnvBlock {
-                symbol: Symbol {
-                    span,
-                    ..Default::default()
-                },
-                blocks,
-            })
+            AstBlockKind::Env(EnvBlock { span, blocks })
         })
 }

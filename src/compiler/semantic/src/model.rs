@@ -9,7 +9,7 @@ use ast::{
 };
 use frontend::{
     EnvBindingKind, ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, PaginatedBlockKind, R2Block, Span, SqlBlockKind, Symbol,
+    PaginatedBlockKind, R2Block, SqlBlockKind, Symbol,
 };
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, vec};
@@ -110,7 +110,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     fn build(
         mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
-        env_bindings: Vec<&'src str>,
+        env_bindings: Vec<&'p Symbol<'src>>,
         table: &SymbolTable<'src, 'p>,
     ) -> Option<Model<'src>> {
         ma.graph.entry(self.name).or_default();
@@ -145,19 +145,19 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 return None;
             }
 
-            let name = env_bindings[0];
-            let Some(sym) = table.env_bindings.get(&SymbolKind::EnvBinding {
+            let binding_symbol = env_bindings[0];
+            if !table.env_bindings.contains_key(&SymbolKind::EnvBinding {
                 kind: EnvBindingKind::D1,
-                name,
-            }) else {
+                name: binding_symbol.name,
+            }) {
                 ma.sink.push(SemanticError::D1ModelInvalidD1Binding {
                     model: self.symbol,
-                    binding: name,
+                    binding: binding_symbol,
                 });
                 return None;
             };
 
-            Some(*sym)
+            Some(binding_symbol)
         } else {
             None
         };
@@ -240,9 +240,14 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Navigation(navigation_block) => {
-                    self.nav(ma, binding_symbol.unwrap(), navigation_block, false, table)
-                }
+                ModelBlockKind::Navigation(navigation_block) => self.nav(
+                    ma,
+                    binding_symbol.unwrap(),
+                    &navigation_block.adj,
+                    &navigation_block.field,
+                    false,
+                    table,
+                ),
                 ModelBlockKind::Kv(kv_block) => {
                     self.kv_field(ma, table, kv_block);
                 }
@@ -350,39 +355,38 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         self.has_defined_pk |= qual.is_primary;
 
         // Check that the adjacent model exists
-        let adj_model_name = fk.adj.first().map(|(m, _)| *m).unwrap_or("");
-        let Some(adj_model_block) = table.models.get(adj_model_name) else {
+        let adj_model_sym = &fk.adj.first().unwrap().0;
+        let Some(adj_model_block) = table.models.get(adj_model_sym.name) else {
             ma.sink.push(SemanticError::UnresolvedSymbol {
-                span: fk.span,
-                name: adj_model_name,
+                symbol: adj_model_sym,
             });
             return;
         };
 
-        if adj_model_name == self.name {
+        if adj_model_sym.name == self.name {
             ma.sink.push(SemanticError::ForeignKeyReferencesSelf {
                 model: self.symbol,
-                foreign_key: fk.span,
+                foreign_key: adj_model_sym,
             });
             return;
         }
 
         // Must belong to the same database
         let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
-        if Some(binding_symbol.name) != adj_binding {
+        if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
-                    span: fk.span,
-                    binding: adj_binding.unwrap_or("no binding"),
+                    binding: adj_model_sym,
                 });
             return;
         }
 
         // All adj entries must reference the same model
-        if let Some((inconsistent_model, _)) = fk.adj.iter().find(|(m, _)| *m != adj_model_name) {
+        if let Some((inconsistent_model, _)) =
+            fk.adj.iter().find(|(m, _)| m.name != adj_model_sym.name)
+        {
             ma.sink.push(SemanticError::InconsistentModelAdjacency {
-                span: fk.span,
-                first_model: adj_model_name,
+                first_model: adj_model_sym,
                 second_model: inconsistent_model,
             });
             return;
@@ -406,7 +410,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             None
         };
 
-        for (field, (_, adj_field_name)) in fk.fields.iter().zip(&fk.adj) {
+        for (field, (_, adj_field_sym)) in fk.fields.iter().zip(&fk.adj) {
             if qual.is_primary && fk.is_optional() {
                 ma.sink
                     .push(SemanticError::NullablePrimaryKey { column: field });
@@ -415,19 +419,17 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
             // Validate the field from the adjacent model
             let Some(adj_field_sym) = table.model_fields.get(&SymbolKind::ModelField {
-                model: adj_model_name,
-                name: adj_field_name,
+                model: adj_model_sym.name,
+                name: adj_field_sym.name,
             }) else {
                 ma.sink.push(SemanticError::UnresolvedSymbol {
-                    span: fk.span,
-                    name: adj_field_name,
+                    symbol: adj_field_sym,
                 });
                 continue;
             };
 
             if !is_valid_sql_type(&adj_field_sym.cidl_type) {
                 ma.sink.push(SemanticError::ForeignKeyInvalidColumnType {
-                    span: fk.span,
                     field: adj_field_sym,
                 });
             }
@@ -435,7 +437,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             if !fk.is_optional() {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                 // Dog must come before Person
-                ma.graph.entry(adj_model_name).or_default().push(self.name);
+                ma.graph
+                    .entry(adj_model_sym.name)
+                    .or_default()
+                    .push(self.name);
                 *ma.in_degree.entry(self.name).or_insert(0) += 1;
             }
 
@@ -450,8 +455,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     },
                 },
                 foreign_key_reference: Some(ForeignKeyReference {
-                    model_name: adj_model_name,
-                    column_name: adj_field_name,
+                    model_name: adj_model_sym.name,
+                    column_name: adj_field_sym.name,
                 }),
                 unique_ids: qual.unique_ids.clone(),
                 composite_id,
@@ -464,14 +469,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         }
 
-        if let Some(nav) = &fk.nav {
-            let nav_block = NavigationBlock {
-                span: nav.span,
-                adj: fk.adj.clone(),
-                field: nav.clone(),
-            };
-
-            self.nav(ma, binding_symbol, &nav_block, true, table);
+        if let Some(nav_field) = &fk.nav {
+            self.nav(ma, binding_symbol, &fk.adj, nav_field, true, table);
         }
     }
 
@@ -479,7 +478,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
         binding_symbol: &'p Symbol<'src>,
-        nav: &NavigationBlock<'src>,
+        adj: &'p [(Symbol<'src>, Symbol<'src>)],
+        field: &'p Symbol<'src>,
         is_one_to_one: bool,
         table: &SymbolTable<'src, 'p>,
     ) {
@@ -487,111 +487,95 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         let mut referenced_field_names = Vec::new();
         {
             let mut all_valid = true;
-            let adj_model_name = nav.adj.first().map(|(m, _)| *m).unwrap_or("");
-            for (ref_model_name, ref_field_name) in &nav.adj {
-                if *ref_model_name != adj_model_name {
+            let adj_model_sym = &adj.first().unwrap().0;
+            for (ref_model_sym, ref_field_sym) in adj {
+                if ref_model_sym.name != adj_model_sym.name {
                     ma.sink.push(SemanticError::InconsistentModelAdjacency {
-                        span: nav.span,
-                        first_model: adj_model_name,
-                        second_model: ref_model_name,
+                        first_model: adj_model_sym,
+                        second_model: ref_model_sym,
                     });
                     all_valid = false;
                     continue;
                 }
 
                 if table.model_fields.contains_key(&SymbolKind::ModelField {
-                    model: adj_model_name,
-                    name: ref_field_name,
+                    model: adj_model_sym.name,
+                    name: ref_field_sym.name,
                 }) {
-                    referenced_field_names.push(*ref_field_name);
+                    referenced_field_names.push(ref_field_sym.name);
                     continue;
                 }
 
                 ma.sink.push(SemanticError::UnresolvedSymbol {
-                    span: nav.span,
-                    name: ref_field_name,
+                    symbol: ref_field_sym,
                 });
                 all_valid = false;
-                continue;
             }
             if !all_valid {
                 return;
             }
         }
 
-        let adj_model_block = table.models.get(nav.adj.first().unwrap().0).unwrap();
+        let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
 
         // Must belong to the same database
         let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
-        if Some(binding_symbol.name) != adj_binding {
+        if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
-                .push(SemanticError::NavigationReferencesDifferentDatabase {
-                    span: nav.span,
-                    binding: adj_binding.unwrap_or("no binding"),
-                });
+                .push(SemanticError::NavigationReferencesDifferentDatabase { field });
             return;
         }
 
-        // For 1:1: check if `model` has a FK whose adj fields match nav.adj fields
-        // (both sides reference the same adj model fields)
+        // For 1:1: check if `model` has a FK whose adj fields match the nav adj fields
         let matching_fk_by_adj = |model: &'p ModelBlock<'src>, name: &'src str| {
             model.foreign_blocks().find(|fb| {
-                fb.adj.first().map(|(m, _)| *m == name).unwrap_or(false)
-                    && fb.adj.len() == nav.adj.len()
+                fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false)
+                    && fb.adj.len() == adj.len()
                     && fb
                         .adj
                         .iter()
-                        .zip(&nav.adj)
-                        .all(|((_, adj_field), (_, nav_field))| adj_field == nav_field)
+                        .zip(adj)
+                        .all(|((_, fb_field), (_, nav_field))| fb_field.name == nav_field.name)
             })
         };
 
-        // For 1:M: check if `model` has a FK pointing to `name` whose local fields match nav.adj field names
-        // nav(Post::authorId) means Post's local field "authorId" is the FK column
+        // For 1:M: check if `model` has a FK pointing to `name` whose local fields match adj field names
         let matching_fk_by_local_fields = |model: &'p ModelBlock<'src>, name: &'src str| {
             model.foreign_blocks().find(|fb| {
-                fb.adj.first().map(|(m, _)| *m == name).unwrap_or(false)
-                    && fb.fields.len() == nav.adj.len()
+                fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false)
+                    && fb.fields.len() == adj.len()
                     && fb
                         .fields
                         .iter()
-                        .zip(&nav.adj)
-                        .all(|(local_field, (_, nav_field))| local_field.name == *nav_field)
+                        .zip(adj)
+                        .all(|(local_field, (_, nav_field))| local_field.name == nav_field.name)
             })
         };
 
         if is_one_to_one {
-            // A foreign key must exist on this model that references the adjacent model
-            // because of the parser syntax.
             let foreign_key = matching_fk_by_adj(self.model, adj_model_block.symbol.name).unwrap();
 
-            // Foreign key has already been validated for 1:1 navs
             self.navigation_fields.push(NavigationField {
                 hash: 0,
                 field: Field {
-                    name: nav.field.name.into(),
+                    name: field.name.into(),
                     cidl_type: CidlType::Object {
                         name: adj_model_block.symbol.name,
                     },
                 },
                 model_reference: adj_model_block.symbol.name,
                 kind: NavigationFieldKind::OneToOne {
-                    columns: foreign_key
-                        .fields
-                        .iter()
-                        .map(|f| f.name)
-                        .collect::<Vec<_>>(),
+                    columns: foreign_key.fields.iter().map(|f| f.name).collect(),
                 },
             });
             return;
         }
 
         if matching_fk_by_local_fields(adj_model_block, self.name).is_some() {
-            // If the adjacent fields form a foreign key to this model, it's 1:M
             self.navigation_fields.push(NavigationField {
                 hash: 0,
                 field: Field {
-                    name: nav.field.name.into(),
+                    name: field.name.into(),
                     cidl_type: CidlType::Array(Box::new(CidlType::Object {
                         name: adj_model_block.symbol.name,
                     })),
@@ -605,35 +589,33 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         // If the adjacent model has a reciprocal nav that references back to this model, it's a Many:Many nav.
-        // Each side references the other model's PK fields (which may differ in name for composite PKs),
-        // so we only check that the reciprocal nav points back to the current model.
         let matching_reciprocal_nav_count = adj_model_block
             .navigation_blocks()
             .filter(|adj_nav| {
                 adj_nav
                     .adj
                     .first()
-                    .map(|(m, _)| *m == self.name)
+                    .map(|(m, _)| m.name == self.name)
                     .unwrap_or(false)
             })
             .count();
 
         if matching_reciprocal_nav_count == 0 {
             ma.sink
-                .push(SemanticError::NavigationMissingReciprocalM2M { span: nav.span });
+                .push(SemanticError::NavigationMissingReciprocalM2M { field });
             return;
         }
 
         if matching_reciprocal_nav_count > 1 {
             ma.sink
-                .push(SemanticError::NavigationAmbiguousM2M { span: nav.span });
+                .push(SemanticError::NavigationAmbiguousM2M { field });
             return;
         }
 
         self.navigation_fields.push(NavigationField {
             hash: 0,
             field: Field {
-                name: nav.field.name.into(),
+                name: field.name.into(),
                 cidl_type: CidlType::Array(Box::new(CidlType::Object {
                     name: adj_model_block.symbol.name,
                 })),
@@ -649,16 +631,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         table: &SymbolTable<'src, 'p>,
         kv: &'p KvBlock<'src>,
     ) {
-        let binding_name = Self::validate_binding(
-            &mut ma.sink,
-            table,
-            kv.env_binding,
-            kv.span,
-            EnvBindingKind::Kv,
-        );
+        let binding_name =
+            Self::validate_binding(&mut ma.sink, table, &kv.env_binding, EnvBindingKind::Kv);
 
         let Ok(format_parameters) =
-            Self::validate_key_format(&mut ma.sink, self.model, kv.span, kv.key_format)
+            Self::validate_key_format(&mut ma.sink, self.model, &kv.field, kv.key_format)
         else {
             return;
         };
@@ -695,16 +672,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         table: &SymbolTable<'src, 'p>,
         r2: &'p R2Block<'src>,
     ) {
-        let binding_name = Self::validate_binding(
-            &mut ma.sink,
-            table,
-            r2.env_binding,
-            r2.span,
-            EnvBindingKind::R2,
-        );
+        let binding_name =
+            Self::validate_binding(&mut ma.sink, table, &r2.env_binding, EnvBindingKind::R2);
 
         let Ok(format_parameters) =
-            Self::validate_key_format(&mut ma.sink, self.model, r2.span, r2.key_format)
+            Self::validate_key_format(&mut ma.sink, self.model, &r2.field, r2.key_format)
         else {
             return;
         };
@@ -729,29 +701,25 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     fn validate_binding(
         sink: &mut ErrorSink<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
-        env_binding: &'src str,
-        span: Span,
+        env_binding: &'p Symbol<'src>,
         expected: EnvBindingKind,
     ) -> Option<&'src str> {
         if let Some(binding_sym) = table.env_bindings.get(&SymbolKind::EnvBinding {
             kind: expected.clone(),
-            name: env_binding,
+            name: env_binding.name,
         }) {
             return Some(binding_sym.name);
         }
 
         let err = match expected {
             EnvBindingKind::Kv => SemanticError::KvInvalidBinding {
-                span,
                 binding: env_binding,
             },
             EnvBindingKind::R2 => SemanticError::R2InvalidBinding {
-                span,
                 binding: env_binding,
             },
             _ => SemanticError::UnresolvedSymbol {
-                span,
-                name: env_binding,
+                symbol: env_binding,
             },
         };
         sink.push(err);
@@ -764,13 +732,13 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     fn validate_key_format(
         sink: &mut ErrorSink<'src, 'p>,
         model_block: &'p ModelBlock<'src>,
-        span: Span,
+        field: &'p Symbol<'src>,
         format: &'src str,
     ) -> Result<Vec<Field<'src>>, ()> {
         let vars = match extract_braced(format) {
             Ok(vars) => vars,
             Err(reason) => {
-                sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
+                sink.push(SemanticError::KvR2InvalidKeyFormat { field, reason });
                 return Err(());
             }
         };
@@ -804,7 +772,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }),
                 (None, false) => {
                     sink.push(SemanticError::KvR2UnknownKeyVariable {
-                        span,
+                        field,
                         variable: var,
                     });
                     return Err(());

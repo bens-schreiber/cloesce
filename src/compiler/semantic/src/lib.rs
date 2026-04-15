@@ -19,7 +19,6 @@ mod api;
 mod crud;
 mod data_source;
 pub mod err;
-pub mod fmt;
 mod model;
 
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -167,7 +166,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     for method in &api_block.methods {
                         if let Some(first) = st.api_method_decls.insert(
                             SymbolKind::ApiMethodDecl {
-                                namespace: api_block.namespace,
+                                namespace: api_block.symbol.name,
                                 name: method.symbol.name,
                             },
                             &method.symbol,
@@ -188,7 +187,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
 
                             if let Some(first) = st.api_method_params.insert(
                                 SymbolKind::ApiMethodParam {
-                                    namespace: api_block.namespace,
+                                    namespace: api_block.symbol.name,
                                     method: method.symbol.name,
                                     name,
                                 },
@@ -205,7 +204,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::DataSource(data_source_block) => {
                     if let Some(first) = st.data_sources.insert(
                         SymbolKind::DataSourceDecl {
-                            model: data_source_block.model,
+                            model: data_source_block.model.name,
                             name: data_source_block.symbol.name,
                         },
                         data_source_block,
@@ -244,7 +243,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     st.envs.push(env_block);
                     for block in &env_block.blocks {
                         match block {
-                            EnvBlockKind::D1 { symbols } => {
+                            EnvBlockKind::D1 { symbols, .. } => {
                                 for symbol in symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
@@ -256,7 +255,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::R2 { symbols } => {
+                            EnvBlockKind::R2 { symbols, .. } => {
                                 for symbol in symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
@@ -268,7 +267,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::Kv { symbols } => {
+                            EnvBlockKind::Kv { symbols, .. } => {
                                 for symbol in symbols {
                                     insert_global(sink, symbol);
                                     st.env_bindings.insert(
@@ -280,7 +279,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                     );
                                 }
                             }
-                            EnvBlockKind::Var { symbols } => {
+                            EnvBlockKind::Var { symbols, .. } => {
                                 for symbol in symbols {
                                     if let Some(first) =
                                         st.env_vars.insert(SymbolKind::EnvVar(symbol.name), symbol)
@@ -511,11 +510,11 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 };
 
-                if let CidlType::Inject { name } = resolved_type {
-                    if table.services.contains_key(name) {
-                        graph.entry(name).or_default().push(service_name);
-                        in_degree.entry(service_name).and_modify(|d| *d += 1);
-                    }
+                if let CidlType::Inject { name } = resolved_type
+                    && table.services.contains_key(name)
+                {
+                    graph.entry(name).or_default().push(service_name);
+                    in_degree.entry(service_name).and_modify(|d| *d += 1);
                 }
 
                 fields.push(Field {
@@ -552,7 +551,7 @@ impl<'src, 'p> SemanticAnalysis {
 ///
 /// Returns an error if the type cannot be resolved or is invalid.
 fn resolve_cidl_type<'src, 'p>(
-    symbol: &Symbol,
+    symbol: &'p Symbol<'src>,
     cidl_type: &CidlType<'src>,
     table: &SymbolTable<'src, 'p>,
 ) -> Result<CidlType<'src>, SemanticError<'src, 'p>> {
@@ -585,19 +584,13 @@ fn resolve_cidl_type<'src, 'p>(
                 return Ok(CidlType::Inject { name: sym.name });
             }
 
-            Err(SemanticError::UnresolvedSymbol {
-                span: symbol.span,
-                name,
-            })
+            Err(SemanticError::UnresolvedSymbol { symbol })
         }
         CidlType::DataSource { model_name } => {
             let valid = table.models.contains_key(model_name);
 
             if !valid {
-                return Err(SemanticError::UnresolvedSymbol {
-                    span: symbol.span,
-                    name: model_name,
-                });
+                return Err(SemanticError::UnresolvedSymbol { symbol });
             }
             Ok(cidl_type.clone())
         }
@@ -606,10 +599,7 @@ fn resolve_cidl_type<'src, 'p>(
                 table.models.contains_key(object_name) || table.poos.contains_key(object_name);
 
             if !valid {
-                return Err(SemanticError::UnresolvedSymbol {
-                    span: symbol.span,
-                    name: object_name,
-                });
+                return Err(SemanticError::UnresolvedSymbol { symbol });
             }
             Ok(cidl_type.clone())
         }

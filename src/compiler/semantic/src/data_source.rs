@@ -4,7 +4,7 @@ use ast::{
     CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
     NavigationFieldKind,
 };
-use frontend::{DataSourceBlockMethod, Symbol};
+use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol};
 use indexmap::IndexMap;
 use orm::select::SelectModel;
 
@@ -25,33 +25,32 @@ impl<'src, 'p> DataSourceAnalysis {
 
         for ds in table.data_sources.values() {
             // Validate the model reference
-            let Some(model_sym) = table.models.get(ds.model).map(|m| &m.symbol) else {
+            let Some(model_sym) = table.models.get(ds.model.name).map(|m| &m.symbol) else {
                 sink.push(SemanticError::DataSourceUnknownModelReference { source: &ds.symbol });
                 continue;
             };
 
-            let model_name = model_sym.name;
-            let Some(model) = models.get(model_name) else {
+            let Some(model) = models.get(model_sym.name) else {
                 // Model must be invalid for some reason, skip.
                 continue;
             };
 
             // Validate include tree via BFS
             let mut q = VecDeque::new();
-            q.push_back((&ds.tree, &model_name, model));
+            q.push_back((&ds.tree, model));
 
-            while let Some((node, _parent_model_name, parent_model)) = q.pop_front() {
-                for (field_name, child) in &node.0 {
+            while let Some((node, parent_model)) = q.pop_front() {
+                for (field, child) in &node.0 {
                     // Check navigation properties
                     let nav = parent_model
                         .navigation_fields
                         .iter()
-                        .find(|nav| &nav.field.name == field_name);
+                        .find(|nav| nav.field.name == field.name);
 
                     if let Some(nav) = nav {
                         // Navigate into the adjacent model
                         if let Some(adj_model) = models.get(nav.model_reference) {
-                            q.push_back((child, &nav.model_reference, adj_model));
+                            q.push_back((child, adj_model));
                         }
                         continue;
                     }
@@ -60,7 +59,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     if parent_model
                         .kv_fields
                         .iter()
-                        .any(|kv| &kv.field.name == field_name)
+                        .any(|kv| kv.field.name == field.name)
                     {
                         continue;
                     }
@@ -69,15 +68,15 @@ impl<'src, 'p> DataSourceAnalysis {
                     if parent_model
                         .r2_fields
                         .iter()
-                        .any(|r2| &r2.field.name == field_name)
+                        .any(|r2| r2.field.name == field.name)
                     {
                         continue;
                     }
 
                     sink.push(SemanticError::DataSourceInvalidIncludeTreeReference {
                         source: &ds.symbol,
-                        model: model_name,
-                        name: field_name.clone(),
+                        model: model_sym,
+                        field,
                     });
                 }
             }
@@ -92,10 +91,10 @@ impl<'src, 'p> DataSourceAnalysis {
                 .and_then(|m| Self::method(&ds.symbol, m, sink));
 
             res.push((
-                model_name,
+                model_sym.name,
                 DataSource {
                     name: ds.symbol.name,
-                    tree: IncludeTree(ds.tree.0.clone()),
+                    tree: parsed_include_tree_to_ast(&ds.tree),
                     list,
                     get,
                     is_internal: ds.is_internal,
@@ -476,4 +475,13 @@ impl<'src> DataSourceExpansion {
         visited.remove(current_model);
         current_node
     }
+}
+
+fn parsed_include_tree_to_ast<'src>(tree: &ParsedIncludeTree<'src>) -> IncludeTree<'src> {
+    IncludeTree(
+        tree.0
+            .iter()
+            .map(|(sym, child)| (sym.name.into(), parsed_include_tree_to_ast(child)))
+            .collect(),
+    )
 }

@@ -1,9 +1,13 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
-use ast::{CidlType, CrudKind, HttpVerb, IncludeTree};
+use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
 
-pub mod fmt;
+pub mod err;
+pub mod formatter;
 pub mod lexer;
 pub mod parser;
 
@@ -38,34 +42,35 @@ pub enum EnvBindingKind {
 
 pub type FileId = u16;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Hash, Eq)]
 pub struct Symbol<'src> {
-    /// [String::default()] for symbols with no name
     pub name: &'src str,
 
     /// [CidlType::default()] for symbols with no type
     pub cidl_type: CidlType<'src>,
 
+    /// The span the symbol name occupies.
     pub span: Span,
 }
 
 pub struct ApiBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
 
-    pub namespace: &'src str,
     pub methods: Vec<ApiBlockMethod<'src>>,
 }
 
 pub enum ApiBlockMethodParamKind<'src> {
     SelfParam {
         symbol: Symbol<'src>,
-        data_source: Option<&'src str>,
+        data_source: Option<Symbol<'src>>,
     },
     Field(Symbol<'src>),
 }
 
 pub struct ApiBlockMethod<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
 
     pub http_verb: HttpVerb,
     pub return_type: CidlType<'src>,
@@ -74,15 +79,19 @@ pub struct ApiBlockMethod<'src> {
 
 pub struct DataSourceBlockMethod<'src> {
     pub span: Span,
+
     pub parameters: Vec<Symbol<'src>>,
     pub raw_sql: &'src str,
 }
 
+pub struct ParsedIncludeTree<'src>(pub BTreeMap<Symbol<'src>, ParsedIncludeTree<'src>>);
+
 pub struct DataSourceBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
 
-    pub model: &'src str,
-    pub tree: IncludeTree<'src>,
+    pub model: Symbol<'src>,
+    pub tree: ParsedIncludeTree<'src>,
     pub list: Option<DataSourceBlockMethod<'src>>,
     pub get: Option<DataSourceBlockMethod<'src>>,
     pub is_internal: bool,
@@ -92,7 +101,7 @@ pub struct NavigationBlock<'src> {
     pub span: Span,
 
     // nav(AdjModel::field1, AdjModel::field2, ...)
-    pub adj: Vec<(&'src str, &'src str)>,
+    pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
 
     // { navName }
     pub field: Symbol<'src>,
@@ -109,7 +118,7 @@ pub struct ForeignBlock<'src> {
     pub span: Span,
 
     // foreign(AdjModel::field1, AdjModel::field2, ...)
-    pub adj: Vec<(&'src str, &'src str)>,
+    pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
 
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
@@ -130,7 +139,7 @@ pub struct KvBlock<'src> {
     pub span: Span,
 
     /// The KV namespace binding name
-    pub env_binding: &'src str,
+    pub env_binding: Symbol<'src>,
 
     /// The key format string, e.g. `"weather/data/{id}"`
     pub key_format: &'src str,
@@ -146,7 +155,7 @@ pub struct R2Block<'src> {
     pub span: Span,
 
     /// R2 bucket binding name
-    pub env_binding: &'src str,
+    pub env_binding: Symbol<'src>,
 
     /// bucket key format string, e.g. `"weather/photos/{id}.jpg"`
     pub key_format: &'src str,
@@ -160,7 +169,7 @@ pub struct R2Block<'src> {
 
 pub enum UseTagParamKind<'src> {
     Crud(CrudKind),
-    EnvBinding(&'src str),
+    EnvBinding(Symbol<'src>),
 }
 
 pub struct UseTag<'src> {
@@ -237,13 +246,14 @@ impl<'src> ModelBlockKind<'src> {
 
 pub struct ModelBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
     pub use_tags: Vec<UseTag<'src>>,
 
     pub blocks: Vec<ModelBlockKind<'src>>,
 }
 
 impl<'src> ModelBlock<'src> {
-    pub fn partition_use_tags(&self) -> (Vec<&CrudKind>, Vec<&'src str>) {
+    pub fn partition_use_tags(&self) -> (Vec<&CrudKind>, Vec<&Symbol<'src>>) {
         let mut crud_tags = Vec::new();
         let mut env_binding_tags = Vec::new();
 
@@ -251,7 +261,7 @@ impl<'src> ModelBlock<'src> {
             for param in &tag.params {
                 match param {
                     UseTagParamKind::Crud(crud_kind) => crud_tags.push(crud_kind),
-                    UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(*binding),
+                    UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(binding),
                 }
             }
         }
@@ -305,28 +315,42 @@ impl<'src> ModelBlock<'src> {
 
 pub struct ServiceBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
     pub fields: Vec<Symbol<'src>>,
 }
 
 pub struct PlainOldObjectBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub span: Span,
     pub fields: Vec<Symbol<'src>>,
 }
 
 pub enum EnvBlockKind<'src> {
-    D1 { symbols: Vec<Symbol<'src>> },
-    R2 { symbols: Vec<Symbol<'src>> },
-    Kv { symbols: Vec<Symbol<'src>> },
-    Var { symbols: Vec<Symbol<'src>> },
+    D1 {
+        span: Span,
+        symbols: Vec<Symbol<'src>>,
+    },
+    R2 {
+        span: Span,
+        symbols: Vec<Symbol<'src>>,
+    },
+    Kv {
+        span: Span,
+        symbols: Vec<Symbol<'src>>,
+    },
+    Var {
+        span: Span,
+        symbols: Vec<Symbol<'src>>,
+    },
 }
 
 pub struct EnvBlock<'src> {
-    pub symbol: Symbol<'src>,
+    pub span: Span,
     pub blocks: Vec<EnvBlockKind<'src>>,
 }
 
 pub struct InjectBlock<'src> {
-    pub symbol: Symbol<'src>,
+    pub span: Span,
     pub symbols: Vec<Symbol<'src>>,
 }
 

@@ -1,11 +1,11 @@
 use chumsky::prelude::*;
 
-use ast::HttpVerb;
+use ast::{CidlType, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, TokenInput, cidl_type},
+    parser::{Extra, TokenInput, cidl_type, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -25,20 +25,17 @@ use crate::{
 pub fn api_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     just(Token::Api)
-        .ignore_then(select! { Token::Ident(name) => name })
+        .ignore_then(symbol())
         .then(
             method()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|(namespace, methods), e| {
+        .map_with(|(symbol, methods), e| {
             AstBlockKind::Api(ApiBlock {
-                symbol: Symbol {
-                    span: e.span(),
-                    ..Default::default()
-                },
-                namespace,
+                symbol,
+                span: e.span(),
                 methods,
             })
         })
@@ -47,13 +44,7 @@ pub fn api_block<'tokens, 'src: 'tokens>()
 fn method<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ApiBlockMethod<'src>, Extra<'tokens, 'src>> {
     http_verb()
-        .then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
-                span: e.span(),
-                name,
-                ..Default::default()
-            }),
-        )
+        .then(symbol())
         .then(
             parameter()
                 .separated_by(just(Token::Comma))
@@ -63,8 +54,9 @@ fn method<'tokens, 'src: 'tokens>()
         )
         .then_ignore(just(Token::Arrow))
         .then(cidl_type())
-        .map(
-            |(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
+        .map_with(
+            |(((http_verb, symbol), parameters), return_type), e| ApiBlockMethod {
+                span: e.span(),
                 symbol,
                 http_verb,
                 return_type,
@@ -79,7 +71,7 @@ fn parameter<'tokens, 'src: 'tokens>()
     // [source DataSourceName]
     let source_tag = just(Token::LBracket)
         .ignore_then(just(Token::Source))
-        .ignore_then(select! { Token::Ident(name) => name })
+        .ignore_then(symbol())
         .then_ignore(just(Token::RBracket));
 
     // [source DataSourceName] self
@@ -89,25 +81,13 @@ fn parameter<'tokens, 'src: 'tokens>()
         .map(|(data_source, span)| ApiBlockMethodParamKind::SelfParam {
             symbol: Symbol {
                 span,
-                ..Default::default()
+                name: "self",
+                cidl_type: CidlType::default(),
             },
             data_source,
         });
 
-    // ident: cidl_type
-    let named_parameter = select! { Token::Ident(name) => name }
-        .map_with(|name, e| (name, e.span()))
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type())
-        .map(|((name, span), ty)| {
-            ApiBlockMethodParamKind::Field(Symbol {
-                name,
-                span,
-                cidl_type: ty,
-            })
-        });
-
-    self_parameter.or(named_parameter)
+    self_parameter.or(typed_symbol().map(ApiBlockMethodParamKind::Field))
 }
 
 fn http_verb<'tokens, 'src: 'tokens>()

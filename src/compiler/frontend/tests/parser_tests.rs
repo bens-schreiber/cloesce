@@ -2,8 +2,16 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
     AstBlockKind, EnvBlockKind, ForeignBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
-    ParseAst, SqlBlockKind, UseTagParamKind,
+    ParseAst, SqlBlockKind, Symbol, UseTagParamKind,
 };
+
+fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
+    adj.len() == expected.len()
+        && adj
+            .iter()
+            .zip(expected)
+            .all(|((m, f), (em, ef))| m.name == *em && f.name == *ef)
+}
 
 macro_rules! expect_block {
     ($iter:expr, $pat:pat => $out:expr, $msg:literal) => {{
@@ -49,7 +57,7 @@ fn env_block() {
 
     let d1_bindings = expect_block!(
         env.blocks,
-        EnvBlockKind::D1 { symbols } => symbols
+        EnvBlockKind::D1 { symbols, .. } => symbols
             .iter()
             .map(|s| s.name)
             .collect::<Vec<_>>(),
@@ -59,7 +67,7 @@ fn env_block() {
 
     let r2_bindings = expect_block!(
         env.blocks,
-        EnvBlockKind::R2 { symbols } => symbols
+        EnvBlockKind::R2 { symbols, .. } => symbols
             .iter()
             .map(|s| s.name)
             .collect::<Vec<_>>(),
@@ -69,7 +77,7 @@ fn env_block() {
 
     let kv_bindings = expect_block!(
         env.blocks,
-        EnvBlockKind::Kv { symbols } => symbols
+        EnvBlockKind::Kv { symbols, .. } => symbols
             .iter()
             .map(|s| s.name)
             .collect::<Vec<_>>(),
@@ -79,7 +87,7 @@ fn env_block() {
 
     let vars = expect_block!(
         env.blocks,
-        EnvBlockKind::Var { symbols } => symbols
+        EnvBlockKind::Var { symbols, .. } => symbols
             .iter()
             .map(|s| (s.name, &s.cidl_type))
             .collect::<Vec<_>>(),
@@ -325,7 +333,7 @@ fn service_block() {
             AstBlockKind::Api(a) => Some(a),
             _ => None,
         })
-        .filter(|a| a.namespace == "MyAppService")
+        .filter(|a| a.symbol.name == "MyAppService")
         .collect();
     assert_eq!(
         api_blocks.len(),
@@ -411,15 +419,15 @@ fn model_primary_unique_optional_foreign() {
 
     let m = find_model(&ast, "M");
 
-    let env_bindings: Vec<&str> = m
+    let env_bindings = m
         .use_tags
         .iter()
         .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
-            UseTagParamKind::EnvBinding(n) => Some(*n),
+            UseTagParamKind::EnvBinding(n) => Some(n.name),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(env_bindings, vec!["d1_db", "d2_db"]);
 
     let cruds: Vec<CrudKind> = m
@@ -459,7 +467,7 @@ fn model_primary_unique_optional_foreign() {
     assert_eq!(
         sql_foreigns(primary)
             .iter()
-            .find(|fb| fb.adj == vec![("Company", "id")])
+            .find(|fb| adj_matches(&fb.adj, &[("Company", "id")]))
             .unwrap()
             .fields[0]
             .name,
@@ -468,7 +476,7 @@ fn model_primary_unique_optional_foreign() {
     assert_eq!(
         sql_foreigns(primary)
             .iter()
-            .find(|fb| fb.adj == vec![("Parent", "orgId"), ("Parent", "userId")])
+            .find(|fb| adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")]))
             .unwrap()
             .fields
             .iter()
@@ -481,7 +489,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Tag", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -492,7 +500,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Person", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Person", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -505,7 +513,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Org", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Org", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -518,7 +526,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Author", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Author", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -548,7 +556,7 @@ fn model_primary_unique_optional_foreign() {
         .iter()
         .find(|u| {
             u.iter()
-                .any(|b| matches!(b, SqlBlockKind::Foreign(fb) if fb.adj == vec![("Dept", "id")]))
+                .any(|b| matches!(b, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
         })
         .unwrap();
     assert_eq!(sql_columns(dept_unique), vec!["role"]);
@@ -580,7 +588,7 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Location", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Location", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -591,7 +599,7 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Foreign(fb) if fb.adj == vec![("Tag", "id")] => Some(fb),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -605,7 +613,7 @@ fn model_navigation() {
             _ => None,
         })
         .unwrap();
-    assert_eq!(weathers_nav.adj, vec![("Weather", "reportId")]);
+    assert!(adj_matches(&weathers_nav.adj, &[("Weather", "reportId")]));
 
     let alerts_nav = m
         .blocks
@@ -615,10 +623,10 @@ fn model_navigation() {
             _ => None,
         })
         .unwrap();
-    assert_eq!(
-        alerts_nav.adj,
-        vec![("Alert", "regionId"), ("Alert", "zoneId")]
-    );
+    assert!(adj_matches(
+        &alerts_nav.adj,
+        &[("Alert", "regionId"), ("Alert", "zoneId")]
+    ));
 }
 
 #[test]
@@ -655,7 +663,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Kv(kv) if kv.env_binding == "ns_a" => Some(kv),
+            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_a" => Some(kv),
             _ => None,
         })
         .unwrap();
@@ -668,7 +676,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::Kv(kv) if kv.env_binding == "ns_b" => Some(kv),
+            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_b" => Some(kv),
             _ => None,
         })
         .unwrap();
@@ -681,7 +689,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::R2(r2) if r2.env_binding == "bucket_a" => Some(r2),
+            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_a" => Some(r2),
             _ => None,
         })
         .unwrap();
@@ -694,7 +702,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|b| match b {
-            ModelBlockKind::R2(r2) if r2.env_binding == "bucket_b" => Some(r2),
+            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_b" => Some(r2),
             _ => None,
         })
         .unwrap();
@@ -716,7 +724,7 @@ fn model_kv_r2_paginated() {
     let kv_c = pblocks
         .iter()
         .find_map(|b| match b {
-            PaginatedBlockKind::Kv(kv) if kv.env_binding == "ns_c" => Some(kv),
+            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_c" => Some(kv),
             _ => None,
         })
         .unwrap();
@@ -733,7 +741,7 @@ fn model_kv_r2_paginated() {
     let r2_c = pblocks
         .iter()
         .find_map(|b| match b {
-            PaginatedBlockKind::R2(r2) if r2.env_binding == "bucket_c" => Some(r2),
+            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_c" => Some(r2),
             _ => None,
         })
         .unwrap();
@@ -745,7 +753,7 @@ fn model_kv_r2_paginated() {
     let kv_d = pblocks
         .iter()
         .find_map(|b| match b {
-            PaginatedBlockKind::Kv(kv) if kv.env_binding == "ns_d" => Some(kv),
+            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_d" => Some(kv),
             _ => None,
         })
         .unwrap();
@@ -757,7 +765,7 @@ fn model_kv_r2_paginated() {
     let r2_d = pblocks
         .iter()
         .find_map(|b| match b {
-            PaginatedBlockKind::R2(r2) if r2.env_binding == "bucket_d" => Some(r2),
+            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_d" => Some(r2),
             _ => None,
         })
         .unwrap();
@@ -768,15 +776,15 @@ fn model_kv_r2_paginated() {
 
     let kv_model = find_model(&ast, "PureKv");
 
-    let kv_env_bindings: Vec<&str> = kv_model
+    let kv_env_bindings = kv_model
         .use_tags
         .iter()
         .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
-            UseTagParamKind::EnvBinding(n) => Some(*n),
+            UseTagParamKind::EnvBinding(n) => Some(n),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(kv_env_bindings.is_empty());
 
     let kv_cruds: Vec<CrudKind> = kv_model
@@ -811,7 +819,7 @@ fn model_kv_r2_paginated() {
         .iter()
         .find_map(|b| match b {
             ModelBlockKind::Paginated { blocks, .. } => blocks.iter().find_map(|b| match b {
-                PaginatedBlockKind::Kv(kv) if kv.env_binding == "kv_ns" => Some(kv),
+                PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
                 _ => None,
             }),
             _ => None,

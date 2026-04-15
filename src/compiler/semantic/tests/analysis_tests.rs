@@ -204,6 +204,10 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
+    eprintln!("errors ({}):", errors.len());
+    for e in &errors {
+        eprintln!("  {e:?}");
+    }
     assert_eq!(errors.len(), 9);
 
     let column = expect_err!(errors,
@@ -222,9 +226,9 @@ fn d1_model_column_fk_errors() {
     assert_eq!(model.name, "User");
 
     let binding = expect_err!(errors,
-        SemanticError::ForeignKeyReferencesDifferentDatabase { binding, .. } => *binding
+        SemanticError::ForeignKeyReferencesDifferentDatabase { binding, .. } => binding.name
     );
-    assert_eq!(binding, "other_d1");
+    assert_eq!(binding, "OtherD1Model");
 
     let inconsistent_model_adj = expect_err!(
         errors,
@@ -232,10 +236,10 @@ fn d1_model_column_fk_errors() {
             first_model,
             second_model,
             ..
-        } => (first_model, second_model)
+        } => (first_model.name, second_model.name)
     );
-    assert_eq!(*inconsistent_model_adj.0, "Post");
-    assert_eq!(*inconsistent_model_adj.1, "User");
+    assert_eq!(inconsistent_model_adj.0, "Post");
+    assert_eq!(inconsistent_model_adj.1, "User");
 
     let inconsistent_field_adj = expect_err!(
         errors,
@@ -251,10 +255,10 @@ fn d1_model_column_fk_errors() {
     let does_not_exist = errors
         .iter()
         .filter_map(|e| match e {
-            SemanticError::UnresolvedSymbol { name, .. }
-                if *name == "DoesNotExist" || *name == "nonexistent" =>
+            SemanticError::UnresolvedSymbol { symbol, .. }
+                if symbol.name == "DoesNotExist" || symbol.name == "nonexistent" =>
             {
-                Some(name)
+                Some(symbol.name)
             }
             _ => None,
         })
@@ -328,15 +332,15 @@ fn d1_model_nav_errors() {
             first_model,
             second_model,
             ..
-        } => (first_model, second_model)
+        } => (first_model.name, second_model.name)
     );
-    assert_eq!(*inconsistent_model_adj.0, "Post");
-    assert_eq!(*inconsistent_model_adj.1, "User");
+    assert_eq!(inconsistent_model_adj.0, "Post");
+    assert_eq!(inconsistent_model_adj.1, "User");
 
-    let binding = expect_err!(errors,
-        SemanticError::NavigationReferencesDifferentDatabase { binding, .. } => *binding
+    let nav_name = expect_err!(errors,
+        SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
     );
-    assert_eq!(binding, "other_d1");
+    assert_eq!(nav_name, "invalidAdjModel");
 
     let ambiguous_m2ms = count_errs!(errors, SemanticError::NavigationAmbiguousM2M { .. });
     assert_eq!(ambiguous_m2ms, 3);
@@ -617,12 +621,12 @@ fn kv_r2_errors() {
     assert_eq!(errors.len(), 4);
 
     let binding = expect_err!(errors,
-        SemanticError::KvInvalidBinding { binding, ..} => *binding
+        SemanticError::KvInvalidBinding { binding, ..} => binding.name
     );
     assert_eq!(binding, "my_d1");
 
     let binding = expect_err!(errors,
-        SemanticError::R2InvalidBinding { binding, .. } => *binding
+        SemanticError::R2InvalidBinding { binding, .. } => binding.name
     );
     assert_eq!(binding, "my_kv");
 
@@ -857,15 +861,15 @@ fn data_source_errors() {
     // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
-        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "nonexistent"
+        SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
+            if field.name == "nonexistent"
     )));
 
     // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
-        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "bogus"
+        SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
+            if field.name == "bogus"
     )));
 
     // BadParamSource: User is not a valid sql type

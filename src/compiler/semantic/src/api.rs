@@ -21,8 +21,8 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         for api_block in &table.apis {
             // Validate the model reference
             let namespace = match (
-                table.models.get(api_block.namespace),
-                table.services.get(api_block.namespace),
+                table.models.get(api_block.symbol.name),
+                table.services.get(api_block.symbol.name),
             ) {
                 (Some(model), _) => model.symbol.name,
                 (_, Some(service)) => service.symbol.name,
@@ -137,13 +137,13 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut params = Vec::new();
 
         let mut has_stream = false;
-        let mut data_source_name = None;
+        let mut data_source_symbol = None;
         let mut is_static = true;
         for param_kind in &method.parameters {
             let param = match param_kind {
                 ApiBlockMethodParamKind::SelfParam { data_source, .. } => {
                     is_static = false;
-                    data_source_name = *data_source;
+                    data_source_symbol = data_source.clone();
                     let Some(ds) = data_source else {
                         continue;
                     };
@@ -153,7 +153,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                         .data_sources
                         .contains_key(&SymbolKind::DataSourceDecl {
                             model: namespace,
-                            name: ds,
+                            name: ds.name,
                         });
 
                     ensure!(
@@ -161,7 +161,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                         self.sink,
                         SemanticError::ApiUnknownDataSourceReference {
                             method: &method.symbol,
-                            data_source: ds,
+                            data_source: ds
                         }
                     );
 
@@ -245,7 +245,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 MediaType::Json
             },
             is_static,
-            data_source_name,
+            data_source_symbol.map(|s| s.name),
         )
     }
 }
