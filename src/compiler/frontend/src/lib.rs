@@ -128,7 +128,7 @@ pub struct NavigationBlock<'src> {
     pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
 
     // { navName }
-    pub symbol: Symbol<'src>,
+    pub nav: Spd<Symbol<'src>>,
 }
 
 #[derive(Clone)]
@@ -152,7 +152,7 @@ pub struct ForeignBlock<'src> {
     ///     nav { navSymbol }
     /// }
     /// ```
-    pub nav: Option<Symbol<'src>>,
+    pub nav: Option<Spd<Symbol<'src>>>,
 
     pub qualifier: Option<ForeignQualifier>,
 }
@@ -229,7 +229,7 @@ impl<'src> ModelBlockKind<'src> {
         match self {
             ModelBlockKind::Column(symbol) => vec![symbol],
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Navigation(navigation_block) => vec![&navigation_block.symbol],
+            ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.block],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
             ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
             ModelBlockKind::Primary(blocks)

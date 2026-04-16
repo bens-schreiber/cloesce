@@ -600,7 +600,7 @@ fn model_navigation() {
         })
         .unwrap();
     assert_eq!(loc_fb.fields[0].name, "locationId");
-    assert_eq!(loc_fb.nav.as_ref().unwrap().name, "location");
+    assert_eq!(loc_fb.nav.as_ref().unwrap().block.name, "location");
 
     let tag_fb = m
         .blocks
@@ -616,7 +616,7 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.block {
-            ModelBlockKind::Navigation(n) if n.symbol.name == "weathers" => Some(n),
+            ModelBlockKind::Navigation(n) if n.nav.block.name == "weathers" => Some(n),
             _ => None,
         })
         .unwrap();
@@ -626,7 +626,7 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.block {
-            ModelBlockKind::Navigation(n) if n.symbol.name == "alerts" => Some(n),
+            ModelBlockKind::Navigation(n) if n.nav.block.name == "alerts" => Some(n),
             _ => None,
         })
         .unwrap();

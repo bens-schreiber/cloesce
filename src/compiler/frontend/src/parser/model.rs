@@ -4,16 +4,16 @@ use ast::CrudKind;
 
 use crate::{
     ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, NavigationBlock,
-    PaginatedBlockKind, R2Block, SqlBlockKind, Symbol, UseTag, UseTagParamKind,
+    PaginatedBlockKind, R2Block, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// `nav { navName }`
 fn foreign_nav_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<Symbol<'src>>, Extra<'tokens, 'src>> {
     just(Token::Ident("nav"))
-        .ignore_then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .ignore_then(symbol().map_spanned(|s| s).delimited_by(just(Token::LBrace), just(Token::RBrace)))
 }
 
 /// `foreign(AdjModel::field1, ...) [primary|optional|unique] { localField ... nav { navName } }`
@@ -172,8 +172,8 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LParen), just(Token::RParen)),
             )
-            .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-            .map(|(adj, field)| ModelBlockKind::Navigation(NavigationBlock { adj, symbol: field }))
+            .then(symbol().map_spanned(|s| s).delimited_by(just(Token::LBrace), just(Token::RBrace)))
+            .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
     // `keyfield { ident* }`
