@@ -60,7 +60,9 @@ pub enum SemanticError<'src, 'p> {
 
     /// A foreign key references a model in a different database (i.e. one with a different D1 binding)
     ForeignKeyReferencesDifferentDatabase {
-        binding: &'p Symbol<'src>,
+        model: &'p Symbol<'src>,
+        fk_model: &'p Symbol<'src>,
+        fk_binding: Option<&'p Symbol<'src>>,
     },
 
     // A foreign key references a field that is not a valid SQLite type
@@ -432,21 +434,39 @@ fn display(
             .ok();
         }
 
-        SemanticError::ForeignKeyReferencesDifferentDatabase { binding } => {
-            let (path, range) = span_parts(&binding.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
-                .with_message(format!(
-                    "foreign key references a model in a different database (binding '{}')",
-                    binding.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("all models in a foreign key must share the same D1 binding")
-                        .with_color(Color::Red),
-                )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
+        SemanticError::ForeignKeyReferencesDifferentDatabase {
+            model,
+            fk_model,
+            fk_binding,
+        } => {
+            let (model_path, model_range) = span_parts(&model.span, file_table);
+            let (fk_path, fk_range) = span_parts(&fk_model.span, file_table);
+            Report::build(
+                ariadne::ReportKind::Error,
+                (fk_path.clone(), fk_range.clone()),
+            )
+            .with_message(format!(
+                "foreign key on model '{}' references model '{}' in a different database",
+                model.name, fk_model.name
+            ))
+            .with_label(
+                Label::new((fk_path, fk_range))
+                    .with_message(match fk_binding {
+                        Some(b) => {
+                            format!("model '{}' belongs to binding '{}'", fk_model.name, b.name)
+                        }
+                        None => format!("model '{}' has no D1 binding", fk_model.name),
+                    })
+                    .with_color(Color::Red),
+            )
+            .with_label(
+                Label::new((model_path, model_range))
+                    .with_message(format!("model '{}' defined here", model.name))
+                    .with_color(Color::Yellow),
+            )
+            .finish()
+            .write(cache, std::io::stderr())
+            .ok();
         }
 
         SemanticError::ForeignKeyInvalidColumnType { field } => {

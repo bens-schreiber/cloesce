@@ -204,10 +204,6 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    eprintln!("errors ({}):", errors.len());
-    for e in &errors {
-        eprintln!("  {e:?}");
-    }
     assert_eq!(errors.len(), 9);
 
     let column = expect_err!(errors,
@@ -225,10 +221,10 @@ fn d1_model_column_fk_errors() {
     );
     assert_eq!(model.name, "User");
 
-    let binding = expect_err!(errors,
-        SemanticError::ForeignKeyReferencesDifferentDatabase { binding, .. } => binding.name
+    let fk_model = expect_err!(errors,
+        SemanticError::ForeignKeyReferencesDifferentDatabase { fk_model, .. } => fk_model.name
     );
-    assert_eq!(binding, "OtherD1Model");
+    assert_eq!(fk_model, "OtherD1Model");
 
     let inconsistent_model_adj = expect_err!(
         errors,

@@ -125,6 +125,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     | ModelBlockKind::Primary(_)
                     | ModelBlockKind::Unique(_)
                     | ModelBlockKind::Optional(_)
+                    | ModelBlockKind::Navigation(_)
             )
         });
 
@@ -376,7 +377,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
-                    binding: adj_model_sym,
+                    model: self.symbol,
+                    fk_model: adj_model_sym,
+                    fk_binding: adj_binding,
                 });
             return;
         }
