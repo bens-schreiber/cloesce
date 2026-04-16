@@ -10,13 +10,17 @@ use crate::{
 ///
 /// ```cloesce
 /// env {
-///     d1 { db, db2 }
+///     d1 {
+///         db
+///         db2
+///     }
+///
 ///     r2 { bucket }
 ///     kv { store }
 ///
 ///     vars {
-///         var1
-///         var2
+///         var1: cidl_type
+///         var2: cidl_type
 ///     }
 /// }
 /// ```

@@ -616,23 +616,18 @@ fn fmt_sql_block_group<'src>(
     }
 }
 
-fn fmt_env_inline(keyword: &str, symbols: &[Symbol<'_>], f: &mut Formatter<'_>) {
+fn fmt_env_inline<'src>(keyword: &str, symbols: &'src [Symbol<'src>], f: &mut Formatter<'src>) {
     f.push(keyword);
-    if symbols.len() == 1 {
-        f.push(" { ");
-        f.push(symbols[0].name);
-        f.push(" }");
-    } else {
-        f.push(" {");
-        f.newline();
-        for sym in symbols {
+    f.push(" {");
+    f.newline();
+    for sym in symbols {
+        f.emit_sym(sym, 2, |f| {
             f.indent(2);
             f.push(sym.name);
-            f.newline();
-        }
-        f.indent(1);
-        f.push("}");
+        });
     }
+    f.indent(1);
+    f.push("}");
 }
 
 fn fmt_sql_params(params: &[Symbol<'_>]) -> String {
