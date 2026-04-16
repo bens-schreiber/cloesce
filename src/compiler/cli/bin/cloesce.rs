@@ -270,7 +270,9 @@ fn main() {
                 Ok(())
             }
             Command::Format(args) => {
-                tracing::warn!("The format command is experimental and will not yet preserve all formatting details.");
+                tracing::warn!(
+                    "The format command is experimental and will not yet preserve all formatting details."
+                );
                 let config = CloesceConfig::load(&root, cli.env)?;
                 let sources = config.collect_sources(&root);
                 format::format(sources, args)?;
@@ -553,10 +555,11 @@ mod migrate {
                 .map(|s| s.to_string())
                 .collect()
         } else {
-            vec![args
-                .binding
-                .expect("clap should enforce --binding or --all")
-                .to_string()]
+            vec![
+                args.binding
+                    .expect("clap should enforce --binding or --all")
+                    .to_string(),
+            ]
         };
 
         for current_binding in bindings {

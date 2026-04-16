@@ -1,3 +1,12 @@
+# [0.3.6] - 2026-4-15
+### Added
+- Experimental `cloesce format` CLI command
+
+### Changed
+- Refactored post parsing AST to be lossless enabling `cloesce format` to work without assuming structure
+
+### Fixed
+
 # [0.3.5] - 2026-4-9
 ### Added
 
