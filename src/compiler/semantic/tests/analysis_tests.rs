@@ -2,7 +2,7 @@
 
 use ast::{CidlType, Field, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
-use semantic::{SemanticAnalysis, err::SemanticError};
+use semantic::{err::SemanticError, SemanticAnalysis};
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -382,12 +382,10 @@ fn d1_model_nav_one_to_one() {
     let person = result.models.get("Person").unwrap();
     assert!(person.columns.len() == 1);
     assert!(person.primary_columns.len() == 1);
-    assert!(
-        person
-            .columns
-            .iter()
-            .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Integer))
-    );
+    assert!(person
+        .columns
+        .iter()
+        .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Integer)));
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
             && nav.model_reference == "Horse"
@@ -904,7 +902,10 @@ fn data_source_include_tree_kv_r2() {
         }
 
         source WithKvR2 for User {
-            include { cached, avatar }
+            include { 
+                cached 
+                avatar 
+            }
         }
     "#,
     );
