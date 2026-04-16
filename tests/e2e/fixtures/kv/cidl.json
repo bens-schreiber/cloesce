@@ -5,8 +5,8 @@
       "db"
     ],
     "kv_bindings": [
-      "otherNamespace",
-      "namespace"
+      "namespace",
+      "otherNamespace"
     ],
     "r2_bindings": [],
     "vars": []

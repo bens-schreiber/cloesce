@@ -9,7 +9,7 @@ use frontend::{
     parser::CloesceParser,
 };
 
-fn lex_parse<'src>(src: &str) -> (ParseAst<'_>, LexResult<'_>) {
+fn lex_parse(src: &str) -> (ParseAst<'_>, LexResult<'_>) {
     let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),

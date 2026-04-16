@@ -62,7 +62,7 @@ pub enum SymbolKind<'src> {
     },
 }
 
-type SymbolLookup<'src, 'p> = HashMap<SymbolKind<'src>, &'p Symbol<'src>>;
+type SymbolLookup<'src, 'p> = BTreeMap<SymbolKind<'src>, &'p Symbol<'src>>;
 
 #[derive(Default)]
 pub struct SymbolTable<'src, 'p> {

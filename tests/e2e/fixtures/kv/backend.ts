@@ -7,8 +7,8 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
-    otherNamespace: KVNamespace;
     namespace: KVNamespace;
+    otherNamespace: KVNamespace;
 }
 export namespace D1BackedModel {
     export const Tag = "D1BackedModel";
