@@ -119,27 +119,13 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        // Check if there are comments before this symbol
-        let prev = self.cursor.get();
-        let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
-        let has_leading_comments = self.cm.entries[lo..]
-            .iter()
-            .any(|&(offset, _)| offset < sym.span.start);
-
         let leading = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name);
         let trailing = self.trailing_comment(sym.span.end);
         self.advance(sym.span.end);
 
         if inline {
-            return if has_leading_comments {
-                leading
-                    .then(Doc::hardline(indent))
-                    .then(content)
-                    .then(trailing)
-            } else {
-                leading.then(content).then(trailing)
-            };
+            return leading.then(content).then(trailing);
         }
 
         // Allow gaps between nodes, but not larger than one blank line
@@ -161,13 +147,6 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        // Check if there are comments before this symbol
-        let prev = self.cursor.get();
-        let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
-        let has_leading_comments = self.cm.entries[lo..]
-            .iter()
-            .any(|&(offset, _)| offset < sym.span.start);
-
         let leading = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name)
             .then(Doc::text(": "))
@@ -176,14 +155,7 @@ impl<'src> FmtCtx<'src> {
         self.advance(sym.span.end);
 
         if inline {
-            return if has_leading_comments {
-                leading
-                    .then(Doc::hardline(indent))
-                    .then(content)
-                    .then(trailing)
-            } else {
-                leading.then(content).then(trailing)
-            };
+            return leading.then(content).then(trailing);
         }
 
         let gap = self
@@ -603,11 +575,10 @@ impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
         };
 
         for symbol in &self.symbols {
-            doc = doc.then(Doc::hardline(2));
             if matches!(self.kind, EnvBindingBlockKind::Var) {
-                doc = doc.then(ctx.sym_typed_doc(symbol, 2, true));
+                doc = doc.then(ctx.sym_typed_doc(symbol, 2, false));
             } else {
-                doc = doc.then(ctx.sym_doc(symbol, 2, true));
+                doc = doc.then(ctx.sym_doc(symbol, 2, false));
             }
         }
 

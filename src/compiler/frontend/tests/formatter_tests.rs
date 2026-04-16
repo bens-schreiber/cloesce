@@ -38,7 +38,6 @@ fn format_non_lossy() {
 
     // Act
     let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
-    panic!("{formatted}");
     let (reparse_ast, _) = lex_parse(&formatted);
 
     // Assert
