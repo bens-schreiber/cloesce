@@ -71,10 +71,13 @@ impl<'src> FmtCtx<'src> {
     fn trailing_comment(&self, node_end: usize) -> Doc<'src> {
         let lo = self.cm.entries.partition_point(|(off, _)| *off < node_end);
         if let Some(&(offset, text)) = self.cm.entries.get(lo) {
-            let gap = self.src.get(node_end..offset).unwrap_or("");
-            if !gap.contains('\n') {
-                self.cursor.set(offset + text.len());
-                return Doc::text(" ").then(Doc::text(text));
+            // Only return if this comment hasn't been processed yet
+            if offset >= self.cursor.get() {
+                let gap = self.src.get(node_end..offset).unwrap_or("");
+                if !gap.contains('\n') {
+                    self.cursor.set(offset + text.len());
+                    return Doc::text(" ").then(Doc::text(text));
+                }
             }
         }
         Doc::nil()
@@ -86,81 +89,123 @@ impl<'src> FmtCtx<'src> {
             self.cursor.set(pos);
         }
     }
+
+    fn spd_doc<T: ToDoc<'src>>(&self, spd: &'src Spd<T>, indent: usize, inline: bool) -> Doc<'src> {
+        let leading = self.leading_comments(spd.span.start, indent);
+        let content = spd.block.to_doc(self);
+        let trailing = self.trailing_comment(spd.span.end);
+        self.advance(spd.span.end);
+
+        if inline {
+            return leading.then(content).then(trailing);
+        }
+
+        // Allow gaps between nodes, but not larger than one blank line
+        let gap = self
+            .src
+            .get(self.cursor.get()..spd.span.start)
+            .unwrap_or("");
+        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
+        extra_blank
+            .then(leading)
+            .then(Doc::hardline(indent))
+            .then(content)
+            .then(trailing)
+    }
+
+    fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
+        // Check if there are comments before this symbol
+        let prev = self.cursor.get();
+        let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
+        let has_leading_comments = self.cm.entries[lo..]
+            .iter()
+            .any(|&(offset, _)| offset < sym.span.start);
+
+        let leading = self.leading_comments(sym.span.start, indent);
+        let content = Doc::text(sym.name);
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
+
+        if inline {
+            return if has_leading_comments {
+                leading
+                    .then(Doc::hardline(indent))
+                    .then(content)
+                    .then(trailing)
+            } else {
+                leading.then(content).then(trailing)
+            };
+        }
+
+        // Allow gaps between nodes, but not larger than one blank line
+        let gap = self
+            .src
+            .get(self.cursor.get()..sym.span.start)
+            .unwrap_or("");
+        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
+        extra_blank
+            .then(leading)
+            .then(Doc::hardline(indent))
+            .then(content)
+            .then(trailing)
+    }
+
+    fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
+        // Check if there are comments before this symbol
+        let prev = self.cursor.get();
+        let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
+        let has_leading_comments = self.cm.entries[lo..]
+            .iter()
+            .any(|&(offset, _)| offset < sym.span.start);
+
+        let leading = self.leading_comments(sym.span.start, indent);
+        let content = Doc::text(sym.name)
+            .then(Doc::text(": "))
+            .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)));
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
+
+        if inline {
+            return if has_leading_comments {
+                leading
+                    .then(Doc::hardline(indent))
+                    .then(content)
+                    .then(trailing)
+            } else {
+                leading.then(content).then(trailing)
+            };
+        }
+
+        let gap = self
+            .src
+            .get(self.cursor.get()..sym.span.start)
+            .unwrap_or("");
+        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
+        extra_blank
+            .then(leading)
+            .then(Doc::hardline(indent))
+            .then(content)
+            .then(trailing)
+    }
 }
 
 trait ToDoc<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src>;
-}
-
-fn spd_doc<'src, T: ToDoc<'src>>(
-    spd: &'src Spd<T>,
-    ctx: &FmtCtx<'src>,
-    indent: usize,
-) -> Doc<'src> {
-    // Allow gaps between nodes, but not larger than one blank line
-    let gap = ctx.src.get(ctx.cursor.get()..spd.span.start).unwrap_or("");
-    let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
-        Doc::hardline(0)
-    } else {
-        Doc::nil()
-    };
-
-    // Collect comments before and after the spd
-    let leading = ctx.leading_comments(spd.span.start, indent);
-    let content = spd.block.to_doc(ctx);
-    let trailing = ctx.trailing_comment(spd.span.end);
-    ctx.advance(spd.span.end);
-
-    extra_blank
-        .then(leading)
-        .then(Doc::hardline(indent))
-        .then(content)
-        .then(trailing)
-}
-
-fn sym_doc<'src>(sym: &'src Symbol<'src>, ctx: &FmtCtx<'src>, indent: usize) -> Doc<'src> {
-    // Allow gaps between nodes, but not larger than one blank line
-    let gap = ctx.src.get(ctx.cursor.get()..sym.span.start).unwrap_or("");
-    let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
-        Doc::hardline(0)
-    } else {
-        Doc::nil()
-    };
-
-    // Collect comments before and after the symbol
-    let leading = ctx.leading_comments(sym.span.start, indent);
-    let content = Doc::text(sym.name);
-    let trailing = ctx.trailing_comment(sym.span.end);
-    ctx.advance(sym.span.end);
-
-    extra_blank
-        .then(leading)
-        .then(Doc::hardline(indent))
-        .then(content)
-        .then(trailing)
-}
-
-fn sym_typed_doc<'src>(sym: &'src Symbol<'src>, ctx: &FmtCtx<'src>, indent: usize) -> Doc<'src> {
-    let gap = ctx.src.get(ctx.cursor.get()..sym.span.start).unwrap_or("");
-    let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
-        Doc::hardline(0)
-    } else {
-        Doc::nil()
-    };
-
-    // Collect comments before and after the symbol
-    let leading = ctx.leading_comments(sym.span.start, indent);
-    let content = Doc::text(sym.name)
-        .then(Doc::text(": "))
-        .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)));
-    let trailing = ctx.trailing_comment(sym.span.end);
-    ctx.advance(sym.span.end);
-
-    extra_blank
-        .then(leading)
-        .then(Doc::hardline(indent))
-        .then(content)
-        .then(trailing)
 }
 
 impl<'src> ParseAst<'src> {
@@ -168,7 +213,7 @@ impl<'src> ParseAst<'src> {
         let mut doc = Doc::nil();
 
         for spd in &self.blocks {
-            doc = doc.then(spd_doc(spd, ctx, 0));
+            doc = doc.then(ctx.spd_doc(spd, 0, false));
         }
 
         doc
@@ -193,33 +238,31 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = Doc::nil();
         for tag in &self.use_tags {
-            doc = doc.then(spd_doc(tag, ctx, 0)).then(Doc::hardline(0));
+            doc = doc.then(ctx.spd_doc(tag, 0, true)).then(Doc::hardline(0));
         }
 
         doc = doc
             .then(Doc::text("model "))
-            .then(sym_doc(&self.symbol, ctx, 0));
+            .then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.blocks.is_empty() {
             // No content, return empty model
-            return doc.then(Doc::text(" {}")).then(Doc::hardline(0));
+            return doc.then(Doc::text(" {}"));
         }
 
         doc = doc.then(Doc::text(" {"));
         for spd in &self.blocks {
-            doc = doc.then(spd_doc(spd, ctx, 1));
+            doc = doc.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
 impl<'src> ToDoc<'src> for UseTag<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.params, |param| match param {
-            UseTagParamKind::Crud(spd) => spd_doc(spd, ctx, 0),
-            UseTagParamKind::EnvBinding(b) => sym_doc(b, ctx, 0),
+            UseTagParamKind::Crud(spd) => ctx.spd_doc(spd, 0, true),
+            UseTagParamKind::EnvBinding(b) => ctx.sym_doc(b, 0, true),
         });
 
         Doc::text("[use ").then(params).then(Doc::text("]"))
@@ -232,42 +275,48 @@ impl<'src> ToDoc<'src> for CrudKind {
     }
 }
 
-impl<'src> ToDoc<'src> for Symbol<'src> {
-    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::text(self.name)
-    }
-}
-
 impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
-            ModelBlockKind::Column(sym) => sym_typed_doc(sym, ctx, 1),
+            ModelBlockKind::Column(sym) => ctx.sym_typed_doc(sym, 1, true),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
-            ModelBlockKind::Primary(blocks)
-            | ModelBlockKind::Unique(blocks)
-            | ModelBlockKind::Optional(blocks) => {
-                let mut doc = Doc::nil();
+            ModelBlockKind::Primary(blocks) => {
+                let mut doc = Doc::text("primary {");
                 for block in blocks {
-                    doc = doc.then(spd_doc(block, ctx, 2));
+                    doc = doc.then(ctx.spd_doc(block, 2, true));
                 }
-                doc
+                doc.then(Doc::hardline(1)).then(Doc::text("}"))
+            }
+            ModelBlockKind::Unique(blocks) => {
+                let mut doc = Doc::text("unique {");
+                for block in blocks {
+                    doc = doc.then(ctx.spd_doc(block, 2, true));
+                }
+                doc.then(Doc::hardline(1)).then(Doc::text("}"))
+            }
+            ModelBlockKind::Optional(blocks) => {
+                let mut doc = Doc::text("optional {");
+                for block in blocks {
+                    doc = doc.then(ctx.spd_doc(block, 2, true));
+                }
+                doc.then(Doc::hardline(1)).then(Doc::text("}"))
             }
             ModelBlockKind::Paginated(blocks) => {
-                let mut doc = Doc::nil();
+                let mut doc = Doc::text("paginated {");
                 for block in blocks {
-                    doc = doc.then(spd_doc(block, ctx, 2));
+                    doc = doc.then(ctx.spd_doc(block, 2, true));
                 }
-                doc
+                doc.then(Doc::hardline(1)).then(Doc::text("}"))
             }
             ModelBlockKind::KeyField(syms) => {
-                let mut doc = Doc::nil();
+                let mut doc = Doc::text("keyfield {");
                 for sym in syms {
-                    doc = doc.then(sym_doc(sym, ctx, 2));
+                    doc = doc.then(Doc::hardline(2)).then(ctx.sym_doc(sym, 2, true));
                 }
-                doc
+                doc.then(Doc::hardline(1)).then(Doc::text("}"))
             }
         }
     }
@@ -276,7 +325,7 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
 impl<'src> ToDoc<'src> for SqlBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
-            SqlBlockKind::Column(sym) => sym_typed_doc(sym, ctx, 2),
+            SqlBlockKind::Column(sym) => ctx.sym_typed_doc(sym, 2, false),
             SqlBlockKind::Foreign(fb) => fb.to_doc(ctx),
         }
     }
@@ -284,20 +333,18 @@ impl<'src> ToDoc<'src> for SqlBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for PaginatedBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("paginated {");
-        doc = doc.then(match self {
+        match self {
             PaginatedBlockKind::R2(r2) => r2.to_doc(ctx),
             PaginatedBlockKind::Kv(kv) => kv.to_doc(ctx),
-        });
-        doc.then(Doc::hardline(1)).then(Doc::text("}"))
+        }
     }
 }
 
 impl<'src> ToDoc<'src> for ForeignBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let adjs = comma_separated(&self.adj, |adj| {
-            let left = sym_doc(&adj.0, ctx, 0);
-            let right = sym_doc(&adj.1, ctx, 0);
+            let left = ctx.sym_doc(&adj.0, 0, true);
+            let right = ctx.sym_doc(&adj.1, 0, true);
             left.then(Doc::text("::")).then(right)
         });
 
@@ -312,29 +359,33 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
         doc = doc.then(qualifier).then(Doc::text(" {"));
 
         for field in &self.fields {
-            doc = doc.then(sym_doc(field, ctx, 2)).then(Doc::hardline(1));
+            doc = doc.then(ctx.sym_doc(field, 2, false));
         }
 
         if let Some(nav) = &self.nav {
-            doc = doc.then(spd_doc(nav, ctx, 2)).then(Doc::hardline(1));
+            doc = doc
+                .then(Doc::hardline(2))
+                .then(Doc::text("nav { "))
+                .then(ctx.sym_doc(&nav.block, 2, true))
+                .then(Doc::text(" }"));
         }
 
-        doc.then(Doc::text("}"))
+        doc.then(Doc::hardline(1)).then(Doc::text("}"))
     }
 }
 
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let adjs = comma_separated(&self.adj, |adj| {
-            let left = sym_doc(&adj.0, ctx, 0);
-            let right = sym_doc(&adj.1, ctx, 0);
+            let left = ctx.sym_doc(&adj.0, 0, true);
+            let right = ctx.sym_doc(&adj.1, 0, true);
             left.then(Doc::text("::")).then(right)
         });
 
         Doc::text("nav (")
             .then(adjs)
             .then(Doc::text(") {"))
-            .then(spd_doc(&self.nav, ctx, 2))
+            .then(ctx.sym_doc(&self.nav.block, 2, false))
             .then(Doc::hardline(1))
             .then(Doc::text("}"))
     }
@@ -348,14 +399,13 @@ impl<'src> ToDoc<'src> for KvBlock<'src> {
             Doc::nil()
         };
         Doc::text("kv (")
-            .then(sym_doc(&self.env_binding, ctx, 0))
+            .then(ctx.sym_doc(&self.env_binding, 0, true))
             .then(Doc::text(", \""))
             .then(Doc::text(self.key_format))
             .then(Doc::text("\")"))
             .then(paginated)
             .then(Doc::text(" {"))
-            .then(Doc::hardline(2))
-            .then(sym_typed_doc(&self.field, ctx, 2))
+            .then(ctx.sym_typed_doc(&self.field, 2, false))
             .then(Doc::hardline(1))
             .then(Doc::text("}"))
     }
@@ -369,14 +419,13 @@ impl<'src> ToDoc<'src> for R2Block<'src> {
             Doc::nil()
         };
         Doc::text("r2 (")
-            .then(sym_doc(&self.env_binding, ctx, 0))
+            .then(ctx.sym_doc(&self.env_binding, 0, true))
             .then(Doc::text(", \""))
             .then(Doc::text(self.key_format))
             .then(Doc::text("\")"))
             .then(paginated)
             .then(Doc::text(" {"))
-            .then(Doc::hardline(2))
-            .then(sym_doc(&self.field, ctx, 2))
+            .then(ctx.sym_doc(&self.field, 2, false))
             .then(Doc::hardline(1))
             .then(Doc::text("}"))
     }
@@ -384,29 +433,27 @@ impl<'src> ToDoc<'src> for R2Block<'src> {
 
 impl<'src> ToDoc<'src> for ApiBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("api ").then(sym_doc(&self.symbol, ctx, 0));
+        let mut doc = Doc::text("api ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.methods.is_empty() {
-            return doc.then(Doc::text(" {}")).then(Doc::hardline(0));
+            return doc.then(Doc::text(" {}"));
         }
 
         doc = doc.then(Doc::text(" {"));
         for spd in &self.methods {
-            doc = doc.then(spd_doc(spd, ctx, 1));
+            doc = doc.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
 impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.parameters, |param| spd_doc(param, ctx, 0));
+        let params = comma_separated(&self.parameters, |param| ctx.spd_doc(param, 0, true));
 
         Doc::text(fmt_http_verb(&self.http_verb))
             .then(Doc::text(" "))
-            .then(sym_doc(&self.symbol, ctx, 0))
+            .then(ctx.sym_doc(&self.symbol, 0, true))
             .then(Doc::text("("))
             .then(params)
             .then(Doc::text(") -> "))
@@ -423,27 +470,33 @@ impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
             } => {
                 let ds_doc = if let Some(ds) = data_source {
                     Doc::text("[source ")
-                        .then(sym_doc(ds, ctx, 0))
+                        .then(ctx.sym_doc(ds, 0, true))
                         .then(Doc::text("] "))
                 } else {
                     Doc::nil()
                 };
-                ds_doc.then(sym_doc(symbol, ctx, 0))
+                ds_doc.then(ctx.sym_doc(symbol, 0, true))
             }
-            ApiBlockMethodParamKind::Field(sym) => sym_typed_doc(sym, ctx, 0),
+            ApiBlockMethodParamKind::Field(sym) => ctx.sym_typed_doc(sym, 0, true),
         }
     }
 }
 
 impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.parameters, |param| sym_typed_doc(param, ctx, 0));
+        let params = comma_separated(&self.parameters, |param| ctx.sym_typed_doc(param, 0, true));
 
-        Doc::text("sql (")
+        Doc::text("(")
             .then(params)
-            .then(Doc::text(") {\""))
+            .then(Doc::text(") {"))
+            .then(Doc::hardline(2))
+            .then(Doc::text("\""))
+            .then(Doc::hardline(2))
             .then(Doc::text(self.raw_sql))
-            .then(Doc::text("\"}"))
+            .then(Doc::hardline(2))
+            .then(Doc::text("\""))
+            .then(Doc::hardline(1))
+            .then(Doc::text("}"))
     }
 }
 
@@ -456,38 +509,34 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
         };
 
         let include = if self.tree.0.is_empty() {
-            Doc::hardline(1)
-                .then(Doc::text("include {}"))
-                .then(Doc::hardline(0))
+            Doc::hardline(1).then(Doc::text("include {}"))
         } else {
             Doc::hardline(1)
                 .then(Doc::text("include {"))
                 .then(self.tree.to_doc_at(ctx, 2))
                 .then(Doc::hardline(1))
                 .then(Doc::text("}"))
-                .then(Doc::hardline(0))
         };
 
         let mut doc = internal
             .then(Doc::text("source "))
-            .then(sym_doc(&self.symbol, ctx, 0))
+            .then(ctx.sym_doc(&self.symbol, 0, true))
             .then(Doc::text(" for "))
-            .then(sym_doc(&self.model, ctx, 0))
+            .then(ctx.sym_doc(&self.model, 0, true))
             .then(Doc::text(" {"))
             .then(include);
 
         for (label, spd_opt) in [("get", &self.get), ("list", &self.list)] {
             if let Some(spd) = spd_opt {
                 doc = doc
-                    .then(Doc::text(label))
-                    .then(Doc::text(" {"))
-                    .then(spd_doc(spd, ctx, 2))
                     .then(Doc::hardline(1))
-                    .then(Doc::text("}"));
+                    .then(Doc::text("sql "))
+                    .then(Doc::text(label))
+                    .then(ctx.spd_doc(spd, 2, true))
             }
         }
 
-        doc.then(Doc::text("}")).then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
@@ -498,11 +547,11 @@ impl ParsedIncludeTree<'_> {
 
         let mut doc = Doc::nil();
         for (leaf, _) in leaves {
-            doc = doc.then(sym_doc(leaf, ctx, depth));
+            doc = doc.then(ctx.sym_doc(leaf, depth, false));
         }
         for (name, subtree) in branches {
             doc = doc
-                .then(sym_doc(name, ctx, depth))
+                .then(ctx.sym_doc(name, depth, false))
                 .then(Doc::text(" {"))
                 .then(subtree.to_doc_at(ctx, depth + 1))
                 .then(Doc::hardline(depth))
@@ -514,37 +563,33 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("service ").then(sym_doc(&self.symbol, ctx, 0));
+        let mut doc = Doc::text("service ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.fields.is_empty() {
-            return doc.then(Doc::text(" {}")).then(Doc::hardline(0));
+            return doc.then(Doc::text(" {}"));
         }
 
         doc = doc.then(Doc::text(" {"));
         for field in &self.fields {
-            doc = doc.then(sym_typed_doc(field, ctx, 1));
+            doc = doc.then(ctx.sym_typed_doc(field, 1, false));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
 impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("poo ").then(sym_doc(&self.symbol, ctx, 0));
+        let mut doc = Doc::text("poo ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.fields.is_empty() {
-            return doc.then(Doc::text(" {}")).then(Doc::hardline(0));
+            return doc.then(Doc::text(" {}"));
         }
 
         doc = doc.then(Doc::text(" {"));
         for field in &self.fields {
-            doc = doc.then(sym_typed_doc(field, ctx, 1));
+            doc = doc.then(ctx.sym_typed_doc(field, 1, false));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
@@ -558,10 +603,11 @@ impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
         };
 
         for symbol in &self.symbols {
+            doc = doc.then(Doc::hardline(2));
             if matches!(self.kind, EnvBindingBlockKind::Var) {
-                doc = doc.then(sym_typed_doc(symbol, ctx, 2));
+                doc = doc.then(ctx.sym_typed_doc(symbol, 2, true));
             } else {
-                doc = doc.then(sym_doc(symbol, ctx, 2));
+                doc = doc.then(ctx.sym_doc(symbol, 2, true));
             }
         }
 
@@ -573,26 +619,22 @@ impl<'src> ToDoc<'src> for EnvBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = Doc::text("env {");
         for spd in &self.blocks {
-            doc = doc.then(spd_doc(spd, ctx, 1));
+            doc = doc.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
 impl<'src> ToDoc<'src> for InjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         if self.symbols.is_empty() {
-            return Doc::text("inject {}").then(Doc::hardline(0));
+            return Doc::text("inject {}");
         }
         let mut doc = Doc::text("inject {");
         for sym in &self.symbols {
-            doc = doc.then(sym_doc(sym, ctx, 1));
+            doc = doc.then(Doc::hardline(1)).then(ctx.sym_doc(sym, 1, true));
         }
-        doc.then(Doc::hardline(0))
-            .then(Doc::text("}"))
-            .then(Doc::hardline(0))
+        doc.then(Doc::hardline(0)).then(Doc::text("}"))
     }
 }
 
