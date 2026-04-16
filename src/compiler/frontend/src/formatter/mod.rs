@@ -164,7 +164,13 @@ impl<'src> Format<'src> for ModelBlock<'src> {
 
         f.push(" {");
         f.newline();
+        let mut prev_is_column = true;
+        let mut first = true;
         for spd in &self.blocks {
+            let is_column = matches!(spd.block, ModelBlockKind::Column(_));
+            if !first && (!is_column || !prev_is_column) {
+                f.newline();
+            }
             f.emit_leading_comments(spd.span.start, 1);
             f.indent(1);
             spd.block.fmt(f);
@@ -173,6 +179,8 @@ impl<'src> Format<'src> for ModelBlock<'src> {
             if spd.span.end > f.cursor {
                 f.cursor = spd.span.end;
             }
+            first = false;
+            prev_is_column = is_column;
         }
         f.push("}");
         f.newline();
@@ -453,9 +461,9 @@ impl ParsedIncludeTree<'_> {
             .map(|(k, v)| (k.name, v))
             .collect();
 
-        if !leaves.is_empty() {
+        for leaf in &leaves {
             f.indent(depth);
-            f.push(&leaves.join(", "));
+            f.push(leaf);
             f.newline();
         }
 
@@ -610,15 +618,21 @@ fn fmt_sql_block_group<'src>(
 
 fn fmt_env_inline(keyword: &str, symbols: &[Symbol<'_>], f: &mut Formatter<'_>) {
     f.push(keyword);
-    f.push(" { ");
-    f.push(
-        &symbols
-            .iter()
-            .map(|s| s.name)
-            .collect::<Vec<_>>()
-            .join(", "),
-    );
-    f.push(" }");
+    if symbols.len() == 1 {
+        f.push(" { ");
+        f.push(symbols[0].name);
+        f.push(" }");
+    } else {
+        f.push(" {");
+        f.newline();
+        for sym in symbols {
+            f.indent(2);
+            f.push(sym.name);
+            f.newline();
+        }
+        f.indent(1);
+        f.push("}");
+    }
 }
 
 fn fmt_sql_params(params: &[Symbol<'_>]) -> String {

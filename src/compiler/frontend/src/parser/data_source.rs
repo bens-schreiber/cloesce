@@ -24,8 +24,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         symbol()
             .then(
                 entry
-                    .separated_by(just(Token::Comma))
-                    .allow_trailing()
+                    .repeated()
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LBrace), just(Token::RBrace))
                     .or_not(),
@@ -45,8 +44,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     // include { ... }
     let include_tree = just(Token::Ident("include")).ignore_then(
         include_entry
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
+            .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );

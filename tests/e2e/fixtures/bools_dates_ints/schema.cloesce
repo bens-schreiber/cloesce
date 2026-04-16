@@ -1,8 +1,13 @@
-env { d1 { db } }
+env {
+    d1 { db }
+}
 
 [use db, save, get]
 model Weather {
-    primary { id: int }
+    primary {
+        id: int
+    }
+
     _date: date
     isRaining: bool
 }

@@ -2,8 +2,7 @@ inject {
     InjectedThing
 }
 
-service FooService {
-}
+service FooService {}
 
 service BarService {
     foo: FooService

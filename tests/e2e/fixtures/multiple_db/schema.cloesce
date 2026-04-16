@@ -1,13 +1,24 @@
-env { d1 { db1 db2 } }
+env {
+    d1 {
+        db1
+        db2
+    }
+}
 
 [use db1, get, save, list]
 model DB1Model {
-    primary { id: int }
+    primary {
+        id: int
+    }
+
     someColumn: string
 }
 
 [use db2, get, save, list]
 model DB2Model {
-    primary { id: int }
+    primary {
+        id: int
+    }
+
     someColumn: string
 }

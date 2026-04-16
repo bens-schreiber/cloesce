@@ -4,7 +4,10 @@ env {
 
 [use db, save]
 model Topping {
-    primary { id: int }
+    primary {
+        id: int
+    }
+
     name: string
 
     nav (Hamburger::id) {
@@ -14,7 +17,10 @@ model Topping {
 
 [use db, save, list]
 model Hamburger {
-    primary { id: int }
+    primary {
+        id: int
+    }
+
     name: string
 
     nav (Topping::id) {
@@ -23,46 +29,49 @@ model Hamburger {
 }
 
 source BurgersWithLettuceOrdered for Hamburger {
-    include { toppings }
-
+    include {
+        toppings
+    }
     sql list(lastId: int, limit: int) {
         "
-            WITH included as ($include)
-            SELECT * FROM included
-            WHERE [toppings.name] = 'LETTUCE'
-            AND id > $lastId
-            ORDER BY id
-            LIMIT $limit
+        WITH included as ($include)
+        SELECT * FROM included
+        WHERE [toppings.name] = 'LETTUCE'
+        AND id > $lastId
+        ORDER BY id
+        LIMIT $limit
         "
     }
 }
 
 [internal]
 source NoLettuce for Hamburger {
-    include { toppings }
-
+    include {
+        toppings
+    }
     sql get(id: int) {
         "
-            WITH included as ($include)
-            SELECT * FROM included
-            WHERE [toppings.name] != 'LETTUCE'
-            AND id = $id
-            ORDER BY id
+        WITH included as ($include)
+        SELECT * FROM included
+        WHERE [toppings.name] != 'LETTUCE'
+        AND id = $id
+        ORDER BY id
         "
     }
 }
 
 [internal]
 source OnlyBacon for Hamburger {
-    include { toppings }
-
+    include {
+        toppings
+    }
     sql get(id: int) {
         "
-            WITH included as ($include)
-            SELECT * FROM included
-            WHERE [toppings.name] = 'BACON'
-            AND id = $id
-            ORDER BY id
+        WITH included as ($include)
+        SELECT * FROM included
+        WHERE [toppings.name] = 'BACON'
+        AND id = $id
+        ORDER BY id
         "
     }
 }

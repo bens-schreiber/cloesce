@@ -69,7 +69,7 @@ model Boss {
 source WithAll for Boss {
     include {
         persons {
-            dogs,
+            dogs
             cats
         }
     }
