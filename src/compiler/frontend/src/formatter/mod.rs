@@ -9,7 +9,7 @@ use crate::{
     DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
     ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind, NavigationBlock,
     PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block, ServiceBlock,
-    Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    Span, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -28,6 +28,7 @@ struct FmtCtx<'src> {
     src: &'src str,
 
     /// Byte offset just past the last thing emitted
+    /// Necessary for reattaching comments
     cursor: Cell<usize>,
 }
 
@@ -40,21 +41,32 @@ impl<'src> FmtCtx<'src> {
         }
     }
 
-    /// Collect leading comment docs between the current cursor and `node_start`
-    fn leading_comments(&self, node_start: usize, indent: usize) -> Doc<'src> {
+    fn _leading_comments(&self, node_start: usize, indent: usize) -> (Doc<'src>, bool) {
         let prev = self.cursor.get();
         let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
         let mut doc = Doc::nil();
         let mut cursor = prev;
+        let mut emitted = false;
 
         for &(offset, text) in &self.cm.entries[lo..] {
             if offset >= node_start {
                 break;
             }
             let gap = self.src.get(cursor..offset).unwrap_or("");
-            let is_leading = gap.is_empty() || gap.contains('\n');
+            let newline_count = gap.chars().filter(|&c| c == '\n').count();
+            let is_leading = newline_count > 0 || gap.is_empty();
             if is_leading {
-                doc = doc.then(Doc::hardline(indent)).then(Doc::text(text));
+                // Preserve newlines but cap at 2 (one blank line)
+                let extra_blank = if newline_count >= 2 {
+                    Doc::hardline(indent)
+                } else {
+                    Doc::nil()
+                };
+                doc = doc
+                    .then(extra_blank)
+                    .then(Doc::hardline(indent))
+                    .then(Doc::text(text));
+                emitted = true;
             }
             cursor = offset + text.len();
         }
@@ -63,12 +75,10 @@ impl<'src> FmtCtx<'src> {
             cursor = node_start;
         }
         self.cursor.set(cursor);
-        doc
+        (doc, emitted)
     }
 
-    /// Emit a trailing comment immediately after `node_end` if one exists on
-    /// the same source line
-    fn trailing_comment(&self, node_end: usize) -> Doc<'src> {
+    fn _trailing_comment(&self, node_end: usize) -> Doc<'src> {
         let lo = self.cm.entries.partition_point(|(off, _)| *off < node_end);
         if let Some(&(offset, text)) = self.cm.entries.get(lo) {
             // Only return if this comment hasn't been processed yet
@@ -84,28 +94,30 @@ impl<'src> FmtCtx<'src> {
     }
 
     /// Advance the cursor to at least `pos`.
-    fn advance(&self, pos: usize) {
+    fn _advance(&self, pos: usize) {
         if pos > self.cursor.get() {
             self.cursor.set(pos);
         }
     }
 
+    fn _gap(&self, span: Span) -> usize {
+        let gap = self.src.get(self.cursor.get()..span.start).unwrap_or("");
+        gap.chars().filter(|&c| c == '\n').count()
+    }
+
     fn spd_doc<T: ToDoc<'src>>(&self, spd: &'src Spd<T>, indent: usize, inline: bool) -> Doc<'src> {
-        let leading = self.leading_comments(spd.span.start, indent);
+        let gap = self._gap(spd.span);
+        let (leading, has_leading_comments) = self._leading_comments(spd.span.start, indent);
         let content = spd.block.to_doc(self);
-        let trailing = self.trailing_comment(spd.span.end);
-        self.advance(spd.span.end);
+        let trailing = self._trailing_comment(spd.span.end);
+        self._advance(spd.span.end);
 
         if inline {
             return leading.then(content).then(trailing);
         }
 
-        // Allow gaps between nodes, but not larger than one blank line
-        let gap = self
-            .src
-            .get(self.cursor.get()..spd.span.start)
-            .unwrap_or("");
-        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+        // Preserve newlines
+        let extra_blank = if gap >= 2 && !has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -119,21 +131,18 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let leading = self.leading_comments(sym.span.start, indent);
+        let gap = self._gap(sym.span);
+        let (leading, has_leading_comments) = self._leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name);
-        let trailing = self.trailing_comment(sym.span.end);
-        self.advance(sym.span.end);
+        let trailing = self._trailing_comment(sym.span.end);
+        self._advance(sym.span.end);
 
         if inline {
             return leading.then(content).then(trailing);
         }
 
-        // Allow gaps between nodes, but not larger than one blank line
-        let gap = self
-            .src
-            .get(self.cursor.get()..sym.span.start)
-            .unwrap_or("");
-        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+        // Preserve newlines
+        let extra_blank = if gap >= 2 && !has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -147,22 +156,20 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let leading = self.leading_comments(sym.span.start, indent);
+        let gap = self._gap(sym.span);
+        let (leading, has_leading_comments) = self._leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name)
             .then(Doc::text(": "))
             .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)));
-        let trailing = self.trailing_comment(sym.span.end);
-        self.advance(sym.span.end);
+        let trailing = self._trailing_comment(sym.span.end);
+        self._advance(sym.span.end);
 
         if inline {
             return leading.then(content).then(trailing);
         }
 
-        let gap = self
-            .src
-            .get(self.cursor.get()..sym.span.start)
-            .unwrap_or("");
-        let extra_blank = if gap.chars().filter(|&c| c == '\n').count() >= 2 {
+        // Preserve newlines
+        let extra_blank = if gap >= 2 && !has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -463,9 +470,7 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
             .then(Doc::text(") {"))
             .then(Doc::hardline(2))
             .then(Doc::text("\""))
-            .then(Doc::hardline(2))
             .then(Doc::text(self.raw_sql))
-            .then(Doc::hardline(2))
             .then(Doc::text("\""))
             .then(Doc::hardline(1))
             .then(Doc::text("}"))
@@ -502,6 +507,7 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
             if let Some(spd) = spd_opt {
                 doc = doc
                     .then(Doc::hardline(1))
+                    .then(Doc::hardline(1))
                     .then(Doc::text("sql "))
                     .then(Doc::text(label))
                     .then(ctx.spd_doc(spd, 2, true))
@@ -517,9 +523,9 @@ impl ParsedIncludeTree<'_> {
         let leaves = self.0.iter().filter(|(_, v)| v.0.is_empty());
         let branches = self.0.iter().filter(|(_, v)| !v.0.is_empty());
 
-        let mut doc = Doc::nil();
+        let mut doc = Doc::nil().then(Doc::hardline(depth));
         for (leaf, _) in leaves {
-            doc = doc.then(ctx.sym_doc(leaf, depth, false));
+            doc = doc.then(ctx.sym_doc(leaf, depth, true));
         }
         for (name, subtree) in branches {
             doc = doc
@@ -653,10 +659,10 @@ fn fmt_crud(kind: &CrudKind) -> &'static str {
     }
 }
 
-fn comma_separated<'src, T, F>(items: &'src [T], mut item_doc: F) -> Doc<'src>
-where
-    F: FnMut(&'src T) -> Doc<'src>,
-{
+fn comma_separated<'src, T, F: FnMut(&'src T) -> Doc<'src>>(
+    items: &'src [T],
+    mut item_doc: F,
+) -> Doc<'src> {
     let mut doc = Doc::nil();
     for (idx, item) in items.iter().enumerate() {
         doc = doc.then(item_doc(item));

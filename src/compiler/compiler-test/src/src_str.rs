@@ -216,10 +216,24 @@ model ModelWithCustomDs {
     }
 
     name: string
+
+    r2 (my_r2, "{id}/data") {
+        data
+    }
+
+    foreign (OneToManyModel::id) {
+        oneToManyId
+        nav { oneToManyModel }
+    }
 }
 
 source Custom for ModelWithCustomDs {
-    include {}
+    include {
+        oneToManyModel {
+            oneToManyNav
+        }
+        data
+    }
 
     sql get(id: int, externalParam: string) {
         "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"

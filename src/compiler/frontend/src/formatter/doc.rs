@@ -10,8 +10,7 @@ pub enum Doc<'src> {
         depth: usize,
     },
 
-    /// Two documents in sequence.
-    Concat(Box<Doc<'src>>, Box<Doc<'src>>),
+    Seq(Vec<Doc<'src>>),
 }
 
 impl<'src> Doc<'src> {
@@ -31,16 +30,32 @@ impl<'src> Doc<'src> {
         Doc::HardLine { depth }
     }
 
+    // TODO: revisit this if it ends up being a noticeable bottleneck.
     pub fn then(self, other: Doc<'src>) -> Doc<'src> {
-        match (&self, &other) {
-            (Doc::Nil, _) => other,
-            (_, Doc::Nil) => self,
-            _ => Doc::Concat(Box::new(self), Box::new(other)),
+        match (self, other) {
+            (Doc::Nil, rhs) => rhs,
+            (lhs, Doc::Nil) => lhs,
+
+            (Doc::Seq(mut lhs), Doc::Seq(mut rhs)) => {
+                lhs.append(&mut rhs);
+                Doc::Seq(lhs)
+            }
+            (Doc::Seq(mut lhs), rhs) => {
+                lhs.push(rhs);
+                Doc::Seq(lhs)
+            }
+            (lhs, Doc::Seq(mut rhs)) => {
+                let mut docs = Vec::with_capacity(1 + rhs.len());
+                docs.push(lhs);
+                docs.append(&mut rhs);
+                Doc::Seq(docs)
+            }
+
+            (lhs, rhs) => Doc::Seq(vec![lhs, rhs]),
         }
     }
 }
 
-/// Render a `Doc` to a `String`.
 pub fn render(doc: &Doc<'_>) -> String {
     let mut out = String::new();
     render_into(doc, &mut out);
@@ -58,9 +73,10 @@ fn render_into(doc: &Doc<'_>, out: &mut String) {
                 out.push_str("    ");
             }
         }
-        Doc::Concat(a, b) => {
-            render_into(a, out);
-            render_into(b, out);
+        Doc::Seq(docs) => {
+            for doc in docs {
+                render_into(doc, out);
+            }
         }
     }
 }
