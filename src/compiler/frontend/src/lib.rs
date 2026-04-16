@@ -63,13 +63,6 @@ impl<'src> FileTable<'src> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum EnvBindingKind {
-    D1,
-    R2,
-    Kv,
-}
-
 pub type FileId = u16;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Hash, Eq)]
@@ -224,11 +217,11 @@ pub enum ModelBlockKind<'src> {
     Navigation(NavigationBlock<'src>),
     Kv(KvBlock<'src>),
     R2(R2Block<'src>),
-    Primary(Vec<SqlBlockKind<'src>>),
+    Primary(Vec<Spd<SqlBlockKind<'src>>>),
     KeyField(Vec<Symbol<'src>>),
-    Unique(Vec<SqlBlockKind<'src>>),
-    Paginated(Vec<PaginatedBlockKind<'src>>),
-    Optional(Vec<SqlBlockKind<'src>>),
+    Unique(Vec<Spd<SqlBlockKind<'src>>>),
+    Paginated(Vec<Spd<PaginatedBlockKind<'src>>>),
+    Optional(Vec<Spd<SqlBlockKind<'src>>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
@@ -243,7 +236,7 @@ impl<'src> ModelBlockKind<'src> {
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .flat_map(|block| match block {
+                .flat_map(|spd| match &spd.block {
                     SqlBlockKind::Column(symbol) => vec![symbol],
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
@@ -251,7 +244,7 @@ impl<'src> ModelBlockKind<'src> {
             ModelBlockKind::KeyField(fields) => fields.iter().collect(),
             ModelBlockKind::Paginated(blocks) => blocks
                 .iter()
-                .flat_map(|block| match block {
+                .flat_map(|spd| match &spd.block {
                     PaginatedBlockKind::Kv(kv_block) => vec![&kv_block.field],
                     PaginatedBlockKind::R2(r2_block) => vec![&r2_block.field],
                 })
@@ -293,7 +286,7 @@ impl<'src> ModelBlock<'src> {
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .filter_map(|b| match b {
+                .filter_map(|b| match &b.block {
                     SqlBlockKind::Foreign(fb) => Some(fb),
                     _ => None,
                 })
@@ -319,7 +312,7 @@ impl<'src> ModelBlock<'src> {
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .filter_map(|b| match b {
+                .filter_map(|b| match &b.block {
                     SqlBlockKind::Column(symbol) => Some(symbol),
                     SqlBlockKind::Foreign(_) => None,
                 })
@@ -343,16 +336,20 @@ pub struct PlainOldObjectBlock<'src> {
     pub fields: Vec<Symbol<'src>>,
 }
 
-pub enum EnvBlockKind {
+pub enum EnvBindingBlockKind {
     D1,
     R2,
     Kv,
     Var,
 }
 
-pub struct EnvBlock<'src> {
+pub struct EnvBindingBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
-    pub kind: EnvBlockKind,
+    pub kind: EnvBindingBlockKind,
+}
+
+pub struct EnvBlock<'src> {
+    pub blocks: Vec<Spd<EnvBindingBlock<'src>>>,
 }
 
 pub struct InjectBlock<'src> {
@@ -365,7 +362,7 @@ pub enum AstBlockKind<'src> {
     Model(ModelBlock<'src>),
     Service(ServiceBlock<'src>),
     PlainOldObject(PlainOldObjectBlock<'src>),
-    Env(Vec<Spd<EnvBlock<'src>>>),
+    Env(EnvBlock<'src>),
     Inject(InjectBlock<'src>),
 }
 

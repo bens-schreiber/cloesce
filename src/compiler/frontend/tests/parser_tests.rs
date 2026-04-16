@@ -1,8 +1,8 @@
 use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
-    AstBlockKind, EnvBlockKind, ForeignBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
-    ParseAst, SqlBlockKind, Symbol, UseTagParamKind,
+    AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
+    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -47,36 +47,46 @@ fn env_block() {
         .expect("env block to be present");
 
     let d1_bindings = env_blocks
+        .blocks
         .iter()
         .find_map(|spd| match &spd.block.kind {
-            EnvBlockKind::D1 => Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>()),
+            EnvBindingBlockKind::D1 => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
             _ => None,
         })
         .expect("d1 block to be present");
     assert_eq!(d1_bindings, vec!["db", "db2"]);
 
     let r2_bindings = env_blocks
+        .blocks
         .iter()
         .find_map(|spd| match &spd.block.kind {
-            EnvBlockKind::R2 => Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>()),
+            EnvBindingBlockKind::R2 => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
             _ => None,
         })
         .expect("r2 block to be present");
     assert_eq!(r2_bindings, vec!["assets"]);
 
     let kv_bindings = env_blocks
+        .blocks
         .iter()
         .find_map(|spd| match &spd.block.kind {
-            EnvBlockKind::Kv => Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>()),
+            EnvBindingBlockKind::Kv => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
             _ => None,
         })
         .expect("kv block to be present");
     assert_eq!(kv_bindings, vec!["cache"]);
 
     let vars = env_blocks
+        .blocks
         .iter()
         .find_map(|spd| match &spd.block.kind {
-            EnvBlockKind::Var => Some(
+            EnvBindingBlockKind::Var => Some(
                 spd.block
                     .symbols
                     .iter()
@@ -539,7 +549,7 @@ fn model_primary_unique_optional_foreign() {
         .unwrap();
     assert_eq!(sql_foreigns(opt)[0].fields[0].name, "draftId");
 
-    let uniques: Vec<&Vec<SqlBlockKind>> = m
+    let uniques: Vec<&Vec<Spd<SqlBlockKind>>> = m
         .blocks
         .iter()
         .filter_map(|spd| match &spd.block {
@@ -553,7 +563,7 @@ fn model_primary_unique_optional_foreign() {
         .iter()
         .find(|u| {
             u.iter()
-                .any(|b| matches!(b, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
+                .any(|b| matches!(&b.block, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
         })
         .unwrap();
     assert_eq!(sql_columns(dept_unique), vec!["role"]);
@@ -720,7 +730,7 @@ fn model_kv_r2_paginated() {
 
     let kv_c = pblocks
         .iter()
-        .find_map(|b| match b {
+        .find_map(|b| match &b.block {
             PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_c" => Some(kv),
             _ => None,
         })
@@ -737,7 +747,7 @@ fn model_kv_r2_paginated() {
 
     let r2_c = pblocks
         .iter()
-        .find_map(|b| match b {
+        .find_map(|b| match &b.block {
             PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_c" => Some(r2),
             _ => None,
         })
@@ -749,7 +759,7 @@ fn model_kv_r2_paginated() {
 
     let kv_d = pblocks
         .iter()
-        .find_map(|b| match b {
+        .find_map(|b| match &b.block {
             PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_d" => Some(kv),
             _ => None,
         })
@@ -761,7 +771,7 @@ fn model_kv_r2_paginated() {
 
     let r2_d = pblocks
         .iter()
-        .find_map(|b| match b {
+        .find_map(|b| match &b.block {
             PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_d" => Some(r2),
             _ => None,
         })
@@ -813,7 +823,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.block {
-            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match b {
+            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match &b.block {
                 PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
                 _ => None,
             }),
@@ -830,20 +840,20 @@ fn model_kv_r2_paginated() {
     );
 }
 
-fn sql_columns<'a>(blocks: &'a [SqlBlockKind]) -> Vec<&'a str> {
+fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {
     blocks
         .iter()
-        .filter_map(|b| match b {
+        .filter_map(|b| match &b.block {
             SqlBlockKind::Column(s) => Some(s.name),
             _ => None,
         })
         .collect()
 }
 
-fn sql_foreigns<'a>(blocks: &'a [SqlBlockKind<'a>]) -> Vec<&'a ForeignBlock<'a>> {
+fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock<'a>> {
     blocks
         .iter()
-        .filter_map(|b| match b {
+        .filter_map(|b| match &b.block {
             SqlBlockKind::Foreign(fb) => Some(fb),
             _ => None,
         })

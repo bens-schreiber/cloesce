@@ -128,6 +128,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             foreign_block().map(SqlBlockKind::Foreign),
             typed_symbol().map(SqlBlockKind::Column),
         ))
+        .map_spanned(|k| k)
     };
 
     // `primary { typed_symbols... foreign(...) { ... } }`
@@ -191,6 +192,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             kv_block().map(PaginatedBlockKind::Kv),
             r2_block().map(PaginatedBlockKind::R2),
         ))
+        .map_spanned(|k| k)
         .repeated()
         .collect::<Vec<_>>()
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
@@ -232,4 +234,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             use_tags,
             blocks,
         })
+        // Without this box, Apple `ld` linker breaks
+        // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
+        .boxed()
 }

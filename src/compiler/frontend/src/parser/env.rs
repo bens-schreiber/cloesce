@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, EnvBlock, EnvBlockKind,
+    AstBlockKind, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
@@ -34,9 +34,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|symbols| EnvBlock {
+        .map_spanned(|symbols| EnvBindingBlock {
             symbols,
-            kind: EnvBlockKind::D1,
+            kind: EnvBindingBlockKind::D1,
         });
 
     // r2 { ident* }
@@ -47,9 +47,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|symbols| EnvBlock {
+        .map_spanned(|symbols| EnvBindingBlock {
             symbols,
-            kind: EnvBlockKind::R2,
+            kind: EnvBindingBlockKind::R2,
         });
 
     // kv { ident* }
@@ -60,9 +60,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|symbols| EnvBlock {
+        .map_spanned(|symbols| EnvBindingBlock {
             symbols,
-            kind: EnvBlockKind::Kv,
+            kind: EnvBindingBlockKind::Kv,
         });
 
     let vars = just(Token::Ident("vars"))
@@ -72,9 +72,9 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|symbols| EnvBlock {
+        .map_spanned(|symbols| EnvBindingBlock {
             symbols,
-            kind: EnvBlockKind::Var,
+            kind: EnvBindingBlockKind::Var,
         });
 
     let sub_block = choice((d1, r2, kv, vars));
@@ -87,5 +87,5 @@ pub fn env_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(AstBlockKind::Env)
+        .map(|blocks| AstBlockKind::Env(EnvBlock { blocks }))
 }

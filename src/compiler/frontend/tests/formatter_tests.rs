@@ -32,17 +32,12 @@ fn lex_parse(src: &str) -> (ParseAst<'_>, LexResult<'_>) {
 
 #[test]
 fn format_non_lossy() {
-    // Arrange
     let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
-
     let comment_map = &lex_result.results[0].comment_map;
 
-    // Act
     let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
     let (reparse_ast, _) = lex_parse(&formatted);
 
-    // Assert
-    // TODO: not sure the best way to test this, do we really want to implement `PartialEq` on the AST?
     assert_eq!(
         parse_ast.blocks.len(),
         reparse_ast.blocks.len(),
@@ -52,11 +47,9 @@ fn format_non_lossy() {
 
 #[test]
 fn format_idempotent() {
-    // Arrange
     let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
     let comment_map = &lex_result.results[0].comment_map;
 
-    // Act
     let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
     let (reparse_ast, relex_result) = lex_parse(&formatted);
     let reformatted = Formatter::format(
@@ -65,7 +58,6 @@ fn format_idempotent() {
         &formatted,
     );
 
-    // Assert
     assert_eq!(
         formatted, reformatted,
         "formatting should be consistent on already formatted code"
@@ -74,7 +66,6 @@ fn format_idempotent() {
 
 #[test]
 fn format_leading_trailing_comments() {
-    // Arrange
     let src = r#"
 // Leading comment for A
 model A {
@@ -88,7 +79,6 @@ model A {
     let (parse_ast, lex_result) = lex_parse(src);
     let comment_map = &lex_result.results[0].comment_map;
 
-    // Act
     let formatted = Formatter::format(&parse_ast, comment_map, src);
     let (reparse_ast, relex_result) = lex_parse(&formatted);
     let reformatted = Formatter::format(
@@ -97,9 +87,131 @@ model A {
         &formatted,
     );
 
-    // Assert
     assert_eq!(
         formatted, reformatted,
         "formatting should preserve leading and trailing comments"
+    );
+}
+
+#[test]
+fn format_comments_in_primary_block() {
+    let src = r#"
+model User {
+    primary {
+        // Leading comment for id
+        id: int // Trailing comment for id
+        // Leading comment for companyId
+        companyId: int
+    }
+}
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (reparse_ast, relex_result) = lex_parse(&formatted);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
+
+    assert_eq!(
+        formatted, reformatted,
+        "comments inside primary block should be preserved idempotently"
+    );
+}
+
+#[test]
+fn format_comments_in_paginated_block() {
+    let src = r#"
+[use myKv]
+model Feed {
+    paginated {
+        // KV entry for feed
+        kv (myKv, "feed/{id}") {
+            item: string
+        }
+    }
+}
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (reparse_ast, relex_result) = lex_parse(&formatted);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
+
+    assert_eq!(
+        formatted, reformatted,
+        "comments inside paginated block should be preserved idempotently"
+    );
+}
+
+#[test]
+fn format_multiple_leading_comments() {
+    let src = r#"
+// First leading comment
+// Second leading comment
+model A {
+    x: int
+}
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (reparse_ast, relex_result) = lex_parse(&formatted);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
+
+    assert_eq!(
+        formatted, reformatted,
+        "multiple consecutive leading comments should be preserved idempotently"
+    );
+}
+
+#[test]
+fn format_comments_in_env_block() {
+    let src = r#"
+// env describes wrangler bindings
+env {
+    // d1 databases
+    d1 {
+        db
+        // db2 is commented out
+    }
+
+    // r2 buckets
+    r2 {
+        bucket
+    }
+}
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (reparse_ast, relex_result) = lex_parse(&formatted);
+    let reformatted = Formatter::format(
+        &reparse_ast,
+        &relex_result.results[0].comment_map,
+        &formatted,
+    );
+
+    assert_eq!(
+        formatted, reformatted,
+        "comments inside env block should be preserved idempotently"
     );
 }

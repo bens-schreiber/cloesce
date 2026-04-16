@@ -1,3 +1,4 @@
+use crate::EnvBindingKind;
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
@@ -8,8 +9,8 @@ use ast::{
     NavigationFieldKind,
 };
 use frontend::{
-    EnvBindingKind, ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, R2Block, SpdSlice, SqlBlockKind, Symbol,
+    ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
+    R2Block, SpdSlice, SqlBlockKind, Symbol,
 };
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, vec};
@@ -184,7 +185,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     };
 
                     for block in blocks {
-                        match block {
+                        match &block.block {
                             SqlBlockKind::Column(symbol) => {
                                 self.column(ma, symbol, qual.clone());
                             }
@@ -206,7 +207,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     self.unique_seed += 1;
 
                     for block in blocks {
-                        match block {
+                        match &block.block {
                             SqlBlockKind::Column(symbol) => {
                                 self.column(ma, symbol, qual.clone());
                             }
@@ -227,7 +228,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     };
 
                     for block in blocks {
-                        match block {
+                        match &block.block {
                             SqlBlockKind::Column(symbol) => {
                                 self.column(ma, symbol, qual.clone());
                             }
@@ -262,7 +263,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::Paginated(blocks) => {
                     for block in blocks {
-                        match block {
+                        match &block.block {
                             PaginatedBlockKind::Kv(kv_block) => {
                                 self.kv_field(ma, table, kv_block);
                             }
