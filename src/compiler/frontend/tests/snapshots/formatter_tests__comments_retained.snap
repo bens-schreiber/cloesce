@@ -1,0 +1,38 @@
+---
+source: frontend/tests/formatter_tests.rs
+expression: formatted
+---
+env {
+    // 1
+    d1 {
+        // 2
+        db
+        // A
+    } // 3
+    // B
+}
+
+// 4
+[use db] // 5
+// 6
+model BasicModel {
+    // C
+    // 7
+    primary {
+        // D
+        id: int // 8
+    } // 9
+    
+    // 14
+    foreign (OneToManyModel::id) {
+        // E
+        fk_to_model // 15
+        nav { 
+        // 16
+        // F
+        oneToOneNav // 18
+        // G
+    }
+    } // 19
+    // H
+} // 20

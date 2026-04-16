@@ -19,7 +19,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
-insta = "1.46.3"
+insta = { workspace = true }
 
 
 [lib]

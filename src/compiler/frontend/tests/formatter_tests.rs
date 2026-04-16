@@ -46,6 +46,7 @@ fn format_non_lossy() {
         reparse_ast.blocks.len(),
         "block count mismatch"
     );
+    insta::assert_snapshot!(formatted);
 }
 
 #[test]
@@ -68,4 +69,57 @@ fn format_idempotent() {
         formatted, reformatted,
         "formatting should be consistent on already formatted code"
     );
+}
+
+#[test]
+fn comments_retained() {
+    // Arrange
+    let src = r#"
+    env {
+        //1
+        d1 { 
+            //2
+            db 
+            //A
+        }//3
+        //B
+    }
+
+    //4
+    [use db] //5
+    //6
+    model BasicModel { //C
+        //7
+        primary { //D
+            id: int //8
+        } //9
+
+        //14
+        foreign (OneToManyModel::id) { //E
+            fk_to_model //15
+            //16
+            nav { //F
+                oneToOneNav //18
+            } //G
+        } //19
+        //H
+    } //20
+    "#;
+
+    let (parse_ast, lex_result) = lex_parse(src);
+    let comment_map = &lex_result.results[0].comment_map;
+    let expected_retained = comment_map.entries.len();
+
+    // Act
+    let formatted = Formatter::format(&parse_ast, comment_map, src);
+    let (_, res) = lex_parse(&formatted);
+
+    // Assert
+    assert_eq!(
+        res.results[0].comment_map.entries.len(),
+        expected_retained,
+        "should retain all comments"
+    );
+
+    insta::assert_snapshot!(formatted);
 }
