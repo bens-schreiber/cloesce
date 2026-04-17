@@ -3,7 +3,7 @@ hljs.registerLanguage("cloesce", function(hljs) {
     // Top-level reserved words (actual lexer keywords)
     const KEYWORDS = [
       "env","model","source","service","inject","api","poo","sql",
-      "d1","r2","kv","vars","self"
+      "d1","r2","kv","vars","self", "internal"
     ];
 
     // Contextual block keywords
