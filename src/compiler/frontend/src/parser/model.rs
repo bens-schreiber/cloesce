@@ -3,8 +3,9 @@ use chumsky::prelude::*;
 use ast::CrudKind;
 
 use crate::{
-    ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag, UseTagParamKind,
+    AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag,
+    UseTagParamKind,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
@@ -116,7 +117,7 @@ fn use_item<'tokens, 'src: 'tokens>()
 }
 
 pub fn model_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ModelBlock<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
     // [use d1, get, save, list]
     let use_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("use")))
@@ -229,9 +230,8 @@ pub fn model_block<'tokens, 'src: 'tokens>()
 
     let use_tags = use_tag.repeated().collect::<Vec<_>>();
 
-    use_tags
-        .then_ignore(just(Token::Model))
-        .then(symbol())
+    let model_body = just(Token::Model)
+        .ignore_then(symbol())
         .then(
             sub_blocks
                 .map_spanned(|k| k)
@@ -239,10 +239,17 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((use_tags, symbol), blocks)| ModelBlock {
+        .map_spanned(|(symbol, blocks)| ModelBlock {
             symbol,
-            use_tags,
+            use_tags: Vec::new(),
             blocks,
+        });
+
+    use_tags
+        .then(model_body)
+        .map(|(use_tags, mut spd): (Vec<Spd<UseTag>>, Spd<ModelBlock>)| {
+            spd.block.use_tags = use_tags;
+            Spd { block: AstBlockKind::Model(spd.block), span: spd.span }
         })
         // Without this box, Apple `ld` linker breaks
         // (a symbol name over 1.2 million characters is generated, exceeding the name limit)

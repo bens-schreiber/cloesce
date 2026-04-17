@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree,
+    AstBlockKind, CidlType, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
@@ -18,7 +18,7 @@ use crate::{
 /// }
 /// ```
 pub fn data_source_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
     // ident | ident { ... }
     let include_entry = recursive(|entry| {
         symbol()
@@ -85,13 +85,17 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     // [internal]
     let internal_decorator = just(Token::LBracket)
         .ignore_then(just(Token::Ident("internal")))
-        .then(just(Token::RBracket))
-        .ignored();
+        .then_ignore(just(Token::RBracket))
+        .map_spanned(|_| ())
+        .map(|spd: Spd<()>| Symbol {
+            name: "internal",
+            cidl_type: CidlType::default(),
+            span: spd.span,
+        });
 
     // source SourceName for ModelName { ... }
-    internal_decorator
-        .or_not()
-        .then(just(Token::Source).ignore_then(symbol()))
+    let source_block = just(Token::Source)
+        .ignore_then(symbol())
         .then_ignore(just(Token::Ident("for")))
         .then(symbol())
         .then(
@@ -100,19 +104,25 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 .then(list_method.or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(
-            |(((is_internal, symbol), model), ((include_entries, get), list))| {
-                let tree =
-                    ParsedIncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
+        .map_spanned(|((symbol, model), ((include_entries, get), list))| {
+            let tree = ParsedIncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
+            DataSourceBlock {
+                symbol,
+                model,
+                tree,
+                get,
+                list,
+                internal: None,
+            }
+        });
 
-                AstBlockKind::DataSource(DataSourceBlock {
-                    symbol,
-                    model,
-                    tree,
-                    get,
-                    list,
-                    is_internal: is_internal.is_some(),
-                })
-            },
-        )
+    internal_decorator.or_not().then(source_block).map(
+        |(internal, mut spd): (Option<Symbol>, Spd<DataSourceBlock>)| {
+            spd.block.internal = internal;
+            Spd {
+                block: AstBlockKind::DataSource(spd.block),
+                span: spd.span,
+            }
+        },
+    )
 }

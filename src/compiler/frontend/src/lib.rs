@@ -120,7 +120,7 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
-    pub is_internal: bool,
+    pub internal: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {

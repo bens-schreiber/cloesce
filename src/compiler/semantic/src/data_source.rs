@@ -97,7 +97,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     tree: parsed_include_tree_to_ast(&ds.tree),
                     list,
                     get,
-                    is_internal: ds.is_internal,
+                    is_internal: ds.internal.is_some(),
                 },
             ));
         }
