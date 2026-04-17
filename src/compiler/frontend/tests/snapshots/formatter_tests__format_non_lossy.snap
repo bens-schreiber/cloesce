@@ -63,8 +63,7 @@ model HasOneToOne {
     
     foreign (BasicModel::id) {
         basicModelId
-        nav { oneToOneNav
-    }
+        nav { oneToOneNav }
     }
 }
 
@@ -235,8 +234,7 @@ model ModelWithCustomDs {
     
     foreign (OneToManyModel::id) {
         oneToManyId
-        nav { oneToManyModel
-    }
+        nav { oneToManyModel }
     }
 }
 

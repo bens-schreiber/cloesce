@@ -7,9 +7,9 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock,
     DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
-    ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind, NavigationBlock,
-    PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block, ServiceBlock,
-    Span, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    ForeignBlockNav, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
+    ServiceBlock, Span, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -19,7 +19,7 @@ impl Formatter {
     pub fn format(ast: &ParseAst<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
         let ctx = FmtCtx::new(comment_map, src);
         let doc = ast.to_doc(&ctx);
-        render(&doc)
+        render(&doc).trim_start_matches('\n').to_string()
     }
 }
 
@@ -28,11 +28,10 @@ struct FmtCtx<'src> {
     src: &'src str,
 
     /// Byte offset just past the last thing emitted
-    /// Necessary for reattaching comments
     cursor: Cell<usize>,
 
-    /// Stack of enclosing spd end offsets. Used to keep comments inside the
-    /// node they originated from.
+    /// Stack of enclosing spd end offsets.
+    /// Necessary for determining inner vs trailing comments.
     node_ends: RefCell<Vec<usize>>,
 }
 
@@ -42,24 +41,17 @@ impl<'src> FmtCtx<'src> {
             cm,
             src,
             cursor: Cell::new(0),
-            node_ends: RefCell::new(Vec::new()),
+            node_ends: RefCell::new(vec![]),
         }
     }
 
-    fn _leading_comments(&self, node_start: usize, indent: usize) -> (Doc<'src>, bool) {
-        self._leading_comments_impl(node_start, indent, true)
-    }
-
-    fn _leading_comments_no_prefix(&self, node_start: usize, indent: usize) -> (Doc<'src>, bool) {
-        self._leading_comments_impl(node_start, indent, false)
-    }
-
-    fn _leading_comments_impl(
-        &self,
-        node_start: usize,
-        indent: usize,
-        prefix_first_line: bool,
-    ) -> (Doc<'src>, bool) {
+    /// Comments that appear before some node, e.g.
+    /// ```cloesce
+    /// // leading
+    /// // comments
+    /// model Foo {}
+    /// ```
+    fn leading_comments(&self, node_start: usize, indent: usize) -> (Doc<'src>, bool) {
         let prev = self.cursor.get();
         let lo = self.cm.entries.partition_point(|(off, _)| *off < prev);
         let mut doc = Doc::nil();
@@ -72,16 +64,14 @@ impl<'src> FmtCtx<'src> {
             }
             let gap = self.src.get(cursor..offset).unwrap_or("");
             let newline_count = gap.chars().filter(|&c| c == '\n').count();
-            // Preserve newlines but cap at 2 (one blank line). If a comment
-            // cannot stay attached to its original node, reattach it to the
-            // next nearest printable span.
+
             let extra_blank = if newline_count >= 2 {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
 
-            let line_prefix = if emitted || prefix_first_line {
+            let line_prefix = if emitted {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -102,24 +92,39 @@ impl<'src> FmtCtx<'src> {
         (doc, emitted)
     }
 
-    fn _trailing_comment(&self, node_end: usize) -> Doc<'src> {
-        let lo = self.cm.entries.partition_point(|(off, _)| *off < node_end);
-        if let Some(&(offset, text)) = self.cm.entries.get(lo) {
-            // Only return if this comment hasn't been processed yet
-            if offset >= self.cursor.get() {
-                let gap = self.src.get(node_end..offset).unwrap_or("");
-                // A trailing comment only belongs to this node when there is no
-                // intervening syntax token between the node and the comment.
-                if !gap.contains('\n') && gap.chars().all(char::is_whitespace) {
-                    self.cursor.set(offset + text.len());
-                    return Doc::text(" ").then(Doc::owned(normalize_comment_text(text)));
-                }
+    /// Comment that appears directly after a node, e.g.
+    /// ```cloesce
+    /// model Foo {} // trailing comment
+    /// ```
+    fn trailing_comment(&self, node_end: usize) -> Doc<'src> {
+        let min_offset = node_end.max(self.cursor.get());
+        let lo = self
+            .cm
+            .entries
+            .partition_point(|(off, _)| *off < min_offset);
+        if let Some(&(offset, text)) = self.cm.entries.get(lo)
+            && offset >= node_end
+        {
+            let gap = self.src.get(node_end..offset).unwrap_or("");
+
+            // A trailing comment only belongs to this node when there is no
+            // intervening syntax token between the node and the comment.
+            if !gap.contains('\n') && gap.chars().all(char::is_whitespace) {
+                self.cursor.set(offset + text.len());
+                return Doc::text(" ").then(Doc::owned(normalize_comment_text(text)));
             }
         }
         Doc::nil()
     }
 
-    fn _inner_comments(&self, indent: usize) -> Doc<'src> {
+    /// Comments that do not lead a node but are in between it's ending, e.g.
+    /// ```cloesce
+    /// model Foo {
+    ///     id: int
+    ///     // inner comment
+    /// }
+    /// ```
+    fn inner_comments(&self, indent: usize) -> Doc<'src> {
         let Some(limit) = self.node_ends.borrow().last().copied() else {
             return Doc::nil();
         };
@@ -154,7 +159,7 @@ impl<'src> FmtCtx<'src> {
     }
 
     /// Advance the cursor to at least `pos`.
-    fn _advance(&self, pos: usize) {
+    fn advance(&self, pos: usize) {
         let current = self.cursor.get();
         if pos <= current {
             return;
@@ -170,103 +175,143 @@ impl<'src> FmtCtx<'src> {
         self.cursor.set(pos);
     }
 
-    fn _gap(&self, span: Span) -> usize {
+    /// Wraps `inner` in a `{ ... }` block at the given inner indent depth.
+    /// Emits ` {`, the inner doc, any inner comments, a hardline at `depth - 1`, then `}`.
+    fn block(&self, inner: Doc<'src>, inner_depth: usize) -> Doc<'src> {
+        Doc::text(" {")
+            .then(inner)
+            .then(self.inner_comments(inner_depth))
+            .then(Doc::hardline(inner_depth.saturating_sub(1)))
+            .then(Doc::text("}"))
+    }
+
+    fn gap(&self, span: Span) -> usize {
         let gap = self.src.get(self.cursor.get()..span.start).unwrap_or("");
         gap.chars().filter(|&c| c == '\n').count()
     }
 
     fn spd_doc<T: ToDoc<'src>>(&self, spd: &'src Spd<T>, indent: usize, inline: bool) -> Doc<'src> {
-        let gap = self._gap(spd.span);
-        let (leading, has_leading_comments) = self._leading_comments(spd.span.start, indent);
+        let gap = self.gap(spd.span);
+        let (leading, has_leading_comments) = self.leading_comments(spd.span.start, indent);
 
         self.node_ends.borrow_mut().push(spd.span.end);
         let content = spd.block.to_doc(self);
         self.node_ends.borrow_mut().pop();
 
-        let trailing = self._trailing_comment(spd.span.end);
-        self._advance(spd.span.end);
+        let trailing = self.trailing_comment(spd.span.end);
+        self.advance(spd.span.end);
 
         if inline {
+            let leading_sep = if has_leading_comments {
+                Doc::hardline(indent)
+            } else {
+                Doc::nil()
+            };
             let content_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            return leading.then(content_sep).then(content).then(trailing);
+            return leading_sep
+                .then(leading)
+                .then(content_sep)
+                .then(content)
+                .then(trailing);
         }
 
         // Preserve newlines
-        let extra_blank = if gap >= 2 && !has_leading_comments {
+        let extra_blank = if indent <= 1 && gap >= 2 && !has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
+        let content_sep = if has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
         };
 
         extra_blank
-            .then(leading)
             .then(Doc::hardline(indent))
+            .then(leading)
+            .then(content_sep)
             .then(content)
             .then(trailing)
     }
 
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let gap = self._gap(sym.span);
-        let (leading, has_leading_comments) = self._leading_comments(sym.span.start, indent);
+        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name);
-        let trailing = self._trailing_comment(sym.span.end);
-        self._advance(sym.span.end);
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
 
         if inline {
+            let leading_sep = if has_leading_comments {
+                Doc::hardline(indent)
+            } else {
+                Doc::nil()
+            };
             let content_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            return leading.then(content_sep).then(content).then(trailing);
+            return leading_sep
+                .then(leading)
+                .then(content_sep)
+                .then(content)
+                .then(trailing);
         }
 
-        // Preserve newlines
-        let extra_blank = if gap >= 2 && !has_leading_comments {
+        let content_sep = if has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
         };
 
-        extra_blank
+        Doc::hardline(indent)
             .then(leading)
-            .then(Doc::hardline(indent))
+            .then(content_sep)
             .then(content)
             .then(trailing)
     }
 
     fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let gap = self._gap(sym.span);
-        let (leading, has_leading_comments) = self._leading_comments(sym.span.start, indent);
+        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name)
             .then(Doc::text(": "))
             .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)));
-        let trailing = self._trailing_comment(sym.span.end);
-        self._advance(sym.span.end);
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
 
         if inline {
+            let leading_sep = if has_leading_comments {
+                Doc::hardline(indent)
+            } else {
+                Doc::nil()
+            };
             let content_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            return leading.then(content_sep).then(content).then(trailing);
+            return leading_sep
+                .then(leading)
+                .then(content_sep)
+                .then(content)
+                .then(trailing);
         }
 
-        // Preserve newlines
-        let extra_blank = if gap >= 2 && !has_leading_comments {
+        let content_sep = if has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
         };
 
-        extra_blank
+        Doc::hardline(indent)
             .then(leading)
-            .then(Doc::hardline(indent))
+            .then(content_sep)
             .then(content)
             .then(trailing)
     }
@@ -296,8 +341,8 @@ impl<'src> ParseAst<'src> {
             doc = doc.then(ctx.spd_doc(spd, 0, false));
         }
 
-        // Keep any unconsumed comments by attaching them at EOF.
-        let (trailing_comments, has_trailing_comments) = ctx._leading_comments(usize::MAX, 0);
+        // Unconsumed dangling comments
+        let (trailing_comments, has_trailing_comments) = ctx.leading_comments(usize::MAX, 0);
         if has_trailing_comments {
             doc = doc.then(trailing_comments);
         }
@@ -327,12 +372,9 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
             doc = doc.then(ctx.spd_doc(tag, 0, true)).then(Doc::hardline(0));
         }
 
-        // Keep comments that appear between `model` and the symbol attached to
-        // the full model header, not inserted between the keyword and name.
-        let (symbol_leading, has_symbol_leading) =
-            ctx._leading_comments_no_prefix(self.symbol.span.start, 0);
-        if has_symbol_leading {
-            doc = doc.then(symbol_leading).then(Doc::hardline(0));
+        let (leading, has_leading_comments) = ctx.leading_comments(self.symbol.span.start, 0);
+        if has_leading_comments {
+            doc = doc.then(leading).then(Doc::hardline(0));
         }
 
         doc = doc
@@ -344,13 +386,11 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
             return doc.then(Doc::text(" {}"));
         }
 
-        doc = doc.then(Doc::text(" {"));
+        let mut inner = Doc::nil();
         for spd in &self.blocks {
-            doc = doc.then(ctx.spd_doc(spd, 1, false));
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        doc.then(ctx.block(inner, 1))
     }
 }
 
@@ -373,56 +413,34 @@ impl<'src> ToDoc<'src> for CrudKind {
 
 impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        fn model_block<'src, T: ToDoc<'src>>(
+            keyword: &'static str,
+            blocks: &'src [Spd<T>],
+            ctx: &FmtCtx<'src>,
+        ) -> Doc<'src> {
+            let mut inner = Doc::nil();
+            for block in blocks {
+                inner = inner.then(ctx.spd_doc(block, 2, false));
+            }
+            Doc::text(keyword).then(ctx.block(inner, 2))
+        }
+
         match self {
             ModelBlockKind::Column(sym) => ctx.sym_typed_doc(sym, 1, true),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
-            ModelBlockKind::Primary(blocks) => {
-                let mut doc = Doc::text("primary {");
-                for block in blocks {
-                    doc = doc.then(ctx.spd_doc(block, 2, false));
-                }
-                doc.then(ctx._inner_comments(2))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("}"))
-            }
-            ModelBlockKind::Unique(blocks) => {
-                let mut doc = Doc::text("unique {");
-                for block in blocks {
-                    doc = doc.then(ctx.spd_doc(block, 2, false));
-                }
-                doc.then(ctx._inner_comments(2))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("}"))
-            }
-            ModelBlockKind::Optional(blocks) => {
-                let mut doc = Doc::text("optional {");
-                for block in blocks {
-                    doc = doc.then(ctx.spd_doc(block, 2, false));
-                }
-                doc.then(ctx._inner_comments(2))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("}"))
-            }
-            ModelBlockKind::Paginated(blocks) => {
-                let mut doc = Doc::text("paginated {");
-                for block in blocks {
-                    doc = doc.then(ctx.spd_doc(block, 2, false));
-                }
-                doc.then(ctx._inner_comments(2))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("}"))
-            }
+            ModelBlockKind::Primary(blocks) => model_block("primary", blocks, ctx),
+            ModelBlockKind::Unique(blocks) => model_block("unique", blocks, ctx),
+            ModelBlockKind::Optional(blocks) => model_block("optional", blocks, ctx),
+            ModelBlockKind::Paginated(blocks) => model_block("paginated", blocks, ctx),
             ModelBlockKind::KeyField(syms) => {
-                let mut doc = Doc::text("keyfield {");
+                let mut inner = Doc::nil();
                 for sym in syms {
-                    doc = doc.then(Doc::hardline(2)).then(ctx.sym_doc(sym, 2, true));
+                    inner = inner.then(ctx.sym_doc(sym, 2, false));
                 }
-                doc.then(ctx._inner_comments(2))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("}"))
+                Doc::text("keyfield").then(ctx.block(inner, 2))
             }
         }
     }
@@ -454,33 +472,26 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             left.then(Doc::text("::")).then(right)
         });
 
-        let mut doc = Doc::text("foreign (").then(adjs).then(Doc::text(")"));
-
+        let doc = Doc::text("foreign (").then(adjs).then(Doc::text(")"));
         let qualifier = match &self.qualifier {
-            Some(ForeignQualifier::Primary) => Doc::text(" primary"),
-            Some(ForeignQualifier::Optional) => Doc::text(" optional"),
-            Some(ForeignQualifier::Unique) => Doc::text(" unique"),
+            Some(ForeignQualifier::Primary) => Doc::text(" primary "),
+            Some(ForeignQualifier::Optional) => Doc::text(" optional "),
+            Some(ForeignQualifier::Unique) => Doc::text(" unique "),
             None => Doc::nil(),
         };
-        doc = doc.then(qualifier).then(Doc::text(" {"));
 
+        let mut inner = Doc::nil();
         for field in &self.fields {
-            doc = doc.then(ctx.sym_doc(field, 2, false));
+            inner = inner.then(ctx.sym_doc(field, 2, false));
         }
 
         if let Some(nav) = &self.nav {
-            doc = doc
+            inner = inner
                 .then(Doc::hardline(2))
-                .then(Doc::text("nav { "))
-                .then(ctx.sym_doc(&nav.block, 2, true))
-                .then(ctx._inner_comments(2))
-                .then(Doc::hardline(1))
-                .then(Doc::text("}"));
+                .then(ctx.spd_doc(nav, 2, false));
         }
 
-        doc.then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+        doc.then(qualifier).then(ctx.block(inner, 2))
     }
 }
 
@@ -494,11 +505,8 @@ impl<'src> ToDoc<'src> for NavigationBlock<'src> {
 
         Doc::text("nav (")
             .then(adjs)
-            .then(Doc::text(") {"))
-            .then(ctx.sym_doc(&self.nav.block, 2, false))
-            .then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+            .then(Doc::text(")"))
+            .then(ctx.block(ctx.sym_doc(&self.nav.block, 2, false), 2))
     }
 }
 
@@ -515,11 +523,7 @@ impl<'src> ToDoc<'src> for KvBlock<'src> {
             .then(Doc::text(self.key_format))
             .then(Doc::text("\")"))
             .then(paginated)
-            .then(Doc::text(" {"))
-            .then(ctx.sym_typed_doc(&self.field, 2, false))
-            .then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+            .then(ctx.block(ctx.sym_typed_doc(&self.field, 2, false), 2))
     }
 }
 
@@ -536,29 +540,23 @@ impl<'src> ToDoc<'src> for R2Block<'src> {
             .then(Doc::text(self.key_format))
             .then(Doc::text("\")"))
             .then(paginated)
-            .then(Doc::text(" {"))
-            .then(ctx.sym_doc(&self.field, 2, false))
-            .then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+            .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
 
 impl<'src> ToDoc<'src> for ApiBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("api ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = Doc::text("api ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.methods.is_empty() {
             return doc.then(Doc::text(" {}"));
         }
 
-        doc = doc.then(Doc::text(" {"));
+        let mut inner = Doc::nil();
         for spd in &self.methods {
-            doc = doc.then(ctx.spd_doc(spd, 1, false));
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        doc.then(ctx.block(inner, 1))
     }
 }
 
@@ -601,16 +599,14 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.parameters, |param| ctx.sym_typed_doc(param, 0, true));
 
-        Doc::text("(")
-            .then(params)
-            .then(Doc::text(") {"))
-            .then(Doc::hardline(2))
+        let sql = Doc::hardline(2)
             .then(Doc::text("\""))
             .then(Doc::text(self.raw_sql))
-            .then(Doc::text("\""))
-            .then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+            .then(Doc::text("\""));
+        Doc::text("(")
+            .then(params)
+            .then(Doc::text(")"))
+            .then(ctx.block(sql, 2))
     }
 }
 
@@ -622,38 +618,36 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
             Doc::nil()
         };
 
-        let include = if self.tree.0.is_empty() {
-            Doc::hardline(1).then(Doc::text("include {}"))
-        } else {
-            Doc::hardline(1)
-                .then(Doc::text("include {"))
-                .then(self.tree.to_doc_at(ctx, 2))
-                .then(Doc::hardline(1))
-                .then(Doc::text("}"))
-        };
-
-        let mut doc = internal
+        let source_doc = internal
             .then(Doc::text("source "))
             .then(ctx.sym_doc(&self.symbol, 0, true))
             .then(Doc::text(" for "))
-            .then(ctx.sym_doc(&self.model, 0, true))
-            .then(Doc::text(" {"))
-            .then(include);
+            .then(ctx.sym_doc(&self.model, 0, true));
 
-        for (label, spd_opt) in [("get", &self.get), ("list", &self.list)] {
-            if let Some(spd) = spd_opt {
-                doc = doc
-                    .then(Doc::hardline(1))
-                    .then(Doc::hardline(1))
-                    .then(Doc::text("sql "))
-                    .then(Doc::text(label))
-                    .then(ctx.spd_doc(spd, 2, true))
-            }
+        let mut include = if self.tree.0.is_empty() {
+            Doc::hardline(1).then(Doc::text("include {}"))
+        } else {
+            Doc::hardline(1)
+                .then(Doc::text("include"))
+                .then(ctx.block(self.tree.to_doc_at(ctx, 2), 2))
+        };
+
+        if let Some(get) = &self.get {
+            include = include
+                .then(Doc::hardline(1))
+                .then(Doc::hardline(1))
+                .then(Doc::text("sql get"))
+                .then(ctx.spd_doc(get, 1, true));
+        }
+        if let Some(list) = &self.list {
+            include = include
+                .then(Doc::hardline(1))
+                .then(Doc::hardline(1))
+                .then(Doc::text("sql list"))
+                .then(ctx.spd_doc(list, 1, true));
         }
 
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        source_doc.then(ctx.block(include, 1))
     }
 }
 
@@ -662,18 +656,14 @@ impl ParsedIncludeTree<'_> {
         let leaves = self.0.iter().filter(|(_, v)| v.0.is_empty());
         let branches = self.0.iter().filter(|(_, v)| !v.0.is_empty());
 
-        let mut doc = Doc::nil().then(Doc::hardline(depth));
+        let mut doc = Doc::nil();
         for (leaf, _) in leaves {
-            doc = doc.then(ctx.sym_doc(leaf, depth, true));
+            doc = doc.then(ctx.sym_doc(leaf, depth, false));
         }
         for (name, subtree) in branches {
             doc = doc
                 .then(ctx.sym_doc(name, depth, false))
-                .then(Doc::text(" {"))
-                .then(subtree.to_doc_at(ctx, depth + 1))
-                .then(ctx._inner_comments(depth + 1))
-                .then(Doc::hardline(depth))
-                .then(Doc::text("}"));
+                .then(ctx.block(subtree.to_doc_at(ctx, depth + 1), depth + 1));
         }
         doc
     }
@@ -681,72 +671,65 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("service ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = Doc::text("service ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
         }
 
-        doc = doc.then(Doc::text(" {"));
+        let mut inner = Doc::nil();
         for field in &self.fields {
-            doc = doc.then(ctx.sym_typed_doc(field, 1, false));
+            inner = inner.then(ctx.sym_typed_doc(field, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        doc.then(ctx.block(inner, 1))
     }
 }
 
 impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("poo ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = Doc::text("poo ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
         }
 
-        doc = doc.then(Doc::text(" {"));
+        let mut inner = Doc::nil();
         for field in &self.fields {
-            doc = doc.then(ctx.sym_typed_doc(field, 1, false));
+            inner = inner.then(ctx.sym_typed_doc(field, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        doc.then(ctx.block(inner, 1))
     }
 }
 
 impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = match self.kind {
-            EnvBindingBlockKind::D1 => Doc::text("d1 {"),
-            EnvBindingBlockKind::R2 => Doc::text("r2 {"),
-            EnvBindingBlockKind::Kv => Doc::text("kv {"),
-            EnvBindingBlockKind::Var => Doc::text("vars {"),
+        let keyword = match self.kind {
+            EnvBindingBlockKind::D1 => "d1",
+            EnvBindingBlockKind::R2 => "r2",
+            EnvBindingBlockKind::Kv => "kv",
+            EnvBindingBlockKind::Var => "vars",
         };
 
+        let mut inner = Doc::nil();
         for symbol in &self.symbols {
             if matches!(self.kind, EnvBindingBlockKind::Var) {
-                doc = doc.then(ctx.sym_typed_doc(symbol, 2, false));
+                inner = inner.then(ctx.sym_typed_doc(symbol, 2, false));
             } else {
-                doc = doc.then(ctx.sym_doc(symbol, 2, false));
+                inner = inner.then(ctx.sym_doc(symbol, 2, false));
             }
         }
 
-        doc.then(ctx._inner_comments(2))
-            .then(Doc::hardline(1))
-            .then(Doc::text("}"))
+        Doc::text(keyword).then(ctx.block(inner, 2))
     }
 }
 
 impl<'src> ToDoc<'src> for EnvBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("env {");
+        let mut inner = Doc::nil();
         for spd in &self.blocks {
-            doc = doc.then(ctx.spd_doc(spd, 1, false));
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        Doc::text("env").then(ctx.block(inner, 1))
     }
 }
 
@@ -755,13 +738,17 @@ impl<'src> ToDoc<'src> for InjectBlock<'src> {
         if self.symbols.is_empty() {
             return Doc::text("inject {}");
         }
-        let mut doc = Doc::text("inject {");
+        let mut inner = Doc::nil();
         for sym in &self.symbols {
-            doc = doc.then(Doc::hardline(1)).then(ctx.sym_doc(sym, 1, true));
+            inner = inner.then(ctx.sym_doc(sym, 1, false));
         }
-        doc.then(ctx._inner_comments(1))
-            .then(Doc::hardline(0))
-            .then(Doc::text("}"))
+        Doc::text("inject").then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        Doc::text("nav").then(ctx.block(ctx.sym_doc(&self.symbol, 3, false), 3))
     }
 }
 

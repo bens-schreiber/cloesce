@@ -75,6 +75,7 @@ fn format_idempotent() {
 fn comments_retained() {
     // Arrange
     let src = r#"
+    // 0
     env {
         //1
         d1 { 
@@ -114,7 +115,7 @@ fn comments_retained() {
     let formatted = Formatter::format(&parse_ast, comment_map, src);
     let (_, res) = lex_parse(&formatted);
 
-    // Assert
+    // // Assert
     assert_eq!(
         res.results[0].comment_map.entries.len(),
         expected_retained,

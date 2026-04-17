@@ -600,7 +600,7 @@ fn model_navigation() {
         })
         .unwrap();
     assert_eq!(loc_fb.fields[0].name, "locationId");
-    assert_eq!(loc_fb.nav.as_ref().unwrap().block.name, "location");
+    assert_eq!(loc_fb.nav.as_ref().unwrap().block.symbol.name, "location");
 
     let tag_fb = m
         .blocks

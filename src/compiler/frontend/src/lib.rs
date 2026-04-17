@@ -138,6 +138,10 @@ pub enum ForeignQualifier {
     Unique,
 }
 
+pub struct ForeignBlockNav<'src> {
+    pub symbol: Symbol<'src>,
+}
+
 pub struct ForeignBlock<'src> {
     // foreign(AdjModel::field1, AdjModel::field2, ...)
     pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
@@ -152,7 +156,7 @@ pub struct ForeignBlock<'src> {
     ///     nav { navSymbol }
     /// }
     /// ```
-    pub nav: Option<Spd<Symbol<'src>>>,
+    pub nav: Option<Spd<ForeignBlockNav<'src>>>,
 
     pub qualifier: Option<ForeignQualifier>,
 }

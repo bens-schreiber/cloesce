@@ -474,7 +474,14 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         if let Some(nav_field) = &fk.nav {
-            self.nav(ma, binding_symbol, &fk.adj, &nav_field.block, true, table);
+            self.nav(
+                ma,
+                binding_symbol,
+                &fk.adj,
+                &nav_field.block.symbol,
+                true,
+                table,
+            );
         }
     }
 

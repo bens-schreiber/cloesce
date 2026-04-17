@@ -2,6 +2,7 @@
 source: frontend/tests/formatter_tests.rs
 expression: formatted
 ---
+// 0
 env {
     // 1
     d1 {
@@ -27,12 +28,12 @@ model BasicModel {
     foreign (OneToManyModel::id) {
         // E
         fk_to_model // 15
-        nav { 
+        
         // 16
-        // F
-        oneToOneNav // 18
-        // G
-    }
+        nav {
+            // F
+            oneToOneNav // 18
+        } // G
     } // 19
     // H
 } // 20
