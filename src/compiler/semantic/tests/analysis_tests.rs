@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 
 use ast::{CidlType, Field, MediaType, NavigationFieldKind};
-use compiler_test::lex_and_parse;
+use compiler_test::{lex_and_parse, lex_and_parse_files};
 use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -47,6 +47,43 @@ fn with_env(src: &str) -> String {
     "#,
         src
     )
+}
+
+#[test]
+fn orphan_use_tag() {
+    // Arrange
+    let file_a = r#"
+        env {
+            d1 { my_d1 }
+        }
+
+        [use my_d1]
+        model GoodModel {
+            primary { id: int }
+        }
+
+        [use my_d1]
+        env {
+            kv { my_kv }
+        }
+
+        [use my_d1]
+    "#;
+
+    let file_b = r#"
+        model ShouldNotInheritTag {
+            primary { id: int }
+        }
+    "#;
+
+    let files = [("a.cidl", file_a), ("b.cidl", file_b)];
+
+    // Act
+    let parse = lex_and_parse_files(&files);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(count_errs!(errors, SemanticError::OrphanUseTag { .. }), 2);
 }
 
 #[test]

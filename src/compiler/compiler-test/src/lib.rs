@@ -27,6 +27,28 @@ macro_rules! expected_str {
     }};
 }
 
+/// Given multiple (path, source) pairs, lex and parse them into a [ParseAst], panicking if either step fails.
+pub fn lex_and_parse_files<'a>(files: &'a [(&'a str, &'a str)]) -> ParseAst<'a> {
+    let sources: Vec<LexTarget<'a>> = files
+        .iter()
+        .map(|(path, src)| LexTarget {
+            src,
+            path: PathBuf::from(path),
+        })
+        .collect();
+    let lexed = CloesceLexer::lex(sources);
+    if lexed.has_errors() {
+        lexed.display_error(&lexed.file_table);
+        panic!("lexing should succeed");
+    }
+    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
+    if result.has_errors() {
+        result.display_error(&lexed.file_table);
+        panic!("parse should succeed");
+    }
+    result.ast
+}
+
 /// Given a source string, lex and parse it into a [ParseAst], panicking if either step fails.
 pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
     let source = LexTarget {

@@ -110,11 +110,20 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             }
         };
 
-        let mut pending_use_tags = Vec::new();
+        // Use tags are top level but must be attached to some model
+        // Defer their insertion until a model is encountered, or orphan them if a
+        // non-model block or new file is encountered
+        let mut pending_use_tags = Vec::<(&'p UseTag<'src>, frontend::Span)>::new();
 
         for spd in &parse.blocks {
+            let is_new_file = spd.span.start
+                < pending_use_tags
+                    .last()
+                    .map(|(_, span): &(_, _)| span.start)
+                    .unwrap_or(0);
             if matches!(spd.block, AstBlockKind::Model(_)).not()
                 && matches!(spd.block, AstBlockKind::UseTag(_)).not()
+                || is_new_file
             {
                 for (_, span) in pending_use_tags.drain(..) {
                     sink.push(SemanticError::OrphanUseTag { span });
@@ -333,6 +342,10 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
             }
+        }
+
+        for (_, span) in pending_use_tags.drain(..) {
+            sink.push(SemanticError::OrphanUseTag { span });
         }
 
         st
