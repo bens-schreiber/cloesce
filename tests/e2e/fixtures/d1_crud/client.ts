@@ -102,7 +102,7 @@ export class CrudHaver {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver[]>>;
   static $list(
@@ -119,8 +119,8 @@ export class CrudHaver {
       `http://localhost:5391/api/CrudHaver/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -232,7 +232,7 @@ export class Parent {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent[]>>;
   static $list(
@@ -240,7 +240,7 @@ export class Parent {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "WithChildren",
+    kind: "WithChildren",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent[]>>;
   static $list(
@@ -257,8 +257,8 @@ export class Parent {
       `http://localhost:5391/api/Parent/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

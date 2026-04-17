@@ -240,7 +240,7 @@ export class {{ model.name }} {
 {%- else %}
   args: {},
 {%- endif %}
-  kind: "{{ ds.name }}",
+    kind: "{{ ds.name }}",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
@@ -268,7 +268,7 @@ export class {{ model.name }} {
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if !self.is_datasource(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
+    baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
 {%- else %}
   {
     const value = (args as any).{{ param.name }};

@@ -167,7 +167,7 @@ export class BlobHaver {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver[]>>;
   static $list(
@@ -184,8 +184,8 @@ export class BlobHaver {
       `http://localhost:5270/api/BlobHaver/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
