@@ -474,9 +474,9 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
 
         let doc = Doc::text("foreign (").then(adjs).then(Doc::text(")"));
         let qualifier = match &self.qualifier {
-            Some(ForeignQualifier::Primary) => Doc::text(" primary "),
-            Some(ForeignQualifier::Optional) => Doc::text(" optional "),
-            Some(ForeignQualifier::Unique) => Doc::text(" unique "),
+            Some(ForeignQualifier::Primary) => Doc::text(" primary"),
+            Some(ForeignQualifier::Optional) => Doc::text(" optional"),
+            Some(ForeignQualifier::Unique) => Doc::text(" unique"),
             None => Doc::nil(),
         };
 
