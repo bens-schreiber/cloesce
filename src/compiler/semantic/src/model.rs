@@ -10,7 +10,7 @@ use ast::{
 };
 use frontend::{
     ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
-    R2Block, SpdSlice, SqlBlockKind, Symbol,
+    R2Block, SpdSlice, SqlBlockKind, Symbol, UseTagParamKind,
 };
 use indexmap::IndexMap;
 use std::{collections::BTreeMap, vec};
@@ -30,7 +30,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
 
         for &model_block in table.models.values() {
-            let (cruds, env_bindings) = model_block.partition_use_tags();
+            let (cruds, env_bindings) = partition_use_tags(model_block.symbol.name, table);
 
             let builder = ModelBuilder::new(model_block);
             let Some(mut model) = builder.build(&mut self, env_bindings, table) else {
@@ -374,7 +374,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         // Must belong to the same database
-        let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
+        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table).1.into_iter().next();
         if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
@@ -530,7 +530,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
 
         // Must belong to the same database
-        let adj_binding = adj_model_block.partition_use_tags().1.first().copied();
+        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table).1.into_iter().next();
         if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::NavigationReferencesDifferentDatabase { field });
@@ -800,6 +800,23 @@ struct FieldQualifiers {
     is_optional: bool,
     is_primary: bool,
     unique_ids: Vec<usize>,
+}
+
+fn partition_use_tags<'src, 'p>(
+    model_name: &'src str,
+    table: &SymbolTable<'src, 'p>,
+) -> (Vec<&'p CrudKind>, Vec<&'p Symbol<'src>>) {
+    let mut cruds = Vec::new();
+    let mut env_bindings = Vec::new();
+    for tag in table.model_use_tags.get(model_name).map(|v| v.as_slice()).unwrap_or(&[]) {
+        for param in &tag.params {
+            match param {
+                UseTagParamKind::Crud(spd) => cruds.push(&spd.block),
+                UseTagParamKind::EnvBinding(sym) => env_bindings.push(sym),
+            }
+        }
+    }
+    (cruds, env_bindings)
 }
 
 /// Extracts braced variables from a format string.

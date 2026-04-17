@@ -47,8 +47,7 @@ source BurgersWithLettuceOrdered for Hamburger {
     }
 }
 
-[internal]
-source NoLettuce for Hamburger {
+internal source NoLettuce for Hamburger {
     include {
         toppings
     }
@@ -64,8 +63,7 @@ source NoLettuce for Hamburger {
     }
 }
 
-[internal]
-source OnlyBacon for Hamburger {
+internal source OnlyBacon for Hamburger {
     include {
         toppings
     }

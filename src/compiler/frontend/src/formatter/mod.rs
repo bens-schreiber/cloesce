@@ -201,17 +201,19 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(spd.span.end);
         self.advance(spd.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
@@ -221,12 +223,6 @@ impl<'src> FmtCtx<'src> {
 
         // Preserve newlines
         let extra_blank = if indent <= 1 && gap >= 2 && !has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
-
-        let content_sep = if has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -246,29 +242,25 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(sym.span.end);
         self.advance(sym.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
 
         Doc::hardline(indent)
             .then(leading)
@@ -285,29 +277,25 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(sym.span.end);
         self.advance(sym.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
 
         Doc::hardline(indent)
             .then(leading)
@@ -355,6 +343,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
             AstBlockKind::Model(b) => b.to_doc(ctx),
+            AstBlockKind::UseTag(b) => b.to_doc(ctx),
             AstBlockKind::Api(b) => b.to_doc(ctx),
             AstBlockKind::DataSource(b) => b.to_doc(ctx),
             AstBlockKind::Service(b) => b.to_doc(ctx),
@@ -367,19 +356,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::nil();
-        for tag in &self.use_tags {
-            doc = doc.then(ctx.spd_doc(tag, 0, true)).then(Doc::hardline(0));
-        }
-
-        let (leading, has_leading_comments) = ctx.leading_comments(self.symbol.span.start, 0);
-        if has_leading_comments {
-            doc = doc.then(leading).then(Doc::hardline(0));
-        }
-
-        doc = doc
-            .then(Doc::text("model "))
-            .then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = Doc::text("model ").then(ctx.sym_doc(&self.symbol, 0, true));
 
         if self.blocks.is_empty() {
             // No content, return empty model
@@ -613,7 +590,7 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
 impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let internal = if self.is_internal {
-            Doc::text("[internal]").then(Doc::hardline(0))
+            Doc::text("internal ")
         } else {
             Doc::nil()
         };

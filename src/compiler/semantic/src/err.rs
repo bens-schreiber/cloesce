@@ -183,6 +183,11 @@ pub enum SemanticError<'src, 'p> {
     ApiReservedMethod {
         method: &'p Symbol<'src>,
     },
+
+    /// A use tag is not immediately followed by a model block.
+    OrphanUseTag {
+        span: Span,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -875,6 +880,20 @@ fn display(
                         .with_message(
                             "names like `$get`, `$list`, and `$save` are reserved by the compiler",
                         )
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .write(cache, std::io::stderr())
+                .ok();
+        }
+
+        SemanticError::OrphanUseTag { span } => {
+            let (path, range) = span_parts(span, file_table);
+            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+                .with_message("use tag is not followed by a model block")
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("this use tag must be placed immediately before a model")
                         .with_color(Color::Red),
                 )
                 .finish()

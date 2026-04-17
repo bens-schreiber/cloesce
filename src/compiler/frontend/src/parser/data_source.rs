@@ -82,14 +82,8 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             raw_sql,
         });
 
-    // [internal]
-    let internal_decorator = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("internal")))
-        .then(just(Token::RBracket))
-        .ignored();
-
-    // source SourceName for ModelName { ... }
-    internal_decorator
+    // internal | source SourceName for ModelName { ... }
+    just(Token::Ident("internal"))
         .or_not()
         .then(just(Token::Source).ignore_then(symbol()))
         .then_ignore(just(Token::Ident("for")))

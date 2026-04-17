@@ -145,11 +145,10 @@ source Custom for Person {
 }
 ```
 
-Every Data Source will be generated to the backend as a type safe query. By default, all Data Sources are exposed to the client for querying. However, should a Data Source be only intended for interal use, it can be marked with the `internal` tag:
+Every Data Source will be generated to the backend as a type safe query. By default, all Data Sources are exposed to the client for querying. However, should a Data Source be only intended for interal use, it can be marked `internal`:
 ```cloesce
 
-[internal]
-source MyInternal for Person {
+internal source MyInternal for Person {
     // ...
 }
 ```

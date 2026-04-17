@@ -2,7 +2,7 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
     AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind,
+    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -425,11 +425,11 @@ fn model_primary_unique_optional_foreign() {
     );
 
     let m = find_model(&ast, "M");
+    let m_tags = find_use_tags(&ast, "M");
 
-    let env_bindings = m
-        .use_tags
+    let env_bindings = m_tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
+        .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
             UseTagParamKind::EnvBinding(n) => Some(n.name),
             _ => None,
@@ -437,10 +437,9 @@ fn model_primary_unique_optional_foreign() {
         .collect::<Vec<_>>();
     assert_eq!(env_bindings, vec!["d1_db", "d2_db"]);
 
-    let cruds: Vec<CrudKind> = m
-        .use_tags
+    let cruds: Vec<CrudKind> = m_tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
+        .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
             UseTagParamKind::Crud(c) => Some(c.block.clone()),
             _ => None,
@@ -782,11 +781,11 @@ fn model_kv_r2_paginated() {
     );
 
     let kv_model = find_model(&ast, "PureKv");
+    let kv_tags = find_use_tags(&ast, "PureKv");
 
-    let kv_env_bindings = kv_model
-        .use_tags
+    let kv_env_bindings = kv_tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
+        .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
             UseTagParamKind::EnvBinding(n) => Some(n),
             _ => None,
@@ -794,10 +793,9 @@ fn model_kv_r2_paginated() {
         .collect::<Vec<_>>();
     assert!(kv_env_bindings.is_empty());
 
-    let kv_cruds: Vec<CrudKind> = kv_model
-        .use_tags
+    let kv_cruds: Vec<CrudKind> = kv_tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
+        .flat_map(|t| t.params.iter())
         .filter_map(|p| match p {
             UseTagParamKind::Crud(c) => Some(c.block.clone()),
             _ => None,
@@ -868,4 +866,25 @@ fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
             _ => None,
         })
         .unwrap_or_else(|| panic!("{name} model to be present"))
+}
+
+fn find_use_tags<'a>(ast: &'a ParseAst<'a>, model_name: &str) -> Vec<&'a UseTag<'a>> {
+    let model_pos = ast
+        .blocks
+        .iter()
+        .position(|spd| matches!(&spd.block, AstBlockKind::Model(m) if m.symbol.name == model_name))
+        .unwrap_or_else(|| panic!("{model_name} model to be present"));
+
+    ast.blocks[..model_pos]
+        .iter()
+        .rev()
+        .take_while(|spd| matches!(&spd.block, AstBlockKind::UseTag(_)))
+        .map(|spd| match &spd.block {
+            AstBlockKind::UseTag(t) => t,
+            _ => unreachable!(),
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect()
 }

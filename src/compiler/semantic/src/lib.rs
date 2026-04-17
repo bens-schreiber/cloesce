@@ -2,11 +2,14 @@ use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
     EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, SpdSlice,
-    Symbol,
+    Symbol, UseTag,
 };
 use indexmap::IndexMap;
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::{
+    collections::{BTreeMap, HashMap, VecDeque},
+    ops::Not,
+};
 
 use crate::{
     api::ApiAnalysis,
@@ -23,14 +26,14 @@ pub mod err;
 mod model;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum EnvBindingKind {
+enum EnvBindingKind {
     D1,
     R2,
     Kv,
 }
 
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SymbolKind<'src> {
+enum SymbolKind<'src> {
     // Scoped
     EnvVar(&'src str),
     EnvBinding {
@@ -72,8 +75,9 @@ pub enum SymbolKind<'src> {
 type SymbolLookup<'src, 'p> = BTreeMap<SymbolKind<'src>, &'p Symbol<'src>>;
 
 #[derive(Default)]
-pub struct SymbolTable<'src, 'p> {
+struct SymbolTable<'src, 'p> {
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
+    model_use_tags: BTreeMap<&'src str, Vec<&'p UseTag<'src>>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
     services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
     envs: Vec<&'p EnvBlock<'src>>,
@@ -106,15 +110,35 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             }
         };
 
-        for block in parse.blocks.blocks() {
-            match block {
+        let mut pending_use_tags = Vec::new();
+
+        for spd in &parse.blocks {
+            if matches!(spd.block, AstBlockKind::Model(_)).not()
+                && matches!(spd.block, AstBlockKind::UseTag(_)).not()
+            {
+                for (_, span) in pending_use_tags.drain(..) {
+                    sink.push(SemanticError::OrphanUseTag { span });
+                }
+            }
+
+            match &spd.block {
+                AstBlockKind::UseTag(tag) => {
+                    pending_use_tags.push((tag, spd.span));
+                }
                 AstBlockKind::Model(model_block) => {
+                    let tags = std::mem::take(&mut pending_use_tags);
+                    if !tags.is_empty() {
+                        st.model_use_tags.insert(
+                            model_block.symbol.name,
+                            tags.into_iter().map(|(t, _)| t).collect(),
+                        );
+                    }
+
                     insert_global(sink, &model_block.symbol);
                     st.models.insert(model_block.symbol.name, model_block);
 
                     for sub_block in model_block.blocks.blocks() {
-                        let symbols = sub_block.symbols();
-                        for symbol in symbols {
+                        for symbol in sub_block.symbols() {
                             if let Some(first) = st.model_fields.insert(
                                 SymbolKind::ModelField {
                                     model: model_block.symbol.name,

@@ -109,8 +109,7 @@ By default, these methods use the default Data Source for the Model. However, ea
 To hide a Data Source from the client CRUD methods, simply mark the Data Source as `internal`:
 
 ```cloesce
-[internal]
-source Internal for User {
+internal source Internal for User {
     include {
         dogs
     }

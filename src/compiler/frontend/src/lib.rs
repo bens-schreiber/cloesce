@@ -261,27 +261,10 @@ pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
 
-    pub use_tags: Vec<Spd<UseTag<'src>>>,
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }
 
 impl<'src> ModelBlock<'src> {
-    pub fn partition_use_tags(&self) -> (Vec<&CrudKind>, Vec<&Symbol<'src>>) {
-        let mut crud_tags = Vec::new();
-        let mut env_binding_tags = Vec::new();
-
-        for tag in &self.use_tags {
-            for param in &tag.block.params {
-                match param {
-                    UseTagParamKind::Crud(spd) => crud_tags.push(&spd.block),
-                    UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(binding),
-                }
-            }
-        }
-
-        (crud_tags, env_binding_tags)
-    }
-
     /// Iterate over all foreign blocks, be they top level or nested in primary/unique/optional blocks
     pub fn foreign_blocks(&self) -> impl Iterator<Item = &ForeignBlock<'src>> {
         self.blocks.iter().flat_map(|spd| match &spd.block {
@@ -364,6 +347,7 @@ pub enum AstBlockKind<'src> {
     Api(ApiBlock<'src>),
     DataSource(DataSourceBlock<'src>),
     Model(ModelBlock<'src>),
+    UseTag(UseTag<'src>),
     Service(ServiceBlock<'src>),
     PlainOldObject(PlainOldObjectBlock<'src>),
     Env(EnvBlock<'src>),

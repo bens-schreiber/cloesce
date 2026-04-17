@@ -4,6 +4,7 @@ mod env;
 mod model;
 
 use ast::CidlType;
+use ast::CrudKind;
 use chumsky::extra;
 use chumsky::input::MappedInput;
 use chumsky::prelude::*;
@@ -12,6 +13,8 @@ use crate::AstBlockKind;
 use crate::FileTable;
 use crate::Span;
 use crate::Symbol;
+use crate::UseTag;
+use crate::UseTagParamKind;
 use crate::lexer::LexedFile;
 use crate::lexer::SpannedToken;
 use crate::lexer::Token;
@@ -91,7 +94,8 @@ fn parser<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParseAst<'src>, Extra<'tokens, 'src>> {
     choice((
         env::env_block(),
-        model::model_block().map(AstBlockKind::Model),
+        model::model_block(),
+        use_tag_block(),
         api::api_block(),
         data_source::data_source_block(),
         service_block(),
@@ -161,7 +165,7 @@ fn inject_block<'tokens, 'src: 'tokens>()
 ///     ident2: cidl_type
 /// }
 /// ```
-pub fn service_block<'tokens, 'src: 'tokens>()
+fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident: InjectedService
     let attribute = typed_symbol();
@@ -176,6 +180,34 @@ pub fn service_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|(symbol, fields)| AstBlockKind::Service(ServiceBlock { symbol, fields }))
+}
+
+fn use_item<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseTagParamKind<'src>, Extra<'tokens, 'src>> {
+    let crud = select! {
+        Token::Ident("get") => CrudKind::Get,
+        Token::Ident("save") => CrudKind::Save,
+        Token::Ident("list") => CrudKind::List,
+    }
+    .map_spanned(|k| k)
+    .map(UseTagParamKind::Crud);
+
+    crud.or(symbol().map(UseTagParamKind::EnvBinding))
+}
+
+fn use_tag_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
+    just(Token::LBracket)
+        .ignore_then(just(Token::Ident("use")))
+        .ignore_then(
+            use_item()
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|params| UseTag { params })
+        .map(AstBlockKind::UseTag)
 }
 
 /// Parses an identifier and captures its name + span info into a `Symbol`.

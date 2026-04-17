@@ -1,10 +1,8 @@
 use chumsky::prelude::*;
 
-use ast::CrudKind;
-
 use crate::{
-    ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag, UseTagParamKind,
+    AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
@@ -102,33 +100,8 @@ fn r2_block<'tokens, 'src: 'tokens>()
         })
 }
 
-fn use_item<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseTagParamKind<'src>, Extra<'tokens, 'src>> {
-    let crud = select! {
-        Token::Ident("get") => CrudKind::Get,
-        Token::Ident("save") => CrudKind::Save,
-        Token::Ident("list") => CrudKind::List,
-    }
-    .map_spanned(|k| k)
-    .map(UseTagParamKind::Crud);
-
-    crud.or(symbol().map(UseTagParamKind::EnvBinding))
-}
-
 pub fn model_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ModelBlock<'src>, Extra<'tokens, 'src>> {
-    // [use d1, get, save, list]
-    let use_tag = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("use")))
-        .ignore_then(
-            use_item()
-                .separated_by(just(Token::Comma))
-                .at_least(1)
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBracket))
-        .map_spanned(|params| UseTag { params });
-
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     let choice_sql = || {
         choice((
             foreign_block().map(SqlBlockKind::Foreign),
@@ -227,11 +200,8 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         unique_block,
     ));
 
-    let use_tags = use_tag.repeated().collect::<Vec<_>>();
-
-    use_tags
-        .then_ignore(just(Token::Model))
-        .then(symbol())
+    just(Token::Model)
+        .ignore_then(symbol())
         .then(
             sub_blocks
                 .map_spanned(|k| k)
@@ -239,11 +209,8 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((use_tags, symbol), blocks)| ModelBlock {
-            symbol,
-            use_tags,
-            blocks,
-        })
+        .map(|(symbol, blocks)| ModelBlock { symbol, blocks })
+        .map(AstBlockKind::Model)
         // Without this box, Apple `ld` linker breaks
         // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
         .boxed()
