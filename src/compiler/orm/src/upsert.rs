@@ -462,7 +462,7 @@ impl<'a> UpsertModel<'a> {
         let mut values = Vec::new();
 
         // Left side columns
-        for (pk_col, val) in left_model.primary_columns.iter().zip(left_vals.into_iter()) {
+        for (pk_col, val) in left_model.primary_columns.iter().zip(left_vals) {
             let col_name = if left_model.primary_columns.len() == 1 {
                 "left".to_string()
             } else {
@@ -473,11 +473,7 @@ impl<'a> UpsertModel<'a> {
         }
 
         // Right side columns
-        for (pk_col, val) in right_model
-            .primary_columns
-            .iter()
-            .zip(right_vals.into_iter())
-        {
+        for (pk_col, val) in right_model.primary_columns.iter().zip(right_vals) {
             let col_name = if right_model.primary_columns.len() == 1 {
                 "right".to_string()
             } else {
