@@ -198,7 +198,8 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
     symbol()
         .then_ignore(just(Token::Colon))
         .then(cidl_type())
-        .map(|(symbol, cidl_type)| Symbol {
+        .map_with(|(symbol, cidl_type), e| Symbol {
+            span: Span::new(symbol.span.context(), symbol.span.start..e.span().end),
             cidl_type,
             ..symbol
         })

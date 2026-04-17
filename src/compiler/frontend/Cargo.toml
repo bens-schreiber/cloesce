@@ -8,6 +8,7 @@ ast = { path = "../ast" }
 ariadne = { workspace = true }
 chumsky = "0.12.0"
 logos = "0.16.1"
+indexmap = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }

@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-
 use chumsky::prelude::*;
+use indexmap::IndexMap;
 
 use crate::{
     AstBlockKind, CidlType, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
@@ -34,7 +33,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                     children
                         .unwrap_or_default()
                         .into_iter()
-                        .collect::<BTreeMap<_, _>>(),
+                        .collect::<IndexMap<_, _>>(),
                 );
                 (symbol, subtree)
             })
@@ -105,7 +104,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_spanned(|((symbol, model), ((include_entries, get), list))| {
-            let tree = ParsedIncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
+            let tree = ParsedIncludeTree(include_entries.into_iter().collect::<IndexMap<_, _>>());
             DataSourceBlock {
                 symbol,
                 model,
