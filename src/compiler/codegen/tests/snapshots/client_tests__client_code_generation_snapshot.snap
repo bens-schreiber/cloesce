@@ -181,43 +181,6 @@ export class ModelWithCompositePk {
     return res;
   }
 }
-export class ModelWithCustomDs {
-  id: number;
-  name: string;
-  async instanceMethod(
-    input: string,
-    externalParam: string,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<string>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(externalParam)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCustomDs/${id}/instanceMethod`
-    );
-    const payload: any = {};
-    payload["input"] = input;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-
-  static fromJson(data: any): ModelWithCustomDs {
-    const res = Object.assign(new ModelWithCustomDs(), data);
-    return res;
-  }
-}
 export class ModelWithKv {
   id1: string;
   id2: string;
@@ -410,6 +373,47 @@ export class BasicModel {
 
   static fromJson(data: any): BasicModel {
     const res = Object.assign(new BasicModel(), data);
+    return res;
+  }
+}
+export class ModelWithCustomDs {
+  id: number;
+  name: string;
+  oneToManyId: number;
+  oneToManyModel: OneToManyModel | undefined;
+  data: R2Object;
+  async instanceMethod(
+    input: string,
+    externalParam: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(externalParam)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCustomDs/${id}/instanceMethod`
+    );
+    const payload: any = {};
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ModelWithCustomDs {
+    const res = Object.assign(new ModelWithCustomDs(), data);
+    res["oneToManyModel"] &&= OneToManyModel.fromJson(res.oneToManyModel);
     return res;
   }
 }
