@@ -186,7 +186,7 @@ struct Cli {
 enum Command {
     Compile,
     Migrate(MigrateArgs),
-    Format(FormatArgs),
+    Fmt(FormatArgs),
     Version,
 }
 
@@ -269,10 +269,8 @@ fn main() {
                 tracing::info!("Migration completed in {:.2?}", elapsed);
                 Ok(())
             }
-            Command::Format(args) => {
-                tracing::warn!(
-                    "The format command is experimental and will not yet preserve all formatting details."
-                );
+            Command::Fmt(args) => {
+                tracing::warn!("The format command is experimental, use with caution.");
                 let config = CloesceConfig::load(&root, cli.env)?;
                 let sources = config.collect_sources(&root);
                 format::format(sources, args)?;
