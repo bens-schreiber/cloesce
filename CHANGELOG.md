@@ -5,6 +5,7 @@
 
 ### Fixed
 - Misc bugs in `cloesce fmt`
+- `"Default"` was not correctly overriding on client crud methods, making users manually specify it.
 
 # [0.3.6] - 2026-4-15
 ### Added

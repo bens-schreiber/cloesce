@@ -41,6 +41,11 @@ export class D1BackedModel {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
+  static $get(
+    args: any,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -68,6 +73,11 @@ export class D1BackedModel {
   static $save(
     model: DeepPartial<D1BackedModel>,
     kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel>>;
+  static $save(
+    model: DeepPartial<D1BackedModel>,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
@@ -101,6 +111,11 @@ export class D1BackedModel {
       limit: number;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel[]>>;
+  static $list(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
@@ -195,6 +210,11 @@ export class PureR2Model {
       id: string;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<PureR2Model>>;
+  static $get(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureR2Model>>;
   static async $get(

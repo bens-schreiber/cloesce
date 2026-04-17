@@ -43,6 +43,11 @@ export class Foo {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Foo>>;
+  static $save(
+    model: DeepPartial<Foo>,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Foo>>;
   static async $save(
     model: DeepPartial<Foo>,
     kind: "Default" = "Default",

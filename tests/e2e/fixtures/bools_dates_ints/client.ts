@@ -9,6 +9,11 @@ export class Weather {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Weather>>;
+  static $save(
+    model: DeepPartial<Weather>,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Weather>>;
   static async $save(
     model: DeepPartial<Weather>,
     kind: "Default" = "Default",
@@ -39,6 +44,11 @@ export class Weather {
       id: number;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Weather>>;
+  static $get(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Weather>>;
   static async $get(

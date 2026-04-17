@@ -32,6 +32,11 @@ export class CrudHaver {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver>>;
+  static $save(
+    model: DeepPartial<CrudHaver>,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver>>;
   static async $save(
     model: DeepPartial<CrudHaver>,
     kind: "Default" = "Default",
@@ -64,6 +69,11 @@ export class CrudHaver {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver>>;
+  static $get(
+    args: any,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -93,6 +103,11 @@ export class CrudHaver {
       limit: number;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver[]>>;
+  static $list(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver[]>>;
   static async $list(
@@ -140,6 +155,11 @@ export class Parent {
     kind: "WithChildren",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
+  static $save(
+    model: DeepPartial<Parent>,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
   static async $save(
     model: DeepPartial<Parent>,
     kind: "Default" | "WithChildren" = "Default",
@@ -179,6 +199,11 @@ export class Parent {
   kind: "WithChildren",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
+  static $get(
+    args: any,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
   static async $get(
     args: any,
     kind: "Default" | "WithChildren" = "Default",
@@ -216,6 +241,11 @@ export class Parent {
       limit: number;
     },
   kind: "WithChildren",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent[]>>;
+  static $list(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent[]>>;
   static async $list(

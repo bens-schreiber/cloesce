@@ -10,6 +10,11 @@ export class DB1Model {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model>>;
+  static $get(
+    args: any,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -36,6 +41,11 @@ export class DB1Model {
   static $save(
     model: DeepPartial<DB1Model>,
     kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model>>;
+  static $save(
+    model: DeepPartial<DB1Model>,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model>>;
   static async $save(
@@ -69,6 +79,11 @@ export class DB1Model {
       limit: number;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model[]>>;
+  static $list(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model[]>>;
   static async $list(
@@ -111,6 +126,11 @@ export class DB2Model {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model>>;
+  static $get(
+    args: any,
+    kind?: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -137,6 +157,11 @@ export class DB2Model {
   static $save(
     model: DeepPartial<DB2Model>,
     kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model>>;
+  static $save(
+    model: DeepPartial<DB2Model>,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model>>;
   static async $save(
@@ -170,6 +195,11 @@ export class DB2Model {
       limit: number;
     },
   kind: "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model[]>>;
+  static $list(
+    args: any,
+    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model[]>>;
   static async $list(
