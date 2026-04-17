@@ -110,11 +110,6 @@ export class {{ model.name }} {
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
 {%- endfor %}
-  static $save(
-    model: DeepPartial<{{ model.name }}>,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
   static async $save(
     model: DeepPartial<{{ model.name }}>,
     kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
@@ -173,11 +168,6 @@ export class {{ model.name }} {
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
 {%- endfor %}
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
   static async $get(
     args: any,
     kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
@@ -245,11 +235,6 @@ export class {{ model.name }} {
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
 {%- endif %}
 {%- endfor %}
-  static $list(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
   static async $list(
     args: any,
     kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",

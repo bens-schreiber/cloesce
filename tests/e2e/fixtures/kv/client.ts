@@ -14,11 +14,6 @@ export class D1BackedModel {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -46,11 +41,6 @@ export class D1BackedModel {
   static $save(
     model: DeepPartial<D1BackedModel>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel>>;
-  static $save(
-    model: DeepPartial<D1BackedModel>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
@@ -84,11 +74,6 @@ export class D1BackedModel {
       limit: number;
     },
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
@@ -155,11 +140,6 @@ export class PaginatedKVModel {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PaginatedKVModel>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<PaginatedKVModel>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -205,11 +185,6 @@ export class PureKVModel {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureKVModel>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<PureKVModel>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -236,11 +211,6 @@ export class PureKVModel {
   static $save(
     model: DeepPartial<PureKVModel>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<PureKVModel>>;
-  static $save(
-    model: DeepPartial<PureKVModel>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureKVModel>>;
   static async $save(

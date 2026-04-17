@@ -97,11 +97,6 @@ export class BlobHaver {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver>>;
-  static $save(
-    model: DeepPartial<BlobHaver>,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<BlobHaver>>;
   static async $save(
     model: DeepPartial<BlobHaver>,
     kind: "Default" = "Default",
@@ -134,11 +129,6 @@ export class BlobHaver {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<BlobHaver>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -168,11 +158,6 @@ export class BlobHaver {
       limit: number;
     },
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<BlobHaver[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver[]>>;
   static async $list(

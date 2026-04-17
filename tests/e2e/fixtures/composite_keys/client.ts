@@ -11,11 +11,6 @@ export class Course {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course>>;
   static async $get(
     args: any,
     kind: "Default" = "Default",
@@ -47,11 +42,6 @@ export class Course {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course[]>>;
   static async $list(
     args: any,
     kind: "Default" = "Default",
@@ -79,11 +69,6 @@ export class Course {
   static $save(
     model: DeepPartial<Course>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course>>;
-  static $save(
-    model: DeepPartial<Course>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course>>;
   static async $save(
@@ -141,11 +126,6 @@ export class Student {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
   static async $get(
     args: any,
     kind: "CoursesOrderedDescending" | "Default" = "Default",
@@ -188,11 +168,6 @@ export class Student {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student[]>>;
   static async $list(
     args: any,
     kind: "CoursesOrderedDescending" | "Default" = "Default",
@@ -228,11 +203,6 @@ export class Student {
   static $save(
     model: DeepPartial<Student>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static $save(
-    model: DeepPartial<Student>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static async $save(
@@ -293,11 +263,6 @@ export class StudentCourse {
   kind: "WithStudentCourse",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
   static async $get(
     args: any,
     kind: "Default" | "WithStudentCourse" = "Default",
@@ -343,11 +308,6 @@ export class StudentCourse {
     kind: "WithStudentCourse",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse[]>>;
   static async $list(
     args: any,
     kind: "Default" | "WithStudentCourse" = "Default",
@@ -382,11 +342,6 @@ export class StudentCourse {
   static $save(
     model: DeepPartial<StudentCourse>,
     kind: "WithStudentCourse",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
-  static $save(
-    model: DeepPartial<StudentCourse>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
   static async $save(

@@ -56,11 +56,6 @@ export class Hamburger {
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Hamburger>>;
-  static $save(
-    model: DeepPartial<Hamburger>,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Hamburger>>;
   static async $save(
     model: DeepPartial<Hamburger>,
     kind: "BurgersWithLettuceOrdered" | "Default" = "Default",
@@ -100,11 +95,6 @@ export class Hamburger {
       limit: number;
     },
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Hamburger[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Hamburger[]>>;
   static async $list(
@@ -148,11 +138,6 @@ export class Topping {
   static $save(
     model: DeepPartial<Topping>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Topping>>;
-  static $save(
-    model: DeepPartial<Topping>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Topping>>;
   static async $save(
