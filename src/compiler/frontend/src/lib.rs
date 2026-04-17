@@ -360,6 +360,7 @@ pub struct InjectBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum AstBlockKind<'src> {
     Api(ApiBlock<'src>),
     DataSource(DataSourceBlock<'src>),

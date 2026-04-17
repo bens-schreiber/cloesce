@@ -249,7 +249,10 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         .then(model_body)
         .map(|(use_tags, mut spd): (Vec<Spd<UseTag>>, Spd<ModelBlock>)| {
             spd.block.use_tags = use_tags;
-            Spd { block: AstBlockKind::Model(spd.block), span: spd.span }
+            Spd {
+                block: AstBlockKind::Model(spd.block),
+                span: spd.span,
+            }
         })
         // Without this box, Apple `ld` linker breaks
         // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
