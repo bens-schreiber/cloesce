@@ -1,3 +1,11 @@
+# [0.3.7] - 2026-4-17
+### Added
+
+### Changed
+
+### Fixed
+- Misc bugs in `cloesce fmt`
+
 # [0.3.6] - 2026-4-15
 ### Added
 - Experimental `cloesce fmt` CLI command
