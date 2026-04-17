@@ -105,6 +105,23 @@ fn comments_retained() {
         } //19
         //H
     } //20
+
+    //21
+    [internal] //22
+    // 23
+    source InternalSource for Model { //I
+        include {
+            //24
+            nested_include {
+                //25
+
+
+
+                deeper_nested_include
+                //26
+            }
+        }
+    }
     "#;
 
     let (parse_ast, lex_result) = lex_parse(src);

@@ -68,7 +68,7 @@ export class DB1Model {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB1Model[]>>;
   static async $list(
@@ -80,8 +80,8 @@ export class DB1Model {
       `http://localhost:5291/api/DB1Model/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -169,7 +169,7 @@ export class DB2Model {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<DB2Model[]>>;
   static async $list(
@@ -181,8 +181,8 @@ export class DB2Model {
       `http://localhost:5291/api/DB2Model/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

@@ -1,10 +1,8 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
+use indexmap::IndexMap;
 
 pub mod err;
 pub mod formatter;
@@ -108,7 +106,8 @@ pub struct DataSourceBlockMethod<'src> {
     pub raw_sql: &'src str,
 }
 
-pub struct ParsedIncludeTree<'src>(pub BTreeMap<Symbol<'src>, ParsedIncludeTree<'src>>);
+// Index map is used here to preserve declaration order
+pub struct ParsedIncludeTree<'src>(pub IndexMap<Symbol<'src>, ParsedIncludeTree<'src>>);
 
 pub struct DataSourceBlock<'src> {
     /// The symbol for the data source itself, e.g. `SourceName`
@@ -120,7 +119,7 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
-    pub is_internal: bool,
+    pub internal: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {
@@ -360,6 +359,7 @@ pub struct InjectBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum AstBlockKind<'src> {
     Api(ApiBlock<'src>),
     DataSource(DataSourceBlock<'src>),

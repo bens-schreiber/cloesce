@@ -90,15 +90,14 @@ impl CloesceParser {
 fn parser<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParseAst<'src>, Extra<'tokens, 'src>> {
     choice((
-        env::env_block(),
-        model::model_block().map(AstBlockKind::Model),
-        api::api_block(),
+        model::model_block(),
         data_source::data_source_block(),
-        service_block(),
-        poo_block(),
-        inject_block(),
+        env::env_block().map_spanned(|b| b),
+        api::api_block().map_spanned(|b| b),
+        service_block().map_spanned(|b| b),
+        poo_block().map_spanned(|b| b),
+        inject_block().map_spanned(|b| b),
     ))
-    .map_spanned(|block| block)
     .repeated()
     .collect::<Vec<_>>()
     .map(|blocks| ParseAst { blocks })
@@ -199,7 +198,8 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
     symbol()
         .then_ignore(just(Token::Colon))
         .then(cidl_type())
-        .map(|(symbol, cidl_type)| Symbol {
+        .map_with(|(symbol, cidl_type), e| Symbol {
+            span: Span::new(symbol.span.context(), symbol.span.start..e.span().end),
             cidl_type,
             ..symbol
         })

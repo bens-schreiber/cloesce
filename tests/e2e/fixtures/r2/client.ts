@@ -100,7 +100,7 @@ export class D1BackedModel {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
@@ -112,8 +112,8 @@ export class D1BackedModel {
       `http://localhost:5538/api/D1BackedModel/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

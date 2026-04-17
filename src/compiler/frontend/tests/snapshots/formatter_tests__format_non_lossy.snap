@@ -17,8 +17,7 @@ env {
     } // Another Comment
     vars {
         // Comment again
-        MY_VAR: string
-        // More comments
+        MY_VAR: string // More comments
     }
 }
 
@@ -63,7 +62,6 @@ model HasOneToOne {
     
     foreign (BasicModel::id) {
         basicModelId
-        
         nav {
             oneToOneNav
         }
@@ -237,7 +235,6 @@ model ModelWithCustomDs {
     
     foreign (OneToManyModel::id) {
         oneToManyId
-        
         nav {
             oneToManyModel
         }

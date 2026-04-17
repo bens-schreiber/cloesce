@@ -510,7 +510,7 @@ export class ModelWithCruds {
       name: string;
       limit: number;
     },
-  kind: "ByName",
+    kind: "ByName",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<ModelWithCruds[]>>;
   static $list(
@@ -518,7 +518,7 @@ export class ModelWithCruds {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<ModelWithCruds[]>>;
   static async $list(
@@ -530,9 +530,9 @@ export class ModelWithCruds {
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("name", String((args as any).name ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("name", String((args as any).name ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

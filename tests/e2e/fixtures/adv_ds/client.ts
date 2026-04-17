@@ -86,7 +86,7 @@ export class Hamburger {
       lastId: number;
       limit: number;
     },
-  kind: "BurgersWithLettuceOrdered",
+    kind: "BurgersWithLettuceOrdered",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Hamburger[]>>;
   static $list(
@@ -94,7 +94,7 @@ export class Hamburger {
       lastSeen_id: number;
       limit: number;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Hamburger[]>>;
   static async $list(
@@ -106,9 +106,9 @@ export class Hamburger {
       `http://localhost:5403/api/Hamburger/$list`
     );
     const payload: any = {};
-  baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
-  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
-  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
+    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

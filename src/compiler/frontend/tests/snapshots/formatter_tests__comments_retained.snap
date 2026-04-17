@@ -14,8 +14,9 @@ env {
 }
 
 // 4
-[use db] // 5
+// 5
 // 6
+[use db]
 model BasicModel {
     // C
     // 7
@@ -28,7 +29,6 @@ model BasicModel {
     foreign (OneToManyModel::id) {
         // E
         fk_to_model // 15
-        
         // 16
         nav {
             // F
@@ -37,3 +37,19 @@ model BasicModel {
     } // 19
     // H
 } // 20
+
+// 21
+// 22
+// 23
+[internal]
+source InternalSource for Model {
+    include {
+        // I
+        // 24
+        nested_include {
+            // 25
+            deeper_nested_include
+            // 26
+        }
+    }
+}

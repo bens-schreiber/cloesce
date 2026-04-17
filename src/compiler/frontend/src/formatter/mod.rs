@@ -9,7 +9,7 @@ use crate::{
     DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
     ForeignBlockNav, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
     NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
-    ServiceBlock, Span, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -62,10 +62,7 @@ impl<'src> FmtCtx<'src> {
             if offset >= node_start {
                 break;
             }
-            let gap = self.src.get(cursor..offset).unwrap_or("");
-            let newline_count = gap.chars().filter(|&c| c == '\n').count();
-
-            let extra_blank = if newline_count >= 2 {
+            let extra_blank = if self.trailing_gap(cursor, offset) >= 2 {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -139,9 +136,7 @@ impl<'src> FmtCtx<'src> {
                 break;
             }
 
-            let gap = self.src.get(cursor..offset).unwrap_or("");
-            let newline_count = gap.chars().filter(|&c| c == '\n').count();
-            let extra_blank = if newline_count >= 2 {
+            let extra_blank = if self.trailing_gap(cursor, offset) >= 2 {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -185,13 +180,24 @@ impl<'src> FmtCtx<'src> {
             .then(Doc::text("}"))
     }
 
-    fn gap(&self, span: Span) -> usize {
-        let gap = self.src.get(self.cursor.get()..span.start).unwrap_or("");
-        gap.chars().filter(|&c| c == '\n').count()
+    fn gap(&self, from: usize, to: usize) -> usize {
+        let text = self.src.get(from..to).unwrap_or("");
+        text.chars().filter(|&c| c == '\n').count()
+    }
+
+    /// Counts newlines in the trailing whitespace of `src[from..to]`.
+    /// Returns >= 2 only when there is a blank line immediately before `to`.
+    fn trailing_gap(&self, from: usize, to: usize) -> usize {
+        let text = self.src.get(from..to).unwrap_or("");
+        text.chars()
+            .rev()
+            .take_while(|c| c.is_whitespace())
+            .filter(|&c| c == '\n')
+            .count()
     }
 
     fn spd_doc<T: ToDoc<'src>>(&self, spd: &'src Spd<T>, indent: usize, inline: bool) -> Doc<'src> {
-        let gap = self.gap(spd.span);
+        let gap = self.gap(self.cursor.get(), spd.span.start);
         let (leading, has_leading_comments) = self.leading_comments(spd.span.start, indent);
 
         self.node_ends.borrow_mut().push(spd.span.end);
@@ -201,17 +207,19 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(spd.span.end);
         self.advance(spd.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
@@ -220,13 +228,7 @@ impl<'src> FmtCtx<'src> {
         }
 
         // Preserve newlines
-        let extra_blank = if indent <= 1 && gap >= 2 && !has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
-
-        let content_sep = if has_leading_comments {
+        let extra_blank = if gap >= 2 && !has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -246,29 +248,25 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(sym.span.end);
         self.advance(sym.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
 
         Doc::hardline(indent)
             .then(leading)
@@ -285,29 +283,25 @@ impl<'src> FmtCtx<'src> {
         let trailing = self.trailing_comment(sym.span.end);
         self.advance(sym.span.end);
 
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
             let leading_sep = if has_leading_comments {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
             };
-            let content_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
+
             return leading_sep
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
 
         Doc::hardline(indent)
             .then(leading)
@@ -486,9 +480,7 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
         }
 
         if let Some(nav) = &self.nav {
-            inner = inner
-                .then(Doc::hardline(2))
-                .then(ctx.spd_doc(nav, 2, false));
+            inner = inner.then(ctx.spd_doc(nav, 2, false));
         }
 
         doc.then(qualifier).then(ctx.block(inner, 2))
@@ -612,8 +604,11 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
 
 impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let internal = if self.is_internal {
-            Doc::text("[internal]").then(Doc::hardline(0))
+        let internal = if let Some(sym) = &self.internal {
+            Doc::text("[")
+                .then(ctx.sym_doc(sym, 0, true))
+                .then(Doc::text("]"))
+                .then(Doc::hardline(0))
         } else {
             Doc::nil()
         };
