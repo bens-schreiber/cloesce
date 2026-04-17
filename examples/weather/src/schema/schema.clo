@@ -1,6 +1,10 @@
 env {
-    d1 { db }
-    r2 { bucket }
+    d1 {
+        db
+    }
+    r2 {
+        bucket
+    }
 }
 
 [use db]
@@ -9,11 +13,11 @@ model WeatherReport {
     primary {
         id: int
     }
-
+    
     nav (Weather::weatherReportId) {
         weatherEntries
     }
-
+    
     title: string
     description: string
 }
@@ -24,16 +28,19 @@ model Weather {
     primary {
         id: int
     }
-
+    
     foreign (WeatherReport::id) {
         weatherReportId
-        nav { weatherReport }
+        
+        nav {
+            weatherReport
+        }
     }
-
+    
     r2 (bucket, "weather/photos/{id}.jpg") {
         photo
     }
-
+    
     dateTime: date
     location: string
     temperature: int

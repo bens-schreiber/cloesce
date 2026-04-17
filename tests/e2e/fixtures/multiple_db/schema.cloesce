@@ -10,7 +10,7 @@ model DB1Model {
     primary {
         id: int
     }
-
+    
     someColumn: string
 }
 
@@ -19,6 +19,6 @@ model DB2Model {
     primary {
         id: int
     }
-
+    
     someColumn: string
 }

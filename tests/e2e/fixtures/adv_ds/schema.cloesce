@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 [use db, save]
@@ -7,9 +9,9 @@ model Topping {
     primary {
         id: int
     }
-
+    
     name: string
-
+    
     nav (Hamburger::id) {
         hamburger
     }
@@ -20,9 +22,9 @@ model Hamburger {
     primary {
         id: int
     }
-
+    
     name: string
-
+    
     nav (Topping::id) {
         toppings
     }
@@ -32,6 +34,7 @@ source BurgersWithLettuceOrdered for Hamburger {
     include {
         toppings
     }
+    
     sql list(lastId: int, limit: int) {
         "
         WITH included as ($include)
@@ -49,6 +52,7 @@ source NoLettuce for Hamburger {
     include {
         toppings
     }
+    
     sql get(id: int) {
         "
         WITH included as ($include)
@@ -65,6 +69,7 @@ source OnlyBacon for Hamburger {
     include {
         toppings
     }
+    
     sql get(id: int) {
         "
         WITH included as ($include)

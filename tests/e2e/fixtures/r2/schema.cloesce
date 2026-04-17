@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
     r2 {
         bucket1
         bucket2
@@ -11,15 +13,15 @@ model PureR2Model {
     keyfield {
         id
     }
-
+    
     r2 (bucket1, "path/to/data/{id}") {
         data
     }
-
+    
     r2 (bucket1, "path/to/other/{id}") {
         otherData
     }
-
+    
     r2 (bucket1, "path/") paginated {
         allData
     }
@@ -35,14 +37,14 @@ model D1BackedModel {
     primary {
         id: int
     }
-
+    
     keyfield {
         keyParam
     }
-
+    
     someColumn: double
     someOtherColumn: string
-
+    
     r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
         r2Data
     }

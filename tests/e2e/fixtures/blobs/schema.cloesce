@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 service BlobService {}
@@ -13,7 +15,7 @@ model BlobHaver {
     primary {
         id: int
     }
-
+    
     blob1: blob
     blob2: blob
 }

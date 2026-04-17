@@ -1,14 +1,15 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
-//#region OneToOne
-
+// #region OneToOne
 [use db, save, get]
 model B {
     primary {
         id: int
     }
-
+    
     nav (A::bId) {
         a
     }
@@ -23,10 +24,13 @@ model A {
     primary {
         id: int
     }
-
-    foreign (B::id) optional {
+    
+    foreign (B::id) optional  {
         bId
-        nav { b }
+        
+        nav {
+            b
+        }
     }
 }
 
@@ -44,15 +48,14 @@ api A {
     post create(e: env, a: A) -> A
     get withoutB([source WithoutB] self) -> A
 }
-//#endregion
-//#region OneToMany
-
+// #endregion
+// #region OneToMany
 [use db, save, get]
 model Person {
     primary {
         id: int
     }
-
+    
     nav (Dog::personId) {
         dogs
     }
@@ -78,25 +81,27 @@ model Dog {
     primary {
         id: int
     }
-
+    
     foreign (Person::id) {
         personId
-        nav { person }
+        
+        nav {
+            person
+        }
     }
 }
 
 api Dog {
     post testMethod(self) -> void
 }
-//#endregion
-//#region ManyToMany
-
+// #endregion
+// #region ManyToMany
 [use db, save, get]
 model Student {
     primary {
         id: int
     }
-
+    
     nav (Course::id) {
         courses
     }
@@ -126,9 +131,8 @@ model Course {
     primary {
         id: int
     }
-
+    
     nav (Student::id) {
         students
     }
-}
-//#endregion
+}// #endregion

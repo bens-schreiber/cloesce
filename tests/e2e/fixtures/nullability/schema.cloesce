@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 [use db]
@@ -7,7 +9,7 @@ model NullabilityChecks {
     primary {
         id: int
     }
-
+    
     notNullableString: string
     nullableString: Option<string>
 }

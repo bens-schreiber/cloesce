@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 inject {

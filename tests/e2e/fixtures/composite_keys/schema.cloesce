@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 [use db, get, list, save]
@@ -8,9 +10,9 @@ model Student {
         id: int
         name: string
     }
-
+    
     favoriteColor: string
-
+    
     nav (StudentCourse::studentId, StudentCourse::studentName) {
         studentCourses
     }
@@ -20,6 +22,7 @@ source CoursesOrderedDescending for Student {
     include {
         studentCourses
     }
+    
     sql list(lastId: int, lastName: string, limit: int) {
         "
         WITH students AS ($include)
@@ -37,9 +40,9 @@ model Course {
     primary {
         id: int
     }
-
+    
     title: string
-
+    
     nav (StudentCourse::courseId) {
         studentCourses
     }
@@ -51,11 +54,17 @@ model StudentCourse {
         foreign (Student::id, Student::name) {
         studentId
         studentName
-        nav { student }
+        
+        nav {
+            student
+        }
     }
         foreign (Course::id) {
         courseId
-        nav { course }
+        
+        nav {
+            course
+        }
     }
     }
 }

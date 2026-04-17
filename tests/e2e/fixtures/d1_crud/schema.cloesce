@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 [use db, save, get, list]
@@ -7,7 +9,7 @@ model CrudHaver {
     primary {
         id: int
     }
-
+    
     name: string
 }
 
@@ -20,12 +22,15 @@ model Parent {
     primary {
         id: int
     }
-
-    foreign (Child::id) optional {
+    
+    foreign (Child::id) optional  {
         favoriteChildId
-        nav { favoriteChild }
+        
+        nav {
+            favoriteChild
+        }
     }
-
+    
     nav (Child::parentId) {
         children
     }
@@ -43,9 +48,12 @@ model Child {
     primary {
         id: int
     }
-
+    
     foreign (Parent::id) {
         parentId
-        nav { parent }
+        
+        nav {
+            parent
+        }
     }
 }

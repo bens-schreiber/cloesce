@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
 }
 
 [use db, save]
@@ -7,7 +9,7 @@ model Dog {
     primary {
         id: int
     }
-
+    
     name: string
     age: int
 }

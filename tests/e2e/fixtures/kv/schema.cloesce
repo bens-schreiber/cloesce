@@ -1,5 +1,7 @@
 env {
-    d1 { db }
+    d1 {
+        db
+    }
     kv {
         namespace
         otherNamespace
@@ -11,11 +13,11 @@ model PureKVModel {
     keyfield {
         id
     }
-
+    
     kv (namespace, "path/to/data/{id}") {
         data: json
     }
-
+    
     kv (otherNamespace, "path/to/other/{id}") {
         otherData: string
     }
@@ -26,14 +28,14 @@ model D1BackedModel {
     primary {
         id: int
     }
-
+    
     keyfield {
         keyParam
     }
-
+    
     someColumn: double
     someOtherColumn: string
-
+    
     kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
         kvData: json
     }
@@ -44,7 +46,7 @@ model PaginatedKVModel {
     keyfield {
         id
     }
-
+    
     kv (namespace, "paginated/items/") paginated {
         items: json
     }
