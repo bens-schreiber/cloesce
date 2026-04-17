@@ -1,9 +1,9 @@
 # [0.3.6] - 2026-4-15
 ### Added
-- Experimental `cloesce format` CLI command
+- Experimental `cloesce fmt` CLI command
 
 ### Changed
-- Refactored post parsing AST to be lossless enabling `cloesce format` to work without assuming structure
+- Refactored post parsing AST to be lossless enabling `cloesce fmt` to work without assuming structure
 
 ### Fixed
 
