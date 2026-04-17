@@ -341,7 +341,7 @@ impl<'src> ParseAst<'src> {
             doc = doc.then(ctx.spd_doc(spd, 0, false));
         }
 
-        // Unconsumed dangling comments
+        // Consume any dangling comments
         let (trailing_comments, has_trailing_comments) = ctx.leading_comments(usize::MAX, 0);
         if has_trailing_comments {
             doc = doc.then(trailing_comments);
