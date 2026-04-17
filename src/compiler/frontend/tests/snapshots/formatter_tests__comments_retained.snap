@@ -28,7 +28,6 @@ model BasicModel {
     foreign (OneToManyModel::id) {
         // E
         fk_to_model // 15
-        
         // 16
         nav {
             // F

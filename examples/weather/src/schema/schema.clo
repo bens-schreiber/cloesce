@@ -32,6 +32,7 @@ model Weather {
     foreign (WeatherReport::id) {
         weatherReportId
         
+        // test
         nav {
             weatherReport
         }

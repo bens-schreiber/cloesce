@@ -9,7 +9,7 @@ use crate::{
     DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
     ForeignBlockNav, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
     NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
-    ServiceBlock, Span, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -62,10 +62,9 @@ impl<'src> FmtCtx<'src> {
             if offset >= node_start {
                 break;
             }
-            let gap = self.src.get(cursor..offset).unwrap_or("");
-            let newline_count = gap.chars().filter(|&c| c == '\n').count();
+            let gap = self.gap(cursor, offset);
 
-            let extra_blank = if newline_count >= 2 {
+            let extra_blank = if gap >= 2 {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -105,11 +104,10 @@ impl<'src> FmtCtx<'src> {
         if let Some(&(offset, text)) = self.cm.entries.get(lo)
             && offset >= node_end
         {
-            let gap = self.src.get(node_end..offset).unwrap_or("");
+            let between = self.src.get(node_end..offset).unwrap_or("");
 
-            // A trailing comment only belongs to this node when there is no
-            // intervening syntax token between the node and the comment.
-            if !gap.contains('\n') && gap.chars().all(char::is_whitespace) {
+            // A trailing comment only belongs to this node when it's on the same line.
+            if !between.contains('\n') && between.chars().all(char::is_whitespace) {
                 self.cursor.set(offset + text.len());
                 return Doc::text(" ").then(Doc::owned(normalize_comment_text(text)));
             }
@@ -139,9 +137,8 @@ impl<'src> FmtCtx<'src> {
                 break;
             }
 
-            let gap = self.src.get(cursor..offset).unwrap_or("");
-            let newline_count = gap.chars().filter(|&c| c == '\n').count();
-            let extra_blank = if newline_count >= 2 {
+            let gap = self.gap(cursor, offset);
+            let extra_blank = if gap >= 2 {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -185,13 +182,19 @@ impl<'src> FmtCtx<'src> {
             .then(Doc::text("}"))
     }
 
-    fn gap(&self, span: Span) -> usize {
-        let gap = self.src.get(self.cursor.get()..span.start).unwrap_or("");
-        gap.chars().filter(|&c| c == '\n').count()
+    /// Count the number of newlines in the trailing whitespace of `src[from..to]`.
+    /// Returns >= 2 when there is a blank line immediately before `to`.
+    fn gap(&self, from: usize, to: usize) -> usize {
+        let text = self.src.get(from..to).unwrap_or("");
+        text.chars()
+            .rev()
+            .take_while(|c| c.is_whitespace())
+            .filter(|&c| c == '\n')
+            .count()
     }
 
     fn spd_doc<T: ToDoc<'src>>(&self, spd: &'src Spd<T>, indent: usize, inline: bool) -> Doc<'src> {
-        let gap = self.gap(spd.span);
+        let gap = self.gap(self.cursor.get(), spd.span.start);
         let (leading, has_leading_comments) = self.leading_comments(spd.span.start, indent);
 
         self.node_ends.borrow_mut().push(spd.span.end);
@@ -222,7 +225,7 @@ impl<'src> FmtCtx<'src> {
         }
 
         // Preserve newlines
-        let extra_blank = if indent <= 1 && gap >= 2 && !has_leading_comments {
+        let extra_blank = if gap >= 2 && !has_leading_comments {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -463,9 +466,7 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
         }
 
         if let Some(nav) = &self.nav {
-            inner = inner
-                .then(Doc::hardline(2))
-                .then(ctx.spd_doc(nav, 2, false));
+            inner = inner.then(ctx.spd_doc(nav, 2, false));
         }
 
         doc.then(qualifier).then(ctx.block(inner, 2))
