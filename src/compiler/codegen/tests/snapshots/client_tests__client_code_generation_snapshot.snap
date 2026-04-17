@@ -446,11 +446,6 @@ export class ModelWithCruds {
   kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<ModelWithCruds>>;
-  static $get(
-    args: any,
-    kind?: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<ModelWithCruds>>;
   static async $get(
     args: any,
     kind: "ByName" | "Default" = "Default",
@@ -483,11 +478,6 @@ export class ModelWithCruds {
   static $save(
     model: DeepPartial<ModelWithCruds>,
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<ModelWithCruds>>;
-  static $save(
-    model: DeepPartial<ModelWithCruds>,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<ModelWithCruds>>;
   static async $save(
@@ -529,11 +519,6 @@ export class ModelWithCruds {
       limit: number;
     },
     kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<ModelWithCruds[]>>;
-  static $list(
-    args: any,
-    kind?: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<ModelWithCruds[]>>;
   static async $list(
