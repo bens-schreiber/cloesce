@@ -374,7 +374,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         // Must belong to the same database
-        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table).1.into_iter().next();
+        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table)
+            .1
+            .into_iter()
+            .next();
         if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
@@ -530,7 +533,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
 
         // Must belong to the same database
-        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table).1.into_iter().next();
+        let adj_binding = partition_use_tags(adj_model_block.symbol.name, table)
+            .1
+            .into_iter()
+            .next();
         if adj_binding.map(|s| s.name) != Some(binding_symbol.name) {
             ma.sink
                 .push(SemanticError::NavigationReferencesDifferentDatabase { field });
@@ -808,7 +814,12 @@ fn partition_use_tags<'src, 'p>(
 ) -> (Vec<&'p CrudKind>, Vec<&'p Symbol<'src>>) {
     let mut cruds = Vec::new();
     let mut env_bindings = Vec::new();
-    for tag in table.model_use_tags.get(model_name).map(|v| v.as_slice()).unwrap_or(&[]) {
+    for tag in table
+        .model_use_tags
+        .get(model_name)
+        .map(|v| v.as_slice())
+        .unwrap_or(&[])
+    {
         for param in &tag.params {
             match param {
                 UseTagParamKind::Crud(spd) => cruds.push(&spd.block),
