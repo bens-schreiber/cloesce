@@ -1,86 +1,33 @@
-use std::ops::Not;
-
 use chumsky::prelude::*;
 
 use ast::CrudKind;
 
 use crate::{
-    ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, NavigationBlock, R2Block, Symbol,
-    SymbolKind, UniqueConstraint, UseTag,
+    ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag, UseTagParamKind,
     lexer::Token,
-    parser::{Extra, Span, TokenInput, cidl_type},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
-
-struct ParsedForeign<'src> {
-    block: ForeignBlock<'src>,
-    nav: Option<Symbol<'src>>,
-}
-
-enum UniqueItem<'src> {
-    Foreign(ParsedForeign<'src>),
-    Field(Symbol<'src>),
-}
-
-enum PrimaryItem<'src> {
-    Foreign(ParsedForeign<'src>),
-    Field(Symbol<'src>),
-}
-
-enum PaginatedItem<'src> {
-    Kv(KvBlock<'src>),
-    R2(R2Block<'src>),
-}
-
-enum ModelItem<'src> {
-    Primary(Span, Vec<PrimaryItem<'src>>),
-    Optional(Vec<ParsedForeign<'src>>),
-    Unique(Span, Vec<UniqueItem<'src>>),
-    Foreign(ParsedForeign<'src>),
-    Field(Symbol<'src>),
-    Kv(KvBlock<'src>),
-    R2(R2Block<'src>),
-    Paginated(Vec<PaginatedItem<'src>>),
-    Nav(NavigationBlock<'src>),
-    KeyField(Vec<Symbol<'src>>),
-}
-
-/// `ident: cidl_type`
-fn typed_field<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    select! { Token::Ident(name) => name }
-        .map_with(|name, e| (name, e.span()))
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type())
-        .map(|((name, span), cidl_type)| Symbol {
-            span,
-            name,
-            cidl_type,
-            kind: SymbolKind::ModelField,
-            ..Default::default()
-        })
-}
 
 /// `nav { navName }`
 fn foreign_nav_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    just(Token::Ident("nav")).ignore_then(
-        select! { Token::Ident(name) => name }
-            .map_with(|name, e| Symbol {
-                span: e.span(),
-                name,
-                kind: SymbolKind::ModelField,
-                ..Default::default()
-            })
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-    )
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<ForeignBlockNav<'src>>, Extra<'tokens, 'src>>
+{
+    just(Token::Ident("nav"))
+        .ignore_then(
+            symbol()
+                .map(|nav| ForeignBlockNav { symbol: nav })
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map_spanned(|s| s)
 }
 
 /// `foreign(AdjModel::field1, ...) [primary|optional|unique] { localField ... nav { navName } }`
 fn foreign_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParsedForeign<'src>, Extra<'tokens, 'src>> {
-    let adj_ref = select! { Token::Ident(model_name) => model_name }
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
+    let adj_ref = symbol()
         .then_ignore(just(Token::DoubleColon))
-        .then(select! { Token::Ident(field_name) => field_name });
+        .then(symbol());
 
     let qualifier = choice((
         just(Token::Ident("primary")).to(ForeignQualifier::Primary),
@@ -88,6 +35,8 @@ fn foreign_block<'tokens, 'src: 'tokens>()
         just(Token::Ident("unique")).to(ForeignQualifier::Unique),
     ))
     .or_not();
+
+    let field = just(Token::Ident("nav")).not().ignore_then(symbol());
 
     just(Token::Ident("foreign"))
         .ignore_then(
@@ -99,113 +48,71 @@ fn foreign_block<'tokens, 'src: 'tokens>()
         )
         .then(qualifier)
         .then(
-            choice((
-                foreign_nav_block().map(|nav| (None::<Symbol<'src>>, Some(nav))),
-                select! { Token::Ident(name) => name }
-                    .map_with(|name, e| Symbol {
-                        span: e.span(),
-                        name,
-                        kind: SymbolKind::ModelField,
-                        ..Default::default()
-                    })
-                    .map(|sym| (Some(sym), None)),
-            ))
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            field
+                .repeated()
+                .collect::<Vec<_>>()
+                .then(foreign_nav_block().or_not())
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((adj_refs, qualifier), body_items), e| {
-            let mut fields: Vec<Symbol<'src>> = Vec::new();
-            let mut nav: Option<Symbol<'src>> = None;
-            for (field_opt, nav_opt) in body_items {
-                if let Some(f) = field_opt {
-                    fields.push(f);
-                }
-                if let Some(n) = nav_opt {
-                    nav = Some(n);
-                }
-            }
-
-            ParsedForeign {
-                block: ForeignBlock {
-                    span: e.span(),
-                    adj: adj_refs,
-                    fields,
-                    qualifier,
-                },
-                nav,
-            }
+        .map(|((adj, qualifier), (fields, nav))| ForeignBlock {
+            adj,
+            qualifier,
+            fields,
+            nav,
         })
 }
 
-/// `kv(binding, "key/format/{id}") paginated { ident: cidl_type }`
+/// `kv (binding, "key/format/{id}") paginated { ident: cidl_type }`
 fn kv_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvBlock<'src>, Extra<'tokens, 'src>> {
-    just(Token::Kv)
+    just(Token::Ident("kv"))
         .ignore_then(
-            select! { Token::Ident(name) => name }
+            symbol()
                 .then_ignore(just(Token::Comma))
                 .then(select! { Token::StringLit(value) => value })
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(just(Token::Ident("paginated")).or_not())
-        .then(typed_field().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map_with(
-            |(((env_binding, key_format), paginated), field), e| KvBlock {
-                span: e.span(),
-                env_binding,
-                key_format,
-                field,
-                is_paginated: paginated.is_some(),
-            },
-        )
+        .then(typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .map(|(((env_binding, key_format), paginated), field)| KvBlock {
+            env_binding,
+            key_format,
+            field,
+            is_paginated: paginated.is_some(),
+        })
 }
 
-/// `r2(binding, "key/format/{id}") paginated{ ident }`
+/// `r2(binding, "key/format/{id}") paginated { ident }`
 fn r2_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2Block<'src>, Extra<'tokens, 'src>> {
-    just(Token::R2)
+    just(Token::Ident("r2"))
         .ignore_then(
-            select! { Token::Ident(name) => name }
+            symbol()
                 .then_ignore(just(Token::Comma))
                 .then(select! { Token::StringLit(value) => value })
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(just(Token::Ident("paginated")).or_not())
-        .then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| Symbol {
-                    span: e.span(),
-                    name,
-                    kind: SymbolKind::ModelField,
-                    ..Default::default()
-                })
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map_with(
-            |(((env_binding, key_format), paginated), field), e| R2Block {
-                span: e.span(),
-                env_binding,
-                key_format,
-                field,
-                is_paginated: paginated.is_some(),
-            },
-        )
-}
-
-enum UseItem<'src> {
-    Crud(CrudKind),
-    Binding(&'src str),
+        .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .map(|(((env_binding, key_format), paginated), field)| R2Block {
+            env_binding,
+            key_format,
+            field,
+            is_paginated: paginated.is_some(),
+        })
 }
 
 fn use_item<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseItem<'src>, Extra<'tokens, 'src>> {
-    select! {
-        Token::Ident("get") => UseItem::Crud(CrudKind::Get),
-        Token::Ident("save") => UseItem::Crud(CrudKind::Save),
-        Token::Ident("list") => UseItem::Crud(CrudKind::List),
-        Token::Ident(name) => UseItem::Binding(name),
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseTagParamKind<'src>, Extra<'tokens, 'src>> {
+    let crud = select! {
+        Token::Ident("get") => CrudKind::Get,
+        Token::Ident("save") => CrudKind::Save,
+        Token::Ident("list") => CrudKind::List,
     }
+    .map_spanned(|k| k)
+    .map(UseTagParamKind::Crud);
+
+    crud.or(symbol().map(UseTagParamKind::EnvBinding))
 }
 
 pub fn model_block<'tokens, 'src: 'tokens>()
@@ -220,45 +127,48 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map_with(|items, e| (items, e.span()));
+        .map_spanned(|params| UseTag { params });
 
-    // `primary { typed_fields... foreign(...) { ... } }`
-    let primary_block = just(Token::Ident("primary")).ignore_then(
+    let choice_sql = || {
         choice((
-            foreign_block().map(PrimaryItem::Foreign),
-            typed_field().map(PrimaryItem::Field),
+            foreign_block().map(SqlBlockKind::Foreign),
+            typed_symbol().map(SqlBlockKind::Column),
         ))
-        .repeated()
-        .collect::<Vec<_>>()
-        .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        .map_spanned(|k| k)
+    };
+
+    // `primary { typed_symbols... foreign(...) { ... } }`
+    let primary_block = just(Token::Ident("primary")).ignore_then(
+        choice_sql()
+            .repeated()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map(ModelBlockKind::Primary),
     );
 
     // `optional { foreign(...) { ... } ... }` — all contained foreigners are nullable
     let optional_block = just(Token::Ident("optional")).ignore_then(
-        foreign_block()
+        choice_sql()
             .repeated()
             .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map(ModelBlockKind::Optional),
     );
 
-    // `unique { foreign(...) { ... } | typed_field ... }`
-    let unique_block = just(Token::Ident("unique"))
-        .ignore_then(
-            choice((
-                foreign_block().map(UniqueItem::Foreign),
-                typed_field().map(UniqueItem::Field),
-            ))
+    // `unique { foreign(...) { ... } | typed_symbol ... }`
+    let unique_block = just(Token::Ident("unique")).ignore_then(
+        choice_sql()
             .repeated()
             .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map_with(|items, e| ModelItem::Unique(e.span(), items));
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map(ModelBlockKind::Unique),
+    );
 
     // `nav(AdjModel::field1, AdjModel::field2) { ident }`
     let nav_block = {
-        let adj_ref = select! { Token::Ident(model_name) => model_name }
+        let adj_ref = symbol()
             .then_ignore(just(Token::DoubleColon))
-            .then(select! { Token::Ident(field_name) => field_name });
+            .then(symbol());
 
         just(Token::Ident("nav"))
             .ignore_then(
@@ -269,300 +179,72 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                     .delimited_by(just(Token::LParen), just(Token::RParen)),
             )
             .then(
-                select! { Token::Ident(name) => name }
-                    .map_with(|name, e| Symbol {
-                        span: e.span(),
-                        name,
-                        kind: SymbolKind::ModelField,
-                        ..Default::default()
-                    })
+                symbol()
+                    .map_spanned(|s| s)
                     .delimited_by(just(Token::LBrace), just(Token::RBrace)),
             )
-            .map_with(|(adj, field), e| {
-                ModelItem::Nav(NavigationBlock {
-                    span: e.span(),
-                    adj,
-                    field,
-                    is_one_to_one: false,
-                })
-            })
+            .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
     // `keyfield { ident* }`
     let keyfield_block = just(Token::Ident("keyfield"))
         .ignore_then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| Symbol {
-                    span: e.span(),
-                    name,
-                    kind: SymbolKind::ModelField,
-                    ..Default::default()
-                })
+            symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(ModelItem::KeyField);
+        .map(ModelBlockKind::KeyField);
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
     let paginated_block = just(Token::Ident("paginated")).ignore_then(
         choice((
-            kv_block().map(PaginatedItem::Kv),
-            r2_block().map(PaginatedItem::R2),
+            kv_block().map(PaginatedBlockKind::Kv),
+            r2_block().map(PaginatedBlockKind::R2),
         ))
+        .map_spanned(|k| k)
         .repeated()
         .collect::<Vec<_>>()
-        .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .map(ModelBlockKind::Paginated),
     );
 
-    let model_item = choice((
-        primary_block.map_with(|items, e| ModelItem::Primary(e.span(), items)),
-        optional_block.map(ModelItem::Optional),
-        unique_block,
-        foreign_block().map(ModelItem::Foreign),
-        paginated_block.map(ModelItem::Paginated),
+    let kv = kv_block().map(ModelBlockKind::Kv);
+    let r2 = r2_block().map(ModelBlockKind::R2);
+    let foreign = foreign_block().map(ModelBlockKind::Foreign);
+    let column = typed_symbol().map(ModelBlockKind::Column);
+
+    let sub_blocks = choice((
+        foreign,
+        kv,
+        r2,
+        column,
         nav_block,
-        kv_block().map(ModelItem::Kv),
-        r2_block().map(ModelItem::R2),
         keyfield_block,
-        typed_field().map(ModelItem::Field),
+        paginated_block,
+        primary_block,
+        optional_block,
+        unique_block,
     ));
 
     let use_tags = use_tag.repeated().collect::<Vec<_>>();
 
     use_tags
         .then_ignore(just(Token::Model))
-        .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
+        .then(symbol())
         .then(
-            model_item
+            sub_blocks
+                .map_spanned(|k| k)
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((tag_lists, (model_name, model_span)), items)| {
-            map_model(model_name, model_span, tag_lists, items)
+        .map(|((use_tags, symbol), blocks)| ModelBlock {
+            symbol,
+            use_tags,
+            blocks,
         })
-}
-
-fn map_model<'src>(
-    model_name: &'src str,
-    model_span: Span,
-    tag_lists: Vec<(Vec<UseItem<'src>>, Span)>,
-    items: Vec<ModelItem<'src>>,
-) -> ModelBlock<'src> {
-    let mut cruds: Vec<CrudKind> = Vec::new();
-    let mut env_bindings: Vec<&str> = Vec::new();
-    let use_tag = {
-        let mut use_span: Option<Span> = None;
-        for (items_list, tag_span) in tag_lists {
-            for item in items_list {
-                match item {
-                    UseItem::Crud(c) => {
-                        if !cruds.contains(&c) {
-                            cruds.push(c);
-                        }
-                    }
-                    UseItem::Binding(b) => {
-                        env_bindings.push(b);
-                    }
-                }
-            }
-
-            use_span = Some(match use_span {
-                Some(existing) => Span {
-                    start: existing.start,
-                    end: tag_span.end,
-                    context: existing.context,
-                },
-                None => tag_span,
-            });
-        }
-
-        use_span.map(|span| UseTag {
-            span,
-            cruds,
-            env_bindings,
-        })
-    };
-
-    let mut fields: Vec<Symbol<'src>> = Vec::new();
-    let mut primary_fields: Vec<&'src str> = Vec::new();
-    let mut key_fields: Vec<Symbol<'src>> = Vec::new();
-    let mut unique_constraints: Vec<UniqueConstraint<'src>> = Vec::new();
-    let mut kvs: Vec<KvBlock<'src>> = Vec::new();
-    let mut r2s: Vec<R2Block<'src>> = Vec::new();
-    let mut foreign_blocks: Vec<ForeignBlock<'src>> = Vec::new();
-    let mut navigation_blocks: Vec<NavigationBlock<'src>> = Vec::new();
-
-    for item in items {
-        match item {
-            ModelItem::Primary(_span, primary_items) => {
-                for pi in primary_items {
-                    match pi {
-                        PrimaryItem::Field(mut sym) => {
-                            sym.parent_name = model_name.into();
-                            primary_fields.push(sym.name);
-                            fields.push(sym);
-                        }
-                        PrimaryItem::Foreign(pf) => {
-                            if matches!(pf.block.qualifier, Some(ForeignQualifier::Primary)).not() {
-                                // `drain_foreign` will push to primary fields if the qual is primary,
-                                // but if not we need to do it here
-                                primary_fields.extend(pf.block.fields.iter().map(|f| f.name));
-                            }
-
-                            foreign_blocks.push(drain_foreign(
-                                model_name,
-                                pf,
-                                &mut navigation_blocks,
-                                &mut primary_fields,
-                                &mut unique_constraints,
-                            ));
-                        }
-                    }
-                }
-            }
-            ModelItem::Optional(pfs) => {
-                for pf in pfs {
-                    let mut drained = drain_foreign(
-                        model_name,
-                        pf,
-                        &mut navigation_blocks,
-                        &mut primary_fields,
-                        &mut unique_constraints,
-                    );
-
-                    drained.qualifier = Some(ForeignQualifier::Optional);
-                    foreign_blocks.push(drained);
-                }
-            }
-            ModelItem::Unique(span, unique_items) => {
-                let mut constraint_names: Vec<&'src str> = Vec::new();
-                for ui in unique_items {
-                    match ui {
-                        UniqueItem::Foreign(pf) => {
-                            for sym in &pf.block.fields {
-                                constraint_names.push(sym.name);
-                            }
-                            foreign_blocks.push(drain_foreign(
-                                model_name,
-                                pf,
-                                &mut navigation_blocks,
-                                &mut primary_fields,
-                                &mut unique_constraints,
-                            ));
-                        }
-                        UniqueItem::Field(mut sym) => {
-                            sym.parent_name = model_name.into();
-                            constraint_names.push(sym.name);
-                            fields.push(sym);
-                        }
-                    }
-                }
-                unique_constraints.push(UniqueConstraint {
-                    span,
-                    fields: constraint_names,
-                });
-            }
-            ModelItem::Foreign(pf) => {
-                foreign_blocks.push(drain_foreign(
-                    model_name,
-                    pf,
-                    &mut navigation_blocks,
-                    &mut primary_fields,
-                    &mut unique_constraints,
-                ));
-            }
-            ModelItem::Field(mut sym) => {
-                sym.parent_name = model_name.into();
-                fields.push(sym);
-            }
-            ModelItem::Nav(mut nb) => {
-                nb.field.parent_name = model_name.into();
-                navigation_blocks.push(nb);
-            }
-            ModelItem::Kv(block) => kvs.push(block),
-            ModelItem::R2(block) => r2s.push(block),
-            ModelItem::Paginated(inner_items) => {
-                for inner in inner_items {
-                    match inner {
-                        PaginatedItem::Kv(mut block) => {
-                            block.is_paginated = true;
-                            kvs.push(block);
-                        }
-                        PaginatedItem::R2(mut block) => {
-                            block.is_paginated = true;
-                            r2s.push(block);
-                        }
-                    }
-                }
-            }
-            ModelItem::KeyField(mut syms) => {
-                for sym in &mut syms {
-                    sym.parent_name = model_name.into()
-                }
-                key_fields.extend(syms);
-            }
-        }
-    }
-
-    ModelBlock {
-        symbol: Symbol {
-            span: model_span,
-            name: model_name,
-            kind: SymbolKind::ModelDecl,
-            ..Default::default()
-        },
-        use_tag,
-        typed_idents: fields,
-        primary_fields,
-        key_fields,
-        unique_constraints,
-        kvs,
-        r2s,
-        navigation_blocks,
-        foreign_blocks,
-    }
-}
-
-fn drain_foreign<'src>(
-    parent_name: &'src str,
-    pf: ParsedForeign<'src>,
-    navigation_blocks: &mut Vec<NavigationBlock<'src>>,
-    primary_fields: &mut Vec<&'src str>,
-    unique_constraints: &mut Vec<UniqueConstraint<'src>>,
-) -> ForeignBlock<'src> {
-    let mut block = pf.block;
-    let mut unique_constraint = UniqueConstraint {
-        span: block.span,
-        fields: Vec::new(),
-    };
-    for sym in &mut block.fields {
-        sym.parent_name = parent_name.into();
-
-        match block.qualifier {
-            Some(ForeignQualifier::Primary) => {
-                primary_fields.push(sym.name);
-            }
-            Some(ForeignQualifier::Unique) => {
-                unique_constraint.fields.push(sym.name);
-            }
-            _ => {}
-        }
-    }
-
-    if !unique_constraint.fields.is_empty() {
-        unique_constraints.push(unique_constraint);
-    }
-
-    if let Some(mut nav) = pf.nav {
-        nav.parent_name = parent_name.into();
-        navigation_blocks.push(NavigationBlock {
-            span: nav.span,
-            adj: block.adj.clone(),
-            field: nav,
-            is_one_to_one: true,
-        });
-    }
-    block
+        // Without this box, Apple `ld` linker breaks
+        // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
+        .boxed()
 }

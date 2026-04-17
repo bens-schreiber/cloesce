@@ -1,10 +1,15 @@
-env { d1 { db } }
-
-//#region OneToOne
+env {
+    d1 {
+        db
+    }
+}
+// #region OneToOne
 [use db, save, get]
 model B {
-    primary { id: int }
-
+    primary {
+        id: int
+    }
+    
     nav (A::bId) {
         a
     }
@@ -16,44 +21,54 @@ api B {
 
 [use db, save, get]
 model A {
-    primary { id: int }
-
-    foreign (B::id) optional {
+    primary {
+        id: int
+    }
+    
+    foreign (B::id) optional  {
         bId
-        nav { b }
+        
+        nav {
+            b
+        }
     }
 }
 
 source WithB for A {
-    include { b }
+    include {
+        b
+    }
 }
 
 source WithoutB for A {
-    include { }
+    include {}
 }
 
 api A {
     post create(e: env, a: A) -> A
     get withoutB([source WithoutB] self) -> A
 }
-//#endregion
-
-//#region OneToMany
+// #endregion
+// #region OneToMany
 [use db, save, get]
 model Person {
-    primary { id: int }
-
+    primary {
+        id: int
+    }
+    
     nav (Dog::personId) {
         dogs
     }
 }
 
 source WithDogs for Person {
-    include { dogs }
+    include {
+        dogs
+    }
 }
 
 source WithoutDogs for Person {
-    include { }
+    include {}
 }
 
 api Person {
@@ -63,35 +78,47 @@ api Person {
 
 [use db, save]
 model Dog {
-    primary { id: int }
-
+    primary {
+        id: int
+    }
+    
     foreign (Person::id) {
         personId
-        nav { person }
+        
+        nav {
+            person
+        }
     }
 }
 
 api Dog {
     post testMethod(self) -> void
 }
-//#endregion
-
-//#region ManyToMany
+// #endregion
+// #region ManyToMany
 [use db, save, get]
 model Student {
-    primary { id: int }
-
+    primary {
+        id: int
+    }
+    
     nav (Course::id) {
         courses
     }
 }
 
 source WithCoursesStudentsCourses for Student {
-    include { courses { students { courses } } }
+    include {
+        courses {
+            students {
+                courses
+            }
+        }
+    }
 }
 
 source None for Student {
-    include { }
+    include {}
 }
 
 api Student {
@@ -101,10 +128,11 @@ api Student {
 
 [use db, save]
 model Course {
-    primary { id: int }
-
+    primary {
+        id: int
+    }
+    
     nav (Student::id) {
         students
     }
-}
-//#endregion
+}// #endregion

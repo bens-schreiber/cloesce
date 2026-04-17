@@ -16,10 +16,6 @@ impl std::fmt::Display for Token<'_> {
             Token::Api => write!(f, "api"),
             Token::Poo => write!(f, "poo"),
             Token::Sql => write!(f, "sql"),
-            Token::D1 => write!(f, "d1"),
-            Token::R2 => write!(f, "r2"),
-            Token::Kv => write!(f, "kv"),
-            Token::Vars => write!(f, "vars"),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
             Token::LParen => write!(f, "("),
@@ -36,6 +32,7 @@ impl std::fmt::Display for Token<'_> {
             Token::StringLit(s) => write!(f, "\"{s}\""),
             Token::Ident(s) => write!(f, "{s}"),
             Token::SelfToken => write!(f, "self"),
+            Token::Comment(s) => write!(f, "{s}"),
             Token::Error => write!(f, "<error>"),
         }
     }

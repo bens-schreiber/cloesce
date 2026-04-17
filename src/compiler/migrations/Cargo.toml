@@ -17,6 +17,5 @@ serde_json = { workspace = true }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
 
 
-
 [lib]
 doctest = false

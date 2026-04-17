@@ -11,6 +11,7 @@ logos = "0.16.1"
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
+insta = { workspace = true }
 
 [lib]
 doctest = false

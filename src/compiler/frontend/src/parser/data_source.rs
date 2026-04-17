@@ -1,13 +1,11 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 use chumsky::prelude::*;
 
-use ast::IncludeTree;
-
 use crate::{
-    DataSourceBlock, DataSourceBlockMethod, Symbol, SymbolKind,
+    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree,
     lexer::Token,
-    parser::{Extra, TokenInput, cidl_type},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -20,26 +18,25 @@ use crate::{
 /// }
 /// ```
 pub fn data_source_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, DataSourceBlock<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // ident | ident { ... }
     let include_entry = recursive(|entry| {
-        select! { Token::Ident(name) => name }
+        symbol()
             .then(
                 entry
-                    .separated_by(just(Token::Comma))
-                    .allow_trailing()
+                    .repeated()
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LBrace), just(Token::RBrace))
                     .or_not(),
             )
-            .map(|(name, children)| {
-                let subtree = IncludeTree(
+            .map(|(symbol, children)| {
+                let subtree = ParsedIncludeTree(
                     children
                         .unwrap_or_default()
                         .into_iter()
                         .collect::<BTreeMap<_, _>>(),
                 );
-                (Cow::Borrowed(name), subtree)
+                (symbol, subtree)
             })
             .boxed()
     });
@@ -47,26 +44,10 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     // include { ... }
     let include_tree = just(Token::Ident("include")).ignore_then(
         include_entry
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
+            .repeated()
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
-
-    // ident: cidl_type
-    let named_parameter = || {
-        select! { Token::Ident(name) => name }
-            .map_with(|name, e| (name, e.span()))
-            .then_ignore(just(Token::Colon))
-            .then(cidl_type())
-            .map(|((name, span), cidl_type)| Symbol {
-                name,
-                span,
-                cidl_type,
-                kind: SymbolKind::DataSourceMethodParam,
-                ..Default::default()
-            })
-    };
 
     // { "..." }
     let sql_block = select! { Token::StringLit(sql) => sql }
@@ -74,7 +55,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql get(ident: cidl_type, ...) { "..." }
     let method_params = || {
-        named_parameter()
+        typed_symbol()
             .separated_by(just(Token::Comma))
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -85,19 +66,21 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     let get_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("get")))
         .ignore_then(method_params())
-        .then(sql_block.clone());
+        .then(sql_block.clone())
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
+            parameters,
+            raw_sql,
+        });
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("list")))
-        .ignore_then(
-            named_parameter()
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)),
-        )
-        .then(sql_block);
+        .ignore_then(method_params())
+        .then(sql_block)
+        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
+            parameters,
+            raw_sql,
+        });
 
     // [internal]
     let internal_decorator = just(Token::LBracket)
@@ -108,60 +91,28 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     // source SourceName for ModelName { ... }
     internal_decorator
         .or_not()
-        .then(just(Token::Source).ignore_then(select! { Token::Ident(name) => name }))
+        .then(just(Token::Source).ignore_then(symbol()))
         .then_ignore(just(Token::Ident("for")))
-        .then(select! { Token::Ident(model) => model })
+        .then(symbol())
         .then(
             include_tree
                 .then(get_method.or_not())
                 .then(list_method.or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(
-            |(((is_internal, name), model), ((include_entries, get_method), list_method)), e| {
-                let tree = IncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
+        .map(
+            |(((is_internal, symbol), model), ((include_entries, get), list))| {
+                let tree =
+                    ParsedIncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
 
-                let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
-                    span: e.span(),
-                    parameters: set_params_parent(model, "get", params, name),
-                    raw_sql,
-                });
-                let list = list_method.map(|(params, raw_sql)| DataSourceBlockMethod {
-                    span: e.span(),
-                    parameters: set_params_parent(model, "list", params, name),
-                    raw_sql,
-                });
-
-                DataSourceBlock {
-                    symbol: Symbol {
-                        name,
-                        span: e.span(),
-                        kind: SymbolKind::DataSourceDecl,
-                        parent_name: Cow::Borrowed(model),
-                        ..Default::default()
-                    },
+                AstBlockKind::DataSource(DataSourceBlock {
+                    symbol,
                     model,
                     tree,
                     get,
                     list,
                     is_internal: is_internal.is_some(),
-                }
+                })
             },
         )
-}
-
-fn set_params_parent<'src>(
-    model: &str,
-    method: &str,
-    params: Vec<Symbol<'src>>,
-    name: &str,
-) -> Vec<Symbol<'src>> {
-    let parent = format!("{model}::{name}::{method}");
-    params
-        .into_iter()
-        .map(|mut p| {
-            p.parent_name = Cow::Owned(parent.clone());
-            p
-        })
-        .collect()
 }

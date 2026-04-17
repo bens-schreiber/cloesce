@@ -1,4 +1,8 @@
-env { d1 { db } }
+env {
+    d1 {
+        db
+    }
+}
 
 poo PooA {
     name: string
@@ -16,7 +20,9 @@ poo PooC {
 
 [use db]
 model PooAcceptYield {
-    primary { id: int }
+    primary {
+        id: int
+    }
 }
 
 api PooAcceptYield {

@@ -1,5 +1,17 @@
 use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
+use frontend::{
+    AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
+    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind,
+};
+
+fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
+    adj.len() == expected.len()
+        && adj
+            .iter()
+            .zip(expected)
+            .all(|((m, f), (em, ef))| m.name == *em && f.name == *ef)
+}
 
 #[test]
 fn env_block() {
@@ -25,31 +37,68 @@ fn env_block() {
     );
 
     // Assert
-    let env = ast
-        .wrangler_envs
-        .first()
-        .expect("wrangler_env to be present");
+    let env_blocks = ast
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            AstBlockKind::Env(blocks) => Some(blocks),
+            _ => None,
+        })
+        .expect("env block to be present");
+
+    let d1_bindings = env_blocks
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block.kind {
+            EnvBindingBlockKind::D1 => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
+            _ => None,
+        })
+        .expect("d1 block to be present");
+    assert_eq!(d1_bindings, vec!["db", "db2"]);
+
+    let r2_bindings = env_blocks
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block.kind {
+            EnvBindingBlockKind::R2 => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
+            _ => None,
+        })
+        .expect("r2 block to be present");
+    assert_eq!(r2_bindings, vec!["assets"]);
+
+    let kv_bindings = env_blocks
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block.kind {
+            EnvBindingBlockKind::Kv => {
+                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
+            _ => None,
+        })
+        .expect("kv block to be present");
+    assert_eq!(kv_bindings, vec!["cache"]);
+
+    let vars = env_blocks
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block.kind {
+            EnvBindingBlockKind::Var => Some(
+                spd.block
+                    .symbols
+                    .iter()
+                    .map(|s| (s.name, &s.cidl_type))
+                    .collect::<Vec<_>>(),
+            ),
+            _ => None,
+        })
+        .expect("vars block to be present");
 
     assert_eq!(
-        env.d1_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
-        vec!["db", "db2"]
-    );
-
-    assert_eq!(
-        env.r2_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
-        vec!["assets"]
-    );
-
-    assert_eq!(
-        env.kv_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
-        vec!["cache"]
-    );
-
-    assert_eq!(
-        env.vars
-            .iter()
-            .map(|v| (v.name, &v.cidl_type))
-            .collect::<Vec<_>>(),
+        vars,
         vec![
             ("api_url", &CidlType::String),
             ("max_retries", &CidlType::Integer),
@@ -95,32 +144,35 @@ fn poo_block() {
     );
 
     // Assert
-    assert_eq!(ast.poos.len(), 3);
-
-    let address_poo = ast
-        .poos
+    let address = ast
+        .blocks
         .iter()
-        .find(|p| p.symbol.name == "Address")
+        .find_map(|spd| match &spd.block {
+            AstBlockKind::PlainOldObject(p) if p.symbol.name == "Address" => Some(p),
+            _ => None,
+        })
         .expect("Address poo to be present");
-    assert_eq!(address_poo.fields.len(), 3);
+    assert_eq!(address.fields.len(), 3);
 
-    let zipcode = address_poo
+    let zipcode = address
         .fields
         .iter()
         .find(|f| f.name == "zipcode")
         .expect("zipcode field to be present");
     assert_eq!(zipcode.cidl_type, CidlType::nullable(CidlType::String));
 
-    let user_poo = ast
-        .poos
+    let user = ast
+        .blocks
         .iter()
-        .find(|p| p.symbol.name == "User")
+        .find_map(|spd| match &spd.block {
+            AstBlockKind::PlainOldObject(p) if p.symbol.name == "User" => Some(p),
+            _ => None,
+        })
         .expect("User poo to be present");
-    assert_eq!(user_poo.fields.len(), 12);
+    assert_eq!(user.fields.len(), 12);
 
     assert_eq!(
-        user_poo
-            .fields
+        user.fields
             .iter()
             .map(|f| (f.name, f.cidl_type.clone()))
             .collect::<Vec<_>>(),
@@ -148,14 +200,17 @@ fn poo_block() {
         ]
     );
 
-    let container_poo = ast
-        .poos
+    let container = ast
+        .blocks
         .iter()
-        .find(|p| p.symbol.name == "Container")
+        .find_map(|spd| match &spd.block {
+            AstBlockKind::PlainOldObject(p) if p.symbol.name == "Container" => Some(p),
+            _ => None,
+        })
         .expect("Container poo to be present");
-    assert_eq!(container_poo.fields.len(), 2);
+    assert_eq!(container.fields.len(), 2);
     assert_eq!(
-        container_poo
+        container
             .fields
             .iter()
             .find(|f| f.name == "nested")
@@ -182,12 +237,19 @@ fn inject_block() {
     );
 
     // Assert
+    let all_injected: Vec<&str> = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.block {
+            AstBlockKind::Inject(i) => Some(i),
+            _ => None,
+        })
+        .flat_map(|i| i.symbols.iter())
+        .map(|s| s.name)
+        .collect();
+
     assert_eq!(
-        ast.injects
-            .iter()
-            .flat_map(|s| s.fields.iter())
-            .map(|r| r.name)
-            .collect::<Vec<_>>(),
+        all_injected,
         vec!["OpenApiService", "YouTubeApi", "SlackApi"]
     );
 }
@@ -218,9 +280,17 @@ fn service_block() {
     );
 
     // Assert
-    assert_eq!(ast.services.len(), 2);
-    let service = ast
-        .services
+    let services: Vec<_> = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.block {
+            AstBlockKind::Service(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(services.len(), 2);
+
+    let service = services
         .iter()
         .find(|s| s.symbol.name == "MyAppService")
         .expect("MyAppService service to be present");
@@ -249,8 +319,7 @@ fn service_block() {
     );
     assert_ne!(api1.span, api2.span, "fields should have distinct spans");
 
-    let empty = ast
-        .services
+    let empty = services
         .iter()
         .find(|s| s.symbol.name == "EmptyService")
         .expect("EmptyService to be present");
@@ -260,765 +329,543 @@ fn service_block() {
         "services should have distinct spans"
     );
 
-    let app_api_blocks: Vec<_> = ast
-        .apis
+    let api_blocks: Vec<_> = ast
+        .blocks
         .iter()
-        .filter(|a| a.namespace == "MyAppService")
+        .filter_map(|spd| match &spd.block {
+            AstBlockKind::Api(a) => Some(a),
+            _ => None,
+        })
+        .filter(|a| a.symbol.name == "MyAppService")
         .collect();
     assert_eq!(
-        app_api_blocks.len(),
+        api_blocks.len(),
         2,
         "should have two separate api blocks for MyAppService"
     );
 
-    let create_block = app_api_blocks
+    let create_block = api_blocks
         .iter()
-        .find(|a| a.methods.iter().any(|m| m.symbol.name == "createItem"))
+        .find(|a| {
+            a.methods
+                .iter()
+                .any(|m| m.block.symbol.name == "createItem")
+        })
         .expect("block with createItem");
     let create = create_block
         .methods
         .iter()
-        .find(|m| m.symbol.name == "createItem")
+        .find(|m| m.block.symbol.name == "createItem")
         .unwrap();
-    assert_eq!(create.http_verb, HttpVerb::Post);
-    assert!(create.is_static);
-    assert_eq!(create.parameters.len(), 2);
-    assert_eq!(create.return_type, CidlType::String);
+    assert_eq!(create.block.http_verb, HttpVerb::Post);
+    // no SelfParam means it's static
+    assert!(
+        create
+            .block
+            .parameters
+            .iter()
+            .all(|p| matches!(&p.block, frontend::ApiBlockMethodParamKind::Field(_)))
+    );
+    assert_eq!(create.block.parameters.len(), 2);
+    assert_eq!(create.block.return_type, CidlType::String);
 
-    let list_block = app_api_blocks
+    let list_block = api_blocks
         .iter()
-        .find(|a| a.methods.iter().any(|m| m.symbol.name == "listItems"))
+        .find(|a| a.methods.iter().any(|m| m.block.symbol.name == "listItems"))
         .expect("block with listItems");
     let list = list_block
         .methods
         .iter()
-        .find(|m| m.symbol.name == "listItems")
+        .find(|m| m.block.symbol.name == "listItems")
         .unwrap();
-    assert_eq!(list.http_verb, HttpVerb::Get);
-    assert!(!list.is_static);
-    assert_eq!(list.return_type, CidlType::array(CidlType::String));
+    assert_eq!(list.block.http_verb, HttpVerb::Get);
+    // has a SelfParam means it's an instance method
+    assert!(list.block.parameters.iter().any(|p| matches!(
+        &p.block,
+        frontend::ApiBlockMethodParamKind::SelfParam { .. }
+    )));
+    assert_eq!(list.block.return_type, CidlType::array(CidlType::String));
 }
 
 #[test]
-fn model_block_scalar() {
-    // Act
+fn model_primary_unique_optional_foreign() {
     let ast = lex_and_parse(
         r#"
-        [use d1_a]
-        model Person {
-            // Composite PK: id and age
-            primary {
-                id: int
-                age: int
-            }
-
-            name: string
-            active: bool
-            birthday: date
+        [use d1_db, list]
+        [use get, save, d2_db]
+        model M {
             score: double
-        }
-        "#,
-    );
 
-    // Assert
-    let model = ast.models.first().expect("model to be present");
-    assert_eq!(model.symbol.name, "Person");
-    assert_eq!(model.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
-    assert_eq!(model.primary_fields, vec!["id", "age"]);
-
-    let all_names: Vec<&str> = model.typed_idents.iter().map(|f| f.name).collect();
-    assert!(all_names.contains(&"id")); // should include primary fields
-    assert!(all_names.contains(&"age"));
-    assert!(all_names.contains(&"name"));
-    assert!(all_names.contains(&"active"));
-    assert!(all_names.contains(&"birthday"));
-    assert!(all_names.contains(&"score"));
-}
-
-#[test]
-fn model_block_kv_r2() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        model Foo {
-            field: string
-
-            kv(cache_ns, "my-interpolated-format{field}-{category}") {
-                kv_value: json
-            }
-
-            kv(all_caches, "my-interpolated-format") paginated {
-                paginated_value: string
-            }
-
-            r2(assets_bucket, "my_interpolated_format{field}") {
-                obj
-            }
-
-            r2(all_buckets, "my_interpolated_format") paginated {
-                paginated_obj
-            }
-        }
-        "#,
-    );
-
-    // Assert
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    assert_eq!(foo.kvs.len(), 2);
-    assert_eq!(foo.r2s.len(), 2);
-
-    let kv_single = &foo.kvs[0];
-    assert_eq!(kv_single.env_binding, "cache_ns");
-    assert_eq!(
-        kv_single.key_format,
-        "my-interpolated-format{field}-{category}"
-    );
-    assert_eq!(kv_single.field.name, "kv_value");
-    assert!(!kv_single.is_paginated);
-
-    let kv_paginated = &foo.kvs[1];
-    assert_eq!(kv_paginated.env_binding, "all_caches");
-    assert_eq!(kv_paginated.key_format, "my-interpolated-format");
-    assert!(kv_paginated.is_paginated);
-    assert_eq!(kv_paginated.field.name, "paginated_value");
-
-    let r2_single = &foo.r2s[0];
-    assert_eq!(r2_single.env_binding, "assets_bucket");
-    assert_eq!(r2_single.key_format, "my_interpolated_format{field}");
-    assert_eq!(r2_single.field.name, "obj");
-
-    let r2_paginated = &foo.r2s[1];
-    assert_eq!(r2_paginated.env_binding, "all_buckets");
-    assert_eq!(r2_paginated.key_format, "my_interpolated_format");
-    assert!(r2_paginated.is_paginated);
-    assert_eq!(r2_paginated.field.name, "paginated_obj");
-}
-
-#[test]
-fn model_block_unique_constraints() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Foo {
             primary {
                 id: int
+                foreign(Company::id) { companyId }
+                foreign(Parent::orgId, Parent::userId) { orgId userId }
+            }
+
+            foreign(Tag::id) { tagId }
+            foreign(Person::id) primary { personId }
+            foreign(Org::id) unique { orgId }
+            foreign(Author::id) optional { authorId }
+
+            optional {
+                foreign(Draft::id) { draftId }
             }
 
             unique {
                 a: int
                 b: int
-                c: int
             }
 
             unique {
-                email: string
-            }
-        }
-        "#,
-    );
-
-    // Assert
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    let unique_constraints: Vec<Vec<&str>> = foo
-        .unique_constraints
-        .iter()
-        .map(|constraint| constraint.fields.to_vec())
-        .collect();
-
-    assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
-}
-
-#[test]
-fn model_block_single_foreign_key() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Person {
-            primary {
-                id: int
-            }
-        }
-
-        [use d1_a]
-        model Dog {
-            primary {
-                id: int
-            }
-
-            foreign(Person::id) {
-                userId
-            }
-
-            userId: int
-        }
-        "#,
-    );
-
-    // Assert
-    let dog = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Dog")
-        .expect("Dog model to be present");
-
-    assert_eq!(dog.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
-
-    assert_eq!(dog.foreign_blocks.len(), 1);
-    let fb = &dog.foreign_blocks[0];
-    assert_eq!(fb.adj, vec![("Person", "id")]);
-    assert_eq!(
-        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["userId"]
-    );
-}
-
-#[test]
-fn model_block_composite_foreign_key() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Parent {
-            primary {
-                orgId: int
-                userId: int
-            }
-        }
-
-        [use d1_a]
-        model Child {
-            primary {
-                id: int
-            }
-
-            foreign(Parent::orgId, Parent::userId) {
-                orgId
-                userId
-            }
-
-            orgId: int
-            userId: int
-        }
-        "#,
-    );
-
-    // Assert
-    let child = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Child")
-        .expect("Child model to be present");
-
-    assert_eq!(child.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
-
-    assert_eq!(child.foreign_blocks.len(), 1);
-    let fb = &child.foreign_blocks[0];
-    assert_eq!(fb.adj, vec![("Parent", "orgId"), ("Parent", "userId")]);
-    assert_eq!(
-        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["orgId", "userId"]
-    );
-}
-
-#[test]
-fn model_block_foreign_with_nav() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Bar {
-            primary {
-                id: int
-            }
-        }
-
-        [use d1_a]
-        model Foo {
-            primary {
-                id: int
-            }
-
-            foreign(Bar::id) {
-                barId
-                nav { bar }
-            }
-
-            barId: int
-        }
-        "#,
-    );
-
-    // Assert
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    assert_eq!(foo.foreign_blocks.len(), 1);
-    let fb = &foo.foreign_blocks[0];
-    assert_eq!(fb.adj, vec![("Bar", "id")]);
-    assert_eq!(
-        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["barId"]
-    );
-
-    assert_eq!(foo.navigation_blocks.len(), 1);
-    let nav = &foo.navigation_blocks[0];
-    assert_eq!(nav.field.name, "bar");
-    assert_eq!(nav.adj, vec![("Bar", "id")]);
-}
-
-#[test]
-fn model_block_foreign_primary() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Person {
-            primary {
-                id: int
-            }
-        }
-
-        [use d1_a]
-        model PassportEntry {
-            foreign(Person::id) primary {
-                personId
-            }
-        }
-        "#,
-    );
-
-    // Assert
-    let passport = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "PassportEntry")
-        .expect("PassportEntry model to be present");
-
-    assert_eq!(passport.primary_fields, vec!["personId"]);
-    assert_eq!(passport.foreign_blocks.len(), 1);
-    let fb = &passport.foreign_blocks[0];
-    assert_eq!(fb.adj, vec![("Person", "id")]);
-    assert_eq!(
-        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["personId"]
-    );
-}
-
-#[test]
-fn model_block_foreign_unique() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Company {
-            primary {
-                id: int
-            }
-        }
-
-        [use d1_a]
-        model Employee {
-            primary {
-                id: int
-            }
-
-            foreign(Company::id) unique {
-                companyId
-            }
-
-            companyId: int
-        }
-        "#,
-    );
-
-    // Assert
-    let employee = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Employee")
-        .expect("Employee model to be present");
-
-    assert_eq!(employee.unique_constraints.len(), 1);
-    assert_eq!(employee.unique_constraints[0].fields, vec!["companyId"]);
-    assert_eq!(employee.foreign_blocks.len(), 1);
-    let fb = &employee.foreign_blocks[0];
-    assert_eq!(fb.adj, vec![("Company", "id")]);
-    assert_eq!(
-        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["companyId"]
-    );
-}
-
-#[test]
-fn model_block_unique_with_nested_foreign() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Org {
-            primary {
-                id: int
-            }
-        }
-
-        [use d1_a]
-        model Member {
-            primary {
-                id: int
-            }
-
-            unique {
-                foreign(Org::id) {
-                    orgId
-                }
+                foreign(Dept::id) unique { deptId }
                 role: string
             }
-
-            orgId: int
         }
         "#,
     );
 
-    // Assert
-    let member = ast
-        .models
+    let m = find_model(&ast, "M");
+
+    let env_bindings = m
+        .use_tags
         .iter()
-        .find(|m| m.symbol.name == "Member")
-        .expect("Member model to be present");
+        .flat_map(|t| t.block.params.iter())
+        .filter_map(|p| match p {
+            UseTagParamKind::EnvBinding(n) => Some(n.name),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(env_bindings, vec!["d1_db", "d2_db"]);
 
-    assert_eq!(member.unique_constraints.len(), 1);
-    assert_eq!(member.unique_constraints[0].fields, vec!["orgId", "role"]);
-    assert_eq!(member.foreign_blocks.len(), 1);
-}
-
-#[test]
-fn model_block_use_tags() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_db, list]
-        [use get, save, d2_db]
-        model User {
-            primary {
-                id: int
-            }
-            name: string
-        }
-
-        [use get, save, list]
-        model PureKv {
-            keyfield {
-                key
-            }
-
-            kv(cache_ns, "my_key_format{key}") {
-                value: json
-            }
-        }
-        "#,
-    );
-
-    // Assert
-    let user = ast
-        .models
+    let cruds: Vec<CrudKind> = m
+        .use_tags
         .iter()
-        .find(|m| m.symbol.name == "User")
-        .expect("User model to be present");
-
-    let pure_kv = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "PureKv")
-        .expect("PureKv model to be present");
-
-    assert_eq!(
-        user.use_tag.as_ref().unwrap().env_bindings,
-        vec!["d1_db", "d2_db"]
-    );
-    assert_eq!(
-        user.use_tag.as_ref().unwrap().cruds,
-        vec![CrudKind::List, CrudKind::Get, CrudKind::Save]
-    );
-    assert_eq!(
-        pure_kv.use_tag.as_ref().unwrap().cruds,
-        vec![CrudKind::Get, CrudKind::Save, CrudKind::List]
-    );
-    assert_eq!(
-        pure_kv.use_tag.as_ref().unwrap().env_bindings,
-        Vec::<String>::new()
-    );
-}
-
-#[test]
-fn model_block_optional_block_form() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Post {
-            primary {
-                id: int
-            }
-
-            optional {
-                foreign(Author::id) unique { authorId }
-                foreign(Category::id) { categoryId }
-            }
-
-            authorId: int
-            categoryId: int
-        }
-        "#,
-    );
-
-    // Assert
-    let post = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Post")
-        .expect("Post model to be present");
-
-    assert_eq!(post.foreign_blocks.len(), 2);
-
-    let author_fb = post
-        .foreign_blocks
-        .iter()
-        .find(|fb| fb.adj == vec![("Author", "id")])
-        .expect("Author foreign block to be present");
+        .flat_map(|t| t.block.params.iter())
+        .filter_map(|p| match p {
+            UseTagParamKind::Crud(c) => Some(c.block.clone()),
+            _ => None,
+        })
+        .collect();
     assert!(
-        author_fb.is_optional(),
-        "foreign block inside optional {{ }} should have optional == true"
-    );
-    assert_eq!(
-        author_fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["authorId"]
+        cruds.contains(&CrudKind::List)
+            && cruds.contains(&CrudKind::Get)
+            && cruds.contains(&CrudKind::Save)
     );
 
-    let category_fb = post
-        .foreign_blocks
+    let col = m
+        .blocks
         .iter()
-        .find(|fb| fb.adj == vec![("Category", "id")])
-        .expect("Category foreign block to be present");
-    assert!(
-        category_fb.is_optional(),
-        "foreign block inside optional {{ }} should have optional == true"
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Column(s) => Some(s),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Double));
+
+    let primary = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Primary(blocks) => Some(blocks),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(sql_columns(primary), vec!["id"]);
+    assert_eq!(
+        sql_foreigns(primary)
+            .iter()
+            .find(|fb| adj_matches(&fb.adj, &[("Company", "id")]))
+            .unwrap()
+            .fields[0]
+            .name,
+        "companyId"
     );
     assert_eq!(
-        category_fb
+        sql_foreigns(primary)
+            .iter()
+            .find(|fb| adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")]))
+            .unwrap()
             .fields
             .iter()
             .map(|s| s.name)
             .collect::<Vec<_>>(),
-        vec!["categoryId"]
+        vec!["orgId", "userId"]
     );
 
-    // Should match infix form
-    let infix_ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model Post {
-            primary {
-                id: int
-            }
-
-            foreign(Author::id) optional { authorId }
-            foreign(Category::id) optional { categoryId }
-
-            authorId: int
-            categoryId: int
-        }
-        "#,
-    );
-
-    let infix_post = infix_ast
-        .models
+    let tag_fb = m
+        .blocks
         .iter()
-        .find(|m| m.symbol.name == "Post")
-        .expect("Post model (infix) to be present");
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(tag_fb.fields[0].name, "tagId");
+    assert!(tag_fb.qualifier.is_none());
 
-    assert_eq!(
-        post.foreign_blocks.len(),
-        infix_post.foreign_blocks.len(),
-        "block form and infix form should produce the same number of foreign blocks"
-    );
-    for fb in &infix_post.foreign_blocks {
-        assert!(
-            fb.is_optional(),
-            "infix optional foreign block should also have optional == true"
-        );
-    }
+    let person_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Person", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(
+        person_fb.qualifier,
+        Some(frontend::ForeignQualifier::Primary)
+    ));
+
+    let org_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Org", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(
+        org_fb.qualifier,
+        Some(frontend::ForeignQualifier::Unique)
+    ));
+
+    let author_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Author", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert!(author_fb.is_optional());
+
+    let opt = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Optional(blocks) => Some(blocks),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(sql_foreigns(opt)[0].fields[0].name, "draftId");
+
+    let uniques: Vec<&Vec<Spd<SqlBlockKind>>> = m
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.block {
+            ModelBlockKind::Unique(blocks) => Some(blocks),
+            _ => None,
+        })
+        .collect();
+    assert!(uniques.iter().any(|u| sql_columns(u) == vec!["a", "b"]));
+
+    let dept_unique = uniques
+        .iter()
+        .find(|u| {
+            u.iter()
+                .any(|b| matches!(&b.block, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
+        })
+        .unwrap();
+    assert_eq!(sql_columns(dept_unique), vec!["role"]);
+    assert!(matches!(
+        sql_foreigns(dept_unique)[0].qualifier,
+        Some(frontend::ForeignQualifier::Unique)
+    ));
 }
 
 #[test]
-fn model_block_paginated_block_form() {
-    // Act
+fn model_navigation() {
     let ast = lex_and_parse(
         r#"
-        model Cache {
-            field: string
-
-            paginated {
-                kv(ns, "key_{field}") { value: json }
-                r2(bucket, "obj_{field}") { obj }
-            }
-        }
-        "#,
-    );
-
-    // Assert
-    let cache = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Cache")
-        .expect("Cache model to be present");
-
-    assert_eq!(cache.kvs.len(), 1);
-    assert_eq!(cache.r2s.len(), 1);
-
-    let kv = &cache.kvs[0];
-    assert_eq!(kv.env_binding, "ns");
-    assert_eq!(kv.key_format, "key_{field}");
-    assert_eq!(kv.field.name, "value");
-    assert!(
-        kv.is_paginated,
-        "kv inside paginated {{ }} should have is_paginated == true"
-    );
-
-    let r2 = &cache.r2s[0];
-    assert_eq!(r2.env_binding, "bucket");
-    assert_eq!(r2.key_format, "obj_{field}");
-    assert_eq!(r2.field.name, "obj");
-    assert!(
-        r2.is_paginated,
-        "r2 inside paginated {{ }} should have is_paginated == true"
-    );
-
-    // Should match infix form
-    let infix_ast = lex_and_parse(
-        r#"
-        model Cache {
-            field: string
-
-            kv(ns, "key_{field}") paginated { value: json }
-            r2(bucket, "obj_{field}") paginated { obj }
-        }
-        "#,
-    );
-
-    let infix_cache = infix_ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Cache")
-        .expect("Cache model (infix) to be present");
-
-    assert_eq!(infix_cache.kvs.len(), 1);
-    assert_eq!(infix_cache.r2s.len(), 1);
-    assert!(infix_cache.kvs[0].is_paginated);
-    assert!(infix_cache.r2s[0].is_paginated);
-}
-
-#[test]
-fn model_block_nav() {
-    // Act
-    let ast = lex_and_parse(
-        r#"
-        [use d1_a]
-        model WeatherReport {
-            primary {
-                id: int
-            }
-
+        model M {
             foreign(Location::id) {
                 locationId
                 nav { location }
             }
+            foreign(Tag::id) { tagId }
+            nav(Weather::reportId) { weathers }
+            nav(Alert::regionId, Alert::zoneId) { alerts }
+        }
+        "#,
+    );
 
-            locationId: int
+    let m = find_model(&ast, "M");
 
-            nav(Weather::weatherReportId) {
-                weathers
+    let loc_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Location", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(loc_fb.fields[0].name, "locationId");
+    assert_eq!(loc_fb.nav.as_ref().unwrap().block.symbol.name, "location");
+
+    let tag_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert!(tag_fb.nav.is_none());
+
+    let weathers_nav = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Navigation(n) if n.nav.block.name == "weathers" => Some(n),
+            _ => None,
+        })
+        .unwrap();
+    assert!(adj_matches(&weathers_nav.adj, &[("Weather", "reportId")]));
+
+    let alerts_nav = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Navigation(n) if n.nav.block.name == "alerts" => Some(n),
+            _ => None,
+        })
+        .unwrap();
+    assert!(adj_matches(
+        &alerts_nav.adj,
+        &[("Alert", "regionId"), ("Alert", "zoneId")]
+    ));
+}
+
+#[test]
+fn model_kv_r2_paginated() {
+    let ast = lex_and_parse(
+        r#"
+        [use get, save, list]
+        model Cache {
+            kv(ns_a, "data/{id}") { value: json }
+            kv(ns_b, "list/{cursor}") paginated { page: json }
+            r2(bucket_a, "photos/{id}.jpg") { photo }
+            r2(bucket_b, "thumbs/{cursor}") paginated { thumb }
+            paginated {
+                kv(ns_c, "cache/{id}") { cached_val: string }
+                r2(bucket_c, "archive/{id}") { archive }
+                kv(ns_d, "feed/{cursor}") paginated { feed_item: json }
+                r2(bucket_d, "feed/{cursor}.mp4") paginated { feed_video }
+            }
+        }
+
+        [use get, save, list]
+        model PureKv {
+            keyfield { key secondary }
+            paginated {
+                kv(kv_ns, "entry/{key}/{secondary}") { entry: json }
             }
         }
         "#,
     );
 
-    // Assert
-    let model = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "WeatherReport")
-        .expect("WeatherReport model to be present");
+    let m = find_model(&ast, "Cache");
 
-    assert_eq!(model.navigation_blocks.len(), 2);
-
-    let fk_nav = model
-        .navigation_blocks
+    let kv_a = m
+        .blocks
         .iter()
-        .find(|n| n.field.name == "location")
-        .expect("location nav to be present");
-    assert!(
-        fk_nav.is_one_to_one,
-        "nav from foreign key should be one-to-one"
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_a" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (kv_a.key_format, kv_a.field.name, kv_a.is_paginated),
+        ("data/{id}", "value", false)
     );
-    assert_eq!(fk_nav.adj, vec![("Location", "id")]);
 
-    let top_nav = model
-        .navigation_blocks
+    let kv_b = m
+        .blocks
         .iter()
-        .find(|n| n.field.name == "weathers")
-        .expect("weathers nav to be present");
-    assert!(
-        !top_nav.is_one_to_one,
-        "top level nav should not be one-to-oen"
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_b" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (kv_b.key_format, kv_b.field.name, kv_b.is_paginated),
+        ("list/{cursor}", "page", true)
     );
-    assert_eq!(top_nav.adj, vec![("Weather", "weatherReportId")]);
+
+    let r2_a = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_a" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (r2_a.key_format, r2_a.field.name, r2_a.is_paginated),
+        ("photos/{id}.jpg", "photo", false)
+    );
+
+    let r2_b = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_b" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (r2_b.key_format, r2_b.field.name, r2_b.is_paginated),
+        ("thumbs/{cursor}", "thumb", true)
+    );
+
+    let pblocks: Vec<_> = m
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.block {
+            ModelBlockKind::Paginated(blocks) => Some(blocks),
+            _ => None,
+        })
+        .flat_map(|bs| bs.iter())
+        .collect();
+
+    let kv_c = pblocks
+        .iter()
+        .find_map(|b| match &b.block {
+            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_c" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (
+            kv_c.key_format,
+            kv_c.field.name,
+            kv_c.field.cidl_type.clone(),
+            kv_c.is_paginated
+        ),
+        ("cache/{id}", "cached_val", CidlType::String, false)
+    );
+
+    let r2_c = pblocks
+        .iter()
+        .find_map(|b| match &b.block {
+            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_c" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (r2_c.key_format, r2_c.field.name, r2_c.is_paginated),
+        ("archive/{id}", "archive", false)
+    );
+
+    let kv_d = pblocks
+        .iter()
+        .find_map(|b| match &b.block {
+            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_d" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (kv_d.key_format, kv_d.field.name, kv_d.is_paginated),
+        ("feed/{cursor}", "feed_item", true)
+    );
+
+    let r2_d = pblocks
+        .iter()
+        .find_map(|b| match &b.block {
+            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_d" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (r2_d.key_format, r2_d.field.name, r2_d.is_paginated),
+        ("feed/{cursor}.mp4", "feed_video", true)
+    );
+
+    let kv_model = find_model(&ast, "PureKv");
+
+    let kv_env_bindings = kv_model
+        .use_tags
+        .iter()
+        .flat_map(|t| t.block.params.iter())
+        .filter_map(|p| match p {
+            UseTagParamKind::EnvBinding(n) => Some(n),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(kv_env_bindings.is_empty());
+
+    let kv_cruds: Vec<CrudKind> = kv_model
+        .use_tags
+        .iter()
+        .flat_map(|t| t.block.params.iter())
+        .filter_map(|p| match p {
+            UseTagParamKind::Crud(c) => Some(c.block.clone()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        kv_cruds.contains(&CrudKind::Get)
+            && kv_cruds.contains(&CrudKind::Save)
+            && kv_cruds.contains(&CrudKind::List)
+    );
+
+    let keyfields: Vec<&str> = kv_model
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::KeyField(fields) => Some(fields.iter().map(|s| s.name).collect()),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(keyfields, vec!["key", "secondary"]);
+
+    let kv_entry = kv_model
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match &b.block {
+                PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
+                _ => None,
+            }),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        (
+            kv_entry.key_format,
+            kv_entry.field.name,
+            kv_entry.field.cidl_type.clone()
+        ),
+        ("entry/{key}/{secondary}", "entry", CidlType::Json)
+    );
 }
 
-#[test]
-fn foreign_passes_inline_qualifier() {
-    let ast = lex_and_parse(
-        r#"
-        model Foo {
-            unique {
-                foreign(Org::id) optional {
-                    orgId
-                }
-                role: string
-            }
-
-            optional {
-                foreign(Org::id) unique {
-                    orgId
-                }
-            }
-        }
-    "#,
-    );
-
-    let foo = ast
-        .models
+fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {
+    blocks
         .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
+        .filter_map(|b| match &b.block {
+            SqlBlockKind::Column(s) => Some(s.name),
+            _ => None,
+        })
+        .collect()
+}
 
-    assert_eq!(foo.unique_constraints.len(), 2);
-    assert_eq!(foo.unique_constraints[0].fields, vec!["orgId", "role"]);
-    assert_eq!(foo.unique_constraints[1].fields, vec!["orgId"]);
-    assert_eq!(foo.foreign_blocks.len(), 2);
-    assert!(foo.foreign_blocks[0].is_optional());
+fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock<'a>> {
+    blocks
+        .iter()
+        .filter_map(|b| match &b.block {
+            SqlBlockKind::Foreign(fb) => Some(fb),
+            _ => None,
+        })
+        .collect()
+}
+
+fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
+    ast.blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            AstBlockKind::Model(m) if m.symbol.name == name => Some(m),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("{name} model to be present"))
 }

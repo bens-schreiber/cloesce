@@ -1,33 +1,55 @@
 env {
-    d1 { db }
-    kv { namespace otherNamespace }
+    d1 {
+        db
+    }
+    kv {
+        namespace
+        otherNamespace
+    }
 }
 
 [use get, save]
 model PureKVModel {
-    keyfield { id }
-
-    kv(namespace, "path/to/data/{id}") { data: json }
-    kv(otherNamespace, "path/to/other/{id}") { otherData: string }
+    keyfield {
+        id
+    }
+    
+    kv (namespace, "path/to/data/{id}") {
+        data: json
+    }
+    
+    kv (otherNamespace, "path/to/other/{id}") {
+        otherData: string
+    }
 }
 
 [use db, get, save, list]
 model D1BackedModel {
-    primary { id: int }
-
-    keyfield { keyParam }
-
+    primary {
+        id: int
+    }
+    
+    keyfield {
+        keyParam
+    }
+    
     someColumn: double
     someOtherColumn: string
-
-    kv(namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") { kvData: json }
+    
+    kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
+        kvData: json
+    }
 }
 
 [use get]
 model PaginatedKVModel {
-    keyfield { id }
-
-    kv(namespace, "paginated/items/") paginated { items: json }
+    keyfield {
+        id
+    }
+    
+    kv (namespace, "paginated/items/") paginated {
+        items: json
+    }
 }
 
 api PaginatedKVModel {

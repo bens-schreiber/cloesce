@@ -1,8 +1,15 @@
-env { d1 { db } }
+env {
+    d1 {
+        db
+    }
+}
 
 [use db, save]
 model Dog {
-    primary { id: int }
+    primary {
+        id: int
+    }
+    
     name: string
     age: int
 }

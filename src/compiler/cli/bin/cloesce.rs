@@ -8,7 +8,7 @@ use std::{
 
 use clap::{Args, Parser, Subcommand};
 use frontend::{
-    fmt::DisplayError,
+    err::DisplayError,
     lexer::{CloesceLexer, LexTarget},
 };
 use serde::Deserialize;
@@ -186,6 +186,7 @@ struct Cli {
 enum Command {
     Compile,
     Migrate(MigrateArgs),
+    Fmt(FormatArgs),
     Version,
 }
 
@@ -220,6 +221,13 @@ fn open_file_or_create(path: &Path) -> Result<File, String> {
         }
         Err(e) => Err(err(e)),
     }
+}
+
+#[derive(Args)]
+#[command(name = "migrate")]
+struct FormatArgs {
+    #[arg(long)]
+    check: bool,
 }
 
 fn main() {
@@ -259,6 +267,16 @@ fn main() {
 
                 let elapsed = start_time.elapsed();
                 tracing::info!("Migration completed in {:.2?}", elapsed);
+                Ok(())
+            }
+            Command::Fmt(args) => {
+                tracing::warn!("The format command is experimental, use with caution.");
+                let config = CloesceConfig::load(&root, cli.env)?;
+                let sources = config.collect_sources(&root);
+                format::format(sources, args)?;
+
+                let elapsed = start_time.elapsed();
+                tracing::info!("Formatting completed in {:.2?}", elapsed);
                 Ok(())
             }
             Command::Version => {
@@ -887,5 +905,76 @@ mod version {
         }
 
         Some(version)
+    }
+}
+
+mod format {
+    use frontend::{formatter::Formatter, lexer::LexResult, parser::CloesceParser};
+
+    use super::*;
+
+    pub fn format(target_paths: Vec<PathBuf>, args: FormatArgs) -> Result<(), String> {
+        // Lexing
+        let sources = target_paths
+            .into_iter()
+            .map(|p| {
+                let src = std::fs::read_to_string(&p)
+                    .map_err(|e| format!("Failed to read source file {}: {}", p.display(), e))?;
+
+                Ok((src, p))
+            })
+            .collect::<Result<Vec<(String, PathBuf)>, String>>()
+            .map_err(|e| {
+                tracing::error!("{}", e);
+                "Failed to read source files".to_string()
+            })?;
+
+        let lexed = CloesceLexer::lex(sources.iter().map(|(src, path)| LexTarget {
+            src: src.as_str(),
+            path: path.clone(),
+        }));
+        if lexed.has_errors() {
+            lexed.display_error(&lexed.file_table);
+            return Err("lexing failed".into());
+        }
+
+        let LexResult {
+            results,
+            file_table,
+            ..
+        } = lexed;
+
+        let mut any_diff = false;
+
+        // Parsing
+        for lex in &results {
+            let (src, path) = file_table.resolve(lex.file_id);
+
+            let parse = CloesceParser::parse(std::slice::from_ref(lex), &file_table);
+            if parse.has_errors() {
+                parse.display_error(&file_table);
+                return Err("parsing failed".into());
+            }
+
+            let formatted = Formatter::format(&parse.ast, &lex.comment_map, src);
+
+            if args.check {
+                // TODO: sophisticated diffing
+                if formatted != src {
+                    any_diff = true;
+                    tracing::error!("{}: not formatted", path.display());
+                }
+            } else {
+                std::fs::write(path, formatted.as_bytes())
+                    .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+                tracing::info!("Formatted {}", path.display());
+            }
+        }
+
+        if any_diff {
+            return Err("formatting check failed: some files are not formatted".into());
+        }
+
+        Ok(())
     }
 }

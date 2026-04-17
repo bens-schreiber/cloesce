@@ -1,36 +1,40 @@
-env { d1 { db } }
+env {
+    d1 {
+        db
+    }
+}
 
 [use db]
 model NoDs {
-    primary { id: int }
+    primary {
+        id: int
+    }
 }
 
 [use db]
 model OneDs {
-    primary { id: int }
+    primary {
+        id: int
+    }
 }
 
 source ShitAss for OneDs {
-    include { }
+    include {}
 }
 
 [use db]
 model Foo {
-    primary { id: int }
+    primary {
+        id: int
+    }
 }
 
 api Foo {
-    post bar(
-        [source Baz] self,
-        customDs: DataSource<Foo>,
-        oneDs: DataSource<OneDs>,
-        noDs: DataSource<NoDs>,
-        poop: Poo
-    ) -> void
+    post bar([source Baz] self, customDs: DataSource<Foo>, oneDs: DataSource<OneDs>, noDs: DataSource<NoDs>, poop: Poo) -> void
 }
 
 source Baz for Foo {
-    include { }
+    include {}
 }
 
 poo Poo {

@@ -1,4 +1,8 @@
-env { d1 { db } }
+env {
+    d1 {
+        db
+    }
+}
 
 [use db, get, list, save]
 model Student {
@@ -6,34 +10,39 @@ model Student {
         id: int
         name: string
     }
-
+    
     favoriteColor: string
-
+    
     nav (StudentCourse::studentId, StudentCourse::studentName) {
         studentCourses
     }
 }
 
 source CoursesOrderedDescending for Student {
-    include { studentCourses }
-
+    include {
+        studentCourses
+    }
+    
     sql list(lastId: int, lastName: string, limit: int) {
         "
-            WITH students AS ($include)
-            SELECT * FROM students
-            WHERE id > $lastId
-               AND name > $lastName
-            ORDER BY id DESC, name DESC
-            LIMIT $limit
+        WITH students AS ($include)
+        SELECT * FROM students
+        WHERE id > $lastId
+        AND name > $lastName
+        ORDER BY id DESC, name DESC
+        LIMIT $limit
         "
     }
 }
 
 [use db, get, list, save]
 model Course {
-    primary { id: int }
+    primary {
+        id: int
+    }
+    
     title: string
-
+    
     nav (StudentCourse::courseId) {
         studentCourses
     }
@@ -42,28 +51,35 @@ model Course {
 [use db, get, list, save]
 model StudentCourse {
     primary {
-        foreign(Student::id, Student::name) {
-            studentId
-            studentName
-            nav { student }
-        }
-
-        foreign(Course::id) {
-            courseId
-            nav { course }
+        foreign (Student::id, Student::name) {
+        studentId
+        studentName
+        
+        nav {
+            student
         }
     }
-
-
+        foreign (Course::id) {
+        courseId
+        
+        nav {
+            course
+        }
+    }
+    }
 }
 
 source Default for StudentCourse {
-    include { }
+    include {}
 }
 
 source WithStudentCourse for StudentCourse {
-    include { 
-        student { studentCourses },
-        course { studentCourses } 
+    include {
+        course {
+            studentCourses
+        }
+        student {
+            studentCourses
+        }
     }
 }

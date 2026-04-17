@@ -8,4 +8,10 @@ fn token_regexes() {
 
     let mut ident_lit = Token::lexer("my_var123");
     assert_eq!(ident_lit.next(), Some(Ok(Token::Ident("my_var123"))));
+
+    let mut comment_lit = Token::lexer("// this is a comment");
+    assert_eq!(
+        comment_lit.next(),
+        Some(Ok(Token::Comment("// this is a comment")))
+    );
 }

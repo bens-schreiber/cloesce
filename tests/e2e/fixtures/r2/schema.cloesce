@@ -1,15 +1,30 @@
 env {
-    d1 { db }
-    r2 { bucket1 bucket2 }
+    d1 {
+        db
+    }
+    r2 {
+        bucket1
+        bucket2
+    }
 }
 
 [use get]
 model PureR2Model {
-    keyfield { id }
-
-    r2(bucket1, "path/to/data/{id}") { data }
-    r2(bucket1, "path/to/other/{id}") { otherData }
-    r2(bucket1, "path/") paginated { allData }
+    keyfield {
+        id
+    }
+    
+    r2 (bucket1, "path/to/data/{id}") {
+        data
+    }
+    
+    r2 (bucket1, "path/to/other/{id}") {
+        otherData
+    }
+    
+    r2 (bucket1, "path/") paginated {
+        allData
+    }
 }
 
 api PureR2Model {
@@ -19,14 +34,20 @@ api PureR2Model {
 
 [use db, get, save, list]
 model D1BackedModel {
-    primary { id: int }
-
-    keyfield { keyParam }
-
+    primary {
+        id: int
+    }
+    
+    keyfield {
+        keyParam
+    }
+    
     someColumn: double
     someOtherColumn: string
-
-    r2(bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") { r2Data }
+    
+    r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
+        r2Data
+    }
 }
 
 api D1BackedModel {

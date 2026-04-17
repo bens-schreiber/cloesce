@@ -1,8 +1,15 @@
-env { d1 { db } }
+env {
+    d1 {
+        db
+    }
+}
 
 [use db, save, get, list]
 model CrudHaver {
-    primary { id: int }
+    primary {
+        id: int
+    }
+    
     name: string
 }
 
@@ -12,28 +19,41 @@ api CrudHaver {
 
 [use db, save, get, list]
 model Parent {
-    primary { id: int }
-
-    foreign (Child::id) optional {
-        favoriteChildId
-        nav { favoriteChild }
+    primary {
+        id: int
     }
-
+    
+    foreign (Child::id) optional  {
+        favoriteChildId
+        
+        nav {
+            favoriteChild
+        }
+    }
+    
     nav (Child::parentId) {
         children
     }
 }
 
 source WithChildren for Parent {
-    include { favoriteChild, children }
+    include {
+        children
+        favoriteChild
+    }
 }
 
 [use db]
 model Child {
-    primary { id: int }
+    primary {
+        id: int
+    }
     
     foreign (Parent::id) {
         parentId
-        nav { parent }
+        
+        nav {
+            parent
+        }
     }
 }

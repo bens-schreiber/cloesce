@@ -1,11 +1,15 @@
 /// Cloesce source string containing a wide variety of features for codegen tests.
 pub const COMPREHENSIVE_SRC: &str = r#"
+// Top level comment
 env {
+// Comments
     d1 { db }
+    // Can exist anywhere in code
     kv { my_kv }
-    r2 { my_r2 }
+    r2 { my_r2 } // Another Comment
     vars {
-        MY_VAR: string
+        // Comment again
+        MY_VAR: string // More comments
     }
 }
 
@@ -212,10 +216,24 @@ model ModelWithCustomDs {
     }
 
     name: string
+
+    r2 (my_r2, "{id}/data") {
+        data
+    }
+
+    foreign (OneToManyModel::id) {
+        oneToManyId
+        nav { oneToManyModel }
+    }
 }
 
 source Custom for ModelWithCustomDs {
-    include {}
+    include {
+        oneToManyModel {
+            oneToManyNav
+        }
+        data
+    }
 
     sql get(id: int, externalParam: string) {
         "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"

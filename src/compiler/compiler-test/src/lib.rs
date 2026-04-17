@@ -3,11 +3,14 @@ use std::path::PathBuf;
 use ast::CloesceAst;
 use frontend::{
     ParseAst,
-    fmt::DisplayError,
+    err::DisplayError,
     lexer::{CloesceLexer, LexTarget},
     parser::CloesceParser,
 };
 use semantic::SemanticAnalysis;
+
+mod src_str;
+pub use src_str::*;
 
 /// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
 /// Ensures that some expr is present in another expr.

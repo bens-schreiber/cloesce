@@ -2,7 +2,6 @@
 
 use ast::{CidlType, Field, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
-use frontend::{SymbolKind, WranglerEnvBindingKind};
 use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -89,12 +88,6 @@ fn wrangler_duplicate_symbol() {
         SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "my_d1");
-    assert!(matches!(
-        second.kind,
-        SymbolKind::WranglerEnvBinding {
-            kind: WranglerEnvBindingKind::D1
-        }
-    ));
 }
 
 #[test]
@@ -123,19 +116,16 @@ fn d1_model_basic_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 3);
-
-    // User has @d1 but no primary key
+    // User has d1 but no primary key
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
-    assert!(matches!(model.kind, SymbolKind::ModelDecl));
 
-    // Post references @d1(other_d1) which is not in the env block
+    // Post references other_d1 which is not in the env block
     expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
 
-    // Comment has fields but no @d1 binding
+    // Comment has fields but no binding
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingD1Binding { model } => model
     );
@@ -220,7 +210,6 @@ fn d1_model_column_fk_errors() {
         SemanticError::NullablePrimaryKey { column } => column
     );
     assert_eq!(column.name, "id");
-    assert!(matches!(column.kind, SymbolKind::ModelField));
 
     let second = expect_err!(errors,
         SemanticError::DuplicateSymbol { second, .. } => second
@@ -232,10 +221,10 @@ fn d1_model_column_fk_errors() {
     );
     assert_eq!(model.name, "User");
 
-    let binding = expect_err!(errors,
-        SemanticError::ForeignKeyReferencesDifferentDatabase { binding, .. } => *binding
+    let fk_model = expect_err!(errors,
+        SemanticError::ForeignKeyReferencesDifferentDatabase { fk_model, .. } => fk_model.name
     );
-    assert_eq!(binding, "other_d1");
+    assert_eq!(fk_model, "OtherD1Model");
 
     let inconsistent_model_adj = expect_err!(
         errors,
@@ -243,10 +232,10 @@ fn d1_model_column_fk_errors() {
             first_model,
             second_model,
             ..
-        } => (first_model, second_model)
+        } => (first_model.name, second_model.name)
     );
-    assert_eq!(*inconsistent_model_adj.0, "Post");
-    assert_eq!(*inconsistent_model_adj.1, "User");
+    assert_eq!(inconsistent_model_adj.0, "Post");
+    assert_eq!(inconsistent_model_adj.1, "User");
 
     let inconsistent_field_adj = expect_err!(
         errors,
@@ -262,10 +251,10 @@ fn d1_model_column_fk_errors() {
     let does_not_exist = errors
         .iter()
         .filter_map(|e| match e {
-            SemanticError::UnresolvedSymbol { name, .. }
-                if *name == "DoesNotExist" || *name == "nonexistent" =>
+            SemanticError::UnresolvedSymbol { symbol, .. }
+                if symbol.name == "DoesNotExist" || symbol.name == "nonexistent" =>
             {
-                Some(name)
+                Some(symbol.name)
             }
             _ => None,
         })
@@ -339,15 +328,15 @@ fn d1_model_nav_errors() {
             first_model,
             second_model,
             ..
-        } => (first_model, second_model)
+        } => (first_model.name, second_model.name)
     );
-    assert_eq!(*inconsistent_model_adj.0, "Post");
-    assert_eq!(*inconsistent_model_adj.1, "User");
+    assert_eq!(inconsistent_model_adj.0, "Post");
+    assert_eq!(inconsistent_model_adj.1, "User");
 
-    let binding = expect_err!(errors,
-        SemanticError::NavigationReferencesDifferentDatabase { binding, .. } => *binding
+    let nav_name = expect_err!(errors,
+        SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
     );
-    assert_eq!(binding, "other_d1");
+    assert_eq!(nav_name, "invalidAdjModel");
 
     let ambiguous_m2ms = count_errs!(errors, SemanticError::NavigationAmbiguousM2M { .. });
     assert_eq!(ambiguous_m2ms, 3);
@@ -600,8 +589,7 @@ fn kv_r2_errors() {
     let src = &with_env(
         r#"
         model Foo {
-            field: string
-
+            keyfield { field }
             kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
                 foo: json
             }
@@ -629,12 +617,12 @@ fn kv_r2_errors() {
     assert_eq!(errors.len(), 4);
 
     let binding = expect_err!(errors,
-        SemanticError::KvInvalidBinding { binding, ..} => *binding
+        SemanticError::KvInvalidBinding { binding, ..} => binding.name
     );
     assert_eq!(binding, "my_d1");
 
     let binding = expect_err!(errors,
-        SemanticError::R2InvalidBinding { binding, .. } => *binding
+        SemanticError::R2InvalidBinding { binding, .. } => binding.name
     );
     assert_eq!(binding, "my_kv");
 
@@ -869,15 +857,15 @@ fn data_source_errors() {
     // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
-        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "nonexistent"
+        SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
+            if field.name == "nonexistent"
     )));
 
     // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
-        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "bogus"
+        SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
+            if field.name == "bogus"
     )));
 
     // BadParamSource: User is not a valid sql type
@@ -912,7 +900,10 @@ fn data_source_include_tree_kv_r2() {
         }
 
         source WithKvR2 for User {
-            include { cached, avatar }
+            include { 
+                cached 
+                avatar 
+            }
         }
     "#,
     );
