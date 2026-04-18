@@ -1,7 +1,6 @@
 import { Miniflare } from "miniflare";
 import { describe, test, expect, beforeAll } from "vitest";
-import * as Cloesce from "@cloesce/backend.js";
-import { Weather } from "@api/main.js"
+import { Weather, WeatherReport } from "@api/main.js"
 import { cloesce } from "@cloesce/backend.js";
 
 async function createTestEnv() {
@@ -56,7 +55,7 @@ describe("Miniflare Integration Tests", () => {
         const env = await createTestEnv();
         const testData = "test-data";
 
-        const report = (await Cloesce.WeatherReport.save(env, {
+        const report = (await WeatherReport.Orm.save(env, {
             title: "Test Report",
             description: "This is a test weather report.",
             weatherEntries: [{
@@ -67,11 +66,11 @@ describe("Miniflare Integration Tests", () => {
             }]
         }))!;
 
-        await new Weather().uploadPhoto(report.weatherEntries[0], env, testData as any);
+        await Weather.uploadPhoto(report.weatherEntries[0], env, testData as any);
 
         // Act
-        const weatherEntries = (await Cloesce.Weather.DataSources.Default.list(env, 0, 100))!;
-        const photo = new Weather().downloadPhoto(weatherEntries[0]);
+        const weatherEntries = (await Weather.Default.list(env, 0, 100))!;
+        const photo = Weather.downloadPhoto(weatherEntries[0]);
 
         // Assert
         expect(photo.ok).toBe(true);
