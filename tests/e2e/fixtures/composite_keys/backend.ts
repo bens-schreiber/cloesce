@@ -5,11 +5,13 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Res
 export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 export interface Env {
     db: D1Database;
 }
 export namespace Course {
-    export const Tag = "Course";
+    export const Kind = "model" as const;
+    export const Tag = "Course" as const;
     export const Meta = cidl.models.Course as any;
 
     export interface Self {
@@ -18,55 +20,62 @@ export namespace Course {
         studentCourses: StudentCourse.Self[];
     }
 
-    export namespace KeyFormat {
+    export namespace Key {
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm }>): Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm } {
+        return _impl(Course, implObj);
     }
 
-    export namespace DataSources {
+    export namespace Source {
         export const Default = {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Course.Self | null> {
-                return await Orm.fromEnv(env).get<Course.Self>(Course.Meta, Course.DataSources.Default.getQuery(env, id), Course.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Course.Self>(Course.Meta, Course.Source.Default.getQuery(env, id), Course.Source.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Course.Self[]> {
-                return await Orm.fromEnv(env).list<Course.Self>(Course.Meta, Course.DataSources.Default.listQuery(env, lastSeen_id, limit), Course.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Course.Self>(Course.Meta, Course.Source.Default.listQuery(env, lastSeen_id, limit), Course.Source.Default.include);
             },
         }
     }
 
-    export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self | null> {
-        return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-    }
+    export namespace _Orm {
+        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self | null> {
+            return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
 
-    export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
-    }
+        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+        }
 
-    export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-    }
+        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
 
-    export function select(include: IncludeTree<Self> = DataSources.Default.include, from?: string): string {
-        return Orm.select(Meta, from ?? null, include);
-    }
+        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
+            return Orm.select(Meta, from ?? null, include);
+        }
 
-    export function map(result: D1Result): Self[] {
-        return Orm.map<Self>(Meta, result, DataSources.Default.include);
-    }
+        export function map(result: D1Result): Self[] {
+            return Orm.map<Self>(Meta, result, Source.Default.include);
+        }
 
-    export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self> {
-        return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self> {
+            return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        }
     }
 }
 export namespace Student {
-    export const Tag = "Student";
+    export const Kind = "model" as const;
+    export const Tag = "Student" as const;
     export const Meta = cidl.models.Student as any;
 
     export interface Self {
@@ -76,66 +85,73 @@ export namespace Student {
         studentCourses: StudentCourse.Self[];
     }
 
-    export namespace KeyFormat {
+    export namespace Key {
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm }>): Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm } {
+        return _impl(Student, implObj);
     }
 
-    export namespace DataSources {
+    export namespace Source {
         export const CoursesOrderedDescending = {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
             async get(env: Env, id: number, name: string): Promise<Student.Self | null> {
-                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.getQuery(env, id, name), Student.DataSources.CoursesOrderedDescending.include, {  });
+                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.Source.CoursesOrderedDescending.getQuery(env, id, name), Student.Source.CoursesOrderedDescending.include, {  });
             },
             listQuery: (env: Env, lastId: number, lastName: string, limit: number) => env.db.prepare(`WITH students AS (SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName") SELECT * FROM students WHERE id > ?1 AND name > ?2 ORDER BY id DESC, name DESC LIMIT ?3`).bind(lastId, lastName, limit),
             async list(env: Env, lastId: number, lastName: string, limit: number): Promise<Student.Self[]> {
-                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.DataSources.CoursesOrderedDescending.listQuery(env, lastId, lastName, limit), Student.DataSources.CoursesOrderedDescending.include);
+                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.Source.CoursesOrderedDescending.listQuery(env, lastId, lastName, limit), Student.Source.CoursesOrderedDescending.include);
             },
         }
         export const Default = {
             include: {"studentCourses":{}},
             getQuery: (env: Env, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
             async get(env: Env, id: number, name: string): Promise<Student.Self | null> {
-                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.DataSources.Default.getQuery(env, id, name), Student.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Student.Self>(Student.Meta, Student.Source.Default.getQuery(env, id, name), Student.Source.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, lastSeen_name: string, limit: number) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastSeen_id, lastSeen_name, limit),
             async list(env: Env, lastSeen_id: number, lastSeen_name: string, limit: number): Promise<Student.Self[]> {
-                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.DataSources.Default.listQuery(env, lastSeen_id, lastSeen_name, limit), Student.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Student.Self>(Student.Meta, Student.Source.Default.listQuery(env, lastSeen_id, lastSeen_name, limit), Student.Source.Default.include);
             },
         }
     }
 
-    export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self | null> {
-        return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-    }
+    export namespace _Orm {
+        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self | null> {
+            return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
 
-    export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
-    }
+        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+        }
 
-    export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-    }
+        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
 
-    export function select(include: IncludeTree<Self> = DataSources.Default.include, from?: string): string {
-        return Orm.select(Meta, from ?? null, include);
-    }
+        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
+            return Orm.select(Meta, from ?? null, include);
+        }
 
-    export function map(result: D1Result): Self[] {
-        return Orm.map<Self>(Meta, result, DataSources.Default.include);
-    }
+        export function map(result: D1Result): Self[] {
+            return Orm.map<Self>(Meta, result, Source.Default.include);
+        }
 
-    export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self> {
-        return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self> {
+            return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        }
     }
 }
 export namespace StudentCourse {
-    export const Tag = "StudentCourse";
+    export const Kind = "model" as const;
+    export const Tag = "StudentCourse" as const;
     export const Meta = cidl.models.StudentCourse as any;
 
     export interface Self {
@@ -146,76 +162,103 @@ export namespace StudentCourse {
         course: Course.Self;
     }
 
-    export namespace KeyFormat {
+    export namespace Key {
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm }>): Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm } {
+        return _impl(StudentCourse, implObj);
     }
 
-    export namespace DataSources {
+    export namespace Source {
         export const Default = {
             include: {},
             getQuery: (env: Env, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),
             async get(env: Env, studentId: number, studentName: string, courseId: number): Promise<StudentCourse.Self | null> {
-                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.Source.Default.getQuery(env, studentId, studentName, courseId), StudentCourse.Source.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit),
             async list(env: Env, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): Promise<StudentCourse.Self[]> {
-                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.Default.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.Source.Default.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.Source.Default.include);
             },
         }
         export const WithStudentCourse = {
             include: {"course":{"studentCourses":{}},"student":{"studentCourses":{}}},
             getQuery: (env: Env, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),
             async get(env: Env, studentId: number, studentName: string, courseId: number): Promise<StudentCourse.Self | null> {
-                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.getQuery(env, studentId, studentName, courseId), StudentCourse.DataSources.WithStudentCourse.include, {  });
+                return await Orm.fromEnv(env).get<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.Source.WithStudentCourse.getQuery(env, studentId, studentName, courseId), StudentCourse.Source.WithStudentCourse.include, {  });
             },
             listQuery: (env: Env, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit),
             async list(env: Env, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): Promise<StudentCourse.Self[]> {
-                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.DataSources.WithStudentCourse.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.DataSources.WithStudentCourse.include);
+                return await Orm.fromEnv(env).list<StudentCourse.Self>(StudentCourse.Meta, StudentCourse.Source.WithStudentCourse.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit), StudentCourse.Source.WithStudentCourse.include);
             },
         }
     }
 
-    export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self | null> {
-        return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-    }
+    export namespace _Orm {
+        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self | null> {
+            return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
 
-    export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
-    }
+        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+        }
 
-    export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-    }
+        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
 
-    export function select(include: IncludeTree<Self> = DataSources.Default.include, from?: string): string {
-        return Orm.select(Meta, from ?? null, include);
-    }
+        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
+            return Orm.select(Meta, from ?? null, include);
+        }
 
-    export function map(result: D1Result): Self[] {
-        return Orm.map<Self>(Meta, result, DataSources.Default.include);
-    }
+        export function map(result: D1Result): Self[] {
+            return Orm.map<Self>(Meta, result, Source.Default.include);
+        }
 
-    export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self> {
-        return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self> {
+            return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        }
     }
 }
+
+function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; _Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] }>): Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] };
+function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
+function _impl(namespace: any, implObj: any) {
+    if (namespace.Kind === "model") {
+        const model = { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace._Orm };
+        for (const key of Object.keys(implObj as object)) {
+            const fn = (model as any)[key];
+            if (typeof fn === "function") (model as any)[key] = fn.bind(model);
+        }
+        return model;
+    }
+
+    const service = { ...implObj, tag: namespace.Tag };
+    for (const key of Object.keys(implObj as object)) {
+        const fn = (service as any)[key];
+        if (typeof fn === "function") (service as any)[key] = fn.bind(service);
+    }
+    return service;
+}
+
 import cidl from "./cidl.json" with { type: "json" };
-(cidl.models.Course.data_sources["Default"] as any).gen = Course.DataSources.Default;
-(cidl.models.Student.data_sources["CoursesOrderedDescending"] as any).gen = Student.DataSources.CoursesOrderedDescending;
-(cidl.models.Student.data_sources["Default"] as any).gen = Student.DataSources.Default;
-(cidl.models.StudentCourse.data_sources["Default"] as any).gen = StudentCourse.DataSources.Default;
-(cidl.models.StudentCourse.data_sources["WithStudentCourse"] as any).gen = StudentCourse.DataSources.WithStudentCourse;
+(cidl.models.Course.data_sources["Default"] as any).gen = Course.Source.Default;
+(cidl.models.Student.data_sources["CoursesOrderedDescending"] as any).gen = Student.Source.CoursesOrderedDescending;
+(cidl.models.Student.data_sources["Default"] as any).gen = Student.Source.Default;
+(cidl.models.StudentCourse.data_sources["Default"] as any).gen = StudentCourse.Source.Default;
+(cidl.models.StudentCourse.data_sources["WithStudentCourse"] as any).gen = StudentCourse.Source.WithStudentCourse;
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "http://localhost:5139/api")
 }
 
-// Default entrypoint for a Cloesce app. 
+// Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {

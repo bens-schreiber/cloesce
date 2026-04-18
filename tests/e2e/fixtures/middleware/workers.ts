@@ -7,15 +7,14 @@ class InjectedThing extends Cloesce.InjectedThing {
     }
 }
 
-class Foo extends Cloesce.Foo.Api {
-    blockedMethod(): void {
+const Foo = Cloesce.Foo.impl({
+    blockedMethod() { },
 
-    }
-    getInjectedThing(thing: InjectedThing): string {
+    getInjectedThing(thing: InjectedThing) {
         return thing.value;
-    }
+    },
 
-}
+});
 
 export default {
     async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
@@ -24,7 +23,7 @@ export default {
         }
 
         const app = await Cloesce.cloesce();
-        app.register(new Foo());
+        app.register(Foo);
 
         app.onNamespace(Cloesce.Foo.Tag, (di) => {
             di.set(new InjectedThing("hello world"));

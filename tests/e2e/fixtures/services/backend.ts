@@ -5,43 +5,75 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Res
 export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 export interface Env {}
 export abstract class InjectedThing {
     readonly tag = "InjectedThing";
 }
 export namespace FooService {
-    export const Tag = "FooService";
+    export const Kind = "service" as const;
+    export const Tag = "FooService" as const;
 
     export interface Self {
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
-        abstract init(self: FooService.Self): MaybePromise<MaybeHttpResult<void>>;
-        abstract staticMethod(thing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
-        abstract instantiatedMethod(self: FooService.Self, thing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
+    export interface Api {
+        init?(self: FooService.Self): ApiResult<void>;
+        staticMethod(thing: InjectedThing): ApiResult<string>;
+        instantiatedMethod(self: FooService.Self, thing: InjectedThing): ApiResult<string>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
+        return _impl(FooService, implObj);
     }
 }
 export namespace BarService {
-    export const Tag = "BarService";
+    export const Kind = "service" as const;
+    export const Tag = "BarService" as const;
 
     export interface Self {
         foo: FooService.Self;
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
-        abstract init(self: BarService.Self): MaybePromise<MaybeHttpResult<void>>;
-        abstract useFoo(self: BarService.Self, injectedThing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
+    export interface Api {
+        init?(self: BarService.Self): ApiResult<void>;
+        useFoo(self: BarService.Self, injectedThing: InjectedThing): ApiResult<string>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
+        return _impl(BarService, implObj);
     }
 }
+
+function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; _Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] }>): Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] };
+function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
+function _impl(namespace: any, implObj: any) {
+    if (namespace.Kind === "model") {
+        const model = { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace._Orm };
+        for (const key of Object.keys(implObj as object)) {
+            const fn = (model as any)[key];
+            if (typeof fn === "function") (model as any)[key] = fn.bind(model);
+        }
+        return model;
+    }
+
+    const service = { ...implObj, tag: namespace.Tag };
+    for (const key of Object.keys(implObj as object)) {
+        const fn = (service as any)[key];
+        if (typeof fn === "function") (service as any)[key] = fn.bind(service);
+    }
+    return service;
+}
+
 import cidl from "./cidl.json" with { type: "json" };
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "http://localhost:5144/api")
 }
 
-// Default entrypoint for a Cloesce app. 
+// Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {

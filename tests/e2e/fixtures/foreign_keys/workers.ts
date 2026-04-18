@@ -1,51 +1,51 @@
 import { HttpResult } from "cloesce";
 import * as Cloesce from "./backend.js";
 
-class A extends Cloesce.A.Api {
-    async create(e: Cloesce.Env, a: Cloesce.A.Self): Promise<Cloesce.A.Self> {
-        return (await Cloesce.A.save(e, a))!;
-    }
-    withoutB(self: Cloesce.A.Self): Cloesce.A.Self {
+const A = Cloesce.A.impl({
+    async create(e, a) {
+        return (await this.Orm.save(e, a))!;
+    },
+    withoutB(self) {
         return self;
-    }
-}
+    },
+});
 
-class B extends Cloesce.B.Api {
-    testMethod(self: Cloesce.B.Self): void { }
-}
+const B = Cloesce.B.impl({
+    testMethod(self) { }
+});
 
-class Person extends Cloesce.Person.Api {
-    async create(e: Cloesce.Env, person: Cloesce.Person.Self): Promise<Cloesce.Person.Self> {
-        return (await Cloesce.Person.save(e, person))!;
-    }
+const Person = Cloesce.Person.impl({
+    async create(e, person) {
+        return (await this.Orm.save(e, person))!;
+    },
 
-    withoutDogs(self: Cloesce.Person.Self): Cloesce.Person.Self {
+    withoutDogs(self) {
         return self;
-    }
-}
+    },
+});
 
-class Dog extends Cloesce.Dog.Api {
-    testMethod(self: Cloesce.Dog.Self): void {
+const Dog = Cloesce.Dog.impl({
+    testMethod(self) {
     }
-}
+});
 
-class Student extends Cloesce.Student.Api {
-    async create(e: Cloesce.Env, student: Cloesce.Student.Self): Promise<Cloesce.Student.Self> {
-        return (await Cloesce.Student.save(e, student, Cloesce.Student.DataSources.WithCoursesStudentsCourses.include))!;
-    }
-    none(self: Cloesce.Student.Self): Cloesce.Student.Self {
+const Student = Cloesce.Student.impl({
+    async create(e, student) {
+        return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.include))!;
+    },
+    none(self) {
         return self;
-    }
-}
+    },
+});
 
 export default {
     async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
         const app = await Cloesce.cloesce();
-        app.register(new A())
-            .register(new B())
-            .register(new Person())
-            .register(new Dog())
-            .register(new Student());
+        app.register(A)
+            .register(B)
+            .register(Person)
+            .register(Dog)
+            .register(Student);
 
         return await app.run(request, env);
     }

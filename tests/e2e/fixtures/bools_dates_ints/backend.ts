@@ -5,11 +5,13 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Res
 export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 export interface Env {
     db: D1Database;
 }
 export namespace Weather {
-    export const Tag = "Weather";
+    export const Kind = "model" as const;
+    export const Tag = "Weather" as const;
     export const Meta = cidl.models.Weather as any;
 
     export interface Self {
@@ -18,61 +20,88 @@ export namespace Weather {
         isRaining: boolean;
     }
 
-    export namespace KeyFormat {
+    export namespace Key {
     }
 
-    export abstract class Api {
-        readonly tag = Tag;
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm }>): Impl & typeof Source & { tag: string; Key: any; Orm: typeof _Orm } {
+        return _impl(Weather, implObj);
     }
 
-    export namespace DataSources {
+    export namespace Source {
         export const Default = {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Weather.Self | null> {
-                return await Orm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.DataSources.Default.getQuery(env, id), Weather.DataSources.Default.include, {  });
+                return await Orm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.Source.Default.getQuery(env, id), Weather.Source.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Weather.Self[]> {
-                return await Orm.fromEnv(env).list<Weather.Self>(Weather.Meta, Weather.DataSources.Default.listQuery(env, lastSeen_id, limit), Weather.DataSources.Default.include);
+                return await Orm.fromEnv(env).list<Weather.Self>(Weather.Meta, Weather.Source.Default.listQuery(env, lastSeen_id, limit), Weather.Source.Default.include);
             },
         }
     }
 
-    export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self | null> {
-        return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-    }
+    export namespace _Orm {
+        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self | null> {
+            return await Orm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
 
-    export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
-    }
+        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self | null> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+        }
 
-    export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
-        args.include ??= DataSources.Default.include;
-        return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-    }
+        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<Self[]> {
+            args.include ??= Source.Default.include;
+            return await Orm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
 
-    export function select(include: IncludeTree<Self> = DataSources.Default.include, from?: string): string {
-        return Orm.select(Meta, from ?? null, include);
-    }
+        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
+            return Orm.select(Meta, from ?? null, include);
+        }
 
-    export function map(result: D1Result): Self[] {
-        return Orm.map<Self>(Meta, result, DataSources.Default.include);
-    }
+        export function map(result: D1Result): Self[] {
+            return Orm.map<Self>(Meta, result, Source.Default.include);
+        }
 
-    export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = DataSources.Default.include): Promise<Self> {
-        return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<Self> {
+            return await Orm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        }
     }
 }
+
+function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; _Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] }>): Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["_Orm"] };
+function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
+function _impl(namespace: any, implObj: any) {
+    if (namespace.Kind === "model") {
+        const model = { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace._Orm };
+        for (const key of Object.keys(implObj as object)) {
+            const fn = (model as any)[key];
+            if (typeof fn === "function") (model as any)[key] = fn.bind(model);
+        }
+        return model;
+    }
+
+    const service = { ...implObj, tag: namespace.Tag };
+    for (const key of Object.keys(implObj as object)) {
+        const fn = (service as any)[key];
+        if (typeof fn === "function") (service as any)[key] = fn.bind(service);
+    }
+    return service;
+}
+
 import cidl from "./cidl.json" with { type: "json" };
-(cidl.models.Weather.data_sources["Default"] as any).gen = Weather.DataSources.Default;
+(cidl.models.Weather.data_sources["Default"] as any).gen = Weather.Source.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "http://localhost:5293/api")
 }
 
-// Default entrypoint for a Cloesce app. 
+// Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {

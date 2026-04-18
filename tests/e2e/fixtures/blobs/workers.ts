@@ -1,10 +1,8 @@
 import { HttpResult } from "cloesce";
 import * as Cloesce from "./backend.js";
 
-class BlobService extends Cloesce.BlobService.Api {
-    init(self: Cloesce.BlobService.Self): void { }
-
-    incrementBlob(blob: Uint8Array): HttpResult<Uint8Array> {
+const BlobService = Cloesce.BlobService.impl({
+    incrementBlob(blob: Uint8Array) {
         if (!(blob instanceof Uint8Array)) {
             throw new Error(
                 `Received blob was not an instance of uint8array: ${JSON.stringify(
@@ -14,25 +12,25 @@ class BlobService extends Cloesce.BlobService.Api {
         }
 
         return HttpResult.ok(200, blob.map((b) => b + 1));
-    }
-}
+    },
+});
 
-class BlobHaver extends Cloesce.BlobHaver.Api {
-    yieldStream(self: Cloesce.BlobHaver.Self): HttpResult<ReadableStream<any>> {
+const BlobHaver = Cloesce.BlobHaver.impl({
+    yieldStream(self: Cloesce.BlobHaver.Self): HttpResult<Cloesce.CfReadableStream> {
         const blob1 = self.blob1;
         return HttpResult.ok(200, new ReadableStream({
             start(controller) {
                 controller.enqueue(blob1);
                 controller.close();
             },
-        }));
-    }
+        }) as any);
+    },
 
-    getBlob1(self: Cloesce.BlobHaver.Self): HttpResult<Uint8Array> {
+    getBlob1(self: Cloesce.BlobHaver.Self) {
         return HttpResult.ok(200, self.blob1);
-    }
+    },
 
-    async inputStream(stream: ReadableStream): Promise<HttpResult<void>> {
+    async inputStream(stream: Cloesce.CfReadableStream) {
         if (!(stream instanceof ReadableStream)) {
             throw new Error("Did not receive a stream");
         }
@@ -54,14 +52,14 @@ class BlobHaver extends Cloesce.BlobHaver.Api {
         }
 
         return HttpResult.ok(200);
-    }
-}
+    },
+});
 
 export default {
     async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
         const app = await Cloesce.cloesce();
-        app.register(new BlobService())
-            .register(new BlobHaver());
+        app.register(BlobService)
+            .register(BlobHaver);
 
         return app.run(request, env);
     }
