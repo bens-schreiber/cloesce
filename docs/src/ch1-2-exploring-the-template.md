@@ -123,21 +123,26 @@ In `src/api/main.ts`, you will find all of the TypeScript API route handlers for
 While Cloesce has a default Workers entrypoint in the generated backend code, almost every application will require custom API route handlers to implement business logic that cannot be expressed in the schema.
 
 ```ts
-class Weather extends Cloesce.Weather.Api {
-    async uploadPhoto(self: Cloesce.Weather.Self, e: Cloesce.Env, s: CfReadableStream): Promise<void> {
-        // ...
-    }
+export const Weather = clo.Weather.impl({
+    async uploadPhoto(self, e, s: CfReadableStream) {
+        const key = this.Key.photo(self.id);
+        await e.bucket.put(key, s);
+    },
 
-    downloadPhoto(self: Cloesce.Weather.Self): HttpResult<CfReadableStream> {
-        // ...
+    downloadPhoto(self) {
+        if (!self.photo) {
+            return HttpResult.fail(404, "Photo not found");
+        }
+        return HttpResult.ok(200, self.photo.body);
     }
-}
+});
 
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
-        const app = (await Cloesce.cloesce())
-            .register(new Weather());
-        // ... 
+    async fetch(request: Request, env: clo.Env): Promise<Response> {
+        const app = (await clo.cloesce())
+            .register(Weather);
+
+        return await app.run(request, env);
     }
-}
+};
 ```

@@ -43,13 +43,28 @@ source ByName for User {
 }
 ```
 
-The generated backend code will create a method `User.DataSources.ByName` with `get` and `list` functions that execute the defined SQL and return hydrated Model instances.
+The generated backend code will create a method `User.Sources.ByName` with `get` and `list` functions that execute the defined SQL and return hydrated Model instances.
 
-Always accessible is the Default Data Source (`User.DataSources.Default`), which provides basic `get` and `list` methods without any custom SQL.
+Always accessible is the Default Data Source (`User.Sources.Default`), which provides basic `get` and `list` methods without any custom SQL.
+
+When implementing a Cloesce Model, these generated methods are placed directly on to the model:
+```ts
+const User = clo.User.impl({});
+
+User.ByName.get("Alice");
+User.Default.get(1);
+```
 
 ## Advanced ORM Usage
 
-Internally, Cloesce uses the `Orm` class to implement the generated methods described above. You may use it directly, or use the generated methods in the namespace of each backend Model, which are more convenient.
+Internally, Cloesce uses the `Orm` class from the `cloesce` package to implement the generated methods described above. You may use it directly, or use the generated methods in the namespace of each backend Model, which are more convenient:
+
+```ts
+const User = clo.User.impl({});
+User.Orm.hydrate(...);
+User.Orm.map(...);
+User.Orm.select(...);
+```
 
 ### select
 

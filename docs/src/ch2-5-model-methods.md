@@ -51,33 +51,36 @@ After compilation, all methods of the `User` Model will be exposed as API endpoi
 An example implementation of the `User` Model methods in TypeScript might look like this:
 
 ```typescript
-import * as Cloesce from "@cloesce/backend";
+import * as clo from "@cloesce/backend";
 
-class UserApi extends Cloesce.User.Api {
-    echo(input: string): HttpResult<string> {
+// Utilize the `impl` function to implement a Model's API methods.
+// The only place `clo` is used in the entire backend is for this call,
+// and the `User` object will inherit all of the generated methods and types from the schema.
+const User = clo.User.impl({
+    echo(input) {
         if (isBadWord(input)) {
             return HttpResult.fail(400, "I'm not saying that!");
         }
 
         return HttpResult.ok(200, `Echo: ${input}`);
-    }
+    },
 
-    myDogs(self: Cloesce.User.Self): Dog[] {
+    myDogs(self){
         // Since this method was hydrated with the default Data Source, 
         // `self` includes the `dogs` Navigation Field.
         return self.dogs;
-    }
+    },
 
-    selfWithoutDogs(self: Cloesce.User.Self): User {
+    selfWithoutDogs(self) {
         // Since this method was hydrated with the `NoDogs` Data Source,
         // `self` does not include the `dogs` Navigation Field.
         return self;
-    }
+    },
 
-    async updateName(self: Cloesce.User.Self,newName: string): Promise<void> {
-        await Cloesce.User.save({ ...self, name: newName });
+    async updateName(self, newName) {
+        await this.Orm.save({ ...self, name: newName });
     }
-}
+});
 ```
 
 The generated client API will have fully typed methods to invoke these endpoints as if they were Object Oriented methods on the class `User`.
@@ -196,15 +199,15 @@ api MediaFile {
 ```
 
 ```typescript
-import * as Cloesce from "@cloesce/backend";
+import * as clo from "@cloesce/backend";
 
-class MediaFileApi extends Cloesce.MediaFile.Api {
-    async uploadFile(self: Cloesce.MediaFile.Self, wrangler: Cloesce.Env, file: CfReadableStream): Promise<void> {
-        const key = Cloesce.Weather.KeyFormat.file(self.id);
+const MediaFile = clo.MediaFile.impl({
+    async uploadFile(self, wrangler, file: CfReadableStream) {
+        const key = this.Key.file(self.id);
         await wrangler.myBucket.put(key, file);
-     }
+     },
 
-    downloadFile(self: Cloesce.MediaFile.Self): HttpResult<CfReadableStream> {
+    downloadFile(self) {
         if (!self.file) {
             return HttpResult.fail(404, "File not found.");
         }
@@ -212,7 +215,7 @@ class MediaFileApi extends Cloesce.MediaFile.Api {
         // Body is never loaded into memory, just streamed!
         return HttpResult.ok(self.file.body);
      }
-}
+});
 ```
 
 
