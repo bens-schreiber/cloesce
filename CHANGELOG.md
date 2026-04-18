@@ -1,3 +1,12 @@
+# [0.3.8] - 2026-4-17
+### Added
+
+### Changed
+- Updated backend TypeScript codegen to reveal an `impl` function which massively reduces boilerplate
+- Moved generated DataSources outside of a namespace to reduce boilerplate and improve readability
+
+### Fixed
+
 # [0.3.7] - 2026-4-17
 ### Added
 
