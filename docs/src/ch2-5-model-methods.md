@@ -78,7 +78,7 @@ const User = clo.User.impl({
     },
 
     async updateName(self, newName) {
-        await this.Orm.save({ ...self, name: newName });
+        await this.Orm.save(self.env, { ...self, name: newName });
     }
 });
 ```

@@ -43,16 +43,16 @@ source ByName for User {
 }
 ```
 
-The generated backend code will create a method `User.Sources.ByName` with `get` and `list` functions that execute the defined SQL and return hydrated Model instances.
+The generated backend code will create a method `User.Source.ByName` with `get` and `list` functions that execute the defined SQL and return hydrated Model instances.
 
-Always accessible is the Default Data Source (`User.Sources.Default`), which provides basic `get` and `list` methods without any custom SQL.
+Always accessible is the Default Data Source (`User.Source.Default`), which provides basic `get` and `list` methods without any custom SQL.
 
 When implementing a Cloesce Model, these generated methods are placed directly on to the model:
 ```ts
 const User = clo.User.impl({});
 
-User.ByName.get("Alice");
-User.Default.get(1);
+User.ByName.get(env, "Alice");
+User.Default.get(env, 1);
 ```
 
 ## Advanced ORM Usage
@@ -92,7 +92,7 @@ source WithAll for Boss {
 
 ```
 
-`Orm.select(Boss.Meta, null, Boss.DataSources.WithAll.include)` produces:
+`Orm.select(Boss.Meta, null, Boss.Source.WithAll.include)` produces:
 
 ```sql
 SELECT 
@@ -115,7 +115,7 @@ LEFT JOIN "Cat" AS "Cat_3"
 `select` can also take a `from` string to wrap a subquery as the base table:
 
 ```typescript
-Orm.select(Boss.Meta, "SELECT * FROM Boss WHERE name = 'Alice'", Boss.DataSources.WithAll.include);
+Orm.select(Boss.Meta, "SELECT * FROM Boss WHERE name = 'Alice'", Boss.Source.WithAll.include);
 ```
 
 ### map
