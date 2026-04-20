@@ -174,10 +174,10 @@ impl Fixture {
 
     pub fn migrate(&self, cidl: &Path, wrangler_path: &Path) -> Result<(bool, bool), String> {
         let fixture_root = self.path.parent().expect("fixture root to exist");
-        let compiler_dir = self.get_project_root();
+        let project_root = self.get_project_root();
 
         let res = self.run_command(
-            Command::new(compiler_dir.join("target/release/cloesce"))
+            Command::new(project_root.join("target/release/cloesce"))
                 .args(["migrate", "--all", "out.Initial"])
                 .arg(cidl)
                 .arg(wrangler_path)
