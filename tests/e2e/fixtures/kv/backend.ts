@@ -34,7 +34,7 @@ export namespace D1BackedModel {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
         return _impl(D1BackedModel, implObj);
     }
 
@@ -101,7 +101,7 @@ export namespace PaginatedKVModel {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
         return _impl(PaginatedKVModel, implObj);
     }
 
@@ -166,7 +166,7 @@ export namespace PureKVModel {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): Impl & typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
         return _impl(PureKVModel, implObj);
     }
 
@@ -208,7 +208,7 @@ export namespace PureKVModel {
     }
 }
 
-function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] }>): Impl & NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] };
+function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] }>): NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] } & Impl;
 function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
 function _impl(namespace: any, implObj: any) {
     if (namespace.Kind === "model") {
