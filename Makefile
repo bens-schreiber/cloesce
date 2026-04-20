@@ -5,9 +5,8 @@ E2E_DIR := tests/e2e
 REGRESSION_DIR := tests/regression
 DOCS_DIR := docs
 
-# Cargo manifests
-COMPILER_MANIFEST := $(COMPILER_DIR)/Cargo.toml
-REGRESSION_MANIFEST := $(REGRESSION_DIR)/Cargo.toml
+# Cargo workspace manifest (root)
+CARGO_MANIFEST := Cargo.toml
 
 # WASM target (ORM only)
 WASM_TARGET := wasm32-unknown-unknown
@@ -25,20 +24,18 @@ check-deps:
 format:
 	@echo "CLOESCE: Formatting Rust and TypeScript code..."
 	npm run format:fix --prefix $(TS_DIR)
-	cargo fmt --all --manifest-path ${COMPILER_MANIFEST}
+	cargo fmt --all --manifest-path $(CARGO_MANIFEST)
 	npm run format:fix --prefix $(E2E_DIR)
-	cargo fmt --all --manifest-path $(REGRESSION_MANIFEST)
 
 .PHONY: format-check
 format-check:
 	@echo "CLOESCE: Checking Rust and TypeScript code formatting..."
-	cargo fmt --all --manifest-path $(COMPILER_MANIFEST) -- --check
-	cargo fmt --all --manifest-path $(REGRESSION_MANIFEST) -- --check
+	cargo fmt --all --manifest-path $(CARGO_MANIFEST) -- --check
 	npm run format --prefix $(TS_DIR) -- --check
 	npm run format --prefix $(E2E_DIR) -- --check
 
 	@echo "CLOESCE: Linting Rust and TypeScript code..."
-	cargo clippy --manifest-path $(COMPILER_MANIFEST) --all-targets --all-features -- -D warnings
+	cargo clippy --manifest-path $(CARGO_MANIFEST) --all-targets --all-features -- -D warnings
 	npx --prefix $(TS_DIR) oxlint . --deny-warnings
 	npx --prefix $(E2E_DIR) oxlint . --deny-warnings
 
@@ -75,11 +72,11 @@ package-cross:
 	$(eval ASSET := $(call asset_name,$(TARGET)))
 	mkdir -p dist
 	@if echo "$(TARGET)" | grep -q "windows"; then \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce.exe dist/cloesce.exe; \
+		cp target/$(TARGET)/release/cloesce.exe dist/cloesce.exe; \
 		cd dist && 7z a $(ASSET).zip cloesce.exe && rm cloesce.exe; \
 		echo "CLOESCE: Packaged dist/$(ASSET).zip"; \
 	else \
-		cp $(COMPILER_DIR)/target/$(TARGET)/release/cloesce dist/cloesce; \
+		cp target/$(TARGET)/release/cloesce dist/cloesce; \
 		cd dist && tar -czf $(ASSET).tar.gz cloesce && rm cloesce; \
 		echo "CLOESCE: Packaged dist/$(ASSET).tar.gz"; \
 	fi
@@ -91,7 +88,7 @@ build-src:
 	npm install --prefix $(E2E_DIR)
 
 	@echo "CLOESCE: Building Rust and TypeScript code..."
-	cargo build --release --manifest-path $(COMPILER_DIR)/cli/Cargo.toml
+	cargo build --release --manifest-path $(CARGO_MANIFEST) --bin cloesce
 	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
 
 	npm run build --prefix $(TS_DIR)
@@ -99,9 +96,9 @@ build-src:
 .PHONY: test
 test:
 	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
-	cargo test --manifest-path $(COMPILER_MANIFEST) --all-features
+	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
 	npm run test --prefix $(TS_DIR)
-	cargo run --manifest-path $(REGRESSION_MANIFEST) --bin regression -- --check
+	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
 	npm run test --prefix $(E2E_DIR)
 
 .PHONY: build-docs
@@ -125,8 +122,7 @@ build-typedoc:
 .PHONY: clean
 clean:
 	@echo "CLOESCE: Cleaning build artifacts..."
-	cargo clean --manifest-path $(COMPILER_MANIFEST)
-	cargo clean --manifest-path $(REGRESSION_MANIFEST)
+	cargo clean --manifest-path $(CARGO_MANIFEST)
 	rm -rf $(TS_DIR)/build
 	rm -rf $(TS_DIR)/node_modules
 	rm -rf $(E2E_DIR)/node_modules

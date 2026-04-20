@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "src/compiler/cli",
+    "src/compiler/ast",
+    "src/compiler/frontend",
+    "src/compiler/semantic",
+    "src/compiler/codegen",
+    "src/compiler/compiler-test",
+    "src/compiler/migrations",
+    "src/compiler/orm",
+    "tests/regression",
+]
+resolver = "3"
+
+[workspace.dependencies]
+ariadne = "0.6.0"
+clap = { version = "4.6.1", features = ["derive"] }
+indexmap = { version = "2.14.0", features = ["serde"] }
+insta = "1.46.3"
+json_comments = "0.2.2"
+sea-query = "0.32.7"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.149"
+sqlformat = "0.5.0"
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+toml = "1.0.4"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+
+[profile.dev]
+opt-level = 0
+debug = true
