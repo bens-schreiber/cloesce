@@ -1,14 +1,13 @@
 [package]
 name = "frontend"
-version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
 ariadne = { workspace = true }
+ast = { path = "../ast" }
 chumsky = "0.12.0"
-logos = "0.16.1"
 indexmap = { workspace = true }
+logos = "0.16.1"
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }

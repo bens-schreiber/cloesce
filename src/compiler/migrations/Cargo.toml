@@ -1,20 +1,19 @@
 [package]
 name = "migrations"
-version = "0.0.1"
 edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
 indexmap = { workspace = true }
-sea-query = "0.32.7"
-sqlformat = "0.5.0"
+sea-query = { workspace = true }
+sqlformat = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
 indexmap = { workspace = true }
 serde_json = { workspace = true }
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+sqlx = { workspace = true }
 
 
 [lib]

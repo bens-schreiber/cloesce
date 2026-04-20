@@ -120,7 +120,6 @@ impl Fixture {
     /// On all success, returns the cidl and wrangler config, otherwise returns the failed file.
     pub fn compile(&self, _workers_domain: &str) -> Result<(bool, PathBuf, PathBuf), String> {
         let project_root = self.get_project_root();
-        let compiler_dir = project_root.join("src/compiler");
 
         let fixture_dir = self.path.parent().unwrap();
         let cidl_out = OutputFile::new(fixture_dir, "cidl.json");
@@ -129,7 +128,7 @@ impl Fixture {
         let client_out = OutputFile::new(fixture_dir, "client.ts");
 
         let cmd = self.run_command(
-            Command::new(compiler_dir.join("target/release/cloesce"))
+            Command::new(project_root.join("target/release/cloesce"))
                 .arg("compile")
                 .current_dir(fixture_dir),
         );
@@ -175,13 +174,10 @@ impl Fixture {
 
     pub fn migrate(&self, cidl: &Path, wrangler_path: &Path) -> Result<(bool, bool), String> {
         let fixture_root = self.path.parent().expect("fixture root to exist");
-        let compiler_dir = {
-            let project_root = self.get_project_root();
-            project_root.join("src/compiler")
-        };
+        let project_root = self.get_project_root();
 
         let res = self.run_command(
-            Command::new(compiler_dir.join("target/release/cloesce"))
+            Command::new(project_root.join("target/release/cloesce"))
                 .args(["migrate", "--all", "out.Initial"])
                 .arg(cidl)
                 .arg(wrangler_path)
