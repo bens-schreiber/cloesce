@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.60", features = ["derive"] }
 glob = "0.3.3"
-similar = "2.7.0"
+similar = "3.1.0"
 tokio = { version = "1.51.1", features = ["full"] }
 futures = "0.3.32"
 tracing = "0.1.41"
