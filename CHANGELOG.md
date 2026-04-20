@@ -1,3 +1,11 @@
+# [0.3.9] - 2026-4-19
+### Added
+
+### Changed
+
+### Fixed
+- A bug where the `impl` function would widen the return type to `ApiResult` instead of inferring the specific return type of the method, making it difficult to work with the results without manually type asserting.
+
 # [0.3.8] - 2026-4-17
 ### Added
 
