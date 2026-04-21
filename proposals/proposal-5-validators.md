@@ -11,8 +11,6 @@
 
 This proposal introduces a set of [Zod](https://zod.dev) inspired "validator tags", allowing fine grained validation of input data in a declarative manner. Validators can be applied to model fields, API parameters, and Data Source parameters, and are inherited by all CRUD methods of a model as well as any API that references that field. The initial set of validators includes numerical validators (e.g. greater than, less than), string validators (e.g. length, regex), and composition of validators through AND chaining.
 
-Additionally, this proposal introduces two new CIDL types: `uint` and `ureal`, representing unsigned integers and unsigned real numbers respectively. These types are validated at runtime to ensure that they are greater than or equal to 0.
-
 ---
 
 ## Motivation
@@ -66,7 +64,6 @@ api Foo {
 - Introduce a subset of Zod's validators as tags that can be used on model fields and API parameters.
 - Allow chaining of multiple validators on the same field or parameter, with an implicit AND relationship (i.e. all validators must pass for the field to be considered valid).
 - Ensure that validators are inherited by all CRUD methods of a model, as well as any API that references that field.
-- Introduce new CIDL types `uint` and `ureal` that represent unsigned integers and unsigned real numbers respectively, with validation enforced at runtime.
 
 ### Non-Goals
 - Custom user-implemented validators (i.e., generating a backend stub to be invoked at runtime)
@@ -194,15 +191,13 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 - **Partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 
-### New CIDL Types
+### Renaming `double` to `real` and Introducing Unsigned Types
 
 First, it's overdue that we rename `double` to `real`. Since Cloesce compiles to multiple languages, we don't really know what the underlying representation of a floating point number will be, and `real` is a more general term that can encompass both single and double precision floats (it is also the SQLite type for floating point numbers).
 
-`real` and `int` will represent a number that can be positive or negative. To complement this, we will introduce two new types:
-- **uint**: An unsigned integer, validated to be greater than or equal to 0 at runtime.
-- **ureal**: An unsigned real, validated to be greater than or equal to 0 at runtime.
+`real` and `int` will represent a number that can be positive or negative. 
 
-Both types will be added to the CIDL type system. In target languages with no native unsigned number types, they map to the same representation as `int` and `real` respectively, with the constraint enforced at runtime by the ORM validator.
+`uint` will be introduced to represent an unsigned integer which must be greater than or equal to 0 at runtime.
 
 ---
 
