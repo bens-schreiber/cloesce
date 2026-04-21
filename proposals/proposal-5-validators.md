@@ -1,4 +1,4 @@
-# Proposal: Zod-like Validators
+# Proposal: Validator Tags
 
 - **Author(s):** Ben Schreiber
 - **Status:** **Draft** | Review | Accepted | Rejected | Implemented
@@ -9,32 +9,49 @@
 
 ## Summary
 
-This proposal introduces a set of [Zod](https://zod.dev) inspired validator tags, allowing fine-grained validation of input data in a declarative manner. These validators can be used in addition to the existing type-based validation, providing more control over the validation process.
+This proposal introduces a set of [Zod](https://zod.dev) inspired "validator tags", allowing fine grained validation of input data in a declarative manner. Validators can be applied to model fields, API parameters, and Data Source parameters, and are inherited by all CRUD methods of a model as well as any API that references that field. The initial set of validators includes numerical validators (e.g. greater than, less than), string validators (e.g. length, regex), and composition of validators through AND chaining.
+
+Additionally, this proposal introduces two new CIDL types: `uint` and `ureal`, representing unsigned integers and unsigned real numbers respectively. These types are validated at runtime to ensure that they are greater than or equal to 0.
 
 ---
 
 ## Motivation
 
-Cloesce relies only on type-based runtime validation when parsing JSON input. While this is sufficient for many use cases, it fails to replace the expressiveness of a full validation library like Zod. Additionally, because method dispatch occurs after hydration, basic custom validation logic must occur after the fact, forcing users to write static methods on their models to be more efficient.
+Cloesce has a simple goal: replace schema languages with a single unified one. 
+
+In the TypeScript ecosystem, Zod is the de facto standard for validation of input data, done by defining a schema that describes the expected shape, types, and constraints of data. For example:
+
+```ts
+const UserSchema = z.object({
+    id: z.string().length(5).uppercase(),
+    age: z.number().int().gt(0),
+    email: z.string().email()
+});
+```
+
+While Cloesce is capable of expressing the structure and types of data, it lacks any fine-grained way to express constraints on that data.
+
+A workaround to this problem is writing validation logic within API implementations, but this approach has two big drawbacks:
+1. We lose the ability to implicitly inherit validation logic across Cloesce constructs
+2. Method dispatch occurs after hydration, so we lose the ability to fail fast on invalid input before performing any unnecessary work.
+
+Thus, taking inspiration from Zod, we can introduce a set of validator tags that can be applied directly to model fields and API parameters. This allows us to express common validation logic in a declarative manner, and have it implicitly inherited across all relevant constructs. For example:
 
 ```cloesce
-
-// All CRUD methods will use the same validation logic
 model Foo {
     primary {
         [length 5]
-        [uppercase]
+        [max 100]
         id: string
     }
 }
 
-// APIs can use the same validation available on model fields
 api Foo {
     get foo(
         self,
 
         [length 5]
-        [uppercase]
+        [max 100]
         id: string
     ) -> Foo
 }
@@ -47,7 +64,9 @@ api Foo {
 ### Goals
 
 - Introduce a subset of Zod's validators as tags that can be used on model fields and API parameters.
-- Allow composition of validators (AND chaining)
+- Allow chaining of multiple validators on the same field or parameter, with an implicit AND relationship (i.e. all validators must pass for the field to be considered valid).
+- Ensure that validators are inherited by all CRUD methods of a model, as well as any API that references that field.
+- Introduce new CIDL types `uint` and `ureal` that represent unsigned integers and unsigned real numbers respectively, with validation enforced at runtime.
 
 ### Non-Goals
 - Custom user-implemented validators (i.e., generating a backend stub to be invoked at runtime)
@@ -131,13 +150,12 @@ source Default for Foo {
 - [gte n]: Validates that a number is greater than or equal to n, where n is an integer or real literal.
 - [lt n]: Validates that a number is less than n, where n is an integer or real literal.
 - [lte n]: Validates that a number is less than or equal to n, where n is an integer or real literal.
+- [multipleOf n]: Validates that a number is a multiple of n, where n is an integer or real literal.
 
 **String Validators**
 - [length n]: Validates that a string has a length of n, where n is an integer literal.
 - [min n]: Validates that a string has a minimum length of n, where n is an integer literal.
 - [max n]: Validates that a string has a maximum length of n, where n is an integer literal.
-- [uppercase]: Validates that a string is in uppercase.
-- [lowercase]: Validates that a string is in lowercase.
 - [regex r]: Validates that a string matches the regular expression r, where r is a regex literal.
 
 ### Inheriting Validators and Generics
