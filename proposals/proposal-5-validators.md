@@ -1,7 +1,7 @@
 # Proposal: Zod-like Validators
 
 - **Author(s):** Ben Schreiber
-- **Status:** Draft | **Review** | Accepted | Rejected | Implemented
+- **Status:** **Draft** | Review | Accepted | Rejected | Implemented
 - **Created:** 2026-04-21
 - **Last Updated:** 2026-04-21
 
