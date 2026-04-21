@@ -27,7 +27,7 @@ fn env_block() {
             vars {
                 api_url: string
                 max_retries: int
-                threshold: double
+                threshold: real
                 created_at: date
                 payload: json
                 enabled: bool
@@ -101,8 +101,8 @@ fn env_block() {
         vars,
         vec![
             ("api_url", &CidlType::String),
-            ("max_retries", &CidlType::Integer),
-            ("threshold", &CidlType::Double),
+            ("max_retries", &CidlType::Int),
+            ("threshold", &CidlType::Real),
             ("created_at", &CidlType::DateIso),
             ("payload", &CidlType::Json),
             ("enabled", &CidlType::Boolean)
@@ -127,7 +127,7 @@ fn poo_block() {
             email: string
             age: Option<int>
             active: bool
-            balance: double
+            balance: real
             created: date
             address: Address
             tags: Array<string>
@@ -177,12 +177,12 @@ fn poo_block() {
             .map(|f| (f.name, f.cidl_type.clone()))
             .collect::<Vec<_>>(),
         vec![
-            ("id", CidlType::Integer),
+            ("id", CidlType::Int),
             ("name", CidlType::String),
             ("email", CidlType::String),
-            ("age", CidlType::nullable(CidlType::Integer)),
+            ("age", CidlType::nullable(CidlType::Int)),
             ("active", CidlType::Boolean),
-            ("balance", CidlType::Double),
+            ("balance", CidlType::Real),
             ("created", CidlType::DateIso),
             ("address", CidlType::UnresolvedReference { name: "Address" }),
             ("tags", CidlType::array(CidlType::String)),
@@ -216,7 +216,7 @@ fn poo_block() {
             .find(|f| f.name == "nested")
             .unwrap()
             .cidl_type,
-        CidlType::array(CidlType::array(CidlType::Integer))
+        CidlType::array(CidlType::array(CidlType::Int))
     );
 }
 
@@ -394,7 +394,7 @@ fn model_primary_unique_optional_foreign() {
         [use d1_db, list]
         [use get, save, d2_db]
         model M {
-            score: double
+            score: real
 
             primary {
                 id: int
@@ -460,7 +460,7 @@ fn model_primary_unique_optional_foreign() {
             _ => None,
         })
         .unwrap();
-    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Double));
+    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Real));
 
     let primary = m
         .blocks

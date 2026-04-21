@@ -15,8 +15,9 @@ pub enum CidlType<'src> {
     #[default]
     Void,
 
-    Integer,
-    Double,
+    Int,
+    Uint,
+    Real,
     String,
     Blob,
     Boolean,

@@ -382,7 +382,7 @@ fn d1_model_nav_one_to_one() {
         person
             .columns
             .iter()
-            .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Integer))
+            .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Int))
     );
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
@@ -667,7 +667,7 @@ fn kv_and_d1_coexist() {
         user.kv_fields[0].format_parameters[0],
         Field {
             name: "id".into(),
-            cidl_type: CidlType::Integer,
+            cidl_type: CidlType::Int,
         }
     );
 }

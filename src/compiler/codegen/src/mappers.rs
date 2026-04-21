@@ -44,8 +44,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
             CidlType::Json => "unknown".to_string(),
-            CidlType::Integer => "number".to_string(),
-            CidlType::Double => "number".to_string(),
+            CidlType::Int | CidlType::Uint | CidlType::Real => "number".to_string(), // goodbye num types :(
             CidlType::String => "string".to_string(),
             CidlType::Boolean => "boolean".to_string(),
             CidlType::DateIso => "Date".to_string(),

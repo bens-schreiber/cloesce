@@ -54,12 +54,8 @@ fn undefined() {
     // Arrays return empty array when undefined, even if not partial
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(
-            CidlType::Array(Box::new(CidlType::Integer)),
-            None,
-            &ast,
-            false,
-        );
+        let result =
+            validate_cidl_type(CidlType::Array(Box::new(CidlType::Int)), None, &ast, false);
         assert_eq!(result.unwrap(), Some(Value::Array(vec![])));
     }
 }
@@ -125,21 +121,21 @@ fn integer() {
     // Non integer returns error
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(CidlType::Integer, Some(json!("not_an_int")), &ast, false);
+        let result = validate_cidl_type(CidlType::Int, Some(json!("not_an_int")), &ast, false);
         assert!(matches!(result, Err(ValidatorErrorKind::NonI64)));
     }
 
     // Floats return error
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(CidlType::Integer, Some(json!(3.01)), &ast, false);
+        let result = validate_cidl_type(CidlType::Int, Some(json!(3.01)), &ast, false);
         assert!(matches!(result, Err(ValidatorErrorKind::NonI64)));
     }
 
     // Integers pass
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(CidlType::Integer, Some(json!(42)), &ast, false);
+        let result = validate_cidl_type(CidlType::Int, Some(json!(42)), &ast, false);
         assert_eq!(result.unwrap(), Some(json!(42)));
     }
 }
@@ -149,14 +145,14 @@ fn real() {
     // Float passes
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(CidlType::Double, Some(json!(3.01)), &ast, false);
+        let result = validate_cidl_type(CidlType::Real, Some(json!(3.01)), &ast, false);
         assert_eq!(result.unwrap(), Some(json!(3.01)));
     }
 
-    // Integer passes
+    // Int passes
     {
         let ast = empty_ast();
-        let result = validate_cidl_type(CidlType::Double, Some(json!(42)), &ast, false);
+        let result = validate_cidl_type(CidlType::Real, Some(json!(42)), &ast, false);
         assert_eq!(result.unwrap(), Some(json!(42)));
     }
 }
@@ -274,7 +270,7 @@ fn array() {
     {
         let ast = empty_ast();
         let result = validate_cidl_type(
-            CidlType::array(CidlType::Integer),
+            CidlType::array(CidlType::Int),
             Some(json!("not an array")),
             &ast,
             false,
@@ -286,7 +282,7 @@ fn array() {
     {
         let ast = empty_ast();
         let result = validate_cidl_type(
-            CidlType::array(CidlType::Integer),
+            CidlType::array(CidlType::Int),
             Some(json!([1, 2, 3])),
             &ast,
             false,
@@ -323,7 +319,7 @@ fn r2() {
     {
         let ast = empty_ast();
         let result = validate_cidl_type(
-            CidlType::array(CidlType::Integer),
+            CidlType::array(CidlType::Int),
             Some(json!(["not", "integers"])),
             &ast,
             false,

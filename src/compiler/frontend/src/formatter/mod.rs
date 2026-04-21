@@ -802,8 +802,9 @@ impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
 fn fmt_cidl_type(ty: &CidlType<'_>) -> String {
     match ty {
         CidlType::Void => "void".into(),
-        CidlType::Integer => "int".into(),
-        CidlType::Double => "double".into(),
+        CidlType::Int => "int".into(),
+        CidlType::Uint => "uint".into(),
+        CidlType::Real => "real".into(),
         CidlType::String => "string".into(),
         CidlType::Blob => "blob".into(),
         CidlType::Boolean => "bool".into(),

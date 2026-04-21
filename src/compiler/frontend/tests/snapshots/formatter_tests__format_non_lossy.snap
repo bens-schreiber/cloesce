@@ -1,5 +1,5 @@
 ---
-source: frontend/tests/formatter_tests.rs
+source: src/compiler/frontend/tests/formatter_tests.rs
 expression: formatted
 ---
 // Top level comment
@@ -44,12 +44,12 @@ model HasSqlColumnTypes {
     
     str: string
     integer: int
-    dub: double
+    dub: real
     boo: bool
     dat: date
     strNull: Option<string>
     integerNull: Option<int>
-    dubNull: Option<double>
+    dubNull: Option<real>
     booNull: Option<bool>
     dateNull: Option<date>
 }

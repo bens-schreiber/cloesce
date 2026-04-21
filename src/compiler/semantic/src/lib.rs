@@ -640,8 +640,9 @@ fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
 
     matches!(
         inner,
-        CidlType::Integer
-            | CidlType::Double
+        CidlType::Int
+            | CidlType::Uint
+            | CidlType::Real
             | CidlType::String
             | CidlType::Blob
             | CidlType::Boolean

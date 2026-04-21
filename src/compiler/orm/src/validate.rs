@@ -73,7 +73,7 @@ pub fn validate_cidl_type(
     };
 
     match unwrapped_type {
-        CidlType::Integer => match &value {
+        CidlType::Int => match &value {
             Value::Number(num) if num.is_i64() => Ok(Some(value)),
             Value::String(s) if s.parse::<i64>().is_ok() => {
                 value = Value::Number(s.parse::<i64>().unwrap().into());
@@ -81,8 +81,15 @@ pub fn validate_cidl_type(
             }
             _ => Err(ValidatorErrorKind::NonI64),
         },
-
-        CidlType::Double => match &value {
+        CidlType::Uint => match &value {
+            Value::Number(num) if num.is_u64() => Ok(Some(value)),
+            Value::String(s) if s.parse::<u64>().is_ok() => {
+                value = Value::Number(s.parse::<u64>().unwrap().into());
+                Ok(Some(value))
+            }
+            _ => Err(ValidatorErrorKind::NonI64),
+        },
+        CidlType::Real => match &value {
             Value::Number(num) if num.is_f64() || num.is_i64() => Ok(Some(value)),
             Value::String(s) if s.parse::<f64>().is_ok() => {
                 value =

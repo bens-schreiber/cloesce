@@ -229,7 +229,7 @@ impl<'src> DataSourceExpansion {
             })
             .chain(vec![Field {
                 name: "limit".into(),
-                cidl_type: CidlType::Integer,
+                cidl_type: CidlType::Uint,
             }])
             .collect();
 

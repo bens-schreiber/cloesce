@@ -34,12 +34,12 @@ model HasSqlColumnTypes {
 
     str: string
     integer: int
-    dub: double
+    dub: real
     boo: bool
     dat: date
     strNull: Option<string>
     integerNull: Option<int>
-    dubNull: Option<double>
+    dubNull: Option<real>
     booNull: Option<bool>
     dateNull: Option<date>
 }

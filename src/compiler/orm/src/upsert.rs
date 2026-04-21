@@ -205,7 +205,7 @@ impl<'a> UpsertModel<'a> {
                     pk_vals.push((pk_col.field.name.to_string(), Some(val)));
                     pk_missing = false;
                 }
-                None if matches!(pk_col.field.cidl_type, CidlType::Integer) => {
+                None if matches!(pk_col.field.cidl_type, CidlType::Int | CidlType::Uint) => {
                     if model.has_composite_pk() {
                         fail!(
                             OrmErrorKind::CompositeKeyCannotAutoincrement,
@@ -846,9 +846,10 @@ fn validate_and_transform(
 
     Ok(match value {
         Value::Null => match cidl_type.root_type() {
-            CidlType::Integer => return Ok(Expr::val(None::<i64>).into()),
+            CidlType::Int => return Ok(Expr::val(None::<i32>).into()),
+            CidlType::Uint => return Ok(Expr::val(None::<u32>).into()),
             CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),
-            CidlType::Double => return Ok(Expr::val(None::<f64>).into()),
+            CidlType::Real => return Ok(Expr::val(None::<f64>).into()),
             CidlType::String | CidlType::DateIso => {
                 return Ok(Expr::val(None::<String>).into());
             }

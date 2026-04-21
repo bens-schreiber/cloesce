@@ -255,8 +255,9 @@ fn cidl_type<'tokens, 'src: 'tokens>()
 
         let primitive_keyword = choice((
             just(Token::Ident("string")).to(CidlType::String),
-            just(Token::Ident("int")).to(CidlType::Integer),
-            just(Token::Ident("double")).to(CidlType::Double),
+            just(Token::Ident("int")).to(CidlType::Int),
+            just(Token::Ident("uint")).to(CidlType::Uint),
+            just(Token::Ident("real")).to(CidlType::Real),
             just(Token::Ident("date")).to(CidlType::DateIso),
             just(Token::Ident("bool")).to(CidlType::Boolean),
             just(Token::Ident("json")).to(CidlType::Json),
