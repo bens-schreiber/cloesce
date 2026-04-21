@@ -9,7 +9,8 @@ use crate::{
     DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
     ForeignBlockNav, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
     NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
-    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, lexer::CommentMap,
+    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, ValidatorLiteral,
+    ValidatorTag, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -243,6 +244,8 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
+        let tags_doc = self.sym_tags_doc(sym, indent);
+
         let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name);
         let trailing = self.trailing_comment(sym.span.end);
@@ -261,14 +264,16 @@ impl<'src> FmtCtx<'src> {
                 Doc::nil()
             };
 
-            return leading_sep
+            return tags_doc
+                .then(leading_sep)
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
 
-        Doc::hardline(indent)
+        tags_doc
+            .then(Doc::hardline(indent))
             .then(leading)
             .then(content_sep)
             .then(content)
@@ -276,6 +281,8 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
+        let tags_doc = self.sym_tags_doc(sym, indent);
+
         let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = Doc::text(sym.name)
             .then(Doc::text(": "))
@@ -296,18 +303,45 @@ impl<'src> FmtCtx<'src> {
                 Doc::nil()
             };
 
-            return leading_sep
+            return tags_doc
+                .then(leading_sep)
                 .then(leading)
                 .then(content_sep)
                 .then(content)
                 .then(trailing);
         }
 
-        Doc::hardline(indent)
+        tags_doc
+            .then(Doc::hardline(indent))
             .then(leading)
             .then(content_sep)
             .then(content)
             .then(trailing)
+    }
+
+    // Emit validator tags, each on its own line at the same indent level.
+    fn sym_tags_doc(&self, sym: &'src Symbol<'src>, indent: usize) -> Doc<'src> {
+        let mut tags_doc = Doc::nil();
+        for tag in &sym.tags {
+            let (tag_leading, tag_has_leading) = self.leading_comments(tag.span.start, indent);
+            self.node_ends.borrow_mut().push(tag.span.end);
+            let tag_content = tag.block.to_doc(self);
+            self.node_ends.borrow_mut().pop();
+            let tag_trailing = self.trailing_comment(tag.span.end);
+            self.advance(tag.span.end);
+            let tag_sep = if tag_has_leading {
+                Doc::hardline(indent)
+            } else {
+                Doc::nil()
+            };
+            tags_doc = tags_doc
+                .then(Doc::hardline(indent))
+                .then(tag_leading)
+                .then(tag_sep)
+                .then(tag_content)
+                .then(tag_trailing);
+        }
+        tags_doc
     }
 }
 
@@ -385,6 +419,24 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
         doc.then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for ValidatorTag<'src> {
+    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let mut doc = Doc::text("[").then(Doc::text(self.name));
+        for arg in &self.args {
+            doc = doc.then(Doc::text(" ")).then(match arg {
+                ValidatorLiteral::Int(s) | ValidatorLiteral::Real(s) => Doc::text(s),
+                ValidatorLiteral::Str(s) => {
+                    Doc::text("\"").then(Doc::text(s)).then(Doc::text("\""))
+                }
+                ValidatorLiteral::Regex(s) => {
+                    Doc::text("/").then(Doc::text(s)).then(Doc::text("/"))
+                }
+            });
+        }
+        doc.then(Doc::text("]"))
     }
 }
 

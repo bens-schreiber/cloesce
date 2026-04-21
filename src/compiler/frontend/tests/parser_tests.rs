@@ -2,7 +2,7 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
     AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind,
+    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind, ValidatorLiteral,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -838,6 +838,43 @@ fn model_kv_r2_paginated() {
         ),
         ("entry/{key}/{secondary}", "entry", CidlType::Json)
     );
+}
+
+#[test]
+fn validator_tags() {
+    let ast = lex_and_parse(
+        r#"
+        model M {
+            [valid1 "arg1" 42 42.0 /[0-9]+/]
+            [valid2 "arg3"]
+            email: string
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+    let col = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Column(s) => Some(s),
+            _ => None,
+        })
+        .unwrap();
+
+    assert_eq!(col.name, "email");
+    assert_eq!(col.cidl_type, CidlType::String);
+    assert_eq!(col.tags.len(), 2);
+    assert_eq!(col.tags[0].block.name, "valid1");
+    assert_eq!(col.tags[0].block.args.len(), 4);
+    assert_eq!(col.tags[0].block.args[0], ValidatorLiteral::Str("arg1"));
+    assert_eq!(col.tags[0].block.args[1], ValidatorLiteral::Int("42"));
+    assert_eq!(col.tags[0].block.args[2], ValidatorLiteral::Real("42.0"));
+    assert_eq!(col.tags[0].block.args[3], ValidatorLiteral::Regex("[0-9]+"));
+
+    assert_eq!(col.tags[1].block.name, "valid2");
+    assert_eq!(col.tags[1].block.args.len(), 1);
+    assert_eq!(col.tags[1].block.args[0], ValidatorLiteral::Str("arg3"));
 }
 
 fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {

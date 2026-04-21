@@ -4,10 +4,10 @@ use ast::CrudKind;
 
 use crate::{
     AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag,
-    UseTagParamKind,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, Symbol,
+    UseTag, UseTagParamKind,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol, validator_tag},
 };
 
 /// `nav { navName }`
@@ -187,15 +187,24 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
-    // `keyfield { ident* }`
-    let keyfield_block = just(Token::Ident("keyfield"))
-        .ignore_then(
-            symbol()
-                .repeated()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map(ModelBlockKind::KeyField);
+    // `keyfield { ([tag]* ident)* }`
+    let keyfield_block = {
+        just(Token::Ident("keyfield"))
+            .ignore_then(
+                validator_tag()
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .then(symbol())
+                    .map(|(validator_tags, symbol)| Symbol {
+                        tags: validator_tags,
+                        ..symbol
+                    })
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            )
+            .map(ModelBlockKind::KeyField)
+    };
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
     let paginated_block = just(Token::Ident("paginated")).ignore_then(

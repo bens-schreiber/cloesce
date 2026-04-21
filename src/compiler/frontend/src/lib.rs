@@ -12,6 +12,7 @@ pub mod parser;
 pub type Span = SimpleSpan<usize, FileId>;
 
 /// A spanned block
+#[derive(Debug, Clone)]
 pub struct Spd<T> {
     pub block: T,
     pub span: Span,
@@ -63,15 +64,48 @@ impl<'src> FileTable<'src> {
 
 pub type FileId = u16;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Hash, Eq)]
+/// A literal argument to a validator tag.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidatorLiteral<'src> {
+    Int(&'src str),
+    Real(&'src str),
+    Str(&'src str),
+    Regex(&'src str),
+}
+
+/// A validator tag applied before a field or parameter, e.g. `[length 5]` or `[regex /^[a-z]+$/]`.
+#[derive(Debug, Clone)]
+pub struct ValidatorTag<'src> {
+    pub name: &'src str,
+    pub args: Vec<ValidatorLiteral<'src>>,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Symbol<'src> {
     pub name: &'src str,
 
     /// [CidlType::default()] for symbols with no type
     pub cidl_type: CidlType<'src>,
 
-    /// The span the symbol name occupies.
+    /// The span the symbol name (and type) occupies, not including any leading validator tags.
     pub span: Span,
+
+    /// Empty for symbols where validators are not applicable (e.g. R2 fields, structural names).
+    pub tags: Vec<Spd<ValidatorTag<'src>>>,
+}
+
+impl PartialEq for Symbol<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.span == other.span
+    }
+}
+
+impl Eq for Symbol<'_> {}
+
+impl std::hash::Hash for Symbol<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.span.hash(state);
+    }
 }
 
 pub struct ApiBlock<'src> {
@@ -188,7 +222,7 @@ pub struct R2Block<'src> {
     /// bucket key format string, e.g. `"weather/photos/{id}.jpg"`
     pub key_format: &'src str,
 
-    /// has no type
+    /// has no type; validators are not applicable to R2 fields
     pub field: Symbol<'src>,
 
     // [paginated]
