@@ -146,17 +146,17 @@ source Default for Foo {
 ### Available Validators
 
 **Numerical Validators (Integer and Real)**
-- [gt n]: Validates that a number is greater than n, where n is an integer or real literal.
-- [gte n]: Validates that a number is greater than or equal to n, where n is an integer or real literal.
-- [lt n]: Validates that a number is less than n, where n is an integer or real literal.
-- [lte n]: Validates that a number is less than or equal to n, where n is an integer or real literal.
-- [multipleOf n]: Validates that a number is a multiple of n, where n is an integer or real literal.
+- `[gt n]`: Validates that a number is greater than n, where n is an integer or real literal.
+- `[gte n]`: Validates that a number is greater than or equal to n, where n is an integer or real literal.
+- `[lt n]`: Validates that a number is less than n, where n is an integer or real literal.
+- `[lte n]`: Validates that a number is less than or equal to n, where n is an integer or real literal.
+- `[multipleOf n]`: Validates that a number is a multiple of n, where n is an integer or real literal.
 
 **String Validators**
-- [length n]: Validates that a string has a length of n, where n is an integer literal.
-- [min n]: Validates that a string has a minimum length of n, where n is an integer literal.
-- [max n]: Validates that a string has a maximum length of n, where n is an integer literal.
-- [regex r]: Validates that a string matches the regular expression r, where r is a regex literal.
+- `[length n]`: Validates that a string has a length of n, where n is an integer literal.
+- `[min n]`: Validates that a string has a minimum length of n, where n is an integer literal.
+- `[max n]`: Validates that a string has a maximum length of n, where n is an integer literal.
+- `[regex r]`: Validates that a string matches the regular expression r, where r is a regex literal.
 
 ### Inheriting Validators and Generics
 
