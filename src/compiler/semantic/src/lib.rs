@@ -1,8 +1,11 @@
-use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
+use ast::{
+    CidlType, CloesceAst, Field, Number, PlainOldObject, Service, ValidatedField, Validator,
+    WranglerEnv,
+};
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
     EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, SpdSlice,
-    Symbol,
+    Symbol, ValidatorLiteral, ValidatorTag,
 };
 use indexmap::IndexMap;
 
@@ -12,7 +15,7 @@ use crate::{
     api::ApiAnalysis,
     crud::CrudExpansion,
     data_source::{DataSourceAnalysis, DataSourceExpansion},
-    err::{ErrorSink, SemanticError},
+    err::{BatchResult, ErrorSink, SemanticError},
     model::ModelAnalysis,
 };
 
@@ -469,9 +472,18 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 }
 
-                fields.push(Field {
+                let validators = match resolve_validators(field) {
+                    Ok(v) => v,
+                    Err(errs) => {
+                        sink.extend(errs);
+                        Vec::new()
+                    }
+                };
+
+                fields.push(ValidatedField {
                     name: field.name.into(),
                     cidl_type: resolved_type,
+                    validators,
                 });
             }
 
@@ -629,6 +641,189 @@ fn resolve_cidl_type<'src, 'p>(
         }
         _ => Ok(cidl_type.clone()),
     }
+}
+
+/// Resolves validators for a given symbol, returning an error if any validator is invalid for the symbol's type.
+fn resolve_validators<'src, 'p>(
+    symbol: &'p Symbol<'src>,
+) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
+    fn parse_number<'src, 'p>(
+        lit: &ValidatorLiteral<'src>,
+        symbol: &'p Symbol<'src>,
+        tag: &'p ValidatorTag<'src>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> Option<Number> {
+        match lit {
+            ValidatorLiteral::Int(s) => s.parse::<i64>().ok().map(Number::Int).or_else(|| {
+                sink.push(SemanticError::ValidatorInvalidArgument {
+                    symbol,
+                    validator: tag,
+                    reason: format!("'{s}' is not a valid integer"),
+                });
+                None
+            }),
+            ValidatorLiteral::Real(s) => s.parse::<f64>().ok().map(Number::Float).or_else(|| {
+                sink.push(SemanticError::ValidatorInvalidArgument {
+                    symbol,
+                    validator: tag,
+                    reason: format!("'{s}' is not a valid number"),
+                });
+                None
+            }),
+            _ => {
+                sink.push(SemanticError::ValidatorInvalidArgument {
+                    symbol,
+                    validator: tag,
+                    reason: "expected a numeric argument".to_owned(),
+                });
+                None
+            }
+        }
+    }
+
+    fn require_one<'src, 'p>(
+        args: &[ValidatorLiteral<'src>],
+        symbol: &'p Symbol<'src>,
+        tag: &'p ValidatorTag<'src>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> bool {
+        if args.len() == 1 {
+            true
+        } else {
+            sink.push(SemanticError::ValidatorInvalidArity {
+                symbol,
+                validator: tag,
+            });
+            false
+        }
+    }
+
+    let mut resolved = Vec::new();
+    let mut sink = ErrorSink::new();
+
+    for spd in &symbol.tags {
+        let tag = &spd.block;
+        let ValidatorTag { name, args } = tag;
+
+        if !require_one(args, symbol, tag, &mut sink) {
+            // TODO: right now everything requires one arg
+            continue;
+        }
+
+        match *name {
+            "gt" => {
+                if let Some(n) = parse_number(&args[0], symbol, tag, &mut sink) {
+                    resolved.push(Validator::GreaterThan(n));
+                }
+            }
+            "gte" => {
+                if let Some(n) = parse_number(&args[0], symbol, tag, &mut sink) {
+                    resolved.push(Validator::GreaterThanOrEqual(n));
+                }
+            }
+            "lt" => {
+                if let Some(n) = parse_number(&args[0], symbol, tag, &mut sink) {
+                    resolved.push(Validator::LessThan(n));
+                }
+            }
+            "lte" => {
+                if let Some(n) = parse_number(&args[0], symbol, tag, &mut sink) {
+                    resolved.push(Validator::LessThanOrEqual(n));
+                }
+            }
+            "step" => {
+                let ValidatorLiteral::Int(s) = &args[0] else {
+                    sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: "expected an integer argument".to_owned(),
+                    });
+                    continue;
+                };
+
+                match s.parse::<i64>() {
+                    Ok(n) => resolved.push(Validator::Step(n)),
+                    Err(_) => sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: format!("'{s}' is not a valid integer"),
+                    }),
+                };
+            }
+            "length" => {
+                let ValidatorLiteral::Int(s) = &args[0] else {
+                    sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: "expected an integer argument".to_owned(),
+                    });
+                    continue;
+                };
+
+                match s.parse::<usize>() {
+                    Ok(n) => resolved.push(Validator::Length(n)),
+                    Err(_) => sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: format!("'{s}' is not a valid non-negative integer"),
+                    }),
+                };
+            }
+            "minlen" => {
+                let ValidatorLiteral::Int(s) = &args[0] else {
+                    sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: "expected an integer argument".to_owned(),
+                    });
+                    continue;
+                };
+
+                match s.parse::<usize>() {
+                    Ok(n) => resolved.push(Validator::MinLength(n)),
+                    Err(_) => sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: format!("'{s}' is not a valid non-negative integer"),
+                    }),
+                };
+            }
+            "maxlen" => {
+                let ValidatorLiteral::Int(s) = &args[0] else {
+                    sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: "expected an integer argument".to_owned(),
+                    });
+                    continue;
+                };
+
+                match s.parse::<usize>() {
+                    Ok(n) => resolved.push(Validator::MaxLength(n)),
+                    Err(_) => sink.push(SemanticError::ValidatorInvalidArgument {
+                        symbol,
+                        validator: tag,
+                        reason: format!("'{s}' is not a valid non-negative integer"),
+                    }),
+                };
+            }
+            "regex" => match &args[0] {
+                ValidatorLiteral::Regex(s) => resolved.push(Validator::Regex(s)),
+                _ => sink.push(SemanticError::ValidatorInvalidArgument {
+                    symbol,
+                    validator: tag,
+                    reason: "expected a regex argument (e.g. /pattern/)".to_owned(),
+                }),
+            },
+            _ => sink.push(SemanticError::ValidatorUnknown {
+                symbol,
+                validator: tag,
+            }),
+        }
+    }
+
+    sink.finish()?;
+    Ok(resolved)
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type

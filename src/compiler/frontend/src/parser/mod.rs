@@ -158,10 +158,18 @@ fn inject_block<'tokens, 'src: 'tokens>()
 ///     ident2: cidl_type
 /// }
 /// ```
-pub fn service_block<'tokens, 'src: 'tokens>()
+fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // ident: InjectedService
-    let attribute = typed_symbol();
+    // ident: cidl_type
+    // NOTE: Does not capture validator tags.
+    let attribute = symbol()
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type())
+        .map_with(|(sym, cidl_type), e| Symbol {
+            span: Span::new(sym.span.context(), sym.span.start..e.span().end),
+            cidl_type,
+            ..sym
+        });
 
     // service ServiceName { ... }
     just(Token::Service)
@@ -205,9 +213,10 @@ fn validator_tag<'tokens, 'src: 'tokens>()
 
 /// Parses a block of the form:
 /// ```cloesce
+/// [tag args...]
 /// ident: cidl_type
 /// ```
-pub fn typed_symbol<'tokens, 'src: 'tokens>()
+fn typed_symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
     validator_tag()
         .repeated()

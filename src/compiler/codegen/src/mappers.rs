@@ -1,9 +1,10 @@
-use ast::{CidlType, CloesceAst, IncludeTree, KvR2Field, MediaType};
+use ast::{CidlType, CloesceAst, Field, IncludeTree, KvField, MediaType, R2Field};
 
 pub trait LanguageTypeMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;
     fn media_type(&self, ty: &MediaType) -> String;
-    fn key_format(&self, kvr2: &KvR2Field) -> String;
+    fn kv_key_format(&self, kv: &KvField) -> String;
+    fn r2_key_format(&self, r2: &R2Field) -> String;
     fn include_tree(&self, tree: &IncludeTree) -> String;
 }
 
@@ -117,20 +118,25 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn key_format(&self, kvr2: &KvR2Field) -> String {
-        // turns format into an interpolated string like
-        // `user:${id}`
-        let mut result = kvr2.format.to_string();
-        for param in &kvr2.format_parameters {
-            let placeholder = format!("{{{}}}", param.name);
-            let replacement = format!("${{{}}}", param.name);
-            result = result.replace(&placeholder, &replacement);
-        }
+    fn kv_key_format(&self, kv: &KvField) -> String {
+        interpolate_format(&kv.format, &kv.format_parameters)
+    }
 
-        format!("`{result}`")
+    fn r2_key_format(&self, r2: &R2Field) -> String {
+        interpolate_format(&r2.format, &r2.format_parameters)
     }
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
         serde_json::to_string(&tree).unwrap()
     }
+}
+
+fn interpolate_format(format: &str, parameters: &[Field]) -> String {
+    let mut result = format.to_string();
+    for field in parameters {
+        let placeholder = format!("{{{}}}", field.name);
+        let replacement = format!("${{{}}}", field.name);
+        result = result.replace(&placeholder, &replacement);
+    }
+    format!("`{result}`")
 }

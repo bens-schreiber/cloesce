@@ -1,5 +1,5 @@
 use ariadne::{Color, Label, Report};
-use frontend::{FileTable, Span, err::DisplayError};
+use frontend::{FileTable, Span, ValidatorTag, err::DisplayError};
 
 use crate::Symbol;
 
@@ -182,6 +182,27 @@ pub enum SemanticError<'src, 'p> {
     /// An API method uses a reserved name (e.g. $get, $list, $save)
     ApiReservedMethod {
         method: &'p Symbol<'src>,
+    },
+
+    ValidatorInvalidForType {
+        validator: &'p ValidatorTag<'src>,
+        symbol: &'p Symbol<'src>,
+    },
+
+    ValidatorInvalidArgument {
+        validator: &'p ValidatorTag<'src>,
+        symbol: &'p Symbol<'src>,
+        reason: String,
+    },
+
+    ValidatorInvalidArity {
+        validator: &'p ValidatorTag<'src>,
+        symbol: &'p Symbol<'src>,
+    },
+
+    ValidatorUnknown {
+        validator: &'p ValidatorTag<'src>,
+        symbol: &'p Symbol<'src>,
     },
 }
 
@@ -875,6 +896,71 @@ fn display(
                         .with_message(
                             "names like `$get`, `$list`, and `$save` are reserved by the compiler",
                         )
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .write(cache, std::io::stderr())
+                .ok();
+        }
+
+        SemanticError::ValidatorUnknown { validator, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+                .with_message(format!("unknown validator `{}`", validator.name))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("this validator is not recognized")
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .write(cache, std::io::stderr())
+                .ok();
+        }
+
+        SemanticError::ValidatorInvalidArity { validator, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+                .with_message(format!(
+                    "wrong number of arguments for validator `{}`",
+                    validator.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("check the expected argument count for this validator")
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .write(cache, std::io::stderr())
+                .ok();
+        }
+
+        SemanticError::ValidatorInvalidArgument { validator, symbol, reason } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+                .with_message(format!(
+                    "invalid argument for validator `{}`",
+                    validator.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(reason.as_str())
+                        .with_color(Color::Red),
+                )
+                .finish()
+                .write(cache, std::io::stderr())
+                .ok();
+        }
+
+        SemanticError::ValidatorInvalidForType { validator, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+                .with_message(format!(
+                    "validator `{}` is not valid for this type",
+                    validator.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("this validator cannot be applied to this field type")
                         .with_color(Color::Red),
                 )
                 .finish()

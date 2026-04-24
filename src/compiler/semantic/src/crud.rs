@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, Field, HttpVerb, MediaType};
+use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, Field, HttpVerb, MediaType, ValidatedField};
 
 pub struct CrudExpansion;
 impl CrudExpansion {
@@ -17,9 +17,10 @@ impl CrudExpansion {
                         // Include all key fields
                         for &name in &model.key_fields {
                             if seen.insert(name.into()) {
-                                parameters.push(Field {
+                                parameters.push(ValidatedField {
                                     name: name.into(),
                                     cidl_type: CidlType::String,
+                                    validators: todo!(),
                                 });
                             }
                         }
@@ -29,9 +30,10 @@ impl CrudExpansion {
                             if let Some(get) = &ds.get {
                                 for param in &get.parameters {
                                     if seen.insert(param.name.clone()) {
-                                        parameters.push(Field {
+                                        parameters.push(ValidatedField {
                                             name: param.name.clone(),
                                             cidl_type: CidlType::nullable(param.cidl_type.clone()),
+                                            validators: todo!(),
                                         });
                                     }
                                 }
@@ -39,11 +41,12 @@ impl CrudExpansion {
                         }
 
                         // Last parameter is always the data source
-                        parameters.push(Field {
+                        parameters.push(ValidatedField {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {
                                 model_name: model.name,
                             },
+                            validators: todo!(),
                         });
 
                         ApiMethod {
@@ -66,9 +69,10 @@ impl CrudExpansion {
                             if let Some(list) = &ds.list {
                                 for param in &list.parameters {
                                     if seen.insert(param.name.clone()) {
-                                        parameters.push(Field {
+                                        parameters.push(ValidatedField {
                                             name: param.name.clone(),
                                             cidl_type: CidlType::nullable(param.cidl_type.clone()),
+                                            validators: todo!(),
                                         });
                                     }
                                 }
@@ -76,11 +80,12 @@ impl CrudExpansion {
                         }
 
                         // Last parameter is always the data source
-                        parameters.push(Field {
+                        parameters.push(ValidatedField {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {
                                 model_name: model.name,
                             },
+                            validators: todo!(),
                         });
 
                         ApiMethod {
@@ -102,17 +107,19 @@ impl CrudExpansion {
                         http_verb: HttpVerb::Post,
                         return_type: CidlType::http(CidlType::Object { name: model.name }),
                         parameters: vec![
-                            Field {
+                            ValidatedField {
                                 name: "model".into(),
                                 cidl_type: CidlType::Partial {
                                     object_name: model.name,
                                 },
+                                validators: todo!(),
                             },
-                            Field {
+                            ValidatedField {
                                 name: "__datasource".into(),
                                 cidl_type: CidlType::DataSource {
                                     model_name: model.name,
                                 },
+                                validators: todo!(),
                             },
                         ],
                         parameters_media: MediaType::Json,

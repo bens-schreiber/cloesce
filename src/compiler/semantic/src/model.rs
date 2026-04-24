@@ -2,11 +2,11 @@ use crate::EnvBindingKind;
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, kahns, resolve_cidl_type,
+    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validators,
 };
 use ast::{
-    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
-    NavigationFieldKind,
+    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
+    NavigationFieldKind, R2Field, ValidatedField,
 };
 use frontend::{
     ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
@@ -82,8 +82,8 @@ struct ModelBuilder<'src, 'p> {
     primary_columns: Vec<Column<'src>>,
     columns: Vec<Column<'src>>,
     navigation_fields: Vec<NavigationField<'src>>,
-    kv_fields: Vec<KvR2Field<'src>>,
-    r2_fields: Vec<KvR2Field<'src>>,
+    kv_fields: Vec<KvField<'src>>,
+    r2_fields: Vec<R2Field<'src>>,
     key_fields: Vec<&'src str>,
 }
 
@@ -321,11 +321,20 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return;
         }
 
+        let validators = match resolve_validators(symbol) {
+            Ok(v) => v,
+            Err(errs) => {
+                ma.sink.extend(errs);
+                Vec::new()
+            }
+        };
+
         let col = Column {
             hash: 0,
-            field: Field {
+            field: ValidatedField {
                 name: symbol.name.into(),
                 cidl_type,
+                validators,
             },
             foreign_key_reference: None,
             unique_ids: qual.unique_ids,
@@ -448,15 +457,25 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 *ma.in_degree.entry(self.name).or_insert(0) += 1;
             }
 
+            let adj_validators = match resolve_validators(adj_field_sym) {
+                Ok(v) => v,
+                Err(_) => {
+                    // No reason to push these errors, it will be caught during
+                    // the validation of the adjacent model's own columns.
+                    Vec::new()
+                }
+            };
+
             let col = Column {
                 hash: 0,
-                field: Field {
+                field: ValidatedField {
                     name: field.name.into(),
                     cidl_type: if fk.is_optional() {
                         CidlType::nullable(adj_field_sym.cidl_type.clone())
                     } else {
                         adj_field_sym.cidl_type.clone()
                     },
+                    validators: adj_validators,
                 },
                 foreign_key_reference: Some(ForeignKeyReference {
                     model_name: adj_model_sym.name,
@@ -659,16 +678,25 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         };
 
+        let validators = match resolve_validators(&kv.field) {
+            Ok(v) => v,
+            Err(errs) => {
+                ma.sink.extend(errs);
+                Vec::new()
+            }
+        };
+
         resolved_type = CidlType::KvObject(Box::new(resolved_type));
 
         if kv.is_paginated {
             resolved_type = CidlType::paginated(resolved_type)
         }
 
-        self.kv_fields.push(KvR2Field {
-            field: Field {
+        self.kv_fields.push(KvField {
+            field: ValidatedField {
                 name: kv.field.name.into(),
                 cidl_type: resolved_type,
+                validators,
             },
             format: kv.key_format,
             binding: binding_name.unwrap_or_default(),
@@ -692,7 +720,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return;
         };
 
-        self.r2_fields.push(KvR2Field {
+        self.r2_fields.push(R2Field {
             field: Field {
                 name: r2.field.name.into(),
                 cidl_type: if r2.is_paginated {

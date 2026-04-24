@@ -244,83 +244,7 @@ impl<'src> FmtCtx<'src> {
     }
 
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let tags_doc = self.sym_tags_doc(sym, indent);
-
-        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
-        let content = Doc::text(sym.name);
-        let trailing = self.trailing_comment(sym.span.end);
-        self.advance(sym.span.end);
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
-
-        if inline {
-            let leading_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
-
-            return tags_doc
-                .then(leading_sep)
-                .then(leading)
-                .then(content_sep)
-                .then(content)
-                .then(trailing);
-        }
-
-        tags_doc
-            .then(Doc::hardline(indent))
-            .then(leading)
-            .then(content_sep)
-            .then(content)
-            .then(trailing)
-    }
-
-    fn sym_typed_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        let tags_doc = self.sym_tags_doc(sym, indent);
-
-        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
-        let content = Doc::text(sym.name)
-            .then(Doc::text(": "))
-            .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)));
-        let trailing = self.trailing_comment(sym.span.end);
-        self.advance(sym.span.end);
-
-        let content_sep = if has_leading_comments {
-            Doc::hardline(indent)
-        } else {
-            Doc::nil()
-        };
-
-        if inline {
-            let leading_sep = if has_leading_comments {
-                Doc::hardline(indent)
-            } else {
-                Doc::nil()
-            };
-
-            return tags_doc
-                .then(leading_sep)
-                .then(leading)
-                .then(content_sep)
-                .then(content)
-                .then(trailing);
-        }
-
-        tags_doc
-            .then(Doc::hardline(indent))
-            .then(leading)
-            .then(content_sep)
-            .then(content)
-            .then(trailing)
-    }
-
-    // Emit validator tags, each on its own line at the same indent level.
-    fn sym_tags_doc(&self, sym: &'src Symbol<'src>, indent: usize) -> Doc<'src> {
+        // Validator tags (if any)
         let mut tags_doc = Doc::nil();
         for tag in &sym.tags {
             let (tag_leading, tag_has_leading) = self.leading_comments(tag.span.start, indent);
@@ -341,7 +265,46 @@ impl<'src> FmtCtx<'src> {
                 .then(tag_content)
                 .then(tag_trailing);
         }
+
+        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
+        let content = if matches!(sym.cidl_type, CidlType::Void) {
+            Doc::text(sym.name)
+        } else {
+            Doc::text(sym.name)
+                .then(Doc::text(": "))
+                .then(Doc::owned(fmt_cidl_type(&sym.cidl_type)))
+        };
+
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
+
+        let content_sep = if has_leading_comments {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
+        if inline {
+            let leading_sep = if has_leading_comments {
+                Doc::hardline(indent)
+            } else {
+                Doc::nil()
+            };
+
+            return tags_doc
+                .then(leading_sep)
+                .then(leading)
+                .then(content_sep)
+                .then(content)
+                .then(trailing);
+        }
+
         tags_doc
+            .then(Doc::hardline(indent))
+            .then(leading)
+            .then(content_sep)
+            .then(content)
+            .then(trailing)
     }
 }
 
@@ -472,7 +435,7 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
         }
 
         match self {
-            ModelBlockKind::Column(sym) => ctx.sym_typed_doc(sym, 1, true),
+            ModelBlockKind::Column(sym) => ctx.sym_doc(sym, 1, true),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
@@ -495,7 +458,7 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
 impl<'src> ToDoc<'src> for SqlBlockKind<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
-            SqlBlockKind::Column(sym) => ctx.sym_typed_doc(sym, 2, true),
+            SqlBlockKind::Column(sym) => ctx.sym_doc(sym, 2, true),
             SqlBlockKind::Foreign(fb) => fb.to_doc(ctx),
         }
     }
@@ -567,7 +530,7 @@ impl<'src> ToDoc<'src> for KvBlock<'src> {
             .then(Doc::text(self.key_format))
             .then(Doc::text("\")"))
             .then(paginated)
-            .then(ctx.block(ctx.sym_typed_doc(&self.field, 2, false), 2))
+            .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
 
@@ -634,14 +597,14 @@ impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
                 };
                 ds_doc.then(ctx.sym_doc(symbol, 0, true))
             }
-            ApiBlockMethodParamKind::Field(sym) => ctx.sym_typed_doc(sym, 0, true),
+            ApiBlockMethodParamKind::Field(sym) => ctx.sym_doc(sym, 0, true),
         }
     }
 }
 
 impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.parameters, |param| ctx.sym_typed_doc(param, 0, true));
+        let params = comma_separated(&self.parameters, |param| ctx.sym_doc(param, 0, true));
 
         let sql = Doc::hardline(2)
             .then(Doc::text("\""))
@@ -726,7 +689,7 @@ impl<'src> ToDoc<'src> for ServiceBlock<'src> {
 
         let mut inner = Doc::nil();
         for field in &self.fields {
-            inner = inner.then(ctx.sym_typed_doc(field, 1, false));
+            inner = inner.then(ctx.sym_doc(field, 1, false));
         }
         doc.then(ctx.block(inner, 1))
     }
@@ -742,7 +705,7 @@ impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
 
         let mut inner = Doc::nil();
         for field in &self.fields {
-            inner = inner.then(ctx.sym_typed_doc(field, 1, false));
+            inner = inner.then(ctx.sym_doc(field, 1, false));
         }
         doc.then(ctx.block(inner, 1))
     }
@@ -760,7 +723,7 @@ impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
         let mut inner = Doc::nil();
         for symbol in &self.symbols {
             if matches!(self.kind, EnvBindingBlockKind::Var) {
-                inner = inner.then(ctx.sym_typed_doc(symbol, 2, false));
+                inner = inner.then(ctx.sym_doc(symbol, 2, false));
             } else {
                 inner = inner.then(ctx.sym_doc(symbol, 2, false));
             }

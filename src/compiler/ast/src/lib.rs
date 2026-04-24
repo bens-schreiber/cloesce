@@ -138,12 +138,54 @@ pub enum HttpVerb {
     Delete,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub enum Number {
+    Int(i64),
+    Float(f64),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub enum Validator<'src> {
+    // Numeric validators
+    GreaterThan(Number),
+    GreaterThanOrEqual(Number),
+    LessThan(Number),
+    LessThanOrEqual(Number),
+    Step(i64),
+
+    // String validators
+    Length(usize),
+    MinLength(usize),
+    MaxLength(usize),
+    Regex(&'src str),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Hash)]
 pub struct Field<'src> {
     pub name: Cow<'src, str>,
 
     #[serde(borrow)]
     pub cidl_type: CidlType<'src>,
+}
+
+/// A [Field] that can have some number of  [Validator]s applied to it.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub struct ValidatedField<'src> {
+    pub name: Cow<'src, str>,
+
+    #[serde(borrow)]
+    pub cidl_type: CidlType<'src>,
+
+    // NOTE: Not all fields can have validators
+    #[serde(borrow)]
+    pub validators: Vec<Validator<'src>>,
+}
+
+impl Hash for ValidatedField<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.cidl_type.hash(state);
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -210,7 +252,7 @@ pub struct Column<'src> {
     pub hash: u64,
 
     #[serde(borrow)]
-    pub field: Field<'src>,
+    pub field: ValidatedField<'src>,
 
     /// If the attribute is a foreign key, the referenced model and column.
     #[serde(borrow)]
@@ -238,7 +280,7 @@ pub enum CrudKind {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DataSourceMethod<'src> {
     #[serde(borrow)]
-    pub parameters: Vec<Field<'src>>,
+    pub parameters: Vec<ValidatedField<'src>>,
 
     #[serde(skip)]
     pub raw_sql: String,
@@ -261,8 +303,25 @@ pub struct DataSource<'src> {
     pub is_internal: bool,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct KvField<'src> {
+    #[serde(borrow)]
+    pub field: ValidatedField<'src>,
+
+    #[serde(borrow)]
+    pub format: &'src str,
+
+    #[serde(borrow)]
+    pub format_parameters: Vec<Field<'src>>,
+
+    #[serde(borrow)]
+    pub binding: &'src str,
+
+    pub list_prefix: bool,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
-pub struct KvR2Field<'src> {
+pub struct R2Field<'src> {
     #[serde(borrow)]
     pub field: Field<'src>,
 
@@ -307,7 +366,7 @@ pub struct ApiMethod<'src> {
     pub parameters_media: MediaType,
 
     #[serde(borrow)]
-    pub parameters: Vec<Field<'src>>,
+    pub parameters: Vec<ValidatedField<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -328,10 +387,10 @@ pub struct Model<'src> {
     pub columns: Vec<Column<'src>>,
 
     #[serde(borrow)]
-    pub kv_fields: Vec<KvR2Field<'src>>,
+    pub kv_fields: Vec<KvField<'src>>,
 
     #[serde(borrow)]
-    pub r2_fields: Vec<KvR2Field<'src>>,
+    pub r2_fields: Vec<R2Field<'src>>,
 
     #[serde(borrow)]
     pub navigation_fields: Vec<NavigationField<'src>>,
@@ -398,7 +457,7 @@ pub struct PlainOldObject<'src> {
     pub name: &'src str,
 
     #[serde(borrow)]
-    pub fields: Vec<Field<'src>>,
+    pub fields: Vec<ValidatedField<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use askama::Template;
 use ast::{
-    ApiMethod, CidlType, CloesceAst, DataSource, Field, HttpVerb, MediaType, Model,
-    NavigationField, NavigationFieldKind,
+    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, MediaType, Model, NavigationField,
+    NavigationFieldKind, ValidatedField,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -196,7 +196,11 @@ impl ClientTemplate<'_> {
             .join(" | ")
     }
 
-    fn ds_get_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+    fn ds_get_params<'t>(
+        &self,
+        model: &'t Model<'t>,
+        api: &ApiMethod<'_>,
+    ) -> Vec<&'t ValidatedField<'t>> {
         let ds_name = match api.data_source {
             Some(name) => name,
             None => return vec![],
@@ -213,7 +217,11 @@ impl ClientTemplate<'_> {
 
     /// Returns DS get params that are NOT fields (primary columns, columns, or key_fields) of the model.
     /// These must be passed explicitly as method parameters.
-    fn ds_extra_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+    fn ds_extra_params<'t>(
+        &self,
+        model: &'t Model<'t>,
+        api: &ApiMethod<'_>,
+    ) -> Vec<&'t ValidatedField<'t>> {
         let all_field_names: std::collections::HashSet<&str> = model
             .primary_columns
             .iter()
