@@ -147,7 +147,7 @@ source Default for Foo {
 - `[gte n]`: Validates that a number is greater than or equal to n, where n is an integer or real literal.
 - `[lt n]`: Validates that a number is less than n, where n is an integer or real literal.
 - `[lte n]`: Validates that a number is less than or equal to n, where n is an integer or real literal.
-- `[multipleOf n]`: Validates that a number is a multiple of n, where n is an integer or real literal.
+- `[step n]`: Validates that a number is a multiple of n, where n is an integer or real literal.
 
 **String Validators**
 - `[length n]`: Validates that a string has a length of n, where n is an integer literal.
@@ -191,7 +191,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 - **Partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 
-### Renaming `double` to `real` and Introducing Unsigned Types
+### Renaming `double` to `real` and Introducing Unsigned Integer Type
 
 First, it's overdue that we rename `double` to `real`. Since Cloesce compiles to multiple languages, we don't really know what the underlying representation of a floating point number will be, and `real` is a more general term that can encompass both single and double precision floats (it is also the SQLite type for floating point numbers).
 
@@ -212,7 +212,51 @@ The implementation of this proposal will involve:
 
 No validation code will be generated, the `validate` function reads validator constraints directly from the compiled AST at runtime.
 
-### Improving Error Messages
+## Data Source Methods
+
+A validator can be applied to data source method parameters. However, this exposes a pre-existing problem with how multi-source CRUD methods are generated.
+
+Currently, `list` and `get` are generated to accept the union of all parameters across all data sources as a flat set of `Option<T>` fields (e.g. if `DataSourceA` has parameters `a` and `b`, and `DataSourceB` has parameters `c` and `d`, the generated signature is `list(a: Option<Type>, b: Option<Type>, c: Option<Type>, d: Option<Type>)`). This already breaks down when two sources define a parameter with the same name but different types. Validators make it unworkable entirely, since there is no way to associate per-source validation constraints with a single merged parameter:
+
+```cloesce
+source A for Foo {
+    // ...
+    sql get([length 5] id: string) {...}
+}
+
+source B for Foo {
+    // ...
+    sql get([length 100] id: string) {...}
+}
+```
+
+**Option 1: flat prefix.** Prefix each parameter with its source name in the generated signature:
+
+```
+get params:
+    - A_id: string [length 5]
+    - B_id: string [length 100]
+```
+
+This is unambiguous, but the flat names leak into the client callsite and become unwieldy with longer source names:
+
+```ts
+const result = await Foo.$get({ A_id: "hello" });
+```
+
+**Option 2: Plain old Object per source method.** Group parameters under a per-source key in the generated client type:
+
+```ts
+const result = await Foo.$get({
+    A: { id: "hello" }
+});
+```
+
+This is clean at the callsite, but requires generating a distinct input type per source method, adding schema noise with no meaning outside this narrow context.
+
+**Chosen approach: prefix internally, present as nested object.** Use the prefixed representation in the compiled AST and generated schema (keeping codegen simple and unambiguous), but emit client-side TypeScript that surfaces the parameters as a nested object keyed by source name. This isolates the structural complexity to the codegen layer and keeps both the schema and client code clean.
+
+## Improving Error Messages
 
 Currently, when the `validate` function fails, it returns a generic error message that doesn't specify which field failed validation, what it expected, or what the actual value was.
 
