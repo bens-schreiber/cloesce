@@ -16,7 +16,7 @@ export namespace Weather {
 
     export interface Self {
         id: number;
-        _date: Date;
+        date: Date;
         isRaining: boolean;
     }
 
@@ -34,11 +34,11 @@ export namespace Weather {
     export namespace Source {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
+            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Weather.Self | null> {
                 return await CloesceOrm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.Source.Default.getQuery(env, id), Weather.Source.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."_date" AS "_date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Weather.Self[]> {
                 return await CloesceOrm.fromEnv(env).list<Weather.Self>(Weather.Meta, Weather.Source.Default.listQuery(env, lastSeen_id, limit), Weather.Source.Default.include);
             },

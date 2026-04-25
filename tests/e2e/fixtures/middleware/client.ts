@@ -38,22 +38,17 @@ export class Foo {
       false
     );
   }
-  static $save(
-    model: DeepPartial<Foo>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Foo>>;
   static async $save(
-    model: DeepPartial<Foo>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<Foo> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5560/api/Foo/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -73,6 +68,10 @@ export class Foo {
     const res = Object.assign(new Foo(), data);
     return res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

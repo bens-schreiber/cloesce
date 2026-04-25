@@ -30,8 +30,10 @@ describe("BlobHaver", () => {
   let blobHaver: BlobHaver;
   it("POST Blob", async () => {
     const res = await BlobHaver.$save({
-      blob1: new Uint8Array([1, 2, 3, 4]),
-      blob2: new Uint8Array([5, 6, 7, 8]),
+      Default: {
+        blob1: new Uint8Array([1, 2, 3, 4]),
+        blob2: new Uint8Array([5, 6, 7, 8]),
+      },
     });
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
@@ -53,8 +55,10 @@ describe("BlobHaver", () => {
 
   it("LIST Blobs", async () => {
     const res = await BlobHaver.$list({
-      lastSeen_id: 0,
-      limit: 100,
+      Default: {
+        lastSeen_id: 0,
+        limit: 100,
+      },
     });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toStrictEqual([blobHaver]);

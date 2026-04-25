@@ -1,7 +1,7 @@
 --- New Models
 CREATE TABLE IF NOT EXISTS "Weather" (
   "id" integer PRIMARY KEY,
-  "_date" text NOT NULL,
+  "date" text NOT NULL,
   "isRaining" integer NOT NULL
 );
 

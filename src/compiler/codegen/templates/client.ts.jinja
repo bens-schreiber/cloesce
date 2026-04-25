@@ -101,28 +101,19 @@ export class {{ model.name }} {
 {%- for api in &model.apis %}
 {%- if self.is_crud_method(api.name) %}
 {%- if api.name == "$save" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $save(
-    model: DeepPartial<{{ model.name }}>,
-    kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $save(
-    model: DeepPartial<{{ model.name }}>,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: DeepPartial<{{ model.name }}> }{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
     const baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
 {%- if !self.is_get_request(&api.http_verb) %}
     const payload: any = {};
-    payload["model"] = model;
+    payload["model"] = args[resolvedKind];
 {%- endif %}
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
@@ -144,38 +135,18 @@ export class {{ model.name }} {
     );
   }
 {%- elif api.name == "$get" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $get(
-    args: {
-{%- for field in &model.key_fields %}
-      {{ field.name }}: string;
-{%- endfor %}
-{%- let ds_params = self.crud_ds_params(api, ds.name) %}
-{%- if !ds_params.is_empty() %}
-      {{ ds.name }}: {
-{%- for param in ds_params %}
-        {{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }};
-{%- endfor %}
-      };
-{%- endif %}
-    },
-    kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $get(
-    args: any,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: { {% for field in &model.key_fields %}{{ field.name }}: string; {% endfor %}{% for param in self.crud_ds_params(api, ds.name) %}{{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }}; {% endfor %}}}{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
 
 {%- for field in &model.key_fields %}
-    baseUrl.searchParams.append("{{ field.name }}", String(args.{{ field.name }}));
+    baseUrl.searchParams.append("{{ field.name }}", String(resolvedArgs?.{{ field.name }} ?? null));
 {%- endfor %}
 {%- for ds in model.data_sources.values() %}
 {%- if !ds.is_internal %}
@@ -184,7 +155,7 @@ export class {{ model.name }} {
 {%- endfor %}
 {%- endif %}
 {%- endfor %}
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
@@ -202,31 +173,11 @@ export class {{ model.name }} {
     );
   }
 {%- elif api.name == "$list" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $list(
-    args: {
-{%- let ds_params = self.crud_ds_params(api, ds.name) %}
-{%- if !ds_params.is_empty() %}
-      {{ ds.name }}: {
-{%- for param in ds_params %}
-        {{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }};
-{%- endfor %}
-      };
-{%- else %}
-      {{ ds.name }}?: Record<string, never>;
-{%- endif %}
-    },
-    kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $list(
-    args: any,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: { {% for param in self.crud_ds_params(api, ds.name) %}{{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }}; {% endfor %}}}{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
     const baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
@@ -238,7 +189,7 @@ export class {{ model.name }} {
 {%- endfor %}
 {%- endif %}
 {%- endfor %}
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
@@ -420,6 +371,10 @@ export class {{ model.name }} {
   }
 }
 {%- endfor %}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
+}
 
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]

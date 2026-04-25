@@ -177,34 +177,6 @@
               "validators": []
             },
             {
-              "name": "NoLettuce_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "NoLettuce_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "OnlyBacon_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "OnlyBacon_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": {

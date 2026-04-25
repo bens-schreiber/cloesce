@@ -87,6 +87,10 @@ export class PooAcceptYield {
   }
 }
 
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
+}
+
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object

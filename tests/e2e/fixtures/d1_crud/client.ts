@@ -27,22 +27,17 @@ export class CrudHaver {
       false
     );
   }
-  static $save(
-    model: DeepPartial<CrudHaver>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<CrudHaver>>;
   static async $save(
-    model: DeepPartial<CrudHaver>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<CrudHaver> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -57,25 +52,17 @@ export class CrudHaver {
       false
     );
   }
-  static $get(
-    args: {
-      Default: {
-        id: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<CrudHaver>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$get`
     );
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -88,27 +75,17 @@ export class CrudHaver {
       false
     );
   }
-  static $list(
-    args: {
-      Default: {
-        lastSeen_id: number;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<CrudHaver[]>>;
   static async $list(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$list`
     );
     baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
     baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -132,27 +109,17 @@ export class Parent {
   favoriteChildId: number | null;
   favoriteChild: Child | undefined;
   children: Child[];
-  static $save(
-    model: DeepPartial<Parent>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
-  static $save(
-    model: DeepPartial<Parent>,
-    kind: "WithChildren",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
   static async $save(
-    model: DeepPartial<Parent>,
-    kind: "Default" | "WithChildren" = "Default",
+    args: { Default: DeepPartial<Parent> } | { WithChildren: DeepPartial<Parent> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
+    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5391/api/Parent/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -167,35 +134,18 @@ export class Parent {
       false
     );
   }
-  static $get(
-    args: {
-      Default: {
-        id: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
-  static $get(
-    args: {
-      WithChildren: {
-        id: number;
-      };
-    },
-    kind: "WithChildren",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
   static async $get(
-    args: any,
-    kind: "Default" | "WithChildren" = "Default",
+    args: { Default: { id: number; }} | { WithChildren: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
+    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5391/api/Parent/$get`
     );
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("WithChildren_id", String(args?.WithChildren?.id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -208,31 +158,11 @@ export class Parent {
       false
     );
   }
-  static $list(
-    args: {
-      Default: {
-        lastSeen_id: number;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent[]>>;
-  static $list(
-    args: {
-      WithChildren: {
-        lastSeen_id: number;
-        limit: number;
-      };
-    },
-    kind: "WithChildren",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent[]>>;
   static async $list(
-    args: any,
-    kind: "Default" | "WithChildren" = "Default",
+    args: { Default: { lastSeen_id: number; limit: number; }} | { WithChildren: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
+    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5391/api/Parent/$list`
     );
@@ -240,7 +170,7 @@ export class Parent {
     baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("WithChildren_lastSeen_id", String(args?.WithChildren?.lastSeen_id ?? null));
     baseUrl.searchParams.append("WithChildren_limit", String(args?.WithChildren?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -273,6 +203,10 @@ export class Child {
     res["parent"] &&= Parent.fromJson(res.parent);
     return res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

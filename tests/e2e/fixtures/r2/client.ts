@@ -33,27 +33,18 @@ export class D1BackedModel {
       false
     );
   }
-  static $get(
-    args: {
-      keyParam: string;
-      Default: {
-        id: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { keyParam: string; id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$get`
     );
-    baseUrl.searchParams.append("keyParam", String(args.keyParam));
+    baseUrl.searchParams.append("keyParam", String(resolvedArgs?.keyParam ?? null));
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -66,22 +57,17 @@ export class D1BackedModel {
       false
     );
   }
-  static $save(
-    model: DeepPartial<D1BackedModel>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
-    model: DeepPartial<D1BackedModel>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<D1BackedModel> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -96,27 +82,17 @@ export class D1BackedModel {
       false
     );
   }
-  static $list(
-    args: {
-      Default: {
-        lastSeen_id: number;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$list`
     );
     baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
     baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -192,23 +168,17 @@ export class PureR2Model {
       false
     );
   }
-  static $get(
-    args: {
-      id: string;
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<PureR2Model>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { id: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureR2Model>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5538/api/PureR2Model/$get`
     );
-    baseUrl.searchParams.append("id", String(args.id));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("id", String(resolvedArgs?.id ?? null));
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -231,6 +201,10 @@ export class PureR2Model {
     }
     return res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

@@ -22,6 +22,9 @@ impl CrudExpansion {
 
                         // Include parameters from each data source, prefixed by source name
                         for (&ds_name, ds) in &model.data_sources {
+                            if ds.is_internal {
+                                continue;
+                            }
                             if let Some(get) = &ds.get {
                                 for param in &get.parameters {
                                     parameters.push(ValidatedField {
@@ -58,6 +61,9 @@ impl CrudExpansion {
 
                         // Include parameters from each data source, prefixed by source name
                         for (&ds_name, ds) in &model.data_sources {
+                            if ds.is_internal {
+                                continue;
+                            }
                             if let Some(list) = &ds.list {
                                 for param in &list.parameters {
                                     parameters.push(ValidatedField {

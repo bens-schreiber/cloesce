@@ -2,24 +2,19 @@
 // @ts-nocheck
 export class Weather {
   id: number;
-  _date: Date;
+  date: Date;
   isRaining: boolean;
-  static $save(
-    model: DeepPartial<Weather>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Weather>>;
   static async $save(
-    model: DeepPartial<Weather>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<Weather> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5293/api/Weather/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -34,25 +29,17 @@ export class Weather {
       false
     );
   }
-  static $get(
-    args: {
-      Default: {
-        id: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Weather>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5293/api/Weather/$get`
     );
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -70,6 +57,10 @@ export class Weather {
     const res = Object.assign(new Weather(), data);
     return res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

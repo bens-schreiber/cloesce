@@ -4,25 +4,17 @@ export class Course {
   id: number;
   title: string;
   studentCourses: StudentCourse[];
-  static $get(
-    args: {
-      Default: {
-        id: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5139/api/Course/$get`
     );
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -35,27 +27,17 @@ export class Course {
       false
     );
   }
-  static $list(
-    args: {
-      Default: {
-        lastSeen_id: number;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course[]>>;
   static async $list(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course[]>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/Course/$list`
     );
     baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
     baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -68,22 +50,17 @@ export class Course {
       true
     );
   }
-  static $save(
-    model: DeepPartial<Course>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Course>>;
   static async $save(
-    model: DeepPartial<Course>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<Course> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
+    const resolvedKind: "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/Course/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -112,31 +89,12 @@ export class Student {
   name: string;
   favoriteColor: string;
   studentCourses: StudentCourse[];
-  static $get(
-    args: {
-      CoursesOrderedDescending: {
-        id: number;
-        name: string;
-      };
-    },
-    kind: "CoursesOrderedDescending",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static $get(
-    args: {
-      Default: {
-        id: number;
-        name: string;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
   static async $get(
-    args: any,
-    kind: "CoursesOrderedDescending" | "Default" = "Default",
+    args: { CoursesOrderedDescending: { id: number; name: string; }} | { Default: { id: number; name: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
+    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5139/api/Student/$get`
     );
@@ -144,7 +102,7 @@ export class Student {
     baseUrl.searchParams.append("CoursesOrderedDescending_name", String(args?.CoursesOrderedDescending?.name ?? null));
     baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("Default_name", String(args?.Default?.name ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -157,33 +115,11 @@ export class Student {
       false
     );
   }
-  static $list(
-    args: {
-      CoursesOrderedDescending: {
-        lastId: number;
-        lastName: string;
-        limit: number;
-      };
-    },
-    kind: "CoursesOrderedDescending",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student[]>>;
-  static $list(
-    args: {
-      Default: {
-        lastSeen_id: number;
-        lastSeen_name: string;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student[]>>;
   static async $list(
-    args: any,
-    kind: "CoursesOrderedDescending" | "Default" = "Default",
+    args: { CoursesOrderedDescending: { lastId: number; lastName: string; limit: number; }} | { Default: { lastSeen_id: number; lastSeen_name: string; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student[]>> {
+    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/Student/$list`
     );
@@ -193,7 +129,7 @@ export class Student {
     baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
     baseUrl.searchParams.append("Default_lastSeen_name", String(args?.Default?.lastSeen_name ?? null));
     baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -206,27 +142,17 @@ export class Student {
       true
     );
   }
-  static $save(
-    model: DeepPartial<Student>,
-    kind: "CoursesOrderedDescending",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static $save(
-    model: DeepPartial<Student>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
   static async $save(
-    model: DeepPartial<Student>,
-    kind: "CoursesOrderedDescending" | "Default" = "Default",
+    args: { CoursesOrderedDescending: DeepPartial<Student> } | { Default: DeepPartial<Student> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
+    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/Student/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -256,33 +182,12 @@ export class StudentCourse {
   courseId: number;
   student: Student | undefined;
   course: Course | undefined;
-  static $get(
-    args: {
-      Default: {
-        studentId: number;
-        studentName: string;
-        courseId: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
-  static $get(
-    args: {
-      WithStudentCourse: {
-        studentId: number;
-        studentName: string;
-        courseId: number;
-      };
-    },
-    kind: "WithStudentCourse",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
   static async $get(
-    args: any,
-    kind: "Default" | "WithStudentCourse" = "Default",
+    args: { Default: { studentId: number; studentName: string; courseId: number; }} | { WithStudentCourse: { studentId: number; studentName: string; courseId: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
+    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
+    const resolvedArgs: any = args[resolvedKind];
     const baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$get`
     );
@@ -292,7 +197,7 @@ export class StudentCourse {
     baseUrl.searchParams.append("WithStudentCourse_studentId", String(args?.WithStudentCourse?.studentId ?? null));
     baseUrl.searchParams.append("WithStudentCourse_studentName", String(args?.WithStudentCourse?.studentName ?? null));
     baseUrl.searchParams.append("WithStudentCourse_courseId", String(args?.WithStudentCourse?.courseId ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -305,35 +210,11 @@ export class StudentCourse {
       false
     );
   }
-  static $list(
-    args: {
-      Default: {
-        lastSeen_studentId: number;
-        lastSeen_studentName: string;
-        lastSeen_courseId: number;
-        limit: number;
-      };
-    },
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse[]>>;
-  static $list(
-    args: {
-      WithStudentCourse: {
-        lastSeen_studentId: number;
-        lastSeen_studentName: string;
-        lastSeen_courseId: number;
-        limit: number;
-      };
-    },
-    kind: "WithStudentCourse",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse[]>>;
   static async $list(
-    args: any,
-    kind: "Default" | "WithStudentCourse" = "Default",
+    args: { Default: { lastSeen_studentId: number; lastSeen_studentName: string; lastSeen_courseId: number; limit: number; }} | { WithStudentCourse: { lastSeen_studentId: number; lastSeen_studentName: string; lastSeen_courseId: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse[]>> {
+    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$list`
     );
@@ -345,7 +226,7 @@ export class StudentCourse {
     baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentName", String(args?.WithStudentCourse?.lastSeen_studentName ?? null));
     baseUrl.searchParams.append("WithStudentCourse_lastSeen_courseId", String(args?.WithStudentCourse?.lastSeen_courseId ?? null));
     baseUrl.searchParams.append("WithStudentCourse_limit", String(args?.WithStudentCourse?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -358,27 +239,17 @@ export class StudentCourse {
       true
     );
   }
-  static $save(
-    model: DeepPartial<StudentCourse>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
-  static $save(
-    model: DeepPartial<StudentCourse>,
-    kind: "WithStudentCourse",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<StudentCourse>>;
   static async $save(
-    model: DeepPartial<StudentCourse>,
-    kind: "Default" | "WithStudentCourse" = "Default",
+    args: { Default: DeepPartial<StudentCourse> } | { WithStudentCourse: DeepPartial<StudentCourse> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
+    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
     const baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$save`
     );
     const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    payload["model"] = args[resolvedKind];
+    baseUrl.searchParams.append("__datasource", resolvedKind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -400,6 +271,10 @@ export class StudentCourse {
     res["course"] &&= Course.fromJson(res.course);
     return res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]
