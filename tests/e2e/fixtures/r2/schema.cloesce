@@ -42,7 +42,7 @@ model D1BackedModel {
         keyParam
     }
     
-    someColumn: double
+    someColumn: real
     someOtherColumn: string
     
     r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {

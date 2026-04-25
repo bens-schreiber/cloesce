@@ -1,8 +1,8 @@
 {
-  "hash": 11218240258977183070,
+  "hash": 14051981039886414279,
   "models": {
     "D1BackedModel": {
-      "hash": 6703974713046051109,
+      "hash": 16719842609251620435,
       "name": "D1BackedModel",
       "d1_binding": "db",
       "primary_columns": [
@@ -10,7 +10,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -19,20 +20,22 @@
       ],
       "columns": [
         {
-          "hash": 4638766536825732897,
+          "hash": 3747858334280870224,
           "field": {
             "name": "someColumn",
-            "cidl_type": "Double"
+            "cidl_type": "Real",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 16794226563886906789,
+          "hash": 15903318361342044116,
           "field": {
             "name": "someOtherColumn",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],

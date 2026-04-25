@@ -6,9 +6,11 @@ export class Course {
   studentCourses: StudentCourse[];
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Course>>;
   static async $get(
@@ -19,8 +21,7 @@ export class Course {
     const baseUrl = new URL(
       `http://localhost:5139/api/Course/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -36,8 +37,10 @@ export class Course {
   }
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -50,9 +53,8 @@ export class Course {
     const baseUrl = new URL(
       `http://localhost:5139/api/Course/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -112,18 +114,22 @@ export class Student {
   studentCourses: StudentCourse[];
   static $get(
     args: {
-      id: number;
-      name: string;
+      CoursesOrderedDescending: {
+        id: number;
+        name: string;
+      };
     },
-  kind: "CoursesOrderedDescending",
+    kind: "CoursesOrderedDescending",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static $get(
     args: {
-      id: number;
-      name: string;
+      Default: {
+        id: number;
+        name: string;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static async $get(
@@ -134,9 +140,10 @@ export class Student {
     const baseUrl = new URL(
       `http://localhost:5139/api/Student/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
-  baseUrl.searchParams.append("name", String((args as any).name ?? null));
+    baseUrl.searchParams.append("CoursesOrderedDescending_id", String(args?.CoursesOrderedDescending?.id ?? null));
+    baseUrl.searchParams.append("CoursesOrderedDescending_name", String(args?.CoursesOrderedDescending?.name ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    baseUrl.searchParams.append("Default_name", String(args?.Default?.name ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -152,18 +159,22 @@ export class Student {
   }
   static $list(
     args: {
-      lastId: number;
-      lastName: string;
-      limit: number;
+      CoursesOrderedDescending: {
+        lastId: number;
+        lastName: string;
+        limit: number;
+      };
     },
     kind: "CoursesOrderedDescending",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student[]>>;
   static $list(
     args: {
-      lastSeen_id: number;
-      lastSeen_name: string;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        lastSeen_name: string;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -176,12 +187,12 @@ export class Student {
     const baseUrl = new URL(
       `http://localhost:5139/api/Student/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
-    baseUrl.searchParams.append("lastName", String((args as any).lastName ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("lastSeen_name", String((args as any).lastSeen_name ?? null));
+    baseUrl.searchParams.append("CoursesOrderedDescending_lastId", String(args?.CoursesOrderedDescending?.lastId ?? null));
+    baseUrl.searchParams.append("CoursesOrderedDescending_lastName", String(args?.CoursesOrderedDescending?.lastName ?? null));
+    baseUrl.searchParams.append("CoursesOrderedDescending_limit", String(args?.CoursesOrderedDescending?.limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_name", String(args?.Default?.lastSeen_name ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -247,20 +258,24 @@ export class StudentCourse {
   course: Course | undefined;
   static $get(
     args: {
-      studentId: number;
-      studentName: string;
-      courseId: number;
+      Default: {
+        studentId: number;
+        studentName: string;
+        courseId: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
   static $get(
     args: {
-      studentId: number;
-      studentName: string;
-      courseId: number;
+      WithStudentCourse: {
+        studentId: number;
+        studentName: string;
+        courseId: number;
+      };
     },
-  kind: "WithStudentCourse",
+    kind: "WithStudentCourse",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse>>;
   static async $get(
@@ -271,10 +286,12 @@ export class StudentCourse {
     const baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("studentId", String((args as any).studentId ?? null));
-  baseUrl.searchParams.append("studentName", String((args as any).studentName ?? null));
-  baseUrl.searchParams.append("courseId", String((args as any).courseId ?? null));
+    baseUrl.searchParams.append("Default_studentId", String(args?.Default?.studentId ?? null));
+    baseUrl.searchParams.append("Default_studentName", String(args?.Default?.studentName ?? null));
+    baseUrl.searchParams.append("Default_courseId", String(args?.Default?.courseId ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_studentId", String(args?.WithStudentCourse?.studentId ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_studentName", String(args?.WithStudentCourse?.studentName ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_courseId", String(args?.WithStudentCourse?.courseId ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -290,20 +307,24 @@ export class StudentCourse {
   }
   static $list(
     args: {
-      lastSeen_studentId: number;
-      lastSeen_studentName: string;
-      lastSeen_courseId: number;
-      limit: number;
+      Default: {
+        lastSeen_studentId: number;
+        lastSeen_studentName: string;
+        lastSeen_courseId: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<StudentCourse[]>>;
   static $list(
     args: {
-      lastSeen_studentId: number;
-      lastSeen_studentName: string;
-      lastSeen_courseId: number;
-      limit: number;
+      WithStudentCourse: {
+        lastSeen_studentId: number;
+        lastSeen_studentName: string;
+        lastSeen_courseId: number;
+        limit: number;
+      };
     },
     kind: "WithStudentCourse",
     fetchImpl?: typeof fetch
@@ -316,11 +337,14 @@ export class StudentCourse {
     const baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_studentId", String((args as any).lastSeen_studentId ?? null));
-    baseUrl.searchParams.append("lastSeen_studentName", String((args as any).lastSeen_studentName ?? null));
-    baseUrl.searchParams.append("lastSeen_courseId", String((args as any).lastSeen_courseId ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_studentId", String(args?.Default?.lastSeen_studentId ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_studentName", String(args?.Default?.lastSeen_studentName ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_courseId", String(args?.Default?.lastSeen_courseId ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentId", String(args?.WithStudentCourse?.lastSeen_studentId ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentName", String(args?.WithStudentCourse?.lastSeen_studentName ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_lastSeen_courseId", String(args?.WithStudentCourse?.lastSeen_courseId ?? null));
+    baseUrl.searchParams.append("WithStudentCourse_limit", String(args?.WithStudentCourse?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

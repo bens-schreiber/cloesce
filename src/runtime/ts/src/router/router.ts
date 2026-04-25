@@ -63,7 +63,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) { }
+  ) {}
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -581,7 +581,7 @@ async function validateRequest(
       const validateRes = invokeOrmWasm(
         wasm.validate_type,
         [
-          WasmResource.fromString(JSON.stringify(p), wasm), // field metadata 
+          WasmResource.fromString(JSON.stringify(p), wasm), // field metadata
           WasmResource.fromString(JSON.stringify(params[p.name]), wasm), // value
         ],
         wasm,

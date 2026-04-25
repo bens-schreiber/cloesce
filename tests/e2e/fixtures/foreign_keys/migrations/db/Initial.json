@@ -1,8 +1,8 @@
 {
-  "hash": 18432525960313685479,
+  "hash": 13563103492600318157,
   "models": {
     "A": {
-      "hash": 7977924658294928939,
+      "hash": 7524899204816327788,
       "name": "A",
       "d1_binding": "db",
       "primary_columns": [
@@ -10,7 +10,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -19,12 +20,13 @@
       ],
       "columns": [
         {
-          "hash": 9913313051553690446,
+          "hash": 14795965140419699510,
           "field": {
             "name": "bId",
             "cidl_type": {
-              "Nullable": "Integer"
-            }
+              "Nullable": "Int"
+            },
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "B",
@@ -36,7 +38,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 12787859864084899288,
+          "hash": 15496760873931370897,
           "field": {
             "name": "b",
             "cidl_type": {
@@ -57,7 +59,7 @@
       ]
     },
     "B": {
-      "hash": 1898279998179927433,
+      "hash": 15334710138958857664,
       "name": "B",
       "d1_binding": "db",
       "primary_columns": [
@@ -65,7 +67,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -75,7 +78,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 14628003936878550728,
+          "hash": 2142773207963205782,
           "field": {
             "name": "a",
             "cidl_type": {
@@ -98,7 +101,7 @@
       ]
     },
     "Course": {
-      "hash": 7548065270413022258,
+      "hash": 16699223254241264860,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -106,7 +109,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -116,7 +120,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 6671087506518003146,
+          "hash": 4351158626271558737,
           "field": {
             "name": "students",
             "cidl_type": {
@@ -133,7 +137,7 @@
       ]
     },
     "Person": {
-      "hash": 15191552719376020347,
+      "hash": 16470081740962856391,
       "name": "Person",
       "d1_binding": "db",
       "primary_columns": [
@@ -141,7 +145,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -151,7 +156,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 103859984955234182,
+          "hash": 6065373329749440851,
           "field": {
             "name": "dogs",
             "cidl_type": {
@@ -174,7 +179,7 @@
       ]
     },
     "Student": {
-      "hash": 16878349331798782765,
+      "hash": 399521836238653955,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -182,7 +187,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -192,7 +198,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 5886394064643331584,
+          "hash": 3566465184463996039,
           "field": {
             "name": "courses",
             "cidl_type": {
@@ -209,7 +215,7 @@
       ]
     },
     "Dog": {
-      "hash": 11927641146139395250,
+      "hash": 13552818947087553442,
       "name": "Dog",
       "d1_binding": "db",
       "primary_columns": [
@@ -217,7 +223,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -229,7 +236,8 @@
           "hash": 16174990813136957012,
           "field": {
             "name": "personId",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "Person",
@@ -241,7 +249,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 5482872260590270089,
+          "hash": 8191773270369632834,
           "field": {
             "name": "person",
             "cidl_type": {

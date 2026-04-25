@@ -170,7 +170,7 @@ describe("Match Route", () => {
         ModelBuilder.model("Model")
           .idPk()
           .method("method", "Post", [], "Void", "ds")
-          .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
+          .dataSource("ds", {}, [{ name: "id", cidl_type: "Int" }])
           .build(),
       ],
     });
@@ -205,7 +205,7 @@ describe("Match Route", () => {
         ModelBuilder.model("Model")
           .idPk()
           .method("method", "Post", [], "Void", "ds")
-          .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
+          .dataSource("ds", {}, [{ name: "id", cidl_type: "Int" }])
           .keyField("key1")
           .keyField("key2")
           .build(),
@@ -391,7 +391,7 @@ describe("Request Validation", () => {
     const model = ModelBuilder.model("Foo")
       .idPk()
       .method("method", "Post", [], "Void", "ds")
-      .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
+      .dataSource("ds", {}, [{ name: "id", cidl_type: "Int" }])
       .build();
 
     const route: MatchedRoute = {

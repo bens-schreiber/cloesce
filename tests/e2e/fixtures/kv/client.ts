@@ -8,10 +8,12 @@ export class D1BackedModel {
   kvData: KValue<unknown>;
   static $get(
     args: {
-      id: number;
       keyParam: string;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
@@ -22,9 +24,8 @@ export class D1BackedModel {
     const baseUrl = new URL(
       `http://localhost:5416/api/D1BackedModel/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("keyParam", String((args as any).keyParam ?? null));
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("keyParam", String(args.keyParam));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -70,8 +71,10 @@ export class D1BackedModel {
   }
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -84,9 +87,8 @@ export class D1BackedModel {
     const baseUrl = new URL(
       `http://localhost:5416/api/D1BackedModel/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -137,7 +139,7 @@ export class PaginatedKVModel {
     args: {
       id: string;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PaginatedKVModel>>;
   static async $get(
@@ -148,8 +150,7 @@ export class PaginatedKVModel {
     const baseUrl = new URL(
       `http://localhost:5416/api/PaginatedKVModel/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("id", String(args.id));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -182,7 +183,7 @@ export class PureKVModel {
     args: {
       id: string;
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<PureKVModel>>;
   static async $get(
@@ -193,8 +194,7 @@ export class PureKVModel {
     const baseUrl = new URL(
       `http://localhost:5416/api/PureKVModel/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("id", String(args.id));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

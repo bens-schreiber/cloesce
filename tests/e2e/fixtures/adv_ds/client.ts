@@ -83,16 +83,20 @@ export class Hamburger {
   }
   static $list(
     args: {
-      lastId: number;
-      limit: number;
+      BurgersWithLettuceOrdered: {
+        lastId: number;
+        limit: number;
+      };
     },
     kind: "BurgersWithLettuceOrdered",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Hamburger[]>>;
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -105,10 +109,10 @@ export class Hamburger {
     const baseUrl = new URL(
       `http://localhost:5403/api/Hamburger/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+    baseUrl.searchParams.append("BurgersWithLettuceOrdered_lastId", String(args?.BurgersWithLettuceOrdered?.lastId ?? null));
+    baseUrl.searchParams.append("BurgersWithLettuceOrdered_limit", String(args?.BurgersWithLettuceOrdered?.limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

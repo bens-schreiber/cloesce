@@ -59,9 +59,11 @@ export class CrudHaver {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<CrudHaver>>;
   static async $get(
@@ -72,8 +74,7 @@ export class CrudHaver {
     const baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -89,8 +90,10 @@ export class CrudHaver {
   }
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -103,9 +106,8 @@ export class CrudHaver {
     const baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -167,16 +169,20 @@ export class Parent {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
   static $get(
     args: {
-      id: number;
+      WithChildren: {
+        id: number;
+      };
     },
-  kind: "WithChildren",
+    kind: "WithChildren",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent>>;
   static async $get(
@@ -187,8 +193,8 @@ export class Parent {
     const baseUrl = new URL(
       `http://localhost:5391/api/Parent/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    baseUrl.searchParams.append("WithChildren_id", String(args?.WithChildren?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -204,16 +210,20 @@ export class Parent {
   }
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Parent[]>>;
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      WithChildren: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "WithChildren",
     fetchImpl?: typeof fetch
@@ -226,9 +236,10 @@ export class Parent {
     const baseUrl = new URL(
       `http://localhost:5391/api/Parent/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    baseUrl.searchParams.append("WithChildren_lastSeen_id", String(args?.WithChildren?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("WithChildren_limit", String(args?.WithChildren?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

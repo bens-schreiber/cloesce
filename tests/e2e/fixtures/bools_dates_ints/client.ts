@@ -36,9 +36,11 @@ export class Weather {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Weather>>;
   static async $get(
@@ -49,8 +51,7 @@ export class Weather {
     const baseUrl = new URL(
       `http://localhost:5293/api/Weather/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

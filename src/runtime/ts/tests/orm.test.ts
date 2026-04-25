@@ -54,7 +54,7 @@ describe("hydrateType Tests", () => {
 
     test("passes through unknown primitive types unchanged", () => {
       expect(hydrateType("hello", "String", createHydrateArgs())).toBe("hello");
-      expect(hydrateType(42, "Integer", createHydrateArgs())).toBe(42);
+      expect(hydrateType(42, "Int", createHydrateArgs())).toBe(42);
     });
   });
 

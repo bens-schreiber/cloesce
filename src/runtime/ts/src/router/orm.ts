@@ -15,13 +15,12 @@ import {
   Cidl,
   getNavigationCidlType,
   KvField,
-  R2Field
 } from "../cidl.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) { }
+  private constructor(private env: unknown) {}
 
   static fromEnv(env: unknown): Orm {
     return new Orm(env);

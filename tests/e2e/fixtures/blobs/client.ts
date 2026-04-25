@@ -124,9 +124,11 @@ export class BlobHaver {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<BlobHaver>>;
   static async $get(
@@ -137,8 +139,7 @@ export class BlobHaver {
     const baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -154,8 +155,10 @@ export class BlobHaver {
   }
   static $list(
     args: {
-      lastSeen_id: number;
-      limit: number;
+      Default: {
+        lastSeen_id: number;
+        limit: number;
+      };
     },
     kind: "Default",
     fetchImpl?: typeof fetch
@@ -168,9 +171,8 @@ export class BlobHaver {
     const baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$list`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
-    baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

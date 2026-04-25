@@ -1,5 +1,5 @@
 {
-  "hash": 4268265255132821547,
+  "hash": 13006754155948345517,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "Hamburger": {
-      "hash": 11891469912896067759,
+      "hash": 9074810877786669492,
       "name": "Hamburger",
       "d1_binding": "db",
       "primary_columns": [
@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -27,10 +28,11 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 5897771438217574949,
           "field": {
             "name": "name",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -41,7 +43,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 17379672083855794608,
+          "hash": 15059743203676459063,
           "field": {
             "name": "toppings",
             "cidl_type": {
@@ -115,7 +117,8 @@
                 "Partial": {
                   "object_name": "Hamburger"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -123,7 +126,8 @@
                 "DataSource": {
                   "model_name": "Hamburger"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -145,22 +149,60 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastId",
+              "name": "BurgersWithLettuceOrdered_lastId",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "BurgersWithLettuceOrdered_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "Default_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
+            },
+            {
+              "name": "NoLettuce_lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "NoLettuce_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
+            },
+            {
+              "name": "OnlyBacon_lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "OnlyBacon_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -168,7 +210,8 @@
                 "DataSource": {
                   "model_name": "Hamburger"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -180,11 +223,13 @@
             "parameters": [
               {
                 "name": "lastId",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -192,7 +237,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -204,11 +250,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -216,7 +264,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -228,11 +277,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -240,7 +291,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -252,11 +304,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -264,7 +318,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -277,7 +332,7 @@
       ]
     },
     "Topping": {
-      "hash": 6851490881146770141,
+      "hash": 4034831846104480738,
       "name": "Topping",
       "d1_binding": "db",
       "primary_columns": [
@@ -285,7 +340,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -294,10 +350,11 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 5897771438217574949,
           "field": {
             "name": "name",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -308,7 +365,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 7547041568480358228,
+          "hash": 5227112688301022683,
           "field": {
             "name": "hamburger",
             "cidl_type": {
@@ -346,7 +403,8 @@
                 "Partial": {
                   "object_name": "Topping"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -354,7 +412,8 @@
                 "DataSource": {
                   "model_name": "Topping"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -366,11 +425,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -378,7 +439,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },

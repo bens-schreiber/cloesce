@@ -90,23 +90,29 @@ export class A {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<A>>;
   static $get(
     args: {
-      id: number;
+      WithB: {
+        id: number;
+      };
     },
-  kind: "WithB",
+    kind: "WithB",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<A>>;
   static $get(
     args: {
-      id: number;
+      WithoutB: {
+        id: number;
+      };
     },
-  kind: "WithoutB",
+    kind: "WithoutB",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<A>>;
   static async $get(
@@ -117,8 +123,9 @@ export class A {
     const baseUrl = new URL(
       `http://localhost:5716/api/A/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    baseUrl.searchParams.append("WithB_id", String(args?.WithB?.id ?? null));
+    baseUrl.searchParams.append("WithoutB_id", String(args?.WithoutB?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -198,9 +205,11 @@ export class B {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<B>>;
   static async $get(
@@ -211,8 +220,7 @@ export class B {
     const baseUrl = new URL(
       `http://localhost:5716/api/B/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -366,23 +374,29 @@ export class Person {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Person>>;
   static $get(
     args: {
-      id: number;
+      WithDogs: {
+        id: number;
+      };
     },
-  kind: "WithDogs",
+    kind: "WithDogs",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Person>>;
   static $get(
     args: {
-      id: number;
+      WithoutDogs: {
+        id: number;
+      };
     },
-  kind: "WithoutDogs",
+    kind: "WithoutDogs",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Person>>;
   static async $get(
@@ -393,8 +407,9 @@ export class Person {
     const baseUrl = new URL(
       `http://localhost:5716/api/Person/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    baseUrl.searchParams.append("WithDogs_id", String(args?.WithDogs?.id ?? null));
+    baseUrl.searchParams.append("WithoutDogs_id", String(args?.WithoutDogs?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -506,23 +521,29 @@ export class Student {
   }
   static $get(
     args: {
-      id: number;
+      Default: {
+        id: number;
+      };
     },
-  kind: "Default",
+    kind: "Default",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static $get(
     args: {
-      id: number;
+      None: {
+        id: number;
+      };
     },
-  kind: "None",
+    kind: "None",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static $get(
     args: {
-      id: number;
+      WithCoursesStudentsCourses: {
+        id: number;
+      };
     },
-  kind: "WithCoursesStudentsCourses",
+    kind: "WithCoursesStudentsCourses",
     fetchImpl?: typeof fetch
   ): Promise<HttpResult<Student>>;
   static async $get(
@@ -533,8 +554,9 @@ export class Student {
     const baseUrl = new URL(
       `http://localhost:5716/api/Student/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
+    baseUrl.searchParams.append("WithCoursesStudentsCourses_id", String(args?.WithCoursesStudentsCourses?.id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {

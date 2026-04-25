@@ -1,5 +1,5 @@
 {
-  "hash": 17604193192701024706,
+  "hash": 16767580073494028876,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 2169888974283939892,
+      "hash": 5642072893624890189,
       "name": "NullabilityChecks",
       "d1_binding": "db",
       "primary_columns": [
@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -27,22 +28,24 @@
       ],
       "columns": [
         {
-          "hash": 17451028643436199502,
+          "hash": 16560120440891336829,
           "field": {
             "name": "notNullableString",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 1280417303455341596,
+          "hash": 17407232496985557666,
           "field": {
             "name": "nullableString",
             "cidl_type": {
               "Nullable": "String"
-            }
+            },
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -70,14 +73,16 @@
             {
               "name": "a",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "b",
               "cidl_type": {
                 "Nullable": "String"
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -106,7 +111,8 @@
                     "name": "NullabilityChecks"
                   }
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -141,9 +147,10 @@
               "name": "a",
               "cidl_type": {
                 "Nullable": {
-                  "Array": "Integer"
+                  "Array": "Int"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "b",
@@ -155,7 +162,8 @@
                     }
                   }
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -187,11 +195,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -199,7 +209,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },

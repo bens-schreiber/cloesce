@@ -33,7 +33,7 @@ model D1BackedModel {
         keyParam
     }
     
-    someColumn: double
+    someColumn: real
     someOtherColumn: string
     
     kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
