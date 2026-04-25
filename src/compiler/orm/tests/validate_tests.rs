@@ -20,7 +20,7 @@ fn validate_nv(
     value: Option<Value>,
     ast: &ast::CloesceAst,
 ) -> Result<Option<Value>, ValidatorErrorKind> {
-    validate_cidl_type(cidl_type, value, ast, false, &[])
+    validate_cidl_type(cidl_type, &[], value, ast, false)
 }
 
 #[test]
@@ -637,10 +637,10 @@ fn validator_less_than() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::LessThan(Number::Int(5))],
             Some(json!(5)),
             &ast,
             false,
-            &[Validator::LessThan(Number::Int(5))],
         );
         assert!(matches!(
             result,
@@ -655,10 +655,10 @@ fn validator_less_than() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::LessThan(Number::Int(5))],
             Some(json!(4)),
             &ast,
             false,
-            &[Validator::LessThan(Number::Int(5))],
         );
         assert_eq!(result.unwrap(), Some(json!(4)));
     }
@@ -667,10 +667,10 @@ fn validator_less_than() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::LessThan(Number::Float(3.0))],
             Some(json!(3.0)),
             &ast,
             false,
-            &[Validator::LessThan(Number::Float(3.0))],
         );
         assert!(matches!(
             result,
@@ -685,10 +685,10 @@ fn validator_less_than() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::LessThan(Number::Float(3.0))],
             Some(json!(2.9)),
             &ast,
             false,
-            &[Validator::LessThan(Number::Float(3.0))],
         );
         assert!(result.is_ok());
     }
@@ -702,10 +702,10 @@ fn validator_less_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::LessThanOrEqual(Number::Int(5))],
             Some(json!(6)),
             &ast,
             false,
-            &[Validator::LessThanOrEqual(Number::Int(5))],
         );
         assert!(matches!(
             result,
@@ -720,10 +720,10 @@ fn validator_less_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::LessThanOrEqual(Number::Int(5))],
             Some(json!(5)),
             &ast,
             false,
-            &[Validator::LessThanOrEqual(Number::Int(5))],
         );
         assert_eq!(result.unwrap(), Some(json!(5)));
     }
@@ -732,10 +732,10 @@ fn validator_less_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::LessThanOrEqual(Number::Float(3.0))],
             Some(json!(3.1)),
             &ast,
             false,
-            &[Validator::LessThanOrEqual(Number::Float(3.0))],
         );
         assert!(matches!(
             result,
@@ -747,10 +747,10 @@ fn validator_less_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::LessThanOrEqual(Number::Float(3.0))],
             Some(json!(3.0)),
             &ast,
             false,
-            &[Validator::LessThanOrEqual(Number::Float(3.0))],
         );
         assert!(result.is_ok());
     }
@@ -764,10 +764,10 @@ fn validator_greater_than() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::GreaterThan(Number::Int(5))],
             Some(json!(5)),
             &ast,
             false,
-            &[Validator::GreaterThan(Number::Int(5))],
         );
         assert!(matches!(
             result,
@@ -782,10 +782,10 @@ fn validator_greater_than() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::GreaterThan(Number::Int(5))],
             Some(json!(6)),
             &ast,
             false,
-            &[Validator::GreaterThan(Number::Int(5))],
         );
         assert_eq!(result.unwrap(), Some(json!(6)));
     }
@@ -794,10 +794,10 @@ fn validator_greater_than() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::GreaterThan(Number::Float(3.0))],
             Some(json!(2.9)),
             &ast,
             false,
-            &[Validator::GreaterThan(Number::Float(3.0))],
         );
         assert!(matches!(
             result,
@@ -809,10 +809,10 @@ fn validator_greater_than() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::GreaterThan(Number::Float(3.0))],
             Some(json!(3.1)),
             &ast,
             false,
-            &[Validator::GreaterThan(Number::Float(3.0))],
         );
         assert!(result.is_ok());
     }
@@ -826,10 +826,10 @@ fn validator_greater_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::GreaterThanOrEqual(Number::Int(5))],
             Some(json!(4)),
             &ast,
             false,
-            &[Validator::GreaterThanOrEqual(Number::Int(5))],
         );
         assert!(matches!(
             result,
@@ -844,10 +844,10 @@ fn validator_greater_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::GreaterThanOrEqual(Number::Int(5))],
             Some(json!(5)),
             &ast,
             false,
-            &[Validator::GreaterThanOrEqual(Number::Int(5))],
         );
         assert_eq!(result.unwrap(), Some(json!(5)));
     }
@@ -856,10 +856,10 @@ fn validator_greater_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
             Some(json!(2.9)),
             &ast,
             false,
-            &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
         );
         assert!(matches!(
             result,
@@ -871,10 +871,10 @@ fn validator_greater_than_or_equal() {
     {
         let result = validate_cidl_type(
             CidlType::Real,
+            &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
             Some(json!(3.0)),
             &ast,
             false,
-            &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
         );
         assert!(result.is_ok());
     }
@@ -888,10 +888,10 @@ fn validator_step() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::Step(5)],
             Some(json!(7)),
             &ast,
             false,
-            &[Validator::Step(5)],
         );
         assert!(matches!(
             result,
@@ -906,10 +906,10 @@ fn validator_step() {
     {
         let result = validate_cidl_type(
             CidlType::Int,
+            &[Validator::Step(5)],
             Some(json!(15)),
             &ast,
             false,
-            &[Validator::Step(5)],
         );
         assert_eq!(result.unwrap(), Some(json!(15)));
     }
@@ -923,10 +923,10 @@ fn validator_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::Length(5)],
             Some(json!("hi")),
             &ast,
             false,
-            &[Validator::Length(5)],
         );
         assert!(matches!(
             result,
@@ -941,10 +941,10 @@ fn validator_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::Length(5)],
             Some(json!("hello")),
             &ast,
             false,
-            &[Validator::Length(5)],
         );
         assert_eq!(result.unwrap(), Some(json!("hello")));
     }
@@ -958,10 +958,10 @@ fn validator_min_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MinLength(5)],
             Some(json!("hi")),
             &ast,
             false,
-            &[Validator::MinLength(5)],
         );
         assert!(matches!(
             result,
@@ -976,10 +976,10 @@ fn validator_min_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MinLength(5)],
             Some(json!("hello world")),
             &ast,
             false,
-            &[Validator::MinLength(5)],
         );
         assert!(result.is_ok());
     }
@@ -988,10 +988,10 @@ fn validator_min_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MinLength(5)],
             Some(json!("hello")),
             &ast,
             false,
-            &[Validator::MinLength(5)],
         );
         assert!(result.is_ok());
     }
@@ -1005,10 +1005,10 @@ fn validator_max_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MaxLength(5)],
             Some(json!("hello world")),
             &ast,
             false,
-            &[Validator::MaxLength(5)],
         );
         assert!(matches!(
             result,
@@ -1023,10 +1023,10 @@ fn validator_max_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MaxLength(5)],
             Some(json!("hi")),
             &ast,
             false,
-            &[Validator::MaxLength(5)],
         );
         assert!(result.is_ok());
     }
@@ -1035,10 +1035,10 @@ fn validator_max_length() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::MaxLength(5)],
             Some(json!("hello")),
             &ast,
             false,
-            &[Validator::MaxLength(5)],
         );
         assert!(result.is_ok());
     }
@@ -1052,10 +1052,10 @@ fn validator_regex() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::Regex("^[a-z]+$")],
             Some(json!("hello123")),
             &ast,
             false,
-            &[Validator::Regex("^[a-z]+$")],
         );
         assert!(matches!(
             result,
@@ -1067,10 +1067,10 @@ fn validator_regex() {
     {
         let result = validate_cidl_type(
             CidlType::String,
+            &[Validator::Regex("^[a-z]+$")],
             Some(json!("hello")),
             &ast,
             false,
-            &[Validator::Regex("^[a-z]+$")],
         );
         assert_eq!(result.unwrap(), Some(json!("hello")));
     }

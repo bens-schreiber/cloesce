@@ -63,7 +63,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) {}
+  ) { }
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -484,8 +484,8 @@ function matchRoute(
 
   const keyFields: Record<string, string> = {};
   for (let i = 0; i < numKeyFields; i++) {
-    const keyField = model.key_fields[i];
-    keyFields[keyField] = parts[1 + numGetParams + i];
+    const field = model.key_fields[i];
+    keyFields[field.name] = parts[1 + numGetParams + i];
   }
 
   return Either.right({
@@ -527,8 +527,8 @@ async function validateRequest(
       }
     }
 
-    for (const keyParam of model.key_fields) {
-      if (!(keyParam in route.keyFields)) {
+    for (const field of model.key_fields) {
+      if (!(field.name in route.keyFields)) {
         return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
       }
     }
@@ -581,8 +581,8 @@ async function validateRequest(
       const validateRes = invokeOrmWasm(
         wasm.validate_type,
         [
-          WasmResource.fromString(JSON.stringify(p.cidl_type), wasm),
-          WasmResource.fromString(JSON.stringify(params[p.name]), wasm),
+          WasmResource.fromString(JSON.stringify(p), wasm), // field metadata 
+          WasmResource.fromString(JSON.stringify(params[p.name]), wasm), // value
         ],
         wasm,
       );

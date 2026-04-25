@@ -1,4 +1,5 @@
-use ast::{CidlType, CloesceAst, IncludeTree};
+use ast::ValidatedField;
+use ast::{CloesceAst, IncludeTree};
 use orm::map::map_sql;
 use orm::select::SelectModel;
 use orm::upsert::UpsertModel;
@@ -262,7 +263,7 @@ pub unsafe extern "C" fn map(
     }
 }
 
-/// Validates a value against a CidlType.
+/// Validates a value against a ValidatedField
 ///
 /// Requires a previous call to [set_ast_ptr].
 ///
@@ -275,17 +276,30 @@ pub unsafe extern "C" fn map(
 ///  and `value_ptr` must be a pointer to a UTF-8 encoded JSON string representing the value to be validated.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn validate_type(
-    // Cidl Type
-    cidl_type_ptr: *const u8,
-    cidl_type_len: usize,
+    // Validated Field
+    validated_field_ptr: *const u8,
+    validated_field_len: usize,
 
     // Value
     value_ptr: *const u8,
     value_len: usize,
 ) -> i32 {
-    let cidl_type_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(cidl_type_ptr, cidl_type_len)).unwrap() };
+    let validated_field_raw = unsafe {
+        str::from_utf8(slice::from_raw_parts(
+            validated_field_ptr,
+            validated_field_len,
+        ))
+        .unwrap()
+    };
     let value_raw = unsafe { str::from_utf8(slice::from_raw_parts(value_ptr, value_len)).unwrap() };
+
+    let validated_field = match serde_json::from_str::<ValidatedField>(validated_field_raw) {
+        Ok(res) => res,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
 
     let value = match serde_json::from_str::<Option<serde_json::Value>>(value_raw) {
         Ok(res) => res,
@@ -295,16 +309,15 @@ pub unsafe extern "C" fn validate_type(
         }
     };
 
-    let cidl_type = match serde_json::from_str::<CidlType>(cidl_type_raw) {
-        Ok(res) => res,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    // TODO: pass validators here?
-    let res = AST.with(|ast| validate_cidl_type(cidl_type, value, &ast.borrow(), false, &[]));
+    let res = AST.with(|ast| {
+        validate_cidl_type(
+            validated_field.cidl_type,
+            &validated_field.validators,
+            value,
+            &ast.borrow(),
+            false,
+        )
+    });
     match res {
         Ok(value) => {
             let bytes = serde_json::to_string(&value).unwrap().into_bytes();

@@ -14,13 +14,14 @@ import {
   CidlType,
   Cidl,
   getNavigationCidlType,
-  KvR2Field,
+  KvField,
+  R2Field
 } from "../cidl.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(private env: unknown) { }
 
   static fromEnv(env: unknown): Orm {
     return new Orm(env);
@@ -263,9 +264,9 @@ export class Orm {
       } = q.shift()!;
 
       // Key fields
-      for (const keyField of currentMeta.key_fields) {
-        if (currentModel[keyField] === undefined) {
-          currentModel[keyField] = (newModel as any)[keyField];
+      for (const field of currentMeta.key_fields) {
+        if (currentModel[field.name] === undefined) {
+          currentModel[field.name] = (newModel as any)[field.name];
         }
       }
 
@@ -525,8 +526,8 @@ export function hydrateType(
     }
 
     // Hydrate key fields
-    for (const keyParam of modelMeta.key_fields) {
-      instance[keyParam] = args.keyFields[keyParam] ?? instance[keyParam];
+    for (const field of modelMeta.key_fields) {
+      instance[field.name] = args.keyFields[field.name] ?? instance[field.name];
     }
 
     // Hydrate KV objects
@@ -631,7 +632,7 @@ export function hydrateType(
 async function hydrateKVList(
   namespace: KVNamespace,
   key: string,
-  kv: KvR2Field,
+  kv: KvField,
   current: any,
 ) {
   const res = await namespace.list({ prefix: key });
@@ -680,7 +681,7 @@ async function hydrateKVList(
 async function hydrateKVSingle(
   namespace: KVNamespace,
   key: string,
-  kv: KvR2Field,
+  kv: KvField,
   current: any,
 ) {
   if (kv.field.cidl_type === "Stream") {

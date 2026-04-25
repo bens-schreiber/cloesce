@@ -819,10 +819,10 @@ fn validate_and_transform(
 ) -> Result<SimpleExpr> {
     let res = validate_cidl_type(
         field.cidl_type.clone(),
+        &field.validators,
         Some(value.clone()),
         ast,
         false,
-        &field.validators,
     );
     let value = match res {
         Ok(Some(v)) => v,

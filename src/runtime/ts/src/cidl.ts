@@ -4,8 +4,9 @@ export type CrudKind = "Save" | "Get" | "List";
 
 export type CidlType =
   | "Void"
-  | "Integer"
-  | "Double"
+  | "Int"
+  | "Uint"
+  | "Real"
   | "String"
   | "Blob"
   | "DateIso"
@@ -26,9 +27,20 @@ export type CidlType =
 
 export type HttpVerb = "Get" | "Post" | "Put" | "Patch" | "Delete";
 
+export type Number = { Int: number } | { Float: number };
+
 export interface Field {
   name: string;
   cidl_type: CidlType;
+}
+
+export interface ValidatedField {
+  name: string;
+  cidl_type: CidlType;
+
+  // No type because it is not valuable
+  // to the TypeScript side of things, just the ORM.
+  validators: unknown[];
 }
 
 export interface ForeignKeyReference {
@@ -37,7 +49,7 @@ export interface ForeignKeyReference {
 }
 
 export interface Column {
-  field: Field;
+  field: ValidatedField;
   foreign_key_reference: ForeignKeyReference | null;
   unique_ids: number[];
   composite_id: number | null;
@@ -54,9 +66,18 @@ export interface NavigationField {
   kind: NavigationFieldKind;
 }
 
-export interface KvR2Field {
+export interface KvField {
+  field: ValidatedField;
+  format: string;
+  format_parameters: Field[];
+  binding: string;
+  list_prefix: boolean;
+}
+
+export interface R2Field {
   field: Field;
   format: string;
+  format_parameters: Field[];
   binding: string;
   list_prefix: boolean;
 }
@@ -70,7 +91,7 @@ export interface ApiMethod {
   return_media: MediaType;
   return_type: CidlType;
   parameters_media: MediaType;
-  parameters: Field[];
+  parameters: ValidatedField[];
   data_source: string | null;
 }
 
@@ -80,9 +101,9 @@ export interface Model {
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
-  key_fields: string[];
-  kv_fields: KvR2Field[];
-  r2_fields: KvR2Field[];
+  key_fields: ValidatedField[];
+  kv_fields: KvField[];
+  r2_fields: R2Field[];
   apis: ApiMethod[];
   cruds: CrudKind[];
   data_sources: Record<string, DataSource>;
@@ -90,7 +111,7 @@ export interface Model {
 
 export interface PlainOldObject {
   name: string;
-  fields: Field[];
+  fields: ValidatedField[];
 }
 
 export interface Service {
@@ -104,7 +125,7 @@ export interface IncludeTree {
 }
 
 export interface DataSourceMethod {
-  parameters: Field[];
+  parameters: ValidatedField[];
 }
 
 export interface DataSourceImpl {

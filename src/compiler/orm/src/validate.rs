@@ -41,10 +41,10 @@ pub enum ValidatorErrorKind {
 /// Additionally, runs any validators on the value (should it be an [ast::ValidatedField])
 pub fn validate_cidl_type(
     cidl_type: CidlType,
+    validators: &[Validator],
     value: Option<Value>,
     ast: &CloesceAst,
     partial: bool,
-    validators: &[Validator],
 ) -> Result<Option<Value>, ValidatorErrorKind> {
     // Json accepts anything
     if matches!(cidl_type, CidlType::Json) {
@@ -206,7 +206,7 @@ pub fn validate_cidl_type(
             new_obj.insert("metadata".to_string(), metadata.unwrap_or(Value::Null));
 
             // Validators apply to the inner type
-            let raw = validate_cidl_type(*inner, raw, ast, partial, validators)?;
+            let raw = validate_cidl_type(*inner, validators, raw, ast, partial)?;
             if let Some(raw) = raw {
                 new_obj.insert("raw".to_string(), raw);
             }
@@ -225,10 +225,10 @@ pub fn validate_cidl_type(
                 let attr_value = obj.remove(attr.name.as_ref());
                 let res = validate_cidl_type(
                     attr.cidl_type.clone(),
+                    &attr.validators,
                     attr_value,
                     ast,
                     is_partial,
-                    &attr.validators,
                 )?;
 
                 if let Some(res) = res {
@@ -249,10 +249,10 @@ pub fn validate_cidl_type(
                 let key_param_value = obj.remove(key_param.name.as_ref());
                 let res = validate_cidl_type(
                     CidlType::String,
+                    &key_param.validators,
                     key_param_value,
                     ast,
                     is_partial,
-                    &key_param.validators,
                 )?;
 
                 if let Some(res) = res {
@@ -264,10 +264,10 @@ pub fn validate_cidl_type(
                 let col_value = obj.remove(col.field.name.as_ref());
                 let res = validate_cidl_type(
                     col.field.cidl_type.clone(),
+                    &col.field.validators,
                     col_value,
                     ast,
                     is_partial,
-                    &col.field.validators,
                 )?;
 
                 if let Some(res) = res {
@@ -284,10 +284,10 @@ pub fn validate_cidl_type(
 
                 let res = validate_cidl_type(
                     nav.field.cidl_type.clone(),
+                    &[],
                     nav_value,
                     ast,
                     is_partial,
-                    &[],
                 )?;
 
                 if let Some(res) = res {
@@ -304,10 +304,10 @@ pub fn validate_cidl_type(
 
                 let res = validate_cidl_type(
                     kv_obj_meta.field.cidl_type.clone(),
+                    &kv_obj_meta.field.validators,
                     kv_obj_value,
                     ast,
                     is_partial,
-                    &kv_obj_meta.field.validators,
                 )?;
 
                 if let Some(res) = res {
@@ -323,10 +323,10 @@ pub fn validate_cidl_type(
                 }
                 let res = validate_cidl_type(
                     r2_obj_meta.field.cidl_type.clone(),
+                    &[],
                     r2_obj_value,
                     ast,
                     is_partial,
-                    &[],
                 )?;
 
                 if let Some(res) = res {
@@ -343,10 +343,10 @@ pub fn validate_cidl_type(
             for item in arr {
                 let res = validate_cidl_type(
                     *cidl_type.clone(),
+                    validators,
                     Some(item.clone()),
                     ast,
                     is_partial,
-                    validators,
                 )?;
 
                 if let Some(res) = res {
@@ -363,7 +363,7 @@ pub fn validate_cidl_type(
             // Validate results array
             let results = obj.remove("results");
             let results_value =
-                validate_cidl_type(CidlType::Array(inner), results, ast, is_partial, validators)?;
+                validate_cidl_type(CidlType::Array(inner), validators, results, ast, is_partial)?;
             if let Some(results_value) = results_value {
                 new_obj.insert("results".to_string(), results_value);
             }
@@ -382,7 +382,7 @@ pub fn validate_cidl_type(
             // Validate complete (boolean)
             let complete = obj.remove("complete");
             let complete_value =
-                validate_cidl_type(CidlType::Boolean, complete, ast, is_partial, &[])?;
+                validate_cidl_type(CidlType::Boolean, &[], complete, ast, is_partial)?;
             if let Some(complete_value) = complete_value {
                 new_obj.insert("complete".to_string(), complete_value);
             }

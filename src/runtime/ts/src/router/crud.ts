@@ -50,29 +50,26 @@ async function get(
 
   const dataSource = meta.data_sources[dataSourceRef];
 
-  // Args is the union of all data source get params across all data sources for the model,
-  // plus the key fields for the model. To find the parameters for this specific data source,
-  // we have to take the intersection of the data source get params and the args passed in.
-  const paramOrder = new Map(
-    dataSource.get?.parameters.map((p, i) => [p.name, i]) ?? [],
-  );
-  const keyFields = new Set(meta.key_fields);
-  const dataSourceArgs: unknown[] = Array.from({ length: paramOrder.size });
-  const keyFieldArgs: Record<string, any> = {};
-
+  // Build a lookup from method parameter name to its value
+  const paramValues = new Map<string, unknown>();
   for (let i = 0; i < method.parameters.length; i++) {
-    const paramName = method.parameters[i].name;
-    const arg = args[i];
-
-    const dsIndex = paramOrder.get(paramName);
-    if (dsIndex !== undefined) {
-      dataSourceArgs[dsIndex] = arg;
-    }
-
-    if (keyFields.has(paramName)) {
-      keyFieldArgs[paramName] = arg;
-    }
+    paramValues.set(method.parameters[i].name, args[i]);
   }
+
+  // Data source params are prefixed with the source name in the method signature.
+  // All DS params are nullable in the method signature to support multi-source schemas,
+  // but once the source is selected they are required.
+  const dataSourceArgs: unknown[] = [];
+  for (const p of dataSource.get?.parameters ?? []) {
+    const val = paramValues.get(`${dataSourceRef}_${p.name}`);
+    if (val === null || val === undefined) return HttpResult.fail(400);
+    dataSourceArgs.push(val);
+  }
+
+  // Key fields are unprefixed
+  const keyFieldArgs = Object.fromEntries(
+    meta.key_fields.map((f) => [f.name, paramValues.get(f.name)]),
+  );
 
   const res = await dataSource.gen.get(
     env,
@@ -96,21 +93,20 @@ async function list(
 
   const dataSource = meta.data_sources[dataSourceRef];
 
-  // Args is the union of all data source get params across all data sources for the model.
-  // To find the parameters for this specific data source, we have to take the intersection
-  // of the data source get params and the args passed in, while preserving the order.
-  const paramOrder = new Map(
-    dataSource.list!.parameters.map((p, i) => [p.name, i]),
-  );
-  const dataSourceArgs: unknown[] = Array.from({ length: paramOrder.size });
-
+  // Build a lookup from method parameter name to its value
+  const paramValues = new Map<string, unknown>();
   for (let i = 0; i < method.parameters.length; i++) {
-    const paramName = method.parameters[i].name;
-    const index = paramOrder.get(paramName);
+    paramValues.set(method.parameters[i].name, args[i]);
+  }
 
-    if (index !== undefined) {
-      dataSourceArgs[index] = args[i];
-    }
+  // Data source params are prefixed with the source name in the method signature.
+  // All DS params are nullable in the method signature to support multi-source schemas,
+  // but once the source is selected they are required.
+  const dataSourceArgs: unknown[] = [];
+  for (const p of dataSource.list!.parameters) {
+    const val = paramValues.get(`${dataSourceRef}_${p.name}`);
+    if (val === null || val === undefined) return HttpResult.fail(400);
+    dataSourceArgs.push(val);
   }
 
   const res = await dataSource.gen.list!(env, ...dataSourceArgs);
