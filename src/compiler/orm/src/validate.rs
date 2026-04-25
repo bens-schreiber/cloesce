@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst};
+use ast::{CidlType, CloesceAst, Number, Validator};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
 use serde::Serialize;
@@ -22,23 +22,32 @@ pub enum ValidatorErrorKind {
     InvalidR2Object,
     UnknownDataSource,
     NonArray,
+
+    // Validators
+    NotLessThan { expected: Number, got: Value },
+    NotLessThanOrEqual { expected: Number, got: Value },
+    NotGreaterThan { expected: Number, got: Value },
+    NotGreaterThanOrEqual { expected: Number, got: Value },
+    NotStep { expected: Number, got: Value },
+    NotLength { expected: Number, got: Value },
+    NotMinLength { expected: Number, got: Value },
+    NotMaxLength { expected: Number, got: Value },
+    UnmatchedRegex { got: Value, pattern: String },
 }
 
-/// Runtime type validation, asserting that the structure of a value
-/// follows the correlated CidlType.
+/// Runtime type validation, asserting that the structure of a JSON value
+/// matches the structure of the provided CIDL type.
 ///
-/// - All values must be defined unless `isPartial` is true.
-/// - Arrays can be left undefined, which will be interpreted as empty.
-/// - Blob types are checked to be b64 encoded
-/// - Dates are checked to be valid ISO strings
+/// Additionally, runs any validators on the value (should it be an [ast::ValidatedField])
 pub fn validate_cidl_type(
     cidl_type: CidlType,
     value: Option<Value>,
     ast: &CloesceAst,
     partial: bool,
+    validators: &[Validator],
 ) -> Result<Option<Value>, ValidatorErrorKind> {
     // Json accepts anything
-    if cidl_type == CidlType::Json {
+    if matches!(cidl_type, CidlType::Json) {
         return Ok(value);
     }
 
@@ -72,50 +81,50 @@ pub fn validate_cidl_type(
         _ => cidl_type,
     };
 
-    match unwrapped_type {
+    let result = match unwrapped_type {
         CidlType::Int => match &value {
-            Value::Number(num) if num.is_i64() => Ok(Some(value)),
+            Value::Number(num) if num.is_i64() => Some(value),
             Value::String(s) if s.parse::<i64>().is_ok() => {
                 value = Value::Number(s.parse::<i64>().unwrap().into());
-                Ok(Some(value))
+                Some(value)
             }
-            _ => Err(ValidatorErrorKind::NonI64),
+            _ => return Err(ValidatorErrorKind::NonI64),
         },
         CidlType::Uint => match &value {
-            Value::Number(num) if num.is_u64() => Ok(Some(value)),
+            Value::Number(num) if num.is_u64() => Some(value),
             Value::String(s) if s.parse::<u64>().is_ok() => {
                 value = Value::Number(s.parse::<u64>().unwrap().into());
-                Ok(Some(value))
+                Some(value)
             }
-            _ => Err(ValidatorErrorKind::NonI64),
+            _ => return Err(ValidatorErrorKind::NonI64),
         },
         CidlType::Real => match &value {
-            Value::Number(num) if num.is_f64() || num.is_i64() => Ok(Some(value)),
+            Value::Number(num) if num.is_f64() || num.is_i64() => Some(value),
             Value::String(s) if s.parse::<f64>().is_ok() => {
                 value =
                     Value::Number(serde_json::Number::from_f64(s.parse::<f64>().unwrap()).unwrap());
-                Ok(Some(value))
+                Some(value)
             }
-            _ => Err(ValidatorErrorKind::NonReal),
+            _ => return Err(ValidatorErrorKind::NonReal),
         },
 
         CidlType::String => value
             .is_string()
             .then_some(Some(value))
-            .ok_or(ValidatorErrorKind::NonString),
+            .ok_or(ValidatorErrorKind::NonString)?,
 
         CidlType::Boolean => match &value {
-            Value::Bool(_) => Ok(Some(value)),
-            Value::String(s) if s.eq_ignore_ascii_case("true") => Ok(Some(Value::Bool(true))),
-            Value::String(s) if s.eq_ignore_ascii_case("false") => Ok(Some(Value::Bool(false))),
-            _ => Err(ValidatorErrorKind::NonBoolean),
+            Value::Bool(_) => Some(value),
+            Value::String(s) if s.eq_ignore_ascii_case("true") => Some(Value::Bool(true)),
+            Value::String(s) if s.eq_ignore_ascii_case("false") => Some(Value::Bool(false)),
+            _ => return Err(ValidatorErrorKind::NonBoolean),
         },
 
         CidlType::DateIso => value
             .as_str()
             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
             .map(|_| Some(value))
-            .ok_or(ValidatorErrorKind::NonDateIso),
+            .ok_or(ValidatorErrorKind::NonDateIso)?,
 
         CidlType::Blob => match &value {
             Value::String(s) => BASE64_STANDARD
@@ -126,18 +135,18 @@ pub fn validate_cidl_type(
                         bytes.into_iter().map(|b| Value::Number(b.into())).collect(),
                     ))
                 })
-                .ok_or(ValidatorErrorKind::NonBase64),
+                .ok_or(ValidatorErrorKind::NonBase64)?,
 
             Value::Array(arr) => {
                 // everything must be u8 (0-255)
-                if arr.iter().all(|v| v.is_u64() && v.as_u64().unwrap() <= 255) {
-                    Ok(Some(value))
-                } else {
-                    Err(ValidatorErrorKind::NonU8Array)
+                if arr.iter().any(|v| !v.is_u64() || v.as_u64().unwrap() > 255) {
+                    return Err(ValidatorErrorKind::NonU8Array);
                 }
+
+                Some(value)
             }
 
-            _ => Err(ValidatorErrorKind::NonBase64),
+            _ => return Err(ValidatorErrorKind::NonBase64),
         },
 
         CidlType::R2Object => {
@@ -157,7 +166,7 @@ pub fn validate_cidl_type(
                 .as_object()
                 .and_then(|obj| serde_json::from_value::<R2Object>(Value::Object(obj.clone())).ok())
                 .map(|_| Some(value))
-                .ok_or(ValidatorErrorKind::InvalidR2Object)
+                .ok_or(ValidatorErrorKind::InvalidR2Object)?
         }
 
         CidlType::DataSource { model_name } => {
@@ -166,11 +175,11 @@ pub fn validate_cidl_type(
                 return Err(ValidatorErrorKind::NonString);
             };
 
-            if model.data_sources.contains_key(value_str) {
-                return Ok(Some(value));
+            if !model.data_sources.contains_key(value_str) {
+                return Err(ValidatorErrorKind::UnknownDataSource);
             }
 
-            Err(ValidatorErrorKind::UnknownDataSource)
+            Some(value)
         }
 
         CidlType::KvObject(inner) => {
@@ -196,51 +205,70 @@ pub fn validate_cidl_type(
             }
             new_obj.insert("metadata".to_string(), metadata.unwrap_or(Value::Null));
 
-            // Validate raw value
-            let raw = validate_cidl_type(*inner, raw, ast, partial)?;
+            // Validators apply to the inner type
+            let raw = validate_cidl_type(*inner, raw, ast, partial, validators)?;
             if let Some(raw) = raw {
                 new_obj.insert("raw".to_string(), raw);
             }
 
-            Ok(Some(Value::Object(new_obj)))
+            return Ok(Some(Value::Object(new_obj)));
         }
 
-        CidlType::Object { name } | CidlType::Partial { object_name: name } => {
+        // Plain old objects
+        CidlType::Object { name } | CidlType::Partial { object_name: name }
+            if let Some(poo) = ast.poos.get(name) =>
+        {
             let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
             let mut new_obj = serde_json::Map::<String, Value>::new();
 
-            // Handle Plain Old Objects
-            if let Some(poo) = ast.poos.get(name) {
-                for attr in &poo.fields {
-                    let attr_value = obj.remove(attr.name.as_ref());
-                    let res =
-                        validate_cidl_type(attr.cidl_type.clone(), attr_value, ast, is_partial)?;
-
-                    if let Some(res) = res {
-                        new_obj.insert(attr.name.to_string(), res);
-                    }
-                }
-
-                return Ok(Some(Value::Object(new_obj)));
-            }
-
-            // Handle Models
-            let model = ast.models.get(name).unwrap();
-            let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
-
-            for key_param in &model.key_fields {
-                let key_param_value = obj.remove(*key_param);
-                let res = validate_cidl_type(CidlType::String, key_param_value, ast, is_partial)?;
+            for attr in &poo.fields {
+                let attr_value = obj.remove(attr.name.as_ref());
+                let res = validate_cidl_type(
+                    attr.cidl_type.clone(),
+                    attr_value,
+                    ast,
+                    is_partial,
+                    &attr.validators,
+                )?;
 
                 if let Some(res) = res {
-                    new_obj.insert(key_param.to_string(), res);
+                    new_obj.insert(attr.name.to_string(), res);
+                }
+            }
+
+            Some(Value::Object(new_obj))
+        }
+
+        // Models
+        CidlType::Object { name } | CidlType::Partial { object_name: name } => {
+            let mut new_obj = serde_json::Map::<String, Value>::new();
+            let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
+            let model = ast.models.get(name).unwrap();
+
+            for key_param in &model.key_fields {
+                let key_param_value = obj.remove(key_param.name.as_ref());
+                let res = validate_cidl_type(
+                    CidlType::String,
+                    key_param_value,
+                    ast,
+                    is_partial,
+                    &key_param.validators,
+                )?;
+
+                if let Some(res) = res {
+                    new_obj.insert(key_param.name.to_string(), res);
                 }
             }
 
             for (col, _) in model.all_columns() {
                 let col_value = obj.remove(col.field.name.as_ref());
-                let res =
-                    validate_cidl_type(col.field.cidl_type.clone(), col_value, ast, is_partial)?;
+                let res = validate_cidl_type(
+                    col.field.cidl_type.clone(),
+                    col_value,
+                    ast,
+                    is_partial,
+                    &col.field.validators,
+                )?;
 
                 if let Some(res) = res {
                     new_obj.insert(col.field.name.to_string(), res);
@@ -254,8 +282,13 @@ pub fn validate_cidl_type(
                     continue;
                 }
 
-                let res =
-                    validate_cidl_type(nav.field.cidl_type.clone(), nav_value, ast, is_partial)?;
+                let res = validate_cidl_type(
+                    nav.field.cidl_type.clone(),
+                    nav_value,
+                    ast,
+                    is_partial,
+                    &[],
+                )?;
 
                 if let Some(res) = res {
                     new_obj.insert(nav.field.name.to_string(), res);
@@ -274,6 +307,7 @@ pub fn validate_cidl_type(
                     kv_obj_value,
                     ast,
                     is_partial,
+                    &kv_obj_meta.field.validators,
                 )?;
 
                 if let Some(res) = res {
@@ -292,6 +326,7 @@ pub fn validate_cidl_type(
                     r2_obj_value,
                     ast,
                     is_partial,
+                    &[],
                 )?;
 
                 if let Some(res) = res {
@@ -299,21 +334,26 @@ pub fn validate_cidl_type(
                 }
             }
 
-            Ok(Some(Value::Object(new_obj)))
+            Some(Value::Object(new_obj))
         }
 
         CidlType::Array(cidl_type) => {
             let arr = value.as_array().ok_or(ValidatorErrorKind::NonArray)?;
             let mut new_arr = Vec::<Value>::new();
             for item in arr {
-                let res =
-                    validate_cidl_type(*cidl_type.clone(), Some(item.clone()), ast, is_partial)?;
+                let res = validate_cidl_type(
+                    *cidl_type.clone(),
+                    Some(item.clone()),
+                    ast,
+                    is_partial,
+                    validators,
+                )?;
 
                 if let Some(res) = res {
                     new_arr.push(res);
                 }
             }
-            Ok(Some(Value::Array(new_arr)))
+            Some(Value::Array(new_arr))
         }
 
         CidlType::Paginated(inner) => {
@@ -323,7 +363,7 @@ pub fn validate_cidl_type(
             // Validate results array
             let results = obj.remove("results");
             let results_value =
-                validate_cidl_type(CidlType::Array(inner), results, ast, is_partial)?;
+                validate_cidl_type(CidlType::Array(inner), results, ast, is_partial, validators)?;
             if let Some(results_value) = results_value {
                 new_obj.insert("results".to_string(), results_value);
             }
@@ -341,14 +381,159 @@ pub fn validate_cidl_type(
 
             // Validate complete (boolean)
             let complete = obj.remove("complete");
-            let complete_value = validate_cidl_type(CidlType::Boolean, complete, ast, is_partial)?;
+            let complete_value =
+                validate_cidl_type(CidlType::Boolean, complete, ast, is_partial, &[])?;
             if let Some(complete_value) = complete_value {
                 new_obj.insert("complete".to_string(), complete_value);
             }
 
-            Ok(Some(Value::Object(new_obj)))
+            Some(Value::Object(new_obj))
         }
 
         _ => unimplemented!(),
+    };
+
+    if let Some(v) = &result {
+        // Validators are only ran on a defined, non-null value.
+        run_validators(v, validators)?;
     }
+
+    Ok(result)
+}
+
+fn run_validators(value: &Value, validators: &[Validator]) -> Result<(), ValidatorErrorKind> {
+    for v in validators {
+        match v {
+            Validator::GreaterThan(number) => match number {
+                Number::Int(i) => {
+                    let value_num = value.as_i64().expect("type validation to have run");
+                    if value_num <= *i {
+                        return Err(ValidatorErrorKind::NotGreaterThan {
+                            expected: Number::Int(*i),
+                            got: value.clone(),
+                        });
+                    }
+                }
+                Number::Float(f) => {
+                    let value_num = value.as_f64().expect("type validation to have run");
+                    if value_num <= *f {
+                        return Err(ValidatorErrorKind::NotGreaterThan {
+                            expected: Number::Float(*f),
+                            got: value.clone(),
+                        });
+                    }
+                }
+            },
+            Validator::GreaterThanOrEqual(number) => match number {
+                Number::Int(i) => {
+                    let value_num = value.as_i64().expect("type validation to have run");
+                    if value_num < *i {
+                        return Err(ValidatorErrorKind::NotGreaterThanOrEqual {
+                            expected: Number::Int(*i),
+                            got: value.clone(),
+                        });
+                    }
+                }
+                Number::Float(f) => {
+                    let value_num = value.as_f64().expect("type validation to have run");
+                    if value_num < *f {
+                        return Err(ValidatorErrorKind::NotGreaterThanOrEqual {
+                            expected: Number::Float(*f),
+                            got: value.clone(),
+                        });
+                    }
+                }
+            },
+            Validator::LessThan(number) => match number {
+                Number::Int(i) => {
+                    let value_num = value.as_i64().expect("type validation to have run");
+                    if value_num >= *i {
+                        return Err(ValidatorErrorKind::NotLessThan {
+                            expected: Number::Int(*i),
+                            got: value.clone(),
+                        });
+                    }
+                }
+                Number::Float(f) => {
+                    let value_num = value.as_f64().expect("type validation to have run");
+                    if value_num >= *f {
+                        return Err(ValidatorErrorKind::NotLessThan {
+                            expected: Number::Float(*f),
+                            got: value.clone(),
+                        });
+                    }
+                }
+            },
+            Validator::LessThanOrEqual(number) => match number {
+                Number::Int(i) => {
+                    let value_num = value.as_i64().expect("type validation to have run");
+                    if value_num > *i {
+                        return Err(ValidatorErrorKind::NotLessThanOrEqual {
+                            expected: Number::Int(*i),
+                            got: value.clone(),
+                        });
+                    }
+                }
+                Number::Float(f) => {
+                    let value_num = value.as_f64().expect("type validation to have run");
+                    if value_num > *f {
+                        return Err(ValidatorErrorKind::NotLessThanOrEqual {
+                            expected: Number::Float(*f),
+                            got: value.clone(),
+                        });
+                    }
+                }
+            },
+            Validator::Step(i) => {
+                let value_num = value.as_i64().expect("type validation to have run");
+                if value_num % *i != 0 {
+                    return Err(ValidatorErrorKind::NotStep {
+                        expected: Number::Int(*i),
+                        got: value.clone(),
+                    });
+                }
+            }
+            Validator::Length(size) => {
+                let value_str = value.as_str().expect("type validation to have run");
+                let size_i64 = i64::try_from(*size).unwrap_or(i64::MAX);
+                if value_str.len() != *size {
+                    return Err(ValidatorErrorKind::NotLength {
+                        expected: Number::Int(size_i64),
+                        got: value.clone(),
+                    });
+                }
+            }
+            Validator::MinLength(min) => {
+                let value_str = value.as_str().expect("type validation to have run");
+                let min_i64 = i64::try_from(*min).unwrap_or(i64::MAX);
+                if value_str.len() < *min {
+                    return Err(ValidatorErrorKind::NotMinLength {
+                        expected: Number::Int(min_i64),
+                        got: value.clone(),
+                    });
+                }
+            }
+            Validator::MaxLength(max) => {
+                let value_str = value.as_str().expect("type validation to have run");
+                let max_i64 = i64::try_from(*max).unwrap_or(i64::MAX);
+                if value_str.len() > *max {
+                    return Err(ValidatorErrorKind::NotMaxLength {
+                        expected: Number::Int(max_i64),
+                        got: value.clone(),
+                    });
+                }
+            }
+            Validator::Regex(r) => {
+                let value_str = value.as_str().expect("type validation to have run");
+                if !regex::Regex::new(r).unwrap().is_match(value_str) {
+                    return Err(ValidatorErrorKind::UnmatchedRegex {
+                        got: value.clone(),
+                        pattern: r.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

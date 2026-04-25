@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst, Column, IncludeTree, Model, NavigationField, NavigationFieldKind};
+use ast::{
+    CidlType, CloesceAst, Column, IncludeTree, Model, NavigationField, NavigationFieldKind,
+    ValidatedField,
+};
 
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
 use sea_query::{Expr, Query};
@@ -105,9 +108,7 @@ impl<'a> UpsertModel<'a> {
             for col in &model.primary_columns {
                 let pk_path = format!("{}.{}", model.name, col.field.name);
                 let pk_expr = match generator.context.get(&pk_path) {
-                    Some(Some(value)) => {
-                        validate_and_transform(col.field.cidl_type.clone(), value, ast)?
-                    }
+                    Some(Some(value)) => validate_and_transform(&col.field, value, ast)?,
                     _ => SqlUpsertBuilder::value_from_ctx(&pk_path),
                 };
                 select_root_model = select_root_model.and_where(
@@ -318,31 +319,18 @@ impl<'a> UpsertModel<'a> {
                 ) {
                     (Some(value), _) => {
                         // A value was provided in `new_model`
-                        builder.push_val(
-                            attr.field.name.as_ref(),
-                            &value,
-                            &attr.field.cidl_type,
-                        )?;
+                        builder.push_val(&attr.field, &value)?;
                     }
                     (None, Some(_)) if path_key.is_some() => {
                         // No value provided, but this column is a FK reference
                         // that can be resolved through context
                         let path_key = path_key.unwrap();
                         let ctx = self.context.get(path_key).expect("Context path missing");
-                        builder.push_val_ctx(
-                            ctx,
-                            attr.field.name.as_ref(),
-                            &attr.field.cidl_type,
-                            path_key,
-                        )?;
+                        builder.push_val_ctx(&attr.field, ctx, path_key)?;
                     }
                     (None, _) if pk_missing && attr.field.cidl_type.is_nullable() => {
                         // Default to null for INSERT (no PK provided).
-                        builder.push_val(
-                            attr.field.name.as_ref(),
-                            &Value::Null,
-                            &attr.field.cidl_type,
-                        )?;
+                        builder.push_val(&attr.field, &Value::Null)?;
                     }
                     (None, _) if !pk_missing => {
                         if !attr.field.cidl_type.is_nullable() {
@@ -435,7 +423,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &nav_meta.primary_columns {
             let path_key = format!("{path}.{}.{}", nav.field.name, pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             left_entries.push(value);
@@ -445,7 +433,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &model.primary_columns {
             let path_key = format!("{path}.{}", pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             right_entries.push(value);
@@ -614,9 +602,9 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Adds a column and value to the insert statement.
     ///
     /// Returns an error if the value does not match the meta type.
-    fn push_val(&mut self, var_name: &str, value: &Value, cidl_type: &CidlType) -> Result<()> {
-        self.cols.push(alias(var_name));
-        let val = validate_and_transform(cidl_type.clone(), value, self.ast)?;
+    fn push_val(&mut self, field: &ValidatedField, value: &Value) -> Result<()> {
+        self.cols.push(alias(field.name.as_ref()));
+        let val = validate_and_transform(field, value, self.ast)?;
         self.vals.push(val);
         Ok(())
     }
@@ -624,18 +612,17 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Adds a column and value from the graph context.
     fn push_val_ctx(
         &mut self,
+        field: &ValidatedField,
         ctx: &Option<Value>,
-        var_name: &str,
-        cidl_type: &CidlType,
         path: &str,
     ) -> Result<()> {
         match ctx {
             None => {
-                self.cols.push(alias(var_name));
+                self.cols.push(alias(field.name.as_ref()));
                 self.vals.push(Self::value_from_ctx(path));
             }
             Some(v) => {
-                self.push_val(var_name, v, cidl_type)?;
+                self.push_val(field, v)?;
             }
         }
         Ok(())
@@ -674,7 +661,7 @@ impl<'a> SqlUpsertBuilder<'a> {
         let mut pk_exprs: Vec<(String, SimpleExpr)> = Vec::new();
         for (pk_col, (pk_name, pk_val)) in self.pk_cols.iter().zip(pk_vals.iter()) {
             let expr = match pk_val {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => {
                     // Value will come from context (auto-generated)
                     continue;
@@ -826,11 +813,17 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
 }
 
 fn validate_and_transform(
-    cidl_type: CidlType,
+    field: &ValidatedField,
     value: &Value,
-    ast: &CloesceAst<'_>,
+    ast: &CloesceAst,
 ) -> Result<SimpleExpr> {
-    let res = validate_cidl_type(cidl_type.clone(), Some(value.clone()), ast, false);
+    let res = validate_cidl_type(
+        field.cidl_type.clone(),
+        Some(value.clone()),
+        ast,
+        false,
+        &field.validators,
+    );
     let value = match res {
         Ok(Some(v)) => v,
         Ok(None) => fail!(
@@ -845,7 +838,7 @@ fn validate_and_transform(
     };
 
     Ok(match value {
-        Value::Null => match cidl_type.root_type() {
+        Value::Null => match field.cidl_type.root_type() {
             CidlType::Int => return Ok(Expr::val(None::<i32>).into()),
             CidlType::Uint => return Ok(Expr::val(None::<u32>).into()),
             CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),

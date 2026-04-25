@@ -396,7 +396,7 @@ pub struct Model<'src> {
     pub navigation_fields: Vec<NavigationField<'src>>,
 
     #[serde(borrow)]
-    pub key_fields: Vec<&'src str>,
+    pub key_fields: Vec<ValidatedField<'src>>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,

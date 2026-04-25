@@ -303,7 +303,8 @@ pub unsafe extern "C" fn validate_type(
         }
     };
 
-    let res = AST.with(|ast| validate_cidl_type(cidl_type, value, &ast.borrow(), false));
+    // TODO: pass validators here?
+    let res = AST.with(|ast| validate_cidl_type(cidl_type, value, &ast.borrow(), false, &[]));
     match res {
         Ok(value) => {
             let bytes = serde_json::to_string(&value).unwrap().into_bytes();

@@ -722,11 +722,7 @@ impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
 
         let mut inner = Doc::nil();
         for symbol in &self.symbols {
-            if matches!(self.kind, EnvBindingBlockKind::Var) {
-                inner = inner.then(ctx.sym_doc(symbol, 2, false));
-            } else {
-                inner = inner.then(ctx.sym_doc(symbol, 2, false));
-            }
+            inner = inner.then(ctx.sym_doc(symbol, 2, false));
         }
 
         Doc::text(keyword).then(ctx.block(inner, 2))

@@ -84,7 +84,7 @@ struct ModelBuilder<'src, 'p> {
     navigation_fields: Vec<NavigationField<'src>>,
     kv_fields: Vec<KvField<'src>>,
     r2_fields: Vec<R2Field<'src>>,
-    key_fields: Vec<&'src str>,
+    key_fields: Vec<ValidatedField<'src>>,
 }
 
 impl<'src, 'p> ModelBuilder<'src, 'p> {
@@ -258,7 +258,19 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::KeyField(fields) => {
                     for field in fields {
-                        self.key_fields.push(field.name);
+                        let validators = match resolve_validators(field) {
+                            Ok(v) => v,
+                            Err(errs) => {
+                                ma.sink.extend(errs);
+                                Vec::new()
+                            }
+                        };
+
+                        self.key_fields.push(ValidatedField {
+                            name: field.name.into(),
+                            cidl_type: CidlType::String,
+                            validators,
+                        });
                     }
                 }
                 ModelBlockKind::Paginated(blocks) => {
@@ -457,14 +469,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 *ma.in_degree.entry(self.name).or_insert(0) += 1;
             }
 
-            let adj_validators = match resolve_validators(adj_field_sym) {
-                Ok(v) => v,
-                Err(_) => {
-                    // No reason to push these errors, it will be caught during
-                    // the validation of the adjacent model's own columns.
-                    Vec::new()
-                }
-            };
+            // No reason to push these errors, it will be caught during
+            // the validation of the adjacent model's own columns.
+            let adj_validators = resolve_validators(adj_field_sym).unwrap_or_default();
 
             let col = Column {
                 hash: 0,

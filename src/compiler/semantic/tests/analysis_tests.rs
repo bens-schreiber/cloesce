@@ -1055,3 +1055,96 @@ fn cidl_types_resolve() {
         ]
     );
 }
+
+#[test]
+fn validator_errors() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { id: int }
+
+            [bogusvalidator 42]       // ValidatorUnknown
+            name: string
+
+            [gt 1 2]                  // ValidatorInvalidArity (too many args)
+            [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
+            [step 2.5]                // ValidatorInvalidArgument (float to step)
+            [length 3.14]             // ValidatorInvalidArgument (float to length)
+            [regex "not_a_regex"]     // ValidatorInvalidArgument (string instead of /regex/)
+            age: int
+        }
+
+        poo MyPoo {
+            [unknown_poo 1]           // ValidatorUnknown on a poo field
+            field: string
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    expect_err!(errors, SemanticError::ValidatorUnknown { .. });
+    expect_err!(errors, SemanticError::ValidatorInvalidArity { .. });
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
+        4
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorUnknown { .. }),
+        2
+    );
+}
+
+#[test]
+fn validator_valid() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { id: int }
+
+            [gt 0]
+            [gte 0]
+            [lt 200]
+            [lte 150]
+            [step 5]
+            age: int
+
+            [minlen 1]
+            [maxlen 64]
+            [length 10]
+            [regex /^[a-z]+$/]
+            name: string
+        }
+
+        poo MyPoo {
+            [gt 0]
+            [lte 100]
+            score: int
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let user = result.models.get("User").unwrap();
+    let age_col = user.columns.iter().find(|c| c.field.name == "age").unwrap();
+    let name_col = user
+        .columns
+        .iter()
+        .find(|c| c.field.name == "name")
+        .unwrap();
+    assert_eq!(age_col.field.validators.len(), 5);
+    assert_eq!(name_col.field.validators.len(), 4);
+
+    let poo = result.poos.get("MyPoo").unwrap();
+    let score = poo.fields.iter().find(|f| f.name == "score").unwrap();
+    assert_eq!(score.validators.len(), 2);
+}

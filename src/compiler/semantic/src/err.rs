@@ -934,7 +934,11 @@ fn display(
                 .ok();
         }
 
-        SemanticError::ValidatorInvalidArgument { validator, symbol, reason } => {
+        SemanticError::ValidatorInvalidArgument {
+            validator,
+            symbol,
+            reason,
+        } => {
             let (path, range) = span_parts(&symbol.span, file_table);
             Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
                 .with_message(format!(

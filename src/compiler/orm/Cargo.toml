@@ -7,6 +7,7 @@ ast = { path = "../ast" }
 base64 = "0.22"
 chrono = { version = "0.4.44", features = ["serde"], default-features = false }
 indexmap = { workspace = true }
+regex = "1.12.3"
 sea-query = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

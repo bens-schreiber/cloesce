@@ -230,7 +230,10 @@ impl<'src> DataSourceExpansion {
         let parameters = model
             .primary_columns
             .iter()
-            .map(|pk| pk.field.clone())
+            .map(|pk| ValidatedField {
+                name: format!("lastSeen_{}", pk.field.name).into(),
+                ..pk.field.clone()
+            })
             .chain(vec![ValidatedField {
                 name: "limit".into(),
                 cidl_type: CidlType::Uint,

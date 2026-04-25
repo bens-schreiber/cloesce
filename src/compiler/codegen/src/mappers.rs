@@ -119,11 +119,11 @@ impl LanguageTypeMapper for TypeScriptMapper {
     }
 
     fn kv_key_format(&self, kv: &KvField) -> String {
-        interpolate_format(&kv.format, &kv.format_parameters)
+        interpolate_format(kv.format, &kv.format_parameters)
     }
 
     fn r2_key_format(&self, r2: &R2Field) -> String {
-        interpolate_format(&r2.format, &r2.format_parameters)
+        interpolate_format(r2.format, &r2.format_parameters)
     }
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
