@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, Field, MediaType, NavigationFieldKind};
+use ast::{CidlType, Field, MediaType, NavigationFieldKind, Number, Validator};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::SemanticError};
 
@@ -1054,6 +1054,67 @@ fn cidl_types_resolve() {
             CidlType::Inject { name: "MyService" },
         ]
     );
+}
+
+#[test]
+fn fk_inherits_validators() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { 
+                [gt 0]
+                id: int 
+            }
+
+            [lt 100]
+            age: int
+        }
+
+        [use my_d1]
+        model Post {
+            primary { id: int }
+
+            foreign (User::id) {
+                userId
+            }
+
+            foreign (User::age) {
+                userAge
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let post = result.models.get("Post").unwrap();
+
+    let user_id_col = post
+        .columns
+        .iter()
+        .find(|c| c.field.name == "userId")
+        .unwrap();
+    assert_eq!(user_id_col.field.validators.len(), 1);
+    assert!(matches!(
+        user_id_col.field.validators[0],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let user_age_col = post
+        .columns
+        .iter()
+        .find(|c| c.field.name == "userAge")
+        .unwrap();
+    assert_eq!(user_age_col.field.validators.len(), 1);
+    assert!(matches!(
+        user_age_col.field.validators[0],
+        Validator::LessThan(Number::Int(100))
+    ));
 }
 
 #[test]
