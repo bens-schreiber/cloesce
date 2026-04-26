@@ -3,9 +3,7 @@ use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
 
-use crate::{OrmErrorKind, alias, fail};
-
-use super::Result;
+use crate::{OrmErrorKind, Result, alias, fail};
 
 pub struct SelectModel<'a> {
     ast: &'a CloesceAst<'a>,
@@ -23,14 +21,14 @@ impl<'a> SelectModel<'a> {
     ) -> Result<String> {
         let model = match ast.models.get(model_name) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
+            None => fail!(OrmErrorKind::UnknownModel {
+                name: model_name.to_string(),
+            }),
         };
         if model.primary_columns.is_empty() {
-            fail!(
-                OrmErrorKind::ModelMissingD1,
-                "Model '{}' is not a D1 model.",
-                model_name
-            )
+            fail!(OrmErrorKind::ModelMissingD1 {
+                name: model_name.to_string(),
+            })
         }
 
         const CUSTOM_FROM: &str = "__custom_from_placeholder__";

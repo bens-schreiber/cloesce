@@ -309,15 +309,7 @@ pub unsafe extern "C" fn validate_type(
         }
     };
 
-    let res = AST.with(|ast| {
-        validate_cidl_type(
-            validated_field.cidl_type,
-            &validated_field.validators,
-            value,
-            &ast.borrow(),
-            false,
-        )
-    });
+    let res = AST.with(|ast| validate_cidl_type(&validated_field, value, &ast.borrow(), false));
     match res {
         Ok(value) => {
             let bytes = serde_json::to_string(&value).unwrap().into_bytes();
@@ -325,7 +317,7 @@ pub unsafe extern "C" fn validate_type(
             0
         }
         Err(e) => {
-            yield_error(serde_json::to_string(&e).unwrap());
+            yield_error(e);
             1
         }
     }
