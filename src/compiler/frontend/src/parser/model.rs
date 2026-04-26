@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use ast::CrudKind;
+use ast::{CidlType, CrudKind};
 
 use crate::{
     AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
@@ -197,6 +197,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                     .then(symbol())
                     .map(|(validator_tags, symbol)| Symbol {
                         tags: validator_tags,
+                        cidl_type: CidlType::String, // keyfields are always strings
                         ..symbol
                     })
                     .repeated()

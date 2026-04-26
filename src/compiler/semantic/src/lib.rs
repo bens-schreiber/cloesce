@@ -4,7 +4,7 @@ use ast::{
 };
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
-    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, SpdSlice,
+    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice,
     Symbol, ValidatorLiteral, ValidatorTag,
 };
 use indexmap::IndexMap;
@@ -649,12 +649,12 @@ fn resolve_validators<'src, 'p>(
 ) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
     fn invalid_arg<'src, 'p>(
         symbol: &'p Symbol<'src>,
-        tag: &'p ValidatorTag<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
         reason: impl Into<std::string::String>,
     ) -> SemanticError<'src, 'p> {
         SemanticError::ValidatorInvalidArgument {
             symbol,
-            validator: tag,
+            validator: spd,
             reason: reason.into(),
         }
     }
@@ -662,7 +662,7 @@ fn resolve_validators<'src, 'p>(
     fn parse_number<'src, 'p>(
         lit: &ValidatorLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        tag: &'p ValidatorTag<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<Number> {
         match lit {
@@ -670,7 +670,7 @@ fn resolve_validators<'src, 'p>(
                 Ok(n) => return Some(Number::Int(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
-                    tag,
+                    spd,
                     format!("'{s}' is not a valid integer"),
                 )),
             },
@@ -678,11 +678,11 @@ fn resolve_validators<'src, 'p>(
                 Ok(n) => return Some(Number::Float(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
-                    tag,
+                    spd,
                     format!("'{s}' is not a valid number"),
                 )),
             },
-            _ => sink.push(invalid_arg(symbol, tag, "expected a numeric argument")),
+            _ => sink.push(invalid_arg(symbol, spd, "expected a numeric argument")),
         }
         None
     }
@@ -690,11 +690,11 @@ fn resolve_validators<'src, 'p>(
     fn parse_usize<'src, 'p>(
         lit: &ValidatorLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        tag: &'p ValidatorTag<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<usize> {
         let ValidatorLiteral::Int(s) = lit else {
-            sink.push(invalid_arg(symbol, tag, "expected an integer argument"));
+            sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
         match s.parse() {
@@ -702,7 +702,7 @@ fn resolve_validators<'src, 'p>(
             Err(_) => {
                 sink.push(invalid_arg(
                     symbol,
-                    tag,
+                    spd,
                     format!("'{s}' is not a valid non-negative integer"),
                 ));
                 None
@@ -713,11 +713,11 @@ fn resolve_validators<'src, 'p>(
     fn parse_i64<'src, 'p>(
         lit: &ValidatorLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        tag: &'p ValidatorTag<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<i64> {
         let ValidatorLiteral::Int(s) = lit else {
-            sink.push(invalid_arg(symbol, tag, "expected an integer argument"));
+            sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
         match s.parse() {
@@ -725,7 +725,7 @@ fn resolve_validators<'src, 'p>(
             Err(_) => {
                 sink.push(invalid_arg(
                     symbol,
-                    tag,
+                    spd,
                     format!("'{s}' is not a valid integer"),
                 ));
                 None
@@ -749,7 +749,7 @@ fn resolve_validators<'src, 'p>(
             _ => {
                 sink.push(SemanticError::ValidatorUnknown {
                     symbol,
-                    validator: tag,
+                    validator: spd,
                 });
                 continue;
             }
@@ -757,7 +757,7 @@ fn resolve_validators<'src, 'p>(
         if !type_ok {
             sink.push(SemanticError::ValidatorInvalidForType {
                 symbol,
-                validator: tag,
+                validator: spd,
             });
         }
 
@@ -765,27 +765,27 @@ fn resolve_validators<'src, 'p>(
         if args.len() != 1 {
             sink.push(SemanticError::ValidatorInvalidArity {
                 symbol,
-                validator: tag,
+                validator: spd,
             });
             continue;
         }
         let arg = &args[0];
 
         let validator = match *name {
-            "gt" => parse_number(arg, symbol, tag, &mut sink).map(Validator::GreaterThan),
-            "gte" => parse_number(arg, symbol, tag, &mut sink).map(Validator::GreaterThanOrEqual),
-            "lt" => parse_number(arg, symbol, tag, &mut sink).map(Validator::LessThan),
-            "lte" => parse_number(arg, symbol, tag, &mut sink).map(Validator::LessThanOrEqual),
-            "step" => parse_i64(arg, symbol, tag, &mut sink).map(Validator::Step),
-            "length" => parse_usize(arg, symbol, tag, &mut sink).map(Validator::Length),
-            "minlen" => parse_usize(arg, symbol, tag, &mut sink).map(Validator::MinLength),
-            "maxlen" => parse_usize(arg, symbol, tag, &mut sink).map(Validator::MaxLength),
+            "gt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
+            "gte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual),
+            "lt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
+            "lte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual),
+            "step" => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
+            "length" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            "minlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
+            "maxlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
             "regex" => match arg {
                 ValidatorLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
                 _ => {
                     sink.push(invalid_arg(
                         symbol,
-                        tag,
+                        spd,
                         "expected a regex argument (e.g. /pattern/)",
                     ));
                     None
