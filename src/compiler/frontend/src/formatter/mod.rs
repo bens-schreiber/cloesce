@@ -394,17 +394,11 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
 impl<'src> ToDoc<'src> for ValidatorTag<'src> {
     fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = Doc::text("[").then(Doc::text(self.name));
-        for arg in &self.args {
-            doc = doc.then(Doc::text(" ")).then(match arg {
-                ValidatorLiteral::Int(s) | ValidatorLiteral::Real(s) => Doc::text(s),
-                ValidatorLiteral::Str(s) => {
-                    Doc::text("\"").then(Doc::text(s)).then(Doc::text("\""))
-                }
-                ValidatorLiteral::Regex(s) => {
-                    Doc::text("/").then(Doc::text(s)).then(Doc::text("/"))
-                }
-            });
-        }
+        doc = doc.then(Doc::text(" ")).then(match self.arg {
+            ValidatorLiteral::Int(s) | ValidatorLiteral::Real(s) => Doc::text(s),
+            ValidatorLiteral::Str(s) => Doc::text("\"").then(Doc::text(s)).then(Doc::text("\"")),
+            ValidatorLiteral::Regex(s) => Doc::text("/").then(Doc::text(s)).then(Doc::text("/")),
+        });
         doc.then(Doc::text("]"))
     }
 }

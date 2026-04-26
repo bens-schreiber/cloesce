@@ -199,11 +199,6 @@ pub enum SemanticError<'src, 'p> {
         reason: String,
     },
 
-    ValidatorInvalidArity {
-        validator: &'p Spd<ValidatorTag<'src>>,
-        symbol: &'p Symbol<'src>,
-    },
-
     ValidatorUnknown {
         validator: &'p Spd<ValidatorTag<'src>>,
         symbol: &'p Symbol<'src>,
@@ -777,25 +772,6 @@ fn display(
                 .with_label(
                     Label::new((v_path, v_range))
                         .with_message("this validator is not recognized")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("applied to this field")
-                        .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::ValidatorInvalidArity { validator, symbol } => {
-            let (path, range) = span_parts(&symbol.span, file_table);
-            let (v_path, v_range) = span_parts(&validator.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "wrong number of arguments for validator `{}`",
-                    validator.block.name
-                ))
-                .with_label(
-                    Label::new((v_path, v_range))
-                        .with_message("check the expected argument count for this validator")
                         .with_color(Color::Red),
                 )
                 .with_label(

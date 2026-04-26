@@ -848,8 +848,10 @@ fn validator_tags() {
     let ast = lex_and_parse(
         r#"
         model M {
-            [valid1 "arg1" 42 42.0 /[0-9]+/]
-            [valid2 "arg3"]
+            [valid1 "arg1"]
+            [valid2 42]
+            [valid3 42.0]
+            [valid4 /[a-z]+/]
             email: string
         }
         "#,
@@ -867,17 +869,19 @@ fn validator_tags() {
 
     assert_eq!(col.name, "email");
     assert_eq!(col.cidl_type, CidlType::String);
-    assert_eq!(col.tags.len(), 2);
+    assert_eq!(col.tags.len(), 4);
+
     assert_eq!(col.tags[0].block.name, "valid1");
-    assert_eq!(col.tags[0].block.args.len(), 4);
-    assert_eq!(col.tags[0].block.args[0], ValidatorLiteral::Str("arg1"));
-    assert_eq!(col.tags[0].block.args[1], ValidatorLiteral::Int("42"));
-    assert_eq!(col.tags[0].block.args[2], ValidatorLiteral::Real("42.0"));
-    assert_eq!(col.tags[0].block.args[3], ValidatorLiteral::Regex("[0-9]+"));
+    assert_eq!(col.tags[0].block.arg, ValidatorLiteral::Str("arg1"));
 
     assert_eq!(col.tags[1].block.name, "valid2");
-    assert_eq!(col.tags[1].block.args.len(), 1);
-    assert_eq!(col.tags[1].block.args[0], ValidatorLiteral::Str("arg3"));
+    assert_eq!(col.tags[1].block.arg, ValidatorLiteral::Int("42"));
+
+    assert_eq!(col.tags[2].block.name, "valid3");
+    assert_eq!(col.tags[2].block.arg, ValidatorLiteral::Real("42.0"));
+
+    assert_eq!(col.tags[3].block.name, "valid4");
+    assert_eq!(col.tags[3].block.arg, ValidatorLiteral::Regex("[a-z]+"));
 }
 
 fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {

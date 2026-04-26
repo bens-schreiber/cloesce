@@ -204,18 +204,14 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
     let validator_tag = just(Token::LBracket)
         .ignore_then(select! { Token::Ident(name) => name })
-        .then(
-            choice((
-                select! { Token::RealLit(s) => ValidatorLiteral::Real(s) },
-                select! { Token::IntLit(s) => ValidatorLiteral::Int(s) },
-                select! { Token::StringLit(s) => ValidatorLiteral::Str(s) },
-                select! { Token::RegexLit(s) => ValidatorLiteral::Regex(s) },
-            ))
-            .repeated()
-            .collect::<Vec<_>>(),
-        )
+        .then(choice((
+            select! { Token::RealLit(s) => ValidatorLiteral::Real(s) },
+            select! { Token::IntLit(s) => ValidatorLiteral::Int(s) },
+            select! { Token::StringLit(s) => ValidatorLiteral::Str(s) },
+            select! { Token::RegexLit(s) => ValidatorLiteral::Regex(s) },
+        )))
         .then_ignore(just(Token::RBracket))
-        .map_spanned(|(name, args)| ValidatorTag { name, args });
+        .map_spanned(|(name, arg)| ValidatorTag { name, arg });
 
     validator_tag
         .repeated()

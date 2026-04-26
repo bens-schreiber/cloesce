@@ -738,7 +738,7 @@ fn resolve_validators<'src, 'p>(
 
     for spd in &symbol.tags {
         let tag = &spd.block;
-        let ValidatorTag { name, args } = tag;
+        let ValidatorTag { name, arg } = tag;
 
         let root = symbol.cidl_type.root_type();
         let type_ok = match *name {
@@ -761,16 +761,6 @@ fn resolve_validators<'src, 'p>(
             });
             continue;
         }
-
-        // All current validators take exactly one argument.
-        if args.len() != 1 {
-            sink.push(SemanticError::ValidatorInvalidArity {
-                symbol,
-                validator: spd,
-            });
-            continue;
-        }
-        let arg = &args[0];
 
         let validator = match *name {
             "gt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),

@@ -1131,7 +1131,6 @@ fn validator_errors() {
                 name: string
             }
 
-            [gt 1 2]                  // ValidatorInvalidArity (too many args)
             [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
             [step 2.5]                // ValidatorInvalidArgument (float to step)
             [len 3.14]                // ValidatorInvalidForType (length on non-string)
@@ -1150,7 +1149,6 @@ fn validator_errors() {
 
     // Assert
     expect_err!(errors, SemanticError::ValidatorUnknown { .. });
-    expect_err!(errors, SemanticError::ValidatorInvalidArity { .. });
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
         2

@@ -77,7 +77,9 @@ pub enum ValidatorLiteral<'src> {
 #[derive(Debug, Clone)]
 pub struct ValidatorTag<'src> {
     pub name: &'src str,
-    pub args: Vec<ValidatorLiteral<'src>>,
+
+    // TODO: Every validator tag has exactly one argument
+    pub arg: ValidatorLiteral<'src>,
 }
 
 #[derive(Debug, Clone, Default)]
