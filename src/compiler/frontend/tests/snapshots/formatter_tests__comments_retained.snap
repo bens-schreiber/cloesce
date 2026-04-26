@@ -1,5 +1,5 @@
 ---
-source: frontend/tests/formatter_tests.rs
+source: src/compiler/frontend/tests/formatter_tests.rs
 expression: formatted
 ---
 // 0
@@ -22,6 +22,12 @@ model BasicModel {
     // 7
     primary {
         // D
+        // gt above
+        [gt 0] // gt side
+        // gt below
+        // lt above
+        [lt 100] // lt side
+        // lt below
         id: int // 8
     } // 9
     

@@ -11,7 +11,7 @@ env {
 [use get]
 model PureR2Model {
     keyfield {
-        id
+        id: string
     }
     
     r2 (bucket1, "path/to/data/{id}") {
@@ -39,10 +39,10 @@ model D1BackedModel {
     }
     
     keyfield {
-        keyParam
+        keyParam: string
     }
     
-    someColumn: double
+    someColumn: real
     someOtherColumn: string
     
     r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {

@@ -60,10 +60,21 @@ pub enum Token<'src> {
     // Literals
     #[regex(r#""[^"]*""#, |lex| {
         let s = lex.slice();
-        // Return a string slice without the quotes
         &s[1..s.len()-1]
     })]
     StringLit(&'src str),
+
+    #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice())]
+    RealLit(&'src str),
+
+    #[regex(r"[0-9]+", |lex| lex.slice())]
+    IntLit(&'src str),
+
+    #[regex(r"/[^/\n][^/\n]*/", |lex| {
+        let s = lex.slice();
+        &s[1..s.len()-1]
+    })]
+    RegexLit(&'src str),
 
     // Identifiers (must come after keywords)
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]

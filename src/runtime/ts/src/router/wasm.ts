@@ -44,8 +44,8 @@ export interface OrmWasmExports {
   ): boolean;
 
   validate_type(
-    cidl_type_ptr: number,
-    cidl_type_len: number,
+    validated_field_ptr: number,
+    validated_field_len: number,
     value_ptr: number,
     value_len: number,
   ): boolean;

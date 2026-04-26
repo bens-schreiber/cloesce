@@ -1,4 +1,6 @@
-use ast::{CidlType, CloesceAst, IncludeTree};
+use ast::ValidatedField;
+use ast::{CloesceAst, IncludeTree};
+use orm::OrmErrorKind;
 use orm::map::map_sql;
 use orm::select::SelectModel;
 use orm::upsert::UpsertModel;
@@ -11,6 +13,12 @@ use std::str;
 
 type IncludeTreeJson = Map<String, serde_json::Value>;
 type D1Result = Vec<Map<String, serde_json::Value>>;
+
+fn serde_err(e: serde_json::Error) -> OrmErrorKind {
+    OrmErrorKind::SerializeError {
+        message: e.to_string(),
+    }
+}
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
@@ -50,7 +58,7 @@ pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
     let parsed: CloesceAst = match serde_json::from_slice(slice) {
         Ok(val) => val,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -114,7 +122,7 @@ pub unsafe extern "C" fn upsert_model(
     let new_model = match serde_json::from_str::<Map<String, serde_json::Value>>(new_model_json) {
         Ok(new_model) => new_model,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -122,7 +130,7 @@ pub unsafe extern "C" fn upsert_model(
     let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -179,7 +187,7 @@ pub unsafe extern "C" fn select_model(
     let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -235,7 +243,7 @@ pub unsafe extern "C" fn map(
     let d1_results = match serde_json::from_str::<D1Result>(d1_results_raw) {
         Ok(res) => res,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -243,7 +251,7 @@ pub unsafe extern "C" fn map(
     let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -262,7 +270,7 @@ pub unsafe extern "C" fn map(
     }
 }
 
-/// Validates a value against a CidlType.
+/// Validates a value against a ValidatedField
 ///
 /// Requires a previous call to [set_ast_ptr].
 ///
@@ -275,35 +283,40 @@ pub unsafe extern "C" fn map(
 ///  and `value_ptr` must be a pointer to a UTF-8 encoded JSON string representing the value to be validated.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn validate_type(
-    // Cidl Type
-    cidl_type_ptr: *const u8,
-    cidl_type_len: usize,
+    // Validated Field
+    validated_field_ptr: *const u8,
+    validated_field_len: usize,
 
     // Value
     value_ptr: *const u8,
     value_len: usize,
 ) -> i32 {
-    let cidl_type_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(cidl_type_ptr, cidl_type_len)).unwrap() };
+    let validated_field_raw = unsafe {
+        str::from_utf8(slice::from_raw_parts(
+            validated_field_ptr,
+            validated_field_len,
+        ))
+        .unwrap()
+    };
     let value_raw = unsafe { str::from_utf8(slice::from_raw_parts(value_ptr, value_len)).unwrap() };
+
+    let validated_field = match serde_json::from_str::<ValidatedField>(validated_field_raw) {
+        Ok(res) => res,
+        Err(e) => {
+            yield_error(serde_err(e));
+            return 1;
+        }
+    };
 
     let value = match serde_json::from_str::<Option<serde_json::Value>>(value_raw) {
         Ok(res) => res,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
 
-    let cidl_type = match serde_json::from_str::<CidlType>(cidl_type_raw) {
-        Ok(res) => res,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let res = AST.with(|ast| validate_cidl_type(cidl_type, value, &ast.borrow(), false));
+    let res = AST.with(|ast| validate_cidl_type(&validated_field, value, &ast.borrow(), false));
     match res {
         Ok(value) => {
             let bytes = serde_json::to_string(&value).unwrap().into_bytes();
@@ -311,7 +324,7 @@ pub unsafe extern "C" fn validate_type(
             0
         }
         Err(e) => {
-            yield_error(serde_json::to_string(&e).unwrap());
+            yield_error(e);
             1
         }
     }
@@ -329,8 +342,8 @@ fn yield_result(mut bytes: Vec<u8>) {
     }
 }
 
-fn yield_error(e: impl ToString) {
-    let bytes = format!("Encountered an issue in the WASM ORM: {}", e.to_string()).into_bytes();
+fn yield_error(e: OrmErrorKind) {
+    let bytes = e.to_string().into_bytes();
     yield_result(bytes);
 }
 

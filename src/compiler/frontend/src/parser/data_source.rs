@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use indexmap::IndexMap;
 
 use crate::{
-    AstBlockKind, CidlType, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
+    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
@@ -88,8 +88,8 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         .map_spanned(|_| ())
         .map(|spd: Spd<()>| Symbol {
             name: "internal",
-            cidl_type: CidlType::default(),
             span: spd.span,
+            ..Default::default()
         });
 
     // source SourceName for ModelName { ... }

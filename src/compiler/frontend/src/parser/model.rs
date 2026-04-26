@@ -187,15 +187,17 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
-    // `keyfield { ident* }`
-    let keyfield_block = just(Token::Ident("keyfield"))
-        .ignore_then(
-            symbol()
-                .repeated()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map(ModelBlockKind::KeyField);
+    // `keyfield { ([tag]* ident: cidl_type)* }`
+    let keyfield_block = {
+        just(Token::Ident("keyfield"))
+            .ignore_then(
+                typed_symbol()
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            )
+            .map(ModelBlockKind::KeyField)
+    };
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
     let paginated_block = just(Token::Ident("paginated")).ignore_then(

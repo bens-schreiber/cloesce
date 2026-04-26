@@ -11,7 +11,7 @@ env {
 [use get, save]
 model PureKVModel {
     keyfield {
-        id
+        id: string
     }
     
     kv (namespace, "path/to/data/{id}") {
@@ -30,10 +30,10 @@ model D1BackedModel {
     }
     
     keyfield {
-        keyParam
+        keyParam: string
     }
     
-    someColumn: double
+    someColumn: real
     someOtherColumn: string
     
     kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
@@ -44,7 +44,7 @@ model D1BackedModel {
 [use get]
 model PaginatedKVModel {
     keyfield {
-        id
+        id: string
     }
     
     kv (namespace, "paginated/items/") paginated {

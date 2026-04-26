@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst, Column, IncludeTree, Model, NavigationField, NavigationFieldKind};
+use ast::{
+    CidlType, CloesceAst, Column, IncludeTree, Model, NavigationField, NavigationFieldKind,
+    ValidatedField,
+};
 
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
 use sea_query::{Expr, Query};
@@ -8,9 +11,9 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::fail;
 use crate::select::SelectModel;
 use crate::{OrmErrorKind, alias};
+use crate::{fail, fmt_cidl_type};
 
 use super::Result;
 use super::validate::validate_cidl_type;
@@ -105,9 +108,7 @@ impl<'a> UpsertModel<'a> {
             for col in &model.primary_columns {
                 let pk_path = format!("{}.{}", model.name, col.field.name);
                 let pk_expr = match generator.context.get(&pk_path) {
-                    Some(Some(value)) => {
-                        validate_and_transform(col.field.cidl_type.clone(), value, ast)?
-                    }
+                    Some(Some(value)) => validate_and_transform(&col.field, value, ast)?,
                     _ => SqlUpsertBuilder::value_from_ctx(&pk_path),
                 };
                 select_root_model = select_root_model.and_where(
@@ -142,7 +143,9 @@ impl<'a> UpsertModel<'a> {
     ) -> Result<()> {
         let model = match self.ast.models.get(model_name) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
+            None => fail!(OrmErrorKind::UnknownModel {
+                name: model_name.to_string(),
+            }),
         };
 
         // KV objects
@@ -150,21 +153,17 @@ impl<'a> UpsertModel<'a> {
             // TODO: Lists?
             let Some(Value::Object(mut kv_object)) = new_model.remove(kv.field.name.as_ref())
             else {
-                fail!(
-                    OrmErrorKind::TypeMismatch,
-                    "{}.{} must be an object",
-                    model.name,
-                    kv.field.name
-                )
+                fail!(OrmErrorKind::TypeMismatch {
+                    expected: fmt_cidl_type(&kv.field.cidl_type),
+                    got: Value::Null
+                })
             };
 
             let Some(value) = kv_object.remove("raw") else {
-                fail!(
-                    OrmErrorKind::MissingAttribute,
-                    "{}.{} missing 'raw' field",
-                    model.name,
-                    kv.field.name
-                )
+                fail!(OrmErrorKind::MissingField {
+                    missing: "raw".into(),
+                    expected: fmt_cidl_type(&kv.field.cidl_type),
+                })
             };
             let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
 
@@ -205,26 +204,21 @@ impl<'a> UpsertModel<'a> {
                     pk_vals.push((pk_col.field.name.to_string(), Some(val)));
                     pk_missing = false;
                 }
-                None if matches!(pk_col.field.cidl_type, CidlType::Integer) => {
+                None if matches!(pk_col.field.cidl_type, CidlType::Int | CidlType::Uint) => {
                     if model.has_composite_pk() {
-                        fail!(
-                            OrmErrorKind::CompositeKeyCannotAutoincrement,
-                            "{}: composite keys cannot be auto-incremented, all key columns must be provided",
-                            model.name
-                        );
+                        fail!(OrmErrorKind::ModelKeyCannotAutoIncrement {
+                            model: model_name.to_string(),
+                            field: pk_col.field.name.to_string()
+                        })
                     }
 
                     // The value is auto incremented and will be generated on insertion.
                     pk_vals.push((pk_col.field.name.to_string(), None));
                 }
-                _ => {
-                    fail!(
-                        OrmErrorKind::MissingPrimaryKey,
-                        "{}.{}",
-                        model.name,
-                        serde_json::to_string(&new_model).unwrap()
-                    );
-                }
+                _ => fail!(OrmErrorKind::MissingField {
+                    expected: fmt_cidl_type(&pk_col.field.cidl_type),
+                    missing: pk_col.field.name.to_string(),
+                }),
             }
         }
 
@@ -318,31 +312,18 @@ impl<'a> UpsertModel<'a> {
                 ) {
                     (Some(value), _) => {
                         // A value was provided in `new_model`
-                        builder.push_val(
-                            attr.field.name.as_ref(),
-                            &value,
-                            &attr.field.cidl_type,
-                        )?;
+                        builder.push_val(&attr.field, &value)?;
                     }
                     (None, Some(_)) if path_key.is_some() => {
                         // No value provided, but this column is a FK reference
                         // that can be resolved through context
                         let path_key = path_key.unwrap();
                         let ctx = self.context.get(path_key).expect("Context path missing");
-                        builder.push_val_ctx(
-                            ctx,
-                            attr.field.name.as_ref(),
-                            &attr.field.cidl_type,
-                            path_key,
-                        )?;
+                        builder.push_val_ctx(&attr.field, ctx, path_key)?;
                     }
                     (None, _) if pk_missing && attr.field.cidl_type.is_nullable() => {
                         // Default to null for INSERT (no PK provided).
-                        builder.push_val(
-                            attr.field.name.as_ref(),
-                            &Value::Null,
-                            &attr.field.cidl_type,
-                        )?;
+                        builder.push_val(&attr.field, &Value::Null)?;
                     }
                     (None, _) if !pk_missing => {
                         if !attr.field.cidl_type.is_nullable() {
@@ -350,15 +331,10 @@ impl<'a> UpsertModel<'a> {
                             builder.flag_missing_non_nullable();
                         }
                     }
-                    _ => {
-                        fail!(
-                            OrmErrorKind::MissingAttribute,
-                            "{}.{}: {}",
-                            model.name,
-                            attr.field.name,
-                            serde_json::to_string(&new_model).unwrap()
-                        );
-                    }
+                    _ => fail!(OrmErrorKind::MissingField {
+                        expected: fmt_cidl_type(&attr.field.cidl_type),
+                        missing: attr.field.name.to_string(),
+                    }),
                 };
             }
         }
@@ -435,7 +411,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &nav_meta.primary_columns {
             let path_key = format!("{path}.{}.{}", nav.field.name, pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             left_entries.push(value);
@@ -445,7 +421,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &model.primary_columns {
             let path_key = format!("{path}.{}", pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             right_entries.push(value);
@@ -614,9 +590,9 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Adds a column and value to the insert statement.
     ///
     /// Returns an error if the value does not match the meta type.
-    fn push_val(&mut self, var_name: &str, value: &Value, cidl_type: &CidlType) -> Result<()> {
-        self.cols.push(alias(var_name));
-        let val = validate_and_transform(cidl_type.clone(), value, self.ast)?;
+    fn push_val(&mut self, field: &ValidatedField, value: &Value) -> Result<()> {
+        self.cols.push(alias(field.name.as_ref()));
+        let val = validate_and_transform(field, value, self.ast)?;
         self.vals.push(val);
         Ok(())
     }
@@ -624,18 +600,17 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Adds a column and value from the graph context.
     fn push_val_ctx(
         &mut self,
+        field: &ValidatedField,
         ctx: &Option<Value>,
-        var_name: &str,
-        cidl_type: &CidlType,
         path: &str,
     ) -> Result<()> {
         match ctx {
             None => {
-                self.cols.push(alias(var_name));
+                self.cols.push(alias(field.name.as_ref()));
                 self.vals.push(Self::value_from_ctx(path));
             }
             Some(v) => {
-                self.push_val(var_name, v, cidl_type)?;
+                self.push_val(field, v)?;
             }
         }
         Ok(())
@@ -674,7 +649,7 @@ impl<'a> SqlUpsertBuilder<'a> {
         let mut pk_exprs: Vec<(String, SimpleExpr)> = Vec::new();
         for (pk_col, (pk_name, pk_val)) in self.pk_cols.iter().zip(pk_vals.iter()) {
             let expr = match pk_val {
-                Some(v) => validate_and_transform(pk_col.field.cidl_type.clone(), v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
                 None => {
                     // Value will come from context (auto-generated)
                     continue;
@@ -752,40 +727,45 @@ fn key_format_interpolation(
             None => unreachable!("Unclosed brace in key format: {}", key_format),
         };
         let param_name = &key_format[start + 1..end];
-        let param_value = match new_model.get(param_name) {
-            Some(v) => v,
-            None => {
-                if meta
-                    .all_columns()
-                    .any(|(col, _)| col.field.name == param_name)
-                {
-                    placeholders_remain = true;
-                    result.push_str(&format!("{{{}}}", param_name));
-                    last_end = end + 1;
-                    continue;
-                }
 
-                fail!(
-                    OrmErrorKind::MissingKeyParameter,
-                    "{}.{} requires parameter '{}'",
-                    meta.name,
-                    key_format,
-                    param_name
-                )
-            }
+        let Some(param_value) = new_model.get(param_name) else {
+            placeholders_remain = true;
+            result.push_str(&format!("{{{}}}", param_name));
+            last_end = end + 1;
+            continue;
         };
 
+        // Field is a column, primary key, or key field
+        let field_meta = meta
+            .all_columns()
+            .find(|(col, _)| col.field.name == param_name)
+            .map(|(col, _)| &col.field)
+            .or_else(|| meta.key_fields.iter().find(|kf| kf.name == param_name))
+            // guaranteed to exist by semantic analysis
+            .unwrap();
+
         let replacement = match param_value {
-            Value::String(s) => s.clone(),
-            Value::Number(n) => n.to_string(),
-            Value::Bool(b) => b.to_string(),
-            _ => fail!(
-                OrmErrorKind::TypeMismatch,
-                "{}.{} parameter '{}' must be string, number, or boolean",
-                meta.name,
-                key_format,
-                param_name
-            ),
+            Value::String(s)
+                if matches!(
+                    field_meta.cidl_type.root_type(),
+                    CidlType::String | CidlType::DateIso | CidlType::Json
+                ) =>
+            {
+                s.clone()
+            }
+            Value::Number(n)
+                if matches!(
+                    field_meta.cidl_type,
+                    CidlType::Real | CidlType::Uint | CidlType::Int
+                ) =>
+            {
+                n.to_string()
+            }
+            Value::Bool(b) if matches!(field_meta.cidl_type, CidlType::Boolean) => b.to_string(),
+            _ => fail!(OrmErrorKind::TypeMismatch {
+                expected: fmt_cidl_type(&field_meta.cidl_type),
+                got: param_value.clone()
+            }),
         };
 
         result.push_str(&replacement);
@@ -826,29 +806,26 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
 }
 
 fn validate_and_transform(
-    cidl_type: CidlType,
+    field: &ValidatedField,
     value: &Value,
-    ast: &CloesceAst<'_>,
+    ast: &CloesceAst,
 ) -> Result<SimpleExpr> {
-    let res = validate_cidl_type(cidl_type.clone(), Some(value.clone()), ast, false);
+    let res = validate_cidl_type(field, Some(value.clone()), ast, false);
     let value = match res {
         Ok(Some(v)) => v,
-        Ok(None) => fail!(
-            OrmErrorKind::MissingAttribute,
-            "An attribute is missing a value"
-        ),
-        Err(e) => fail!(
-            OrmErrorKind::TypeMismatch,
-            "Value does not match expected type: {:?}",
-            e
-        ),
+        Ok(None) => fail!(OrmErrorKind::MissingField {
+            expected: fmt_cidl_type(&field.cidl_type),
+            missing: field.name.to_string(),
+        }),
+        Err(e) => fail!(e),
     };
 
     Ok(match value {
-        Value::Null => match cidl_type.root_type() {
-            CidlType::Integer => return Ok(Expr::val(None::<i64>).into()),
+        Value::Null => match field.cidl_type.root_type() {
+            CidlType::Int => return Ok(Expr::val(None::<i32>).into()),
+            CidlType::Uint => return Ok(Expr::val(None::<u32>).into()),
             CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),
-            CidlType::Double => return Ok(Expr::val(None::<f64>).into()),
+            CidlType::Real => return Ok(Expr::val(None::<f64>).into()),
             CidlType::String | CidlType::DateIso => {
                 return Ok(Expr::val(None::<String>).into());
             }

@@ -480,10 +480,10 @@ impl MigrateTables {
                                                 // Column type changed, cast
                                                 let sql_type = match &model_c.cidl_type.root_type()
                                                 {
-                                                    CidlType::Integer | CidlType::Boolean => {
-                                                        "integer"
-                                                    }
-                                                    CidlType::Double => "real",
+                                                    CidlType::Int
+                                                    | CidlType::Uint
+                                                    | CidlType::Boolean => "integer",
+                                                    CidlType::Real => "real",
                                                     CidlType::String | CidlType::DateIso => "text",
                                                     _ => unreachable!(),
                                                 };
@@ -886,11 +886,11 @@ fn sql_default(ty: &CidlType) -> sea_query::Value {
     if ty.is_nullable() {
         return sea_query::Value::Int(None);
     }
-
     match ty {
-        CidlType::Integer => sea_query::Value::Int(Some(0i32)),
+        CidlType::Int => sea_query::Value::Int(Some(0i32)),
+        CidlType::Uint => sea_query::Value::Unsigned(Some(0u32)),
+        CidlType::Real => sea_query::Value::Float(Some(0.0)),
         CidlType::String => sea_query::Value::String(Some(Box::new("".into()))),
-        CidlType::Double => sea_query::Value::Float(Some(0.0)),
         _ => unreachable!(),
     }
 }
@@ -907,8 +907,8 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     }
 
     match inner {
-        CidlType::Integer | CidlType::Boolean => col.integer(),
-        CidlType::Double => col.decimal(),
+        CidlType::Int | CidlType::Uint | CidlType::Boolean => col.integer(),
+        CidlType::Real => col.decimal(),
         CidlType::String | CidlType::DateIso => col.text(),
         CidlType::Blob => col.blob(),
         _ => unreachable!("column type must be validated"),

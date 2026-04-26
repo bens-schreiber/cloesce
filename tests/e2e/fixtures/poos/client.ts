@@ -5,16 +5,16 @@ export class PooA {
   major: string;
 
   static fromJson(data: any): PooA {
-    const res = Object.assign(new PooA(), data);
-    return res;
+    const __res = Object.assign(new PooA(), data);
+    return __res;
   }
 }
 export class PooB {
   color: string;
 
   static fromJson(data: any): PooB {
-    const res = Object.assign(new PooB(), data);
-    return res;
+    const __res = Object.assign(new PooB(), data);
+    return __res;
   }
 }
 export class PooC {
@@ -22,12 +22,12 @@ export class PooC {
   b: PooB[];
 
   static fromJson(data: any): PooC {
-    const res = Object.assign(new PooC(), data);
-    res["a"] &&= PooA.fromJson(res.a);
-    for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = PooB.fromJson(res.b[i]);
+    const __res = Object.assign(new PooC(), data);
+    __res["a"] &&= PooA.fromJson(__res.a);
+    for (let i = 0; i < __res.b?.length; i++) {
+      __res.b[i] = PooB.fromJson(__res.b[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class PooAcceptYield {
@@ -38,22 +38,22 @@ export class PooAcceptYield {
     c: PooC,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `http://localhost:5005/api/PooAcceptYield/acceptPoos`
     );
-    const payload: any = {};
-    payload["a"] = a;
-    payload["b"] = b;
-    payload["c"] = c;
+    const __payload: any = {};
+    __payload["a"] = a;
+    __payload["b"] = b;
+    __payload["c"] = c;
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       undefined,
       false
@@ -62,19 +62,19 @@ export class PooAcceptYield {
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `http://localhost:5005/api/PooAcceptYield/yieldPoo`
     );
-    const payload: any = {};
+    const __payload: any = {};
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       PooC,
       false
@@ -82,9 +82,13 @@ export class PooAcceptYield {
   }
 
   static fromJson(data: any): PooAcceptYield {
-    const res = Object.assign(new PooAcceptYield(), data);
-    return res;
+    const __res = Object.assign(new PooAcceptYield(), data);
+    return __res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

@@ -1,9 +1,9 @@
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    resolve_cidl_type,
+    resolve_cidl_type, resolve_validators,
 };
-use ast::{ApiMethod, CidlType, Field, HttpVerb, MediaType};
+use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
 use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice};
 
 #[derive(Default)]
@@ -133,7 +133,12 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         namespace: &'src str,
         method: &'p ApiBlockMethod<'src>,
         table: &SymbolTable<'src, 'p>,
-    ) -> (Vec<Field<'src>>, MediaType, bool, Option<&'src str>) {
+    ) -> (
+        Vec<ValidatedField<'src>>,
+        MediaType,
+        bool,
+        Option<&'src str>,
+    ) {
         let mut params = Vec::new();
 
         let mut has_stream = false;
@@ -231,9 +236,18 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 _ => {}
             }
 
-            params.push(Field {
+            let validators = match resolve_validators(param) {
+                Ok(v) => v,
+                Err(errs) => {
+                    self.sink.extend(errs);
+                    Vec::new()
+                }
+            };
+
+            params.push(ValidatedField {
                 name: param.name.into(),
                 cidl_type: resolved_type,
+                validators,
             });
         }
 

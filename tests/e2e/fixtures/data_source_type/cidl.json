@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -48,7 +49,8 @@
                 "DataSource": {
                   "model_name": "Foo"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "oneDs",
@@ -56,7 +58,8 @@
                 "DataSource": {
                   "model_name": "OneDs"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "noDs",
@@ -64,7 +67,8 @@
                 "DataSource": {
                   "model_name": "NoDs"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "poop",
@@ -72,7 +76,8 @@
                 "Object": {
                   "name": "Poo"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -84,11 +89,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -96,7 +103,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -108,11 +116,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -120,7 +130,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -138,7 +149,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -158,11 +170,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -170,7 +184,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -188,7 +203,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -208,11 +224,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -220,7 +238,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -232,11 +251,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -244,7 +265,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -265,7 +287,8 @@
             "DataSource": {
               "model_name": "Foo"
             }
-          }
+          },
+          "validators": []
         }
       ]
     }

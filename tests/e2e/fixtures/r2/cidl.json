@@ -1,5 +1,5 @@
 {
-  "hash": 11218240258977183070,
+  "hash": 14051981039886414279,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -13,7 +13,7 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 6703974713046051109,
+      "hash": 16719842609251620435,
       "name": "D1BackedModel",
       "d1_binding": "db",
       "primary_columns": [
@@ -21,7 +21,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -30,20 +31,22 @@
       ],
       "columns": [
         {
-          "hash": 4638766536825732897,
+          "hash": 3747858334280870224,
           "field": {
             "name": "someColumn",
-            "cidl_type": "Double"
+            "cidl_type": "Real",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 16794226563886906789,
+          "hash": 15903318361342044116,
           "field": {
             "name": "someOtherColumn",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -61,7 +64,7 @@
           "format_parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": "Int"
             },
             {
               "name": "keyParam",
@@ -69,7 +72,7 @@
             },
             {
               "name": "someColumn",
-              "cidl_type": "Double"
+              "cidl_type": "Real"
             },
             {
               "name": "someOtherColumn",
@@ -82,7 +85,11 @@
       ],
       "navigation_fields": [],
       "key_fields": [
-        "keyParam"
+        {
+          "name": "keyParam",
+          "cidl_type": "String",
+          "validators": []
+        }
       ],
       "apis": [
         {
@@ -98,11 +105,13 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "data",
-              "cidl_type": "Stream"
+              "cidl_type": "Stream",
+              "validators": []
             }
           ]
         },
@@ -123,13 +132,17 @@
           "parameters": [
             {
               "name": "keyParam",
-              "cidl_type": "String"
+              "cidl_type": {
+                "Nullable": "String"
+              },
+              "validators": []
             },
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -137,7 +150,8 @@
                 "DataSource": {
                   "model_name": "D1BackedModel"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -162,7 +176,8 @@
                 "Partial": {
                   "object_name": "D1BackedModel"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -170,7 +185,8 @@
                 "DataSource": {
                   "model_name": "D1BackedModel"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -192,16 +208,18 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "Default_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -209,7 +227,8 @@
                 "DataSource": {
                   "model_name": "D1BackedModel"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -221,11 +240,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -233,7 +254,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -299,7 +321,11 @@
       ],
       "navigation_fields": [],
       "key_fields": [
-        "id"
+        {
+          "name": "id",
+          "cidl_type": "String",
+          "validators": []
+        }
       ],
       "apis": [
         {
@@ -315,11 +341,13 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "data",
-              "cidl_type": "Stream"
+              "cidl_type": "Stream",
+              "validators": []
             }
           ]
         },
@@ -336,11 +364,13 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "data",
-              "cidl_type": "Stream"
+              "cidl_type": "Stream",
+              "validators": []
             }
           ]
         },
@@ -361,7 +391,10 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "String"
+              "cidl_type": {
+                "Nullable": "String"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -369,7 +402,8 @@
                 "DataSource": {
                   "model_name": "PureR2Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }

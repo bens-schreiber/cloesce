@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use askama::Template;
 use ast::{
-    ApiMethod, CidlType, CloesceAst, DataSource, Field, HttpVerb, MediaType, Model,
-    NavigationField, NavigationFieldKind,
+    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, MediaType, Model, NavigationField,
+    NavigationFieldKind, ValidatedField,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -169,6 +169,29 @@ impl ClientTemplate<'_> {
         name == "$get" || name == "$save" || name == "$list"
     }
 
+    /// Returns the un-prefixed parameter name given a data source name and a prefixed param name.
+    /// e.g. ds_name="Default", param_name="Default_id" → "id"
+    fn strip_ds_prefix<'a>(&self, ds_name: &str, param_name: &'a str) -> &'a str {
+        let prefix = format!("{}_", ds_name);
+        param_name
+            .strip_prefix(prefix.as_str())
+            .unwrap_or(param_name)
+    }
+
+    /// Returns the CRUD method parameters (from the ApiMethod) that belong to `ds_name`.
+    /// These are params whose name starts with `"{ds_name}_"`.
+    fn crud_ds_params<'t>(
+        &self,
+        api: &'t ApiMethod<'t>,
+        ds_name: &str,
+    ) -> Vec<&'t ValidatedField<'t>> {
+        let prefix = format!("{}_", ds_name);
+        api.parameters
+            .iter()
+            .filter(|p| p.name.starts_with(prefix.as_str()))
+            .collect()
+    }
+
     fn crud_args_type(
         &self,
         method_name: &str,
@@ -196,7 +219,11 @@ impl ClientTemplate<'_> {
             .join(" | ")
     }
 
-    fn ds_get_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+    fn ds_get_params<'t>(
+        &self,
+        model: &'t Model<'t>,
+        api: &ApiMethod<'_>,
+    ) -> Vec<&'t ValidatedField<'t>> {
         let ds_name = match api.data_source {
             Some(name) => name,
             None => return vec![],
@@ -213,13 +240,17 @@ impl ClientTemplate<'_> {
 
     /// Returns DS get params that are NOT fields (primary columns, columns, or key_fields) of the model.
     /// These must be passed explicitly as method parameters.
-    fn ds_extra_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+    fn ds_extra_params<'t>(
+        &self,
+        model: &'t Model<'t>,
+        api: &ApiMethod<'_>,
+    ) -> Vec<&'t ValidatedField<'t>> {
         let all_field_names: std::collections::HashSet<&str> = model
             .primary_columns
             .iter()
             .map(|c| c.field.name.as_ref())
             .chain(model.columns.iter().map(|c| c.field.name.as_ref()))
-            .chain(model.key_fields.iter().copied())
+            .chain(model.key_fields.iter().map(|k| k.name.as_ref()))
             .collect();
 
         self.ds_get_params(model, api)

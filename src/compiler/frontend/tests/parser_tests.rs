@@ -2,7 +2,7 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
     AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind,
+    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind, ValidatorLiteral,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -27,7 +27,7 @@ fn env_block() {
             vars {
                 api_url: string
                 max_retries: int
-                threshold: double
+                threshold: real
                 created_at: date
                 payload: json
                 enabled: bool
@@ -101,8 +101,8 @@ fn env_block() {
         vars,
         vec![
             ("api_url", &CidlType::String),
-            ("max_retries", &CidlType::Integer),
-            ("threshold", &CidlType::Double),
+            ("max_retries", &CidlType::Int),
+            ("threshold", &CidlType::Real),
             ("created_at", &CidlType::DateIso),
             ("payload", &CidlType::Json),
             ("enabled", &CidlType::Boolean)
@@ -127,7 +127,7 @@ fn poo_block() {
             email: string
             age: Option<int>
             active: bool
-            balance: double
+            balance: real
             created: date
             address: Address
             tags: Array<string>
@@ -177,12 +177,12 @@ fn poo_block() {
             .map(|f| (f.name, f.cidl_type.clone()))
             .collect::<Vec<_>>(),
         vec![
-            ("id", CidlType::Integer),
+            ("id", CidlType::Int),
             ("name", CidlType::String),
             ("email", CidlType::String),
-            ("age", CidlType::nullable(CidlType::Integer)),
+            ("age", CidlType::nullable(CidlType::Int)),
             ("active", CidlType::Boolean),
-            ("balance", CidlType::Double),
+            ("balance", CidlType::Real),
             ("created", CidlType::DateIso),
             ("address", CidlType::UnresolvedReference { name: "Address" }),
             ("tags", CidlType::array(CidlType::String)),
@@ -216,7 +216,7 @@ fn poo_block() {
             .find(|f| f.name == "nested")
             .unwrap()
             .cidl_type,
-        CidlType::array(CidlType::array(CidlType::Integer))
+        CidlType::array(CidlType::array(CidlType::Int))
     );
 }
 
@@ -394,7 +394,7 @@ fn model_primary_unique_optional_foreign() {
         [use d1_db, list]
         [use get, save, d2_db]
         model M {
-            score: double
+            score: real
 
             primary {
                 id: int
@@ -460,7 +460,7 @@ fn model_primary_unique_optional_foreign() {
             _ => None,
         })
         .unwrap();
-    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Double));
+    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Real));
 
     let primary = m
         .blocks
@@ -656,7 +656,10 @@ fn model_kv_r2_paginated() {
 
         [use get, save, list]
         model PureKv {
-            keyfield { key secondary }
+            keyfield { 
+                key: string
+                secondary: int 
+            }
             paginated {
                 kv(kv_ns, "entry/{key}/{secondary}") { entry: json }
             }
@@ -838,6 +841,47 @@ fn model_kv_r2_paginated() {
         ),
         ("entry/{key}/{secondary}", "entry", CidlType::Json)
     );
+}
+
+#[test]
+fn validator_tags() {
+    let ast = lex_and_parse(
+        r#"
+        model M {
+            [valid1 "arg1"]
+            [valid2 42]
+            [valid3 42.0]
+            [valid4 /[a-z]+/]
+            email: string
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+    let col = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.block {
+            ModelBlockKind::Column(s) => Some(s),
+            _ => None,
+        })
+        .unwrap();
+
+    assert_eq!(col.name, "email");
+    assert_eq!(col.cidl_type, CidlType::String);
+    assert_eq!(col.tags.len(), 4);
+
+    assert_eq!(col.tags[0].block.name, "valid1");
+    assert_eq!(col.tags[0].block.arg, ValidatorLiteral::Str("arg1"));
+
+    assert_eq!(col.tags[1].block.name, "valid2");
+    assert_eq!(col.tags[1].block.arg, ValidatorLiteral::Int("42"));
+
+    assert_eq!(col.tags[2].block.name, "valid3");
+    assert_eq!(col.tags[2].block.arg, ValidatorLiteral::Real("42.0"));
+
+    assert_eq!(col.tags[3].block.name, "valid4");
+    assert_eq!(col.tags[3].block.arg, ValidatorLiteral::Regex("[a-z]+"));
 }
 
 fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {

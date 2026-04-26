@@ -1,8 +1,8 @@
 {
-  "hash": 4268265255132821547,
+  "hash": 13006754155948345517,
   "models": {
     "Hamburger": {
-      "hash": 11891469912896067759,
+      "hash": 9074810877786669492,
       "name": "Hamburger",
       "d1_binding": "db",
       "primary_columns": [
@@ -10,7 +10,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -19,10 +20,11 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 5897771438217574949,
           "field": {
             "name": "name",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -31,7 +33,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 17379672083855794608,
+          "hash": 15059743203676459063,
           "field": {
             "name": "toppings",
             "cidl_type": {
@@ -48,7 +50,7 @@
       ]
     },
     "Topping": {
-      "hash": 6851490881146770141,
+      "hash": 4034831846104480738,
       "name": "Topping",
       "d1_binding": "db",
       "primary_columns": [
@@ -56,7 +58,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -65,10 +68,11 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 5897771438217574949,
           "field": {
             "name": "name",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -77,7 +81,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 7547041568480358228,
+          "hash": 5227112688301022683,
           "field": {
             "name": "hamburger",
             "cidl_type": {

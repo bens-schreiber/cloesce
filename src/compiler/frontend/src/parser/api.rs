@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use ast::{CidlType, HttpVerb};
+use ast::HttpVerb;
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
@@ -82,7 +82,7 @@ fn parameter<'tokens, 'src: 'tokens>() -> impl Parser<
             symbol: Symbol {
                 span,
                 name: "self",
-                cidl_type: CidlType::default(),
+                ..Default::default()
             },
             data_source,
         });

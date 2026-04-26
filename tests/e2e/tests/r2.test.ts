@@ -38,7 +38,9 @@ describe("Pure R2 Model", () => {
 
   it("retrieves head", async () => {
     const res = await PureR2Model.$get({
-      id: "test-id-1",
+      Default: {
+        id: "test-id-1",
+      },
     });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
@@ -59,9 +61,11 @@ describe("D1 Backed Model", () => {
   let model: D1BackedModel;
   it("uploads d1", async () => {
     const res = await D1BackedModel.$save({
-      keyParam: "key-param-1",
-      someColumn: 42,
-      someOtherColumn: "foo",
+      Default: {
+        keyParam: "key-param-1",
+        someColumn: 42,
+        someOtherColumn: "foo",
+      },
     });
 
     expect(res.ok, withRes("SAVE should be OK", res)).toBe(true);
@@ -77,8 +81,10 @@ describe("D1 Backed Model", () => {
 
   it("retrieves full model", async () => {
     const res = await D1BackedModel.$get({
-      id: model.id,
-      keyParam: model.keyParam,
+      Default: {
+        id: model.id,
+        keyParam: model.keyParam,
+      },
     });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
@@ -89,8 +95,10 @@ describe("D1 Backed Model", () => {
 
   it("lists models", async () => {
     const res = await D1BackedModel.$list({
-      lastSeen_id: 0,
-      limit: 10,
+      Default: {
+        lastSeen_id: 0,
+        limit: 10,
+      },
     });
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);

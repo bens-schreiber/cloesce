@@ -4,6 +4,7 @@ import { ModelBuilder, createAst } from "./builder";
 import { _cloesceInternal } from "../src/router/router.js";
 import { hydrateType } from "../src/router/orm";
 import { Cidl } from "../src/cidl.js";
+import { CloesceResult } from "../src/common.js";
 
 function createHydrateArgs() {
   return {
@@ -54,7 +55,7 @@ describe("hydrateType Tests", () => {
 
     test("passes through unknown primitive types unchanged", () => {
       expect(hydrateType("hello", "String", createHydrateArgs())).toBe("hello");
-      expect(hydrateType(42, "Integer", createHydrateArgs())).toBe(42);
+      expect(hydrateType(42, "Int", createHydrateArgs())).toBe(42);
     });
   });
 
@@ -311,7 +312,7 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const promises: Promise<void>[] = [];
+      const promises: Promise<CloesceResult<void>>[] = [];
       const noIncludeTree = hydrateType(
         { ...base },
         { Object: { name: "TestModel" } },
@@ -343,7 +344,7 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const promises: Promise<void>[] = [];
+      const promises: Promise<CloesceResult<void>>[] = [];
       const fullIncludeTree = hydrateType(
         { ...base },
         { Object: { name: "TestModel" } },
@@ -441,7 +442,7 @@ describe("ORM Hydrate Tests", () => {
     const ast = createAst({ models: [modelMeta] });
 
     // Act
-    const promises: Promise<void>[] = [];
+    const promises: Promise<CloesceResult<void>>[] = [];
     const hydrated = hydrateType(
       { id: 1 },
       { Object: { name: "CursorModel" } },

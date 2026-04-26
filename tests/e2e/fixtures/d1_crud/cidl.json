@@ -1,5 +1,5 @@
 {
-  "hash": 7593425098127812687,
+  "hash": 14846765435635902856,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "CrudHaver": {
-      "hash": 3221090397089686579,
+      "hash": 18021533906554076977,
       "name": "CrudHaver",
       "d1_binding": "db",
       "primary_columns": [
@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -27,10 +28,11 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 5897771438217574949,
           "field": {
             "name": "name",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -75,7 +77,8 @@
                 "Partial": {
                   "object_name": "CrudHaver"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -83,7 +86,8 @@
                 "DataSource": {
                   "model_name": "CrudHaver"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -103,10 +107,11 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -114,7 +119,8 @@
                 "DataSource": {
                   "model_name": "CrudHaver"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -136,16 +142,18 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "Default_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -153,7 +161,8 @@
                 "DataSource": {
                   "model_name": "CrudHaver"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -165,11 +174,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -177,7 +188,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -191,7 +203,7 @@
       ]
     },
     "Parent": {
-      "hash": 10217849743135784009,
+      "hash": 11381680676619887414,
       "name": "Parent",
       "d1_binding": "db",
       "primary_columns": [
@@ -199,7 +211,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -208,12 +221,13 @@
       ],
       "columns": [
         {
-          "hash": 18265058039846388621,
+          "hash": 4700966054935737206,
           "field": {
             "name": "favoriteChildId",
             "cidl_type": {
-              "Nullable": "Integer"
-            }
+              "Nullable": "Int"
+            },
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "Child",
@@ -227,7 +241,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 4901042800312040762,
+          "hash": 7609943810091403507,
           "field": {
             "name": "favoriteChild",
             "cidl_type": {
@@ -246,7 +260,7 @@
           }
         },
         {
-          "hash": 10782356584402575912,
+          "hash": 16743869929196782581,
           "field": {
             "name": "children",
             "cidl_type": {
@@ -290,7 +304,8 @@
                 "Partial": {
                   "object_name": "Parent"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -298,7 +313,8 @@
                 "DataSource": {
                   "model_name": "Parent"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -318,10 +334,18 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithChildren_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -329,7 +353,8 @@
                 "DataSource": {
                   "model_name": "Parent"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -351,16 +376,32 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "Default_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Uint"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithChildren_lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithChildren_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -368,7 +409,8 @@
                 "DataSource": {
                   "model_name": "Parent"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -380,11 +422,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -392,7 +436,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -404,11 +449,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -416,7 +463,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -430,7 +478,7 @@
       ]
     },
     "Child": {
-      "hash": 2477743275987146240,
+      "hash": 4102921076935304432,
       "name": "Child",
       "d1_binding": "db",
       "primary_columns": [
@@ -438,7 +486,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -450,7 +499,8 @@
           "hash": 5546773060400918129,
           "field": {
             "name": "parentId",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "Parent",
@@ -464,7 +514,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 1543591661476837575,
+          "hash": 4252492671256200320,
           "field": {
             "name": "parent",
             "cidl_type": {
@@ -492,11 +542,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -504,7 +556,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },

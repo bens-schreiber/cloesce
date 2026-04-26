@@ -12,6 +12,8 @@ use crate::AstBlockKind;
 use crate::FileTable;
 use crate::Span;
 use crate::Symbol;
+use crate::ValidatorLiteral;
+use crate::ValidatorTag;
 use crate::lexer::LexedFile;
 use crate::lexer::SpannedToken;
 use crate::lexer::Token;
@@ -114,14 +116,10 @@ fn parser<'tokens, 'src: 'tokens>()
 /// ```
 fn poo_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // ident: cidl_type
-    let poo_field = typed_symbol();
-
-    // poo MyObject { ... }
     just(Token::Poo)
         .ignore_then(symbol())
         .then(
-            poo_field
+            typed_symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -160,10 +158,18 @@ fn inject_block<'tokens, 'src: 'tokens>()
 ///     ident2: cidl_type
 /// }
 /// ```
-pub fn service_block<'tokens, 'src: 'tokens>()
+fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // ident: InjectedService
-    let attribute = typed_symbol();
+    // ident: cidl_type
+    // NOTE: Does not capture validator tags.
+    let attribute = symbol()
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type())
+        .map_with(|(sym, cidl_type), e| Symbol {
+            span: Span::new(sym.span.context(), sym.span.start..e.span().end),
+            cidl_type,
+            ..sym
+        });
 
     // service ServiceName { ... }
     just(Token::Service)
@@ -179,30 +185,49 @@ pub fn service_block<'tokens, 'src: 'tokens>()
 
 /// Parses an identifier and captures its name + span info into a `Symbol`.
 ///
-/// Does not capture cidl type (sets to [CidlType::default()])
+/// Does not capture cidl type / validator (sets to [CidlType::default()])
 fn symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
     select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
         span: e.span(),
         name,
-        cidl_type: CidlType::default(),
+        ..Default::default()
     })
 }
 
 /// Parses a block of the form:
 /// ```cloesce
+/// [tag args...]
 /// ident: cidl_type
 /// ```
 fn typed_symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    symbol()
+    let validator_tag = just(Token::LBracket)
+        .ignore_then(select! { Token::Ident(name) => name })
+        .then(choice((
+            select! { Token::RealLit(s) => ValidatorLiteral::Real(s) },
+            select! { Token::IntLit(s) => ValidatorLiteral::Int(s) },
+            select! { Token::StringLit(s) => ValidatorLiteral::Str(s) },
+            select! { Token::RegexLit(s) => ValidatorLiteral::Regex(s) },
+        )))
+        .then_ignore(just(Token::RBracket))
+        .map_spanned(|(name, arg)| ValidatorTag { name, arg });
+
+    validator_tag
+        .repeated()
+        .collect::<Vec<_>>()
+        .then(symbol())
         .then_ignore(just(Token::Colon))
         .then(cidl_type())
-        .map_with(|(symbol, cidl_type), e| Symbol {
-            span: Span::new(symbol.span.context(), symbol.span.start..e.span().end),
+        .map_with(|((validator_tags, sym), cidl_type), e| Symbol {
+            span: Span::new(sym.span.context(), sym.span.start..e.span().end),
             cidl_type,
-            ..symbol
+            tags: validator_tags,
+            ..sym
         })
+        // Without this box, Apple `ld` linker breaks
+        // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
+        .boxed()
 }
 
 fn cidl_type<'tokens, 'src: 'tokens>()
@@ -234,8 +259,9 @@ fn cidl_type<'tokens, 'src: 'tokens>()
 
         let primitive_keyword = choice((
             just(Token::Ident("string")).to(CidlType::String),
-            just(Token::Ident("int")).to(CidlType::Integer),
-            just(Token::Ident("double")).to(CidlType::Double),
+            just(Token::Ident("int")).to(CidlType::Int),
+            just(Token::Ident("uint")).to(CidlType::Uint),
+            just(Token::Ident("real")).to(CidlType::Real),
             just(Token::Ident("date")).to(CidlType::DateIso),
             just(Token::Ident("bool")).to(CidlType::Boolean),
             just(Token::Ident("json")).to(CidlType::Json),

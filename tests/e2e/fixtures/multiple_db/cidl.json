@@ -1,5 +1,5 @@
 {
-  "hash": 5303730850516668862,
+  "hash": 18092913188023989415,
   "wrangler_env": {
     "d1_bindings": [
       "db1",
@@ -11,7 +11,7 @@
   },
   "models": {
     "DB1Model": {
-      "hash": 7341731061861978357,
+      "hash": 3695430497616817140,
       "name": "DB1Model",
       "d1_binding": "db1",
       "primary_columns": [
@@ -19,7 +19,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -28,10 +29,11 @@
       ],
       "columns": [
         {
-          "hash": 3747858334280870224,
+          "hash": 2856950131736007551,
           "field": {
             "name": "someColumn",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -59,10 +61,11 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -70,7 +73,8 @@
                 "DataSource": {
                   "model_name": "DB1Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -95,7 +99,8 @@
                 "Partial": {
                   "object_name": "DB1Model"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -103,7 +108,8 @@
                 "DataSource": {
                   "model_name": "DB1Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -125,16 +131,18 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "Default_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -142,7 +150,8 @@
                 "DataSource": {
                   "model_name": "DB1Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -154,11 +163,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -166,7 +177,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -180,7 +192,7 @@
       ]
     },
     "DB2Model": {
-      "hash": 122024037709630579,
+      "hash": 14922467547174020977,
       "name": "DB2Model",
       "d1_binding": "db2",
       "primary_columns": [
@@ -188,7 +200,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -197,10 +210,11 @@
       ],
       "columns": [
         {
-          "hash": 3747858334280870224,
+          "hash": 2856950131736007551,
           "field": {
             "name": "someColumn",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -228,10 +242,11 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -239,7 +254,8 @@
                 "DataSource": {
                   "model_name": "DB2Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -264,7 +280,8 @@
                 "Partial": {
                   "object_name": "DB2Model"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -272,7 +289,8 @@
                 "DataSource": {
                   "model_name": "DB2Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -294,16 +312,18 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "Default_lastSeen_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
-              "name": "limit",
+              "name": "Default_limit",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Uint"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -311,7 +331,8 @@
                 "DataSource": {
                   "model_name": "DB2Model"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -323,11 +344,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -335,7 +358,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },

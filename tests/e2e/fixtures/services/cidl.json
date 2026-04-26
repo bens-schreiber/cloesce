@@ -24,7 +24,8 @@
                 "Inject": {
                   "name": "InjectedThing"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -45,7 +46,8 @@
                 "Inject": {
                   "name": "InjectedThing"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -81,7 +83,8 @@
                 "Inject": {
                   "name": "InjectedThing"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }

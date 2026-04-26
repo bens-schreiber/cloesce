@@ -1,0 +1,48 @@
+env {
+    d1 {
+        db
+    }
+
+    kv {
+        store
+    }
+}
+
+[use db, save, get, list]
+model Validator {
+    primary {
+        [lt 100]
+        id: uint
+    }
+
+    [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
+    [maxlen 255]
+    [minlen 5]
+    email: string
+
+    keyfield {
+        [len 10]
+        name: string
+    }
+
+    kv(store, "some_crap/{email}/{name}") {
+        [maxlen 500]
+        data: string
+    }
+}
+
+api Validator {
+    post someMethod(
+        self,
+
+        [lt 100] 
+        id: uint,
+
+        [len 10] 
+        name: string,
+    ) -> void
+}
+
+source None for Validator {
+    include {}
+}

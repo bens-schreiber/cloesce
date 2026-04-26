@@ -28,7 +28,7 @@ fn generates_default_wrangler_value() {
                 API_KEY: string
                 TIMEOUT: int
                 ENABLED: bool
-                THRESHOLD: double
+                THRESHOLD: real
             }
         }
     "#;

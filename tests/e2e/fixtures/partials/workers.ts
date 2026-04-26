@@ -3,7 +3,7 @@ import { HttpResult, DeepPartial } from "cloesce";
 
 export const DogImpl = Dog.impl({
     async create(env: Env, dog: DeepPartial<Dog.Self>): Promise<Dog.Self> {
-        return (await this.Orm.save(env, dog))!
+        return (await this.Orm.save(env, dog)).value!;
     },
 
 

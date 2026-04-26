@@ -7,23 +7,23 @@ export class {{ poo.name }} {
 {%- endfor %}
 
   static fromJson(data: any): {{ poo.name }} {
-    const res = Object.assign(new {{ poo.name }}(), data);
+    const __res = Object.assign(new {{ poo.name }}(), data);
 {%- for field in &poo.fields %}
 {%- if self.is_object_array(&field.cidl_type) %}
-    for (let i = 0; i < res.{{ field.name }}?.length; i++) {
-      res.{{ field.name }}[i] = {{ self.object_name(&field.cidl_type) }}.fromJson(res.{{ field.name }}[i]);
+    for (let i = 0; i < __res.{{ field.name }}?.length; i++) {
+      __res.{{ field.name }}[i] = {{ self.object_name(&field.cidl_type) }}.fromJson(__res.{{ field.name }}[i]);
     }
 {%- else if self.is_object(&field.cidl_type) %}
-    res["{{ field.name }}"] &&= {{ self.object_name(&field.cidl_type) }}.fromJson(res.{{ field.name }});
+    __res["{{ field.name }}"] &&= {{ self.object_name(&field.cidl_type) }}.fromJson(__res.{{ field.name }});
 {%- else if self.is_blob_array(&field.cidl_type) %}
-    for (let i = 0; i < res.{{ field.name }}.length; i++) {
-      res.{{ field.name }}[i] = b64ToU8(res.{{ field.name }}[i]);
+    for (let i = 0; i < __res.{{ field.name }}.length; i++) {
+      __res.{{ field.name }}[i] = b64ToU8(__res.{{ field.name }}[i]);
     }
 {%- else if self.is_blob(&field.cidl_type) %}
-    res.{{ field.name }} = b64ToU8(res.{{ field.name }});
+    __res.{{ field.name }} = b64ToU8(__res.{{ field.name }});
 {%- endif %}
 {%- endfor %}
-    return res;
+    return __res;
   }
 }
 {%- endfor %}
@@ -39,31 +39,31 @@ export class {{ service.name }} {
 {%- endfor %}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
-    const baseUrl = new URL("{{ worker_url }}/{{ service.name }}/{{ api.name }}");
+    const __baseUrl = new URL("{{ worker_url }}/{{ service.name }}/{{ api.name }}");
 {%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
+    const __payload: any = {};
 {%- endif %}
 
 {%- for param in &api.parameters %}
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+    __baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
 {%- else %}
-    payload["{{ param.name }}"] = {{ param.name }};
+    __payload["{{ param.name }}"] = {{ param.name }};
 {%- endif %}
 {%- endif %}
 {%- endfor %}
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
 {%- if !self.is_get_request(&api.http_verb) %}
       headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, __payload),
 {%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -88,8 +88,8 @@ export class {{ model.name }} {
 {%- for nav in &model.navigation_fields %}
   {{ nav.field.name }}: {{ self.nav_type(nav) }}{% if self.is_one_to_one(nav) %} | undefined{% endif %};
 {%- endfor %}
-{%- for key in &model.key_fields %}
-  {{ key }}: string;
+{%- for field in &model.key_fields %}
+  {{ field.name }}: string;
 {%- endfor %}
 {%- for kv in &model.kv_fields %}
   {{ kv.field.name }}: {% if self.contains_stream(&kv.field.cidl_type) %}KValue<void>{% else %}{{ self.map_type(&kv.field.cidl_type) }}{% endif %};
@@ -101,39 +101,30 @@ export class {{ model.name }} {
 {%- for api in &model.apis %}
 {%- if self.is_crud_method(api.name) %}
 {%- if api.name == "$save" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $save(
-    model: DeepPartial<{{ model.name }}>,
-    kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $save(
-    model: DeepPartial<{{ model.name }}>,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: DeepPartial<{{ model.name }}> }{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
-    const baseUrl = new URL(
+    const __resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
+    const __baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
 {%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
-    payload["model"] = model;
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
 {%- endif %}
-    baseUrl.searchParams.append("__datasource", kind);
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
 {%- if !self.is_get_request(&api.http_verb) %}
       headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, __payload),
 {%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -144,70 +135,34 @@ export class {{ model.name }} {
     );
   }
 {%- elif api.name == "$get" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $get(
-{%- if let Some(get) = &ds.get %}
-    args: {
-{%- for param in &get.parameters %}
-      {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
-{%- endfor %}
-{%- for key in &model.key_fields %}
-      {{ key }}: string;
-{%- endfor %}
-    },
-{%- else %}
-    args: {
-{%- for key in &model.key_fields %}
-      {{ key }}: string;
-{%- endfor %}
-    },
-{%- endif %}
-  kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $get(
-    args: any,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: { {% for field in &model.key_fields %}{{ field.name }}: string; {% endfor %}{% for param in self.crud_ds_params(api, ds.name) %}{{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }}; {% endfor %}}}{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
-    const baseUrl = new URL(
+    const __resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
-{%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
-{%- else %}
-    const payload: any = {};
-{%- endif %}
 
-{%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
-{%- if !self.is_datasource(&param.cidl_type) %}
-{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
-{%- else %}
-  {
-    const value = (args as any).{{ param.name }};
-    payload["{{ param.name }}"] = value === undefined ? null : value;
-  }
-{%- endif %}
-{%- endif %}
+{%- for field in &model.key_fields %}
+    __baseUrl.searchParams.append("{{ field.name }}", String(__resolvedArgs?.{{ field.name }} ?? null));
+{%- endfor %}
+{%- for ds in model.data_sources.values() %}
+{%- if !ds.is_internal %}
+{%- for param in self.crud_ds_params(api, ds.name) %}
+    __baseUrl.searchParams.append("{{ param.name }}", String(args?.{{ ds.name }}?.{{ self.strip_ds_prefix(ds.name, &param.name) }} ?? null));
+{%- endfor %}
 {%- endif %}
 {%- endfor %}
-    baseUrl.searchParams.append("__datasource", kind);
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
-{%- if !self.is_get_request(&api.http_verb) %}
-      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
-{%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -218,63 +173,30 @@ export class {{ model.name }} {
     );
   }
 {%- elif api.name == "$list" %}
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-  static $list(
-{%- if let Some(list) = &ds.list %}
-    args: {
-{%- for param in &list.parameters %}
-      {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
-{%- endfor %}
-    },
-{%- else %}
-  args: {},
-{%- endif %}
-    kind: "{{ ds.name }}",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endif %}
-{%- endfor %}
   static async $list(
-    args: any,
-    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    args: {% for ds in model.data_sources.values() %}{% if !ds.is_internal %}{% if !loop.first %} | {% endif %}{ {{ ds.name }}: { {% for param in self.crud_ds_params(api, ds.name) %}{{ self.strip_ds_prefix(ds.name, &param.name) }}: {{ self.map_root_type(&param.cidl_type) }}; {% endfor %}}}{% endif %}{% endfor %},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
-    const baseUrl = new URL(
+    const __resolvedKind: {{ self.ds_kind_union(&model.data_sources) }} = dsKey(args) as any;
+    const __baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
-{%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
-{%- else %}
-    const payload: any = {};
-{%- endif %}
 
-{%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
-{%- if !self.is_datasource(&param.cidl_type) %}
-{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
-{%- else %}
-  {
-    const value = (args as any).{{ param.name }};
-    payload["{{ param.name }}"] = value === undefined ? null : value;
-  }
-{%- endif %}
-{%- endif %}
+{%- for ds in model.data_sources.values() %}
+{%- if !ds.is_internal %}
+{%- for param in self.crud_ds_params(api, ds.name) %}
+    __baseUrl.searchParams.append("{{ param.name }}", String(args?.{{ ds.name }}?.{{ self.strip_ds_prefix(ds.name, &param.name) }} ?? null));
+{%- endfor %}
 {%- endif %}
 {%- endfor %}
-    baseUrl.searchParams.append("__datasource", kind);
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
-{%- if !self.is_get_request(&api.http_verb) %}
-      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
-{%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -289,39 +211,39 @@ export class {{ model.name }} {
     args: {{ self.crud_args_type(api.name, model.name, &model.data_sources) }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
     );
 {%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
+    const __payload: any = {};
 {%- endif %}
 
 {%- for param in &api.parameters %}
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if !self.is_datasource(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
+    __baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
 {%- else %}
-  {
-    const value = (args as any).{{ param.name }};
-    payload["{{ param.name }}"] = value === undefined ? null : value;
-  }
+    {
+      const value = (args as any).{{ param.name }};
+      __payload["{{ param.name }}"] = value === undefined ? null : value;
+    }
 {%- endif %}
 {%- endif %}
 {%- endif %}
 {%- endfor %}
-    baseUrl.searchParams.append("__datasource", args.kind);
+    __baseUrl.searchParams.append("__datasource", args.kind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
 {%- if !self.is_get_request(&api.http_verb) %}
       headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, __payload),
 {%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -347,7 +269,7 @@ export class {{ model.name }} {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
 {%- if !api.is_static %}
-    const id = [
+    const __id = [
 {%- for param in self.ds_get_params(model, api) %}
 {%- if self.is_ds_extra_param(model, api, &param.name) %}
       encodeURIComponent(String({{ param.name }})),
@@ -355,38 +277,38 @@ export class {{ model.name }} {
       encodeURIComponent(String(this.{{ param.name }})),
 {%- endif %}
 {%- endfor %}
-{%- for key in &model.key_fields %}
-      encodeURIComponent(String(this.{{ key }})),
+{%- for field in &model.key_fields %}
+      encodeURIComponent(String(this.{{ field.name }})),
 {%- endfor %}
     ].join("/");
 {%- endif %}
-    const baseUrl = new URL(
-      `{{ worker_url }}/{{ model.name }}/{% if !api.is_static %}${id}/{% endif %}{{ api.name }}`
+    const __baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{% if !api.is_static %}${__id}/{% endif %}{{ api.name }}`
     );
 {%- if !self.is_get_request(&api.http_verb) %}
-    const payload: any = {};
+    const __payload: any = {};
 {%- endif %}
 
 {%- for param in &api.parameters %}
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+    __baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
 {%- else %}
-    payload["{{ param.name }}"] = {{ param.name }};
+    __payload["{{ param.name }}"] = {{ param.name }};
 {%- endif %}
 {%- endif %}
 {%- endfor %}
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "{{ self.fmt_verb(&api.http_verb) }}",
 {%- if !self.is_get_request(&api.http_verb) %}
       headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
-      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, __payload),
 {%- endif %}
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       {{ self.map_media(&api.return_media) }},
 {%- if self.needs_constructor(&api.return_type) %}
       {{ self.map_root_type(&api.return_type) }},
@@ -400,55 +322,59 @@ export class {{ model.name }} {
 {%- endfor %}
 
   static fromJson(data: any): {{ model.name }} {
-    const res = Object.assign(new {{ model.name }}(), data);
+    const __res = Object.assign(new {{ model.name }}(), data);
 {%- for nav in &model.navigation_fields %}
 {%- if self.is_one_to_one(nav) %}
-    res["{{ nav.field.name }}"] &&= {{ nav.model_reference }}.fromJson(res.{{ nav.field.name }});
+    __res["{{ nav.field.name }}"] &&= {{ nav.model_reference }}.fromJson(__res.{{ nav.field.name }});
 {%- else %}
-    for (let i = 0; i < res.{{ nav.field.name }}?.length; i++) {
-      res.{{ nav.field.name }}[i] = {{ nav.model_reference }}.fromJson(res.{{ nav.field.name }}[i]);
+    for (let i = 0; i < __res.{{ nav.field.name }}?.length; i++) {
+      __res.{{ nav.field.name }}[i] = {{ nav.model_reference }}.fromJson(__res.{{ nav.field.name }}[i]);
     }
 {%- endif %}
 {%- endfor %}
 {%- for col in &model.columns %}
 {%- if self.is_blob_array(&col.field.cidl_type) %}
-    for (let i = 0; i < res.{{ col.field.name }}.length; i++) {
-      res.{{ col.field.name }}[i] = b64ToU8(res.{{ col.field.name }}[i]);
+    for (let i = 0; i < __res.{{ col.field.name }}.length; i++) {
+      __res.{{ col.field.name }}[i] = b64ToU8(__res.{{ col.field.name }}[i]);
     }
 {%- else if self.is_blob(&col.field.cidl_type) %}
-    res.{{ col.field.name }} = b64ToU8(res.{{ col.field.name }});
+    __res.{{ col.field.name }} = b64ToU8(__res.{{ col.field.name }});
 {%- endif %}
 {%- endfor %}
 {%- for kv in &model.kv_fields %}
 {%- if self.is_paginated(&kv.field.cidl_type) %}
-    if (res.{{ kv.field.name }}?.results) {
-      for (let i = 0; i < res.{{ kv.field.name }}.results.length; i++) {
-    res.{{ kv.field.name }}.results[i] = Object.assign(new KValue(), res.{{ kv.field.name }}.results[i]);
+    if (__res.{{ kv.field.name }}?.results) {
+      for (let i = 0; i < __res.{{ kv.field.name }}.results.length; i++) {
+        __res.{{ kv.field.name }}.results[i] = Object.assign(new KValue(), __res.{{ kv.field.name }}.results[i]);
 {%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
-        if (res.{{ kv.field.name }}.results[i].raw) res.{{ kv.field.name }}.results[i].raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.results[i].raw);
+        if (__res.{{ kv.field.name }}.results[i].raw) __res.{{ kv.field.name }}.results[i].raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(__res.{{ kv.field.name }}.results[i].raw);
 {%- endif %}
       }
     }
 {%- else if !self.contains_stream(&kv.field.cidl_type) %}
-  if (res.{{ kv.field.name }}) res.{{ kv.field.name }} = Object.assign(new KValue(), res.{{ kv.field.name }});
+    if (__res.{{ kv.field.name }}) __res.{{ kv.field.name }} = Object.assign(new KValue(), __res.{{ kv.field.name }});
 {%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
-    if (res.{{ kv.field.name }}?.raw) res.{{ kv.field.name }}.raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.raw);
+    if (__res.{{ kv.field.name }}?.raw) __res.{{ kv.field.name }}.raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(__res.{{ kv.field.name }}.raw);
 {%- endif %}
 {%- endif %}
 {%- endfor %}
 {%- for r2 in &model.r2_fields %}
 {%- if self.is_paginated(&r2.field.cidl_type) %}
-    if (res.{{ r2.field.name }}?.results) {
-      for (let i = 0; i < res.{{ r2.field.name }}.results.length; i++) {
-        res.{{ r2.field.name }}.results[i] = Object.assign(new R2Object(), res.{{ r2.field.name }}.results[i]);
+    if (__res.{{ r2.field.name }}?.results) {
+      for (let i = 0; i < __res.{{ r2.field.name }}.results.length; i++) {
+        __res.{{ r2.field.name }}.results[i] = Object.assign(new R2Object(), __res.{{ r2.field.name }}.results[i]);
       }
     }
 {%- endif %}
 {%- endfor %}
-    return res;
+    return __res;
   }
 }
 {%- endfor %}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
+}
 
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]

@@ -1,5 +1,5 @@
-use ariadne::{Color, Label, Report};
-use frontend::{FileTable, Span, err::DisplayError};
+use ariadne::{Color, Label, Report, ReportKind};
+use frontend::{FileTable, Span, Spd, ValidatorTag, err::DisplayError};
 
 use crate::Symbol;
 
@@ -101,6 +101,10 @@ pub enum SemanticError<'src, 'p> {
         cycle: Vec<&'src str>,
     },
 
+    KeyFieldInvalidType {
+        field: &'p Symbol<'src>,
+    },
+
     /// A KV tag references an env binding that is not a KV namespace
     KvInvalidBinding {
         binding: &'p Symbol<'src>,
@@ -183,6 +187,22 @@ pub enum SemanticError<'src, 'p> {
     ApiReservedMethod {
         method: &'p Symbol<'src>,
     },
+
+    ValidatorInvalidForType {
+        validator: &'p Spd<ValidatorTag<'src>>,
+        symbol: &'p Symbol<'src>,
+    },
+
+    ValidatorInvalidArgument {
+        validator: &'p Spd<ValidatorTag<'src>>,
+        symbol: &'p Symbol<'src>,
+        reason: String,
+    },
+
+    ValidatorUnknown {
+        validator: &'p Spd<ValidatorTag<'src>>,
+        symbol: &'p Symbol<'src>,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -244,51 +264,46 @@ fn display(
     file_table: &FileTable,
     cache: &mut impl ariadne::Cache<String>,
 ) {
-    match error {
+    macro_rules! report {
+        ($path:expr, $range:expr) => {
+            Report::build(ReportKind::Error, ($path, $range))
+        };
+    }
+
+    let report = match error {
         SemanticError::DuplicateSymbol { first, second } => {
             let (first_path, first_range) = span_parts(&first.span, file_table);
             let (second_path, second_range) = span_parts(&second.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (second_path.clone(), second_range.clone()),
-            )
-            .with_message(format!("'{}' is defined more than once", second.name))
-            .with_label(
-                Label::new((second_path, second_range))
-                    .with_message("duplicate definition here")
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((first_path, first_range))
-                    .with_message("first defined here")
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
+            report!(second_path.clone(), second_range.clone())
+                .with_message(format!("'{}' is defined more than once", second.name))
+                .with_label(
+                    Label::new((second_path, second_range))
+                        .with_message("duplicate definition here")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((first_path, first_range))
+                        .with_message("first defined here")
+                        .with_color(Color::Yellow),
+                )
         }
-
         SemanticError::UnresolvedSymbol { symbol } => {
             let (path, range) = span_parts(&symbol.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!("unresolved symbol '{}'", symbol.name))
                 .with_label(
                     Label::new((path, range))
                         .with_message("this name could not be resolved")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::MissingWranglerEnvBlock => {
             eprintln!("error: project has models but no `env` block is defined");
+            return;
         }
-
         SemanticError::D1ModelMissingD1Binding { model } => {
             let (path, range) = span_parts(&model.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "model '{}' has columns but no `[use]` binding is specified",
                     model.name
@@ -298,52 +313,38 @@ fn display(
                         .with_message("add a `[use (\"<binding>\")]` tag to this model")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::D1ModelInvalidD1Binding { model, binding } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (binding_path.clone(), binding_range.clone()),
-            )
-            .with_message(format!(
-                "'{}' is not a valid D1 binding in the env block",
-                binding.name
-            ))
-            .with_label(
-                Label::new((binding_path, binding_range))
-                    .with_message("this binding is not defined in the env block")
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((model_path, model_range))
-                    .with_message(format!("required by model '{}'", model.name))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
+            report!(binding_path.clone(), binding_range.clone())
+                .with_message(format!(
+                    "'{}' is not a valid D1 binding in the env block",
+                    binding.name
+                ))
+                .with_label(
+                    Label::new((binding_path, binding_range))
+                        .with_message("this binding is not defined in the env block")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((model_path, model_range))
+                        .with_message(format!("required by model '{}'", model.name))
+                        .with_color(Color::Yellow),
+                )
         }
-
         SemanticError::D1ModelMultipleD1Bindings { model, bindings } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
-            let mut report = Report::build(
-                ariadne::ReportKind::Error,
-                (model_path.clone(), model_range.clone()),
-            )
-            .with_message(format!(
-                "model '{}' specifies multiple D1 bindings",
-                model.name,
-            ))
-            .with_label(
-                Label::new((model_path, model_range))
-                    .with_message("a model may only have one `[use]` binding")
-                    .with_color(Color::Yellow),
-            );
+            let mut report = report!(model_path.clone(), model_range.clone())
+                .with_message(format!(
+                    "model '{}' specifies multiple D1 bindings",
+                    model.name,
+                ))
+                .with_label(
+                    Label::new((model_path, model_range))
+                        .with_message("a model may only have one `[use]` binding")
+                        .with_color(Color::Yellow),
+                );
             for binding in bindings {
                 let (b_path, b_range) = span_parts(&binding.span, file_table);
                 report = report.with_label(
@@ -352,12 +353,11 @@ fn display(
                         .with_color(Color::Red),
                 );
             }
-            report.finish().write(cache, std::io::stderr()).ok();
+            report
         }
-
         SemanticError::D1ModelMissingPrimaryKey { model } => {
             let (path, range) = span_parts(&model.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "D1 model '{}' does not declare a primary key",
                     model.name
@@ -367,14 +367,10 @@ fn display(
                         .with_message("add a `primary { (\"<field>\") }` block to this model")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::InvalidColumnType { column } => {
             let (path, range) = span_parts(&column.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "column '{}' has a type that is not a valid SQLite type",
                     column.name
@@ -382,18 +378,14 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "only string, int, double, date, json, bool, and blob are allowed",
+                            "only string, int, real, uint, date, json, bool, and blob are allowed",
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::NullablePrimaryKey { column } => {
             let (path, range) = span_parts(&column.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "primary key column '{}' cannot be nullable",
                     column.name
@@ -403,37 +395,26 @@ fn display(
                         .with_message("remove the `?` from this column's type")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::ForeignKeyReferencesSelf { model, foreign_key } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (fk_path, fk_range) = span_parts(&foreign_key.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (fk_path.clone(), fk_range.clone()),
-            )
-            .with_message(format!(
-                "foreign key on model '{}' references its own model",
-                model.name
-            ))
-            .with_label(
-                Label::new((fk_path, fk_range))
-                    .with_message("a foreign key cannot reference the model it is defined on")
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((model_path, model_range))
-                    .with_message(format!("model '{}' defined here", model.name))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
+            report!(fk_path.clone(), fk_range.clone())
+                .with_message(format!(
+                    "foreign key on model '{}' references its own model",
+                    model.name
+                ))
+                .with_label(
+                    Label::new((fk_path, fk_range))
+                        .with_message("a foreign key cannot reference the model it is defined on")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((model_path, model_range))
+                        .with_message(format!("model '{}' defined here", model.name))
+                        .with_color(Color::Yellow),
+                )
         }
-
         SemanticError::ForeignKeyReferencesDifferentDatabase {
             model,
             fk_model,
@@ -441,37 +422,30 @@ fn display(
         } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (fk_path, fk_range) = span_parts(&fk_model.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (fk_path.clone(), fk_range.clone()),
-            )
-            .with_message(format!(
-                "foreign key on model '{}' references model '{}' in a different database",
-                model.name, fk_model.name
-            ))
-            .with_label(
-                Label::new((fk_path, fk_range))
-                    .with_message(match fk_binding {
-                        Some(b) => {
-                            format!("model '{}' belongs to binding '{}'", fk_model.name, b.name)
-                        }
-                        None => format!("model '{}' has no D1 binding", fk_model.name),
-                    })
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((model_path, model_range))
-                    .with_message(format!("model '{}' defined here", model.name))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
+            report!(fk_path.clone(), fk_range.clone())
+                .with_message(format!(
+                    "foreign key on model '{}' references model '{}' in a different database",
+                    model.name, fk_model.name
+                ))
+                .with_label(
+                    Label::new((fk_path, fk_range))
+                        .with_message(match fk_binding {
+                            Some(b) => {
+                                format!("model '{}' belongs to binding '{}'", fk_model.name, b.name)
+                            }
+                            None => format!("model '{}' has no D1 binding", fk_model.name),
+                        })
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((model_path, model_range))
+                        .with_message(format!("model '{}' defined here", model.name))
+                        .with_color(Color::Yellow),
+                )
         }
-
         SemanticError::ForeignKeyInvalidColumnType { field } => {
             let (path, range) = span_parts(&field.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "foreign key references column '{}' which is not a valid SQLite type",
                     field.name
@@ -481,47 +455,37 @@ fn display(
                         .with_message("foreign key columns must be a valid SQLite type")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::InconsistentModelAdjacency {
             first_model,
             second_model,
         } => {
             let (first_path, first_range) = span_parts(&first_model.span, file_table);
             let (second_path, second_range) = span_parts(&second_model.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (second_path.clone(), second_range.clone()),
-            )
-            .with_message("adjacency list references multiple models")
-            .with_label(
-                Label::new((second_path, second_range))
-                    .with_message(format!("'{}' referenced here", second_model.name))
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((first_path, first_range))
-                    .with_message(format!(
-                        "'{}' referenced here — all entries must point to the same model",
-                        first_model.name
-                    ))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
-        }
 
+            report!(second_path.clone(), second_range.clone())
+                .with_message("adjacency list references multiple models")
+                .with_label(
+                    Label::new((second_path, second_range))
+                        .with_message(format!("'{}' referenced here", second_model.name))
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((first_path, first_range))
+                        .with_message(format!(
+                            "'{}' referenced here — all entries must point to the same model",
+                            first_model.name
+                        ))
+                        .with_color(Color::Yellow),
+                )
+        }
         SemanticError::ForeignKeyInconsistentFieldAdj {
             span,
             adj_count,
             field_count,
         } => {
             let (path, range) = span_parts(span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message("foreign key has mismatched adjacency and field counts")
                 .with_label(
                     Label::new((path, range))
@@ -530,14 +494,10 @@ fn display(
                         ))
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::NavigationReferencesDifferentDatabase { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "navigation property '{}' references a model in a different database",
                     nav.name
@@ -549,49 +509,37 @@ fn display(
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::NavigationMissingReciprocalM2M { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message("many-to-many navigation property has no reciprocal `nav` on the adjacent model")
                 .with_label(
                     Label::new((path, range))
                         .with_message("the adjacent model must have exactly one reciprocal many-to-many `nav`")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::NavigationAmbiguousM2M { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message("many-to-many navigation property has multiple reciprocal `nav`s on the adjacent model")
                 .with_label(
                     Label::new((path, range))
                         .with_message("there must be exactly one reciprocal many-to-many `nav`")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::CyclicalRelationship { cycle } => {
             eprintln!(
                 "error: cyclical relationship detected among: {}",
                 cycle.join(" -> ")
             );
+            return;
         }
-
         SemanticError::KvInvalidBinding { binding } => {
             let (path, range) = span_parts(&binding.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "'{}' is not a valid KV namespace binding",
                     binding.name
@@ -603,14 +551,10 @@ fn display(
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::R2InvalidBinding { binding } => {
             let (path, range) = span_parts(&binding.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "'{}' is not a valid R2 bucket binding",
                     binding.name
@@ -622,14 +566,10 @@ fn display(
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::KvR2UnknownKeyVariable { field, variable } => {
             let (path, range) = span_parts(&field.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "key format references unknown variable '${variable}'"
                 ))
@@ -638,28 +578,20 @@ fn display(
                         .with_message("this variable is not a field or key param on the model")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::KvR2InvalidKeyFormat { field, reason } => {
             let (path, range) = span_parts(&field.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message("invalid key format string")
                 .with_label(
                     Label::new((path, range))
                         .with_message(reason.as_str())
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::PlainOldObjectInvalidFieldType { field } => {
             let (path, range) = span_parts(&field.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "field '{}' has an invalid type for a plain object",
                     field.name
@@ -671,14 +603,10 @@ fn display(
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::DataSourceUnknownModelReference { source } => {
             let (path, range) = span_parts(&source.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "data source '{}' references an unknown or non-model type",
                     source.name
@@ -688,11 +616,7 @@ fn display(
                         .with_message("this model does not exist")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::DataSourceInvalidIncludeTreeReference {
             source,
             model,
@@ -700,43 +624,17 @@ fn display(
         } => {
             let (field_path, field_range) = span_parts(&field.span, file_table);
             let (source_path, source_range) = span_parts(&source.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (field_path.clone(), field_range.clone()),
-            )
-            .with_message(format!(
-                "'{}' is not a valid include on model '{}'",
-                field.name, model.name
-            ))
-            .with_label(
-                Label::new((field_path, field_range))
-                    .with_message(format!(
-                        "not a navigation property, KV, or R2 on '{}'",
-                        model.name
-                    ))
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((source_path, source_range))
-                    .with_message(format!("data source '{}' declared here", source.name))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
-        }
-
-        SemanticError::DataSourceInvalidMethodParam { source, param } => {
-            let (param_path, param_range) = span_parts(&param.span, file_table);
-            let (source_path, source_range) = span_parts(&source.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (param_path.clone(), param_range.clone()))
+            report!(field_path.clone(), field_range.clone())
                 .with_message(format!(
-                    "parameter '{}' on data source '{}' is not a valid SQLite type",
-                    param.name, source.name
+                    "'{}' is not a valid include on model '{}'",
+                    field.name, model.name
                 ))
                 .with_label(
-                    Label::new((param_path, param_range))
-                        .with_message("only string, int, double, date, bool, and blob are allowed as method params")
+                    Label::new((field_path, field_range))
+                        .with_message(format!(
+                            "not a navigation property, KV, or R2 on '{}'",
+                            model.name
+                        ))
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -744,14 +642,29 @@ fn display(
                         .with_message(format!("data source '{}' declared here", source.name))
                         .with_color(Color::Yellow),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
+        SemanticError::DataSourceInvalidMethodParam { source, param } => {
+            let (param_path, param_range) = span_parts(&param.span, file_table);
+            let (source_path, source_range) = span_parts(&source.span, file_table);
+            report!(param_path.clone(), param_range.clone())
+                .with_message(format!(
+                    "parameter '{}' on data source '{}' is not a valid SQLite type",
+                    param.name, source.name
+                ))
+                .with_label(
+                    Label::new((param_path, param_range))
+                        .with_message("only string, int, real, uint, date, json, bool, and blob are allowed as method params")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((source_path, source_range))
+                        .with_message(format!("data source '{}' declared here", source.name))
+                        .with_color(Color::Yellow),
+                )
+        }
         SemanticError::DataSourceUnknownSqlParam { source, name } => {
             let (path, range) = span_parts(&source.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!("SQL references unknown placeholder '${name}'"))
                 .with_label(
                     Label::new((path, range))
@@ -761,14 +674,10 @@ fn display(
                         ))
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::UnsupportedCrudOperation { model } => {
             let (path, range) = span_parts(&model.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "model '{}' has a CRUD operation that is not supported for its backing store",
                     model.name
@@ -778,14 +687,10 @@ fn display(
                         .with_message("this CRUD operation is not available for this model type")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::ApiUnknownNamespaceReference { api } => {
             let (path, range) = span_parts(&api.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "API block '{}' references an unknown model or service",
                     api.name
@@ -795,17 +700,13 @@ fn display(
                         .with_message("this model or service does not exist")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::ApiUnknownDataSourceReference {
             method,
             data_source,
         } => {
             let (path, range) = span_parts(&method.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "API method '{}' references unknown data source '{}'",
                     method.name, data_source.name
@@ -818,14 +719,10 @@ fn display(
                         ))
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::ApiInvalidReturn { method } => {
             let (path, range) = span_parts(&method.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!(
                     "API method '{}' has an invalid return type",
                     method.name
@@ -835,40 +732,29 @@ fn display(
                         .with_message("this return type is not valid for an API method")
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-
         SemanticError::ApiInvalidParam { method, param } => {
             let (param_path, param_range) = span_parts(&param.span, file_table);
             let (method_path, method_range) = span_parts(&method.span, file_table);
-            Report::build(
-                ariadne::ReportKind::Error,
-                (param_path.clone(), param_range.clone()),
-            )
-            .with_message(format!(
-                "parameter '{}' on API method '{}' has an invalid type",
-                param.name, method.name
-            ))
-            .with_label(
-                Label::new((param_path, param_range))
-                    .with_message("this parameter type is not valid for an API method")
-                    .with_color(Color::Red),
-            )
-            .with_label(
-                Label::new((method_path, method_range))
-                    .with_message(format!("method '{}' declared here", method.name))
-                    .with_color(Color::Yellow),
-            )
-            .finish()
-            .write(cache, std::io::stderr())
-            .ok();
+            report!(param_path.clone(), param_range.clone())
+                .with_message(format!(
+                    "parameter '{}' on API method '{}' has an invalid type",
+                    param.name, method.name
+                ))
+                .with_label(
+                    Label::new((param_path, param_range))
+                        .with_message("this parameter type is not valid for an API method")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((method_path, method_range))
+                        .with_message(format!("method '{}' declared here", method.name))
+                        .with_color(Color::Yellow),
+                )
         }
-
         SemanticError::ApiReservedMethod { method } => {
             let (path, range) = span_parts(&method.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
+            report!(path.clone(), range.clone())
                 .with_message(format!("API method '{}' uses a reserved name", method.name))
                 .with_label(
                     Label::new((path, range))
@@ -877,9 +763,81 @@ fn display(
                         )
                         .with_color(Color::Red),
                 )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
         }
-    }
+        SemanticError::ValidatorUnknown { validator, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            let (v_path, v_range) = span_parts(&validator.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!("unknown validator `{}`", validator.block.name))
+                .with_label(
+                    Label::new((v_path, v_range))
+                        .with_message("this validator is not recognized")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("applied to this field")
+                        .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::ValidatorInvalidArgument {
+            validator,
+            symbol,
+            reason,
+        } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            let (v_path, v_range) = span_parts(&validator.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "invalid argument for validator `{}`",
+                    validator.block.name
+                ))
+                .with_label(
+                    Label::new((v_path, v_range))
+                        .with_message(reason.as_str())
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("applied to this field")
+                        .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::ValidatorInvalidForType { validator, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            let (v_path, v_range) = span_parts(&validator.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "validator `{}` is not valid for this type",
+                    validator.block.name
+                ))
+                .with_label(
+                    Label::new((v_path, v_range))
+                        .with_message("this validator cannot be applied to this field type")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("applied to this field")
+                        .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::KeyFieldInvalidType { field } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "key field '{}' has a type that is not a valid SQLite type",
+                    field.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "key fields must be a valid SQLite type (string, int, real, uint, date, json, bool, or blob)"
+                        )
+                        .with_color(Color::Red),
+                )
+        }
+    };
+
+    report.finish().write(cache, std::io::stderr()).ok();
 }

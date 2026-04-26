@@ -533,7 +533,7 @@ impl WranglerDefault {
                 spec.vars.entry(var.name.to_string()).or_insert_with(|| {
                     let default = match var.cidl_type {
                         CidlType::String => "default_string",
-                        CidlType::Integer | CidlType::Double => "0",
+                        CidlType::Int | CidlType::Uint | CidlType::Real => "0",
                         CidlType::Boolean => "false",
                         _ => "default_value",
                     };
