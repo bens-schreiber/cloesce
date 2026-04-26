@@ -1132,8 +1132,8 @@ fn validator_errors() {
             [gt 1 2]                  // ValidatorInvalidArity (too many args)
             [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
             [step 2.5]                // ValidatorInvalidArgument (float to step)
-            [length 3.14]             // ValidatorInvalidArgument (float to length)
-            [regex "not_a_regex"]     // ValidatorInvalidArgument (string instead of /regex/)
+            [len 3.14]             // ValidatorInvalidForType (length on non-string)
+            [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
             age: int
         }
 
@@ -1151,7 +1151,11 @@ fn validator_errors() {
     expect_err!(errors, SemanticError::ValidatorInvalidArity { .. });
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
-        4
+        2
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorInvalidForType { .. }),
+        2
     );
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorUnknown { .. }),
@@ -1177,7 +1181,7 @@ fn validator_valid() {
 
             [minlen 1]
             [maxlen 64]
-            [length 10]
+            [len 10]
             [regex /^[a-z]+$/]
             name: string
         }

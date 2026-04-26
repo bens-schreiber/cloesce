@@ -21,7 +21,7 @@ model Validator {
     email: string
 
     keyfield {
-        [length 10]
+        [len 10]
         name
     }
 
@@ -38,7 +38,7 @@ api Validator {
         [lt 100] 
         id: uint,
 
-        [length 10] 
+        [len 10] 
         name: string,
     ) -> void
 }

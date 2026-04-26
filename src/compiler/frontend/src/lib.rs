@@ -73,7 +73,7 @@ pub enum ValidatorLiteral<'src> {
     Regex(&'src str),
 }
 
-/// A validator tag applied before a field or parameter, e.g. `[length 5]` or `[regex /^[a-z]+$/]`.
+/// A validator tag applied before a field or parameter, e.g. `[len 5]` or `[regex /^[a-z]+$/]`.
 #[derive(Debug, Clone)]
 pub struct ValidatorTag<'src> {
     pub name: &'src str,

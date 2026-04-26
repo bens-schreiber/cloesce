@@ -1,4 +1,4 @@
-import { CloesceResult } from "./common";
+import type { CloesceResult } from "./common.js";
 
 /** NOTE: These definitions mirror the definitions in the Compiler */
 export type CrudKind = "Save" | "Get" | "List";

@@ -1,4 +1,4 @@
-import { D1Result } from "@cloudflare/workers-types";
+import type { D1Result } from "@cloudflare/workers-types";
 
 /**
  * @internal
@@ -84,12 +84,9 @@ export type CloesceResult<T> =
 export class CloesceError {
   static drain<T>(results: CloesceResult<T>[]): CloesceResult<never> | void {
     const errors = [];
-    const values = [];
     for (const r of results) {
       if (r.errors.length > 0) {
         errors.push(...r.errors);
-      } else {
-        values.push(r.value);
       }
     }
 
@@ -121,15 +118,23 @@ export class CloesceError {
   }
 
   static displayErrors(result: CloesceResult<never>): string {
+    function display(v: unknown): string {
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return String(v);
+      }
+    }
+
     return result.errors
       .map((e) => {
         switch (e.kind) {
           case "cloesce":
             return e.message;
           case "d1":
-            return `A D1 error occurred: ${JSON.stringify(e.result)}`;
+            return `A D1 error occurred: ${display(e.result)}`;
           case "generic":
-            return `An error occurred: ${JSON.stringify(e.error)}`;
+            return `An error occurred: ${display(e.error)}`;
         }
       })
       .join(", ");
