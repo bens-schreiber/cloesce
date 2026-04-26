@@ -10,6 +10,6 @@ model Weather {
         id: int
     }
     
-    _date: date
+    date: date
     isRaining: bool
 }

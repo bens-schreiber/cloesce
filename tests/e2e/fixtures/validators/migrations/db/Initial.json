@@ -1,0 +1,53 @@
+{
+  "hash": 12943445999625665821,
+  "models": {
+    "Validator": {
+      "hash": 11924306774175608156,
+      "name": "Validator",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 5506969935928112087,
+          "field": {
+            "name": "id",
+            "cidl_type": "Uint",
+            "validators": [
+              {
+                "LessThan": {
+                  "Int": 100
+                }
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 15344942205672937722,
+          "field": {
+            "name": "email",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+              },
+              {
+                "MaxLength": 255
+              },
+              {
+                "MinLength": 5
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": []
+    }
+  }
+}

@@ -2,63 +2,51 @@
 // @ts-nocheck
 export class Weather {
   id: number;
-  _date: Date;
+  date: Date;
   isRaining: boolean;
-  static $save(
-    model: DeepPartial<Weather>,
-    kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Weather>>;
   static async $save(
-    model: DeepPartial<Weather>,
-    kind: "Default" = "Default",
+    args: { Default: DeepPartial<Weather> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5293/api/Weather/$save`
     );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Weather,
       false
     );
   }
-  static $get(
-    args: {
-      id: number;
-    },
-  kind: "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Weather>>;
   static async $get(
-    args: any,
-    kind: "Default" = "Default",
+    args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5293/api/Weather/$get`
     );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Weather,
       false
@@ -66,9 +54,13 @@ export class Weather {
   }
 
   static fromJson(data: any): Weather {
-    const res = Object.assign(new Weather(), data);
-    return res;
+    const __res = Object.assign(new Weather(), data);
+    return __res;
   }
+}
+
+function dsKey(args: object): string {
+  return Object.keys(args)[0];
 }
 
 type DeepPartialInner<T> = T extends (infer U)[]

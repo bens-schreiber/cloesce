@@ -1,8 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 
 use ast::{
-    CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
-    NavigationFieldKind,
+    CidlType, CloesceAst, DataSource, DataSourceMethod, IncludeTree, Model, NavigationFieldKind,
+    ValidatedField,
 };
 use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol};
 use indexmap::IndexMap;
@@ -11,7 +11,7 @@ use orm::select::SelectModel;
 use crate::{
     SymbolTable,
     err::{ErrorSink, SemanticError},
-    is_valid_sql_type,
+    is_valid_sql_type, resolve_validators,
 };
 
 pub struct DataSourceAnalysis;
@@ -119,9 +119,19 @@ impl<'src, 'p> DataSourceAnalysis {
                     param,
                 });
             }
-            parameters.push(Field {
+
+            let validators = match resolve_validators(param) {
+                Ok(v) => v,
+                Err(errs) => {
+                    sink.extend(errs);
+                    Vec::new()
+                }
+            };
+
+            parameters.push(ValidatedField {
                 name: param.name.into(),
                 cidl_type: param.cidl_type.clone(),
+                validators,
             });
         }
 
@@ -182,10 +192,7 @@ impl<'src> DataSourceExpansion {
         let parameters = model
             .primary_columns
             .iter()
-            .map(|pk| Field {
-                name: pk.field.name.clone(),
-                cidl_type: pk.field.cidl_type.clone(),
-            })
+            .map(|pk| pk.field.clone())
             .collect();
 
         let where_clause = if model.primary_columns.len() == 1 {
@@ -223,13 +230,14 @@ impl<'src> DataSourceExpansion {
         let parameters = model
             .primary_columns
             .iter()
-            .map(|pk| Field {
+            .map(|pk| ValidatedField {
                 name: format!("lastSeen_{}", pk.field.name).into(),
-                cidl_type: pk.field.cidl_type.clone(),
+                ..pk.field.clone()
             })
-            .chain(vec![Field {
+            .chain(vec![ValidatedField {
                 name: "limit".into(),
-                cidl_type: CidlType::Integer,
+                cidl_type: CidlType::Uint,
+                validators: Vec::new(),
             }])
             .collect();
 

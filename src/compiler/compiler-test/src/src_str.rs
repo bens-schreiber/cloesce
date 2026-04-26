@@ -34,12 +34,12 @@ model HasSqlColumnTypes {
 
     str: string
     integer: int
-    dub: double
+    dub: real
     boo: bool
     dat: date
     strNull: Option<string>
     integerNull: Option<int>
-    dubNull: Option<double>
+    dubNull: Option<real>
     booNull: Option<bool>
     dateNull: Option<date>
 }
@@ -105,8 +105,8 @@ api ModelWithCompositePk {
 
 model ModelWithKv {
     keyfield {
-        id1
-        id2
+        id1: string
+        id2: int
     }
 
     kv(my_kv, "{id1}") {
@@ -130,7 +130,7 @@ api ModelWithKv {
 
 model ModelWithR2 {
     keyfield {
-        id
+        id: string
     }
 
     r2(my_r2, "{id}") {
@@ -156,7 +156,7 @@ model ToyotaPrius {
     modelYear: int
 
     keyfield {
-        someKey
+        someKey: string
     }
 
     kv(my_kv, "{ownerId}/{modelYear}") {

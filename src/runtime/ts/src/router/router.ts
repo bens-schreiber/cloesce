@@ -13,7 +13,12 @@ import {
   DataSource,
   CidlType,
 } from "../cidl.js";
-import { Either, InternalError } from "../common.js";
+import {
+  CloesceError,
+  CloesceResult,
+  Either,
+  InternalError,
+} from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
@@ -127,11 +132,6 @@ export class CloesceApp {
    * making it available for routing and injection, respectively.
    */
   public register(api: { readonly tag: string }): this {
-    if (this.apiRegistry.has(api.tag)) {
-      console.warn(
-        `Overwriting existing API for tag ${api.tag}. This may cause unexpected behavior.`,
-      );
-    }
     this.apiRegistry.set(api.tag, api);
     return this;
   }
@@ -220,8 +220,11 @@ export class CloesceApp {
       }
 
       // Run init method
+      type ServiceInit = {
+        init?: (self: any) => Promise<HttpResult<void> | void>;
+      };
       const serviceApi = this.apiRegistry.get(serviceMeta.name) as
-        | { init: (self: any) => Promise<HttpResult<void> | void> }
+        | ServiceInit
         | undefined;
       if (serviceApi?.init) {
         const res = await serviceApi.init(service);
@@ -484,8 +487,8 @@ function matchRoute(
 
   const keyFields: Record<string, string> = {};
   for (let i = 0; i < numKeyFields; i++) {
-    const keyField = model.key_fields[i];
-    keyFields[keyField] = parts[1 + numGetParams + i];
+    const field = model.key_fields[i];
+    keyFields[field.name] = parts[1 + numGetParams + i];
   }
 
   return Either.right({
@@ -513,8 +516,8 @@ async function validateRequest(
   route: MatchedRoute,
 ): Promise<Either<HttpResult, RequestParamMap>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  const invalidRequest = (c: RouterError) =>
-    exit(400, c, "Invalid Request Body");
+  const invalidRequest = (c: RouterError, reason: string) =>
+    exit(400, c, `Invalid Request: ${reason}`);
 
   // Validate instantiated invocation
   if (route.kind === "model" && !route.method.is_static) {
@@ -523,13 +526,19 @@ async function validateRequest(
     // Validate all data source get parameters are present
     for (const field of route.dataSource?.get?.parameters ?? []) {
       if (!(field.name in route.getParamValues)) {
-        return invalidRequest(RouterError.InstantiatedMethodMissingGetParam);
+        return invalidRequest(
+          RouterError.InstantiatedMethodMissingGetParam,
+          `Missing data source get parameter ${field.name}`,
+        );
       }
     }
 
-    for (const keyParam of model.key_fields) {
-      if (!(keyParam in route.keyFields)) {
-        return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
+    for (const field of model.key_fields) {
+      if (!(field.name in route.keyFields)) {
+        return invalidRequest(
+          RouterError.InstantiatedMethodMissingKeyParam,
+          `Missing key field ${field.name}`,
+        );
       }
     }
   }
@@ -567,12 +576,18 @@ async function validateRequest(
         }
       }
     } catch {
-      return invalidRequest(RouterError.RequestMissingBody);
+      return invalidRequest(
+        RouterError.RequestMissingBody,
+        "Request body is missing or malformed",
+      );
     }
   }
 
   if (!requiredParams.every((p) => p.name in params)) {
-    return invalidRequest(RouterError.RequestBodyMissingParameters);
+    return invalidRequest(
+      RouterError.RequestBodyMissingParameters,
+      "One or more required parameters are missing",
+    );
   }
 
   // Validate all parameters type. Octet streams need no validation.
@@ -581,14 +596,18 @@ async function validateRequest(
       const validateRes = invokeOrmWasm(
         wasm.validate_type,
         [
-          WasmResource.fromString(JSON.stringify(p.cidl_type), wasm),
-          WasmResource.fromString(JSON.stringify(params[p.name]), wasm),
+          WasmResource.fromString(JSON.stringify(p), wasm), // field metadata
+          WasmResource.fromString(JSON.stringify(params[p.name]), wasm), // value
         ],
         wasm,
       );
 
       if (validateRes.isLeft()) {
-        return invalidRequest(RouterError.RequestBodyInvalidParameter);
+        const message = validateRes.unwrapLeft();
+        return invalidRequest(
+          RouterError.RequestBodyInvalidParameter,
+          `Parameter ${p.name} is invalid: ${message}`,
+        );
       }
 
       const validatedRaw = JSON.parse(validateRes.unwrap());
@@ -630,9 +649,9 @@ async function hydrate(
   const dataSource: DataSource =
     meta.data_sources[route.method.data_source ?? "Default"];
 
-  // Error state: If some outside force tweaked the database schema, the query may fail.
-  // Otherwise, this indicates a bug in the compiler or runtime.
-  const malformedQuery = (e: any) =>
+  // Error state: If some outside force tweaked the database schema, or some outage caused the
+  // data store to return an error, hydration may fail.
+  const hydrationFailed = (e: any) =>
     exit(
       500,
       RouterError.InvalidDatabaseQuery,
@@ -646,9 +665,15 @@ async function hydrate(
       ...Object.values(route.keyFields),
     );
 
+    if (result.errors.length > 0) {
+      return hydrationFailed(
+        CloesceError.displayErrors(result as CloesceResult<never>),
+      );
+    }
+
     // Result will only be null if the record does not exist for a D1 query
     // (KV or R2 based models will just be empty, as that is a valid state).
-    if (result === null) {
+    if (result.value === null) {
       return exit(
         404,
         RouterError.ModelNotFound,
@@ -656,9 +681,9 @@ async function hydrate(
       );
     }
 
-    return Either.right(result);
+    return Either.right(result.value);
   } catch (e) {
-    return malformedQuery(JSON.stringify(e));
+    return hydrationFailed(JSON.stringify(e));
   }
 }
 

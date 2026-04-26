@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["node"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
     "strict": true,
     "strictPropertyInitialization": false,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "noEmit": true
   },
-  "include": ["src/**/*.ts", "fixtures/**/*.ts"]
+  "include": ["src/**/*.ts", "fixtures/**/*.ts", "tests/**/*.ts", "global.d.ts"]
 }

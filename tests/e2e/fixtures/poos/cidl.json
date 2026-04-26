@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -48,7 +49,8 @@
                 "Object": {
                   "name": "PooA"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "b",
@@ -56,7 +58,8 @@
                 "Object": {
                   "name": "PooB"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "c",
@@ -64,7 +67,8 @@
                 "Object": {
                   "name": "PooC"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -92,11 +96,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -104,7 +110,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -121,11 +128,13 @@
       "fields": [
         {
           "name": "name",
-          "cidl_type": "String"
+          "cidl_type": "String",
+          "validators": []
         },
         {
           "name": "major",
-          "cidl_type": "String"
+          "cidl_type": "String",
+          "validators": []
         }
       ]
     },
@@ -134,7 +143,8 @@
       "fields": [
         {
           "name": "color",
-          "cidl_type": "String"
+          "cidl_type": "String",
+          "validators": []
         }
       ]
     },
@@ -147,7 +157,8 @@
             "Object": {
               "name": "PooA"
             }
-          }
+          },
+          "validators": []
         },
         {
           "name": "b",
@@ -157,7 +168,8 @@
                 "name": "PooB"
               }
             }
-          }
+          },
+          "validators": []
         }
       ]
     }

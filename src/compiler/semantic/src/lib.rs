@@ -1,8 +1,11 @@
-use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
+use ast::{
+    CidlType, CloesceAst, Field, Number, PlainOldObject, Service, ValidatedField, Validator,
+    WranglerEnv,
+};
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
-    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, SpdSlice,
-    Symbol,
+    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice,
+    Symbol, ValidatorLiteral, ValidatorTag,
 };
 use indexmap::IndexMap;
 
@@ -12,7 +15,7 @@ use crate::{
     api::ApiAnalysis,
     crud::CrudExpansion,
     data_source::{DataSourceAnalysis, DataSourceExpansion},
-    err::{ErrorSink, SemanticError},
+    err::{BatchResult, ErrorSink, SemanticError},
     model::ModelAnalysis,
 };
 
@@ -469,9 +472,18 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 }
 
-                fields.push(Field {
+                let validators = match resolve_validators(field) {
+                    Ok(v) => v,
+                    Err(errs) => {
+                        sink.extend(errs);
+                        Vec::new()
+                    }
+                };
+
+                fields.push(ValidatedField {
                     name: field.name.into(),
                     cidl_type: resolved_type,
+                    validators,
                 });
             }
 
@@ -631,6 +643,157 @@ fn resolve_cidl_type<'src, 'p>(
     }
 }
 
+/// Resolves validators for a given symbol, returning an error if any validator is invalid for the symbol's type.
+fn resolve_validators<'src, 'p>(
+    symbol: &'p Symbol<'src>,
+) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
+    fn invalid_arg<'src, 'p>(
+        symbol: &'p Symbol<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
+        reason: impl Into<std::string::String>,
+    ) -> SemanticError<'src, 'p> {
+        SemanticError::ValidatorInvalidArgument {
+            symbol,
+            validator: spd,
+            reason: reason.into(),
+        }
+    }
+
+    fn parse_number<'src, 'p>(
+        lit: &ValidatorLiteral<'src>,
+        symbol: &'p Symbol<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> Option<Number> {
+        match lit {
+            ValidatorLiteral::Int(s) => match s.parse() {
+                Ok(n) => return Some(Number::Int(n)),
+                Err(_) => sink.push(invalid_arg(
+                    symbol,
+                    spd,
+                    format!("'{s}' is not a valid integer"),
+                )),
+            },
+            ValidatorLiteral::Real(s) => match s.parse() {
+                Ok(n) => return Some(Number::Float(n)),
+                Err(_) => sink.push(invalid_arg(
+                    symbol,
+                    spd,
+                    format!("'{s}' is not a valid number"),
+                )),
+            },
+            _ => sink.push(invalid_arg(symbol, spd, "expected a numeric argument")),
+        }
+        None
+    }
+
+    fn parse_usize<'src, 'p>(
+        lit: &ValidatorLiteral<'src>,
+        symbol: &'p Symbol<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> Option<usize> {
+        let ValidatorLiteral::Int(s) = lit else {
+            sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
+            return None;
+        };
+        match s.parse() {
+            Ok(n) => Some(n),
+            Err(_) => {
+                sink.push(invalid_arg(
+                    symbol,
+                    spd,
+                    format!("'{s}' is not a valid non-negative integer"),
+                ));
+                None
+            }
+        }
+    }
+
+    fn parse_i64<'src, 'p>(
+        lit: &ValidatorLiteral<'src>,
+        symbol: &'p Symbol<'src>,
+        spd: &'p Spd<ValidatorTag<'src>>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> Option<i64> {
+        let ValidatorLiteral::Int(s) = lit else {
+            sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
+            return None;
+        };
+        match s.parse() {
+            Ok(n) => Some(n),
+            Err(_) => {
+                sink.push(invalid_arg(
+                    symbol,
+                    spd,
+                    format!("'{s}' is not a valid integer"),
+                ));
+                None
+            }
+        }
+    }
+
+    let mut resolved = Vec::new();
+    let mut sink = ErrorSink::new();
+
+    for spd in &symbol.tags {
+        let tag = &spd.block;
+        let ValidatorTag { name, arg } = tag;
+
+        let root = symbol.cidl_type.root_type();
+        let type_ok = match *name {
+            "gt" | "gte" | "lt" | "lte" | "step" => {
+                matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
+            }
+            "len" | "minlen" | "maxlen" | "regex" => matches!(root, CidlType::String),
+            _ => {
+                sink.push(SemanticError::ValidatorUnknown {
+                    symbol,
+                    validator: spd,
+                });
+                continue;
+            }
+        };
+        if !type_ok {
+            sink.push(SemanticError::ValidatorInvalidForType {
+                symbol,
+                validator: spd,
+            });
+            continue;
+        }
+
+        let validator = match *name {
+            "gt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
+            "gte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual),
+            "lt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
+            "lte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual),
+            "step" => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
+            "len" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            "minlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
+            "maxlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
+            "regex" => match arg {
+                ValidatorLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
+                _ => {
+                    sink.push(invalid_arg(
+                        symbol,
+                        spd,
+                        "expected a regex argument (e.g. /pattern/)",
+                    ));
+                    None
+                }
+            },
+            _ => unreachable!("filtered above"),
+        };
+
+        if let Some(v) = validator {
+            resolved.push(v);
+        }
+    }
+
+    sink.finish()?;
+    Ok(resolved)
+}
+
 /// Returns if a column in a D1 model is a valid SQLite type
 fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     let inner = match cidl_type {
@@ -640,8 +803,9 @@ fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
 
     matches!(
         inner,
-        CidlType::Integer
-            | CidlType::Double
+        CidlType::Int
+            | CidlType::Uint
+            | CidlType::Real
             | CidlType::String
             | CidlType::Blob
             | CidlType::Boolean

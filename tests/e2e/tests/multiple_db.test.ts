@@ -19,7 +19,7 @@ afterAll(async () => {
 describe("Multiple DBs", () => {
   it("CRUD on DB1Model", async () => {
     const save = await DB1Model.$save({
-      someColumn: "test",
+      Default: { someColumn: "test" },
     });
     expect(save.ok, withRes("POST should be OK", save)).toBe(true);
     expect(save.data).toEqual({
@@ -28,7 +28,7 @@ describe("Multiple DBs", () => {
     });
 
     const $get = await DB1Model.$get({
-      id: save.data!.id,
+      Default: { id: save.data!.id },
     });
     expect($get.ok, withRes("$get should be OK", $get)).toBe(true);
     expect($get.data).toEqual({
@@ -37,8 +37,7 @@ describe("Multiple DBs", () => {
     });
 
     const list = await DB1Model.$list({
-      lastSeen_id: 0,
-      limit: 10,
+      Default: { lastSeen_id: 0, limit: 10 },
     });
     expect(list.ok, withRes("$list should be OK", list)).toBe(true);
     expect(list.data).toEqual([
@@ -51,7 +50,7 @@ describe("Multiple DBs", () => {
 
   it("CRUD on DB2Model", async () => {
     const save = await DB2Model.$save({
-      someColumn: "test2",
+      Default: { someColumn: "test2" },
     });
     expect(save.ok, withRes("POST should be OK", save)).toBe(true);
     expect(save.data).toEqual({
@@ -60,7 +59,7 @@ describe("Multiple DBs", () => {
     });
 
     const get = await DB2Model.$get({
-      id: save.data!.id,
+      Default: { id: save.data!.id },
     });
     expect(get.ok, withRes("$get should be OK", get)).toBe(true);
     expect(get.data).toEqual({
@@ -69,8 +68,7 @@ describe("Multiple DBs", () => {
     });
 
     const list = await DB2Model.$list({
-      lastSeen_id: 0,
-      limit: 10,
+      Default: { lastSeen_id: 0, limit: 10 },
     });
     expect(list.ok, withRes("$list should be OK", list)).toBe(true);
     expect(list.data).toEqual([

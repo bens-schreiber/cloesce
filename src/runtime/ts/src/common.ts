@@ -1,3 +1,5 @@
+import type { D1Result } from "@cloudflare/workers-types";
+
 /**
  * @internal
  * Denotes that some error occured internally in Cloesce that should not happen.
@@ -9,10 +11,7 @@ export class InternalError extends Error {
   }
 }
 
-/**
- * @internal
- * todo: update to https://github.com/dmmulroy/better-result
- */
+/** @internal */
 export class Either<L, R> {
   private constructor(
     private readonly inner: { ok: true; right: R } | { ok: false; left: L },
@@ -68,21 +67,78 @@ export class Either<L, R> {
   }
 }
 
-/** @internal */
-export function b64ToU8(b64: string): Uint8Array {
-  // Prefer Buffer in Node.js environments
-  if (typeof Buffer !== "undefined") {
-    const buffer = Buffer.from(b64, "base64");
-    return new Uint8Array(buffer);
+export type CloesceErrorKind =
+  | { kind: "cloesce"; message: string }
+  | { kind: "d1"; result: D1Result }
+  | { kind: "generic"; error: unknown };
+
+export type CloesceResult<T> =
+  | { value: null; errors: CloesceErrorKind[] }
+  | { value: T; errors: [] };
+
+/**
+ * @internal
+ *
+ * An internal class to raise a user facing `CloesceResult`
+ */
+export class CloesceError {
+  static drain<T>(results: CloesceResult<T>[]): CloesceResult<never> | void {
+    const errors = [];
+    for (const r of results) {
+      if (r.errors.length > 0) {
+        errors.push(...r.errors);
+      }
+    }
+
+    if (errors.length > 0) {
+      return { value: null, errors };
+    }
   }
 
-  // Use atob only in browser environments
-  const s = atob(b64);
-  const u8 = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) {
-    u8[i] = s.charCodeAt(i);
+  static generic(error: unknown): CloesceResult<never> {
+    return { value: null, errors: [{ kind: "generic", error }] };
   }
-  return u8;
+
+  static async catchGeneric<T>(
+    fn: () => Promise<T>,
+  ): Promise<CloesceResult<T>> {
+    try {
+      return { value: await fn(), errors: [] };
+    } catch (e) {
+      return CloesceError.generic(e);
+    }
+  }
+
+  static cloesce(message: string): CloesceResult<never> {
+    return { value: null, errors: [{ kind: "cloesce", message }] };
+  }
+
+  static d1(result: D1Result): CloesceResult<never> {
+    return { value: null, errors: [{ kind: "d1", result }] };
+  }
+
+  static displayErrors(result: CloesceResult<never>): string {
+    function display(v: unknown): string {
+      try {
+        return JSON.stringify(v);
+      } catch {
+        return String(v);
+      }
+    }
+
+    return result.errors
+      .map((e) => {
+        switch (e.kind) {
+          case "cloesce":
+            return e.message;
+          case "d1":
+            return `A D1 error occurred: ${display(e.result)}`;
+          case "generic":
+            return `An error occurred: ${display(e.error)}`;
+        }
+      })
+      .join(", ");
+  }
 }
 
 /** @internal */

@@ -1,5 +1,5 @@
 {
-  "hash": 18432525960313685479,
+  "hash": 13563103492600318157,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "A": {
-      "hash": 7977924658294928939,
+      "hash": 7524899204816327788,
       "name": "A",
       "d1_binding": "db",
       "primary_columns": [
@@ -18,7 +18,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -27,12 +28,13 @@
       ],
       "columns": [
         {
-          "hash": 9913313051553690446,
+          "hash": 14795965140419699510,
           "field": {
             "name": "bId",
             "cidl_type": {
-              "Nullable": "Integer"
-            }
+              "Nullable": "Int"
+            },
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "B",
@@ -46,7 +48,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 12787859864084899288,
+          "hash": 15496760873931370897,
           "field": {
             "name": "b",
             "cidl_type": {
@@ -84,7 +86,8 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "a",
@@ -92,7 +95,8 @@
                 "Object": {
                   "name": "A"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -133,7 +137,8 @@
                 "Partial": {
                   "object_name": "A"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -141,7 +146,8 @@
                 "DataSource": {
                   "model_name": "A"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -161,10 +167,25 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithB_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithoutB_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -172,7 +193,8 @@
                 "DataSource": {
                   "model_name": "A"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -184,11 +206,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -196,7 +220,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -208,11 +233,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -220,7 +247,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -232,11 +260,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -244,7 +274,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -257,7 +288,7 @@
       ]
     },
     "B": {
-      "hash": 1898279998179927433,
+      "hash": 15334710138958857664,
       "name": "B",
       "d1_binding": "db",
       "primary_columns": [
@@ -265,7 +296,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -277,7 +309,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 14628003936878550728,
+          "hash": 2142773207963205782,
           "field": {
             "name": "a",
             "cidl_type": {
@@ -333,7 +365,8 @@
                 "Partial": {
                   "object_name": "B"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -341,7 +374,8 @@
                 "DataSource": {
                   "model_name": "B"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -361,10 +395,11 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -372,7 +407,8 @@
                 "DataSource": {
                   "model_name": "B"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -384,11 +420,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -396,7 +434,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -409,7 +448,7 @@
       ]
     },
     "Course": {
-      "hash": 7548065270413022258,
+      "hash": 16699223254241264860,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -417,7 +456,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -429,7 +469,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 6671087506518003146,
+          "hash": 4351158626271558737,
           "field": {
             "name": "students",
             "cidl_type": {
@@ -467,7 +507,8 @@
                 "Partial": {
                   "object_name": "Course"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -475,7 +516,8 @@
                 "DataSource": {
                   "model_name": "Course"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -487,11 +529,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -499,7 +543,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -511,7 +556,7 @@
       ]
     },
     "Person": {
-      "hash": 15191552719376020347,
+      "hash": 16470081740962856391,
       "name": "Person",
       "d1_binding": "db",
       "primary_columns": [
@@ -519,7 +564,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -531,7 +577,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 103859984955234182,
+          "hash": 6065373329749440851,
           "field": {
             "name": "dogs",
             "cidl_type": {
@@ -571,7 +617,8 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "person",
@@ -579,7 +626,8 @@
                 "Object": {
                   "name": "Person"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -620,7 +668,8 @@
                 "Partial": {
                   "object_name": "Person"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -628,7 +677,8 @@
                 "DataSource": {
                   "model_name": "Person"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -648,10 +698,25 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithDogs_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithoutDogs_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -659,7 +724,8 @@
                 "DataSource": {
                   "model_name": "Person"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -671,11 +737,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -683,7 +751,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -695,11 +764,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -707,7 +778,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -719,11 +791,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -731,7 +805,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -744,7 +819,7 @@
       ]
     },
     "Student": {
-      "hash": 16878349331798782765,
+      "hash": 399521836238653955,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -752,7 +827,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -764,7 +840,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 5886394064643331584,
+          "hash": 3566465184463996039,
           "field": {
             "name": "courses",
             "cidl_type": {
@@ -798,7 +874,8 @@
           "parameters": [
             {
               "name": "e",
-              "cidl_type": "Env"
+              "cidl_type": "Env",
+              "validators": []
             },
             {
               "name": "student",
@@ -806,7 +883,8 @@
                 "Object": {
                   "name": "Student"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -847,7 +925,8 @@
                 "Partial": {
                   "object_name": "Student"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -855,7 +934,8 @@
                 "DataSource": {
                   "model_name": "Student"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         },
@@ -875,10 +955,25 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "id",
+              "name": "Default_id",
               "cidl_type": {
-                "Nullable": "Integer"
-              }
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "None_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
+            },
+            {
+              "name": "WithCoursesStudentsCourses_id",
+              "cidl_type": {
+                "Nullable": "Int"
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -886,7 +981,8 @@
                 "DataSource": {
                   "model_name": "Student"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -898,11 +994,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -910,7 +1008,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -922,11 +1021,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -934,7 +1035,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -946,11 +1048,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -958,7 +1062,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },
@@ -971,7 +1076,7 @@
       ]
     },
     "Dog": {
-      "hash": 11927641146139395250,
+      "hash": 13552818947087553442,
       "name": "Dog",
       "d1_binding": "db",
       "primary_columns": [
@@ -979,7 +1084,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -991,7 +1097,8 @@
           "hash": 16174990813136957012,
           "field": {
             "name": "personId",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "Person",
@@ -1005,7 +1112,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 5482872260590270089,
+          "hash": 8191773270369632834,
           "field": {
             "name": "person",
             "cidl_type": {
@@ -1059,7 +1166,8 @@
                 "Partial": {
                   "object_name": "Dog"
                 }
-              }
+              },
+              "validators": []
             },
             {
               "name": "__datasource",
@@ -1067,7 +1175,8 @@
                 "DataSource": {
                   "model_name": "Dog"
                 }
-              }
+              },
+              "validators": []
             }
           ]
         }
@@ -1079,11 +1188,13 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               },
               {
                 "name": "limit",
-                "cidl_type": "Integer"
+                "cidl_type": "Uint",
+                "validators": []
               }
             ]
           },
@@ -1091,7 +1202,8 @@
             "parameters": [
               {
                 "name": "id",
-                "cidl_type": "Integer"
+                "cidl_type": "Int",
+                "validators": []
               }
             ]
           },

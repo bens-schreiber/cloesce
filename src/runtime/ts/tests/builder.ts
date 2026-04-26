@@ -3,6 +3,7 @@ import {
   Cidl,
   IncludeTree,
   Field,
+  ValidatedField,
   HttpVerb,
   CidlType,
   NavigationFieldKind,
@@ -12,8 +13,9 @@ import {
   ApiMethod,
   Service,
   MediaType,
-  KvR2Field,
   CrudKind,
+  KvField,
+  R2Field,
 } from "../src/cidl";
 
 export function createAst(args?: {
@@ -57,7 +59,7 @@ abstract class ApiMethodBuilder {
     name: string,
     http_verb: HttpVerb,
     is_static: boolean,
-    parameters: Field[],
+    parameters: ValidatedField[],
     return_type: CidlType,
     return_media: MediaType = "Json",
     parameters_media: MediaType = "Json",
@@ -110,9 +112,9 @@ export class ModelBuilder {
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
   private navigation_fields: NavigationField[] = [];
-  private key_fields: string[] = [];
-  private kv_fields: KvR2Field[] = [];
-  private r2_fields: KvR2Field[] = [];
+  private key_fields: ValidatedField[] = [];
+  private kv_fields: KvField[] = [];
+  private r2_fields: R2Field[] = [];
   private apis: ApiMethod[] = [];
   private data_sources: Record<string, DataSource> = {};
   private cruds: CrudKind[] = [];
@@ -141,7 +143,7 @@ export class ModelBuilder {
     foreign_key: { model_name: string; column_name: string } | null = null,
   ): this {
     this.columns.push({
-      field: { name, cidl_type },
+      field: { name, cidl_type, validators: [] },
       foreign_key_reference: foreign_key,
       unique_ids: [],
       composite_id: null,
@@ -167,11 +169,11 @@ export class ModelBuilder {
   }
 
   idPk(): this {
-    return this.pk("id", "Integer");
+    return this.pk("id", "Int");
   }
 
   keyField(name: string): this {
-    this.key_fields.push(name);
+    this.key_fields.push({ name, cidl_type: "String", validators: [] });
     return this;
   }
 
@@ -181,10 +183,12 @@ export class ModelBuilder {
     name: string,
     list_prefix: boolean,
     cidl_type: CidlType,
+    format_parameters: Field[] = [],
   ): this {
     this.kv_fields.push({
-      field: { name, cidl_type },
+      field: { name, cidl_type, validators: [] },
       format,
+      format_parameters,
       binding,
       list_prefix,
     });
@@ -197,10 +201,12 @@ export class ModelBuilder {
     name: string,
     list_prefix: boolean,
     cidl_type: CidlType = "R2Object",
+    format_parameters: Field[] = [],
   ): this {
     this.r2_fields.push({
       field: { name, cidl_type },
       format,
+      format_parameters,
       binding,
       list_prefix,
     });
@@ -210,7 +216,7 @@ export class ModelBuilder {
   method(
     name: string,
     http_verb: HttpVerb,
-    parameters: Field[],
+    parameters: ValidatedField[],
     return_type: CidlType,
     data_source: string | null = null,
   ): this {
@@ -237,7 +243,9 @@ export class ModelBuilder {
       name,
       is_internal,
       gen: { include: tree } as any,
-      get: get ? { parameters: get } : undefined,
+      get: get
+        ? { parameters: get.map((f) => ({ ...f, validators: [] })) }
+        : undefined,
     };
     return this;
   }
@@ -260,7 +268,8 @@ export class ModelBuilder {
         primary_columns.push({
           field: {
             name: pkName,
-            cidl_type: this.primary_key_types[pkName] ?? "Integer",
+            cidl_type: this.primary_key_types[pkName] ?? "Int",
+            validators: [],
           },
           foreign_key_reference: null,
           unique_ids: [],

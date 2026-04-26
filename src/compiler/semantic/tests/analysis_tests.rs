@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, Field, MediaType, NavigationFieldKind};
+use ast::{CidlType, Field, MediaType, NavigationFieldKind, Number, Validator};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::SemanticError};
 
@@ -382,7 +382,7 @@ fn d1_model_nav_one_to_one() {
         person
             .columns
             .iter()
-            .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Integer))
+            .any(|c| c.field.name == "horseId" && matches!(c.field.cidl_type, CidlType::Int))
     );
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
@@ -589,7 +589,7 @@ fn kv_r2_errors() {
     let src = &with_env(
         r#"
         model Foo {
-            keyfield { field }
+            keyfield { field: string }
             kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
                 foo: json
             }
@@ -667,7 +667,7 @@ fn kv_and_d1_coexist() {
         user.kv_fields[0].format_parameters[0],
         Field {
             name: "id".into(),
-            cidl_type: CidlType::Integer,
+            cidl_type: CidlType::Int,
         }
     );
 }
@@ -1054,4 +1054,162 @@ fn cidl_types_resolve() {
             CidlType::Inject { name: "MyService" },
         ]
     );
+}
+
+#[test]
+fn fk_inherits_validators() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { 
+                [gt 0]
+                id: int 
+            }
+
+            [lt 100]
+            age: int
+        }
+
+        [use my_d1]
+        model Post {
+            primary { id: int }
+
+            foreign (User::id) {
+                userId
+            }
+
+            foreign (User::age) {
+                userAge
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let post = result.models.get("Post").unwrap();
+
+    let user_id_col = post
+        .columns
+        .iter()
+        .find(|c| c.field.name == "userId")
+        .unwrap();
+    assert_eq!(user_id_col.field.validators.len(), 1);
+    assert!(matches!(
+        user_id_col.field.validators[0],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let user_age_col = post
+        .columns
+        .iter()
+        .find(|c| c.field.name == "userAge")
+        .unwrap();
+    assert_eq!(user_age_col.field.validators.len(), 1);
+    assert!(matches!(
+        user_age_col.field.validators[0],
+        Validator::LessThan(Number::Int(100))
+    ));
+}
+
+#[test]
+fn validator_errors() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { id: int }
+
+            keyfield {
+                [bogusvalidator 42]       // ValidatorUnknown
+                name: string
+            }
+
+            [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
+            [step 2.5]                // ValidatorInvalidArgument (float to step)
+            [len 3.14]                // ValidatorInvalidForType (length on non-string)
+            [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
+            age: int
+        }
+
+        poo MyPoo {
+            [unknown_poo 1]           // ValidatorUnknown on a poo field
+            field: string
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    expect_err!(errors, SemanticError::ValidatorUnknown { .. });
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
+        2
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorInvalidForType { .. }),
+        2
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::ValidatorUnknown { .. }),
+        2
+    );
+}
+
+#[test]
+fn validator_valid() {
+    // Arrange
+    let src = with_env(
+        r#"
+        [use my_d1]
+        model User {
+            primary { id: int }
+
+            [gt 0]
+            [gte 0]
+            [lt 200]
+            [lte 150]
+            [step 5]
+            age: int
+
+            [minlen 1]
+            [maxlen 64]
+            [len 10]
+            [regex /^[a-z]+$/]
+            name: string
+        }
+
+        poo MyPoo {
+            [gt 0]
+            [lte 100]
+            score: int
+        }
+        "#,
+    );
+    let parse = lex_and_parse(&src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let user = result.models.get("User").unwrap();
+    let age_col = user.columns.iter().find(|c| c.field.name == "age").unwrap();
+    let name_col = user
+        .columns
+        .iter()
+        .find(|c| c.field.name == "name")
+        .unwrap();
+    assert_eq!(age_col.field.validators.len(), 5);
+    assert_eq!(name_col.field.validators.len(), 4);
+
+    let poo = result.poos.get("MyPoo").unwrap();
+    let score = poo.fields.iter().find(|f| f.name == "score").unwrap();
+    assert_eq!(score.validators.len(), 2);
 }

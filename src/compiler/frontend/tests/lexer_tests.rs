@@ -14,4 +14,13 @@ fn token_regexes() {
         comment_lit.next(),
         Some(Ok(Token::Comment("// this is a comment")))
     );
+
+    let mut int_lit = Token::lexer("42");
+    assert_eq!(int_lit.next(), Some(Ok(Token::IntLit("42"))));
+
+    let mut real_lit = Token::lexer("3.14");
+    assert_eq!(real_lit.next(), Some(Ok(Token::RealLit("3.14"))));
+
+    let mut regex_lit = Token::lexer("/[a-z]+/");
+    assert_eq!(regex_lit.next(), Some(Ok(Token::RegexLit("[a-z]+"))));
 }

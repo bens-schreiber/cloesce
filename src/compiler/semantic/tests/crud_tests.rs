@@ -1,4 +1,4 @@
-use ast::{ApiMethod, CidlType, HttpVerb, Model};
+use ast::{ApiMethod, CidlType, HttpVerb, Model, Number, Validator};
 use compiler_test::src_to_ast;
 
 fn find_method<'src>(model: &'src Model, name: &str) -> Option<&'src ApiMethod<'src>> {
@@ -49,7 +49,7 @@ fn adds_crud_methods_to_models() {
             .iter()
             .map(|p| p.name.to_string())
             .collect::<Vec<_>>(),
-        vec!["orderId", "productId", "__datasource"]
+        vec!["Default_orderId", "Default_productId", "__datasource"]
     );
 
     assert_eq!(get_method.http_verb, HttpVerb::Get);
@@ -73,8 +73,8 @@ fn crud_key_params() {
             }
 
             keyfield {
-                category
-                subcategory
+                category: string
+                subcategory: string
             }
 
             kv(my_kv, "{category}/{subcategory}") {
@@ -110,7 +110,7 @@ fn crud_key_params() {
 }
 
 #[test]
-fn crud_params_union_data_source_params() {
+fn crud_methods_namespace_sources_inherit_validators() {
     // Act
     let ast = src_to_ast(
         r#"
@@ -118,24 +118,32 @@ fn crud_params_union_data_source_params() {
             d1 { db }
         }
 
-        [use db, get, list, save]
+        [use db, get, list]
         model Product {
             primary {
+                [gt 0]
                 id: int
             }
-            name: string
-            category: string
         }
 
-        source ByName for Product {
+        source CustomDs for Product {
             include {}
 
-            sql get(name: string) {
-                "SELECT * FROM Product WHERE name = ?"
+            sql get(
+                [lt 100]
+                id: int
+            ) {
+                "SELECT * FROM Product WHERE id = ?"
             }
 
-            sql list(name: string, limit: int) {
-                "SELECT * FROM Product WHERE name LIKE ? LIMIT ?"
+            sql list(
+                [step 10]
+                lastSeen_id: int,
+
+                [gt 0]
+                limit: int
+            ) {
+                "SELECT * FROM Product WHERE id > ? LIMIT ?"
             }
         }
     "#,
@@ -144,71 +152,85 @@ fn crud_params_union_data_source_params() {
     // Assert
     let product = ast.models.get("Product").unwrap();
 
-    // $get should have union of default (id) and ByName (name), all nullable
-    let get_method = find_method(product, "$get").unwrap();
-    let get_param_names: Vec<String> = get_method
-        .parameters
-        .iter()
-        .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.to_string())
-        .collect();
-    assert!(
-        get_param_names.contains(&"id".into()),
-        "GET should have 'id' from default data source"
-    );
-    assert!(
-        get_param_names.contains(&"name".into()),
-        "GET should have 'name' from ByName data source"
-    );
-    // All non-datasource params should be nullable
-    for p in &get_method.parameters {
-        if p.name != "__datasource" {
-            assert!(
-                p.cidl_type.is_nullable(),
-                "GET param '{}' should be nullable",
-                p.name
-            );
-        }
-    }
+    // GET
+    {
+        let method = find_method(product, "$get").unwrap();
 
-    // $list should have union of default (lastSeen_id, limit) and ByName (name, limit)
-    let list_method = find_method(product, "$list").unwrap();
-    let list_param_names: Vec<String> = list_method
-        .parameters
-        .iter()
-        .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.to_string())
-        .collect();
-    assert!(
-        list_param_names.contains(&"lastSeen_id".into()),
-        "LIST should have 'lastSeen_id' from default data source"
-    );
-    assert!(
-        list_param_names.contains(&"limit".into()),
-        "LIST should have 'limit' (shared between both data sources)"
-    );
-    assert!(
-        list_param_names.contains(&"name".into()),
-        "LIST should have 'name' from ByName data source"
-    );
-    // 'limit' should not be duplicated
-    assert_eq!(
-        list_param_names.iter().filter(|&n| n == "limit").count(),
-        1,
-        "LIST should not have duplicate 'limit' param"
-    );
-
-    // $save should just have model + __datasource
-    let save_method = find_method(product, "$save").unwrap();
-    assert!(
-        save_method.parameters.iter().any(|p| p.name == "model"),
-        "SAVE should have 'model' parameter"
-    );
-    assert!(
-        save_method
+        let default_id_param = method
             .parameters
             .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "SAVE should have __datasource parameter"
-    );
+            .find(|p| p.name == "Default_id")
+            .unwrap();
+        assert!(
+            default_id_param
+                .validators
+                .first()
+                .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))
+                .unwrap_or(false),
+        );
+
+        let custom_id_param = method
+            .parameters
+            .iter()
+            .find(|p| p.name == "CustomDs_id")
+            .unwrap();
+        assert!(
+            custom_id_param
+                .validators
+                .first()
+                .map(|v| matches!(v, Validator::LessThan(Number::Int(100))))
+                .unwrap_or(false),
+        );
+    }
+
+    // LIST
+    {
+        let method = find_method(product, "$list").unwrap();
+
+        let default_last_id_param = method
+            .parameters
+            .iter()
+            .find(|p| p.name == "Default_lastSeen_id")
+            .unwrap();
+        assert!(
+            default_last_id_param
+                .validators
+                .first()
+                .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))
+                .unwrap_or(false),
+        );
+
+        let custom_last_id_param = method
+            .parameters
+            .iter()
+            .find(|p| p.name == "CustomDs_lastSeen_id")
+            .unwrap();
+        assert!(
+            custom_last_id_param
+                .validators
+                .first()
+                .map(|v| matches!(v, Validator::Step(10)))
+                .unwrap_or(false),
+        );
+
+        let default_limit_param = method
+            .parameters
+            .iter()
+            .find(|p| p.name == "Default_limit")
+            .unwrap();
+        assert!(default_limit_param.validators.is_empty());
+
+        let custom_limit_param = method
+            .parameters
+            .iter()
+            .find(|p| p.name == "CustomDs_limit")
+            .unwrap();
+        assert!(
+            custom_limit_param
+                .validators
+                .first()
+                .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))
+                .unwrap_or(false)
+        );
+    }
 }

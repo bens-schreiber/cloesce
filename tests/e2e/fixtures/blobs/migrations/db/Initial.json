@@ -1,8 +1,8 @@
 {
-  "hash": 4055048839320829329,
+  "hash": 5838618954633320915,
   "models": {
     "BlobHaver": {
-      "hash": 560041510452854967,
+      "hash": 3392668001046713360,
       "name": "BlobHaver",
       "d1_binding": "db",
       "primary_columns": [
@@ -10,7 +10,8 @@
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -19,20 +20,22 @@
       ],
       "columns": [
         {
-          "hash": 17404811013903783014,
+          "hash": 16513902811358920341,
           "field": {
             "name": "blob1",
-            "cidl_type": "Blob"
+            "cidl_type": "Blob",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 14390429867474788070,
+          "hash": 13499521664997034261,
           "field": {
             "name": "blob2",
-            "cidl_type": "Blob"
+            "cidl_type": "Blob",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],

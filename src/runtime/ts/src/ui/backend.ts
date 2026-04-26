@@ -29,6 +29,12 @@ export class KValue<V> {
   raw: unknown | null;
   metadata: unknown | null;
 
+  constructor(key: string, value: V | null, metadata: unknown | null = null) {
+    this.key = key;
+    this.raw = value;
+    this.metadata = metadata;
+  }
+
   get value(): V | null {
     return this.raw as V | null;
   }

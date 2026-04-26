@@ -5,14 +5,14 @@ use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::OrmErrorKind;
-use crate::fail;
-
-use super::Result;
+use crate::{OrmErrorKind, Result, fail};
 
 type D1Result = Vec<Map<String, Value>>;
 type IncludeTreeJson = Map<String, Value>;
 
+/// Maps raw SQL query results into a nested JSON structure based on the provided model and include tree.
+///
+/// Can return errors [OrmErrorKind::UnknownModel] and [OrmErrorKind::ModelMissingD1].
 pub fn map_sql(
     model_name: &str,
     rows: D1Result,
@@ -21,14 +21,14 @@ pub fn map_sql(
 ) -> Result<Vec<Value>> {
     let model = match ast.models.get(model_name) {
         Some(m) => m,
-        None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
+        None => fail!(OrmErrorKind::UnknownModel {
+            name: model_name.to_string(),
+        }),
     };
     if !model.has_d1() {
-        fail!(
-            OrmErrorKind::ModelMissingD1,
-            "Model {} is not a D1 model",
-            model_name
-        )
+        fail!(OrmErrorKind::ModelMissingD1 {
+            name: model_name.to_string(),
+        })
     }
 
     let mut result_map = IndexMap::new();
@@ -117,7 +117,9 @@ fn process_navigation_properties(
 
         let nested_model = match ast.models.get(&nav_prop.model_reference) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_reference),
+            None => fail!(OrmErrorKind::UnknownModel {
+                name: nav_prop.model_reference.to_string(),
+            }),
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
