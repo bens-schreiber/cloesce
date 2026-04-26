@@ -1,3 +1,17 @@
+# [0.4.0] - Unreleased
+### Added
+- Basic zod-inspired validators for any field (Model, Poo, API method, Data Source method)
+    - string validators: `regex`, `maxlen`, `minlen`, `len`
+    - number validators: `gt`, `gte`, `lt`, `lte`, `step`
+- new `uint` type which performs the same as `int` but with an implicit `gt 0` validator
+
+### Changed
+- Renamed `double` to `real` to be more semantically correct
+- Client CRUD methods now accept the data source as an object with arguments nested inside.
+
+### Fixed
+
+
 # [0.3.9] - 2026-4-19
 ### Added
 
