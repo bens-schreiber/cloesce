@@ -1,6 +1,7 @@
 import { Orm, HttpResult } from "../ui/backend.js";
 import { ApiMethod, Model } from "../cidl.js";
 import { ApiImplementation } from "./router.js";
+import { CloesceError, CloesceResult, InternalError } from "../common.js";
 
 export function crudRoute(
   meta: Model,
@@ -28,15 +29,25 @@ async function upsert(
   const dataSource = meta.data_sources[dataSourceRef];
   const orm = Orm.fromEnv(env);
 
-  // Upsert
-  let result: unknown | null = null;
+  let result: CloesceResult<unknown | null>;
   try {
     result = await orm.upsert(meta, body, dataSource.gen.include);
-  } catch {
-    return HttpResult.fail(400);
+  } catch (e) {
+    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
   }
 
-  return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
+  if (result.errors.length > 0) {
+    return HttpResult.fail(
+      400,
+      CloesceError.displayErrors(result as CloesceResult<never>),
+    );
+  }
+
+  if (result.value === null) {
+    return HttpResult.fail(404);
+  }
+
+  return HttpResult.ok(200, result.value);
 }
 
 async function get(
@@ -76,10 +87,19 @@ async function get(
     ...dataSourceArgs,
     ...Object.values(keyFieldArgs),
   );
-  if (res === null) {
+
+  if (res.errors.length > 0) {
+    return HttpResult.fail(
+      400,
+      CloesceError.displayErrors(res as CloesceResult<never>),
+    );
+  }
+
+  if (res.value === null) {
     return HttpResult.fail(404);
   }
-  return HttpResult.ok(200, res);
+
+  return HttpResult.ok(200, res.value);
 }
 
 async function list(
@@ -110,5 +130,12 @@ async function list(
   }
 
   const res = await dataSource.gen.list!(env, ...dataSourceArgs);
-  return HttpResult.ok(200, res);
+  if (res.errors.length > 0) {
+    return HttpResult.fail(
+      400,
+      CloesceError.displayErrors(res as CloesceResult<never>),
+    );
+  }
+
+  return HttpResult.ok(200, res.value);
 }

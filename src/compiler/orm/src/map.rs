@@ -10,6 +10,9 @@ use crate::{OrmErrorKind, Result, fail};
 type D1Result = Vec<Map<String, Value>>;
 type IncludeTreeJson = Map<String, Value>;
 
+/// Maps raw SQL query results into a nested JSON structure based on the provided model and include tree.
+///
+/// Can return errors [OrmErrorKind::UnknownModel] and [OrmErrorKind::ModelMissingD1].
 pub fn map_sql(
     model_name: &str,
     rows: D1Result,

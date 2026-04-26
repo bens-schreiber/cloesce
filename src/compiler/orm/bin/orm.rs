@@ -1,5 +1,6 @@
 use ast::ValidatedField;
 use ast::{CloesceAst, IncludeTree};
+use orm::OrmErrorKind;
 use orm::map::map_sql;
 use orm::select::SelectModel;
 use orm::upsert::UpsertModel;
@@ -12,6 +13,12 @@ use std::str;
 
 type IncludeTreeJson = Map<String, serde_json::Value>;
 type D1Result = Vec<Map<String, serde_json::Value>>;
+
+fn serde_err(e: serde_json::Error) -> OrmErrorKind {
+    OrmErrorKind::SerializeError {
+        message: e.to_string(),
+    }
+}
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
@@ -51,7 +58,7 @@ pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
     let parsed: CloesceAst = match serde_json::from_slice(slice) {
         Ok(val) => val,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -115,7 +122,7 @@ pub unsafe extern "C" fn upsert_model(
     let new_model = match serde_json::from_str::<Map<String, serde_json::Value>>(new_model_json) {
         Ok(new_model) => new_model,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -123,7 +130,7 @@ pub unsafe extern "C" fn upsert_model(
     let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -180,7 +187,7 @@ pub unsafe extern "C" fn select_model(
     let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -236,7 +243,7 @@ pub unsafe extern "C" fn map(
     let d1_results = match serde_json::from_str::<D1Result>(d1_results_raw) {
         Ok(res) => res,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -244,7 +251,7 @@ pub unsafe extern "C" fn map(
     let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -296,7 +303,7 @@ pub unsafe extern "C" fn validate_type(
     let validated_field = match serde_json::from_str::<ValidatedField>(validated_field_raw) {
         Ok(res) => res,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -304,7 +311,7 @@ pub unsafe extern "C" fn validate_type(
     let value = match serde_json::from_str::<Option<serde_json::Value>>(value_raw) {
         Ok(res) => res,
         Err(e) => {
-            yield_error(e);
+            yield_error(serde_err(e));
             return 1;
         }
     };
@@ -335,8 +342,8 @@ fn yield_result(mut bytes: Vec<u8>) {
     }
 }
 
-fn yield_error(e: impl ToString) {
-    let bytes = format!("Encountered an issue in the WASM ORM: {}", e.to_string()).into_bytes();
+fn yield_error(e: OrmErrorKind) {
+    let bytes = e.to_string().into_bytes();
     yield_result(bytes);
 }
 

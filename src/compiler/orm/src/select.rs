@@ -13,6 +13,7 @@ pub struct SelectModel<'a> {
 }
 
 impl<'a> SelectModel<'a> {
+    /// Can return errors [OrmErrorKind::UnknownModel] and [OrmErrorKind::ModelMissingD1].
     pub fn query(
         model_name: &str,
         from: Option<String>,

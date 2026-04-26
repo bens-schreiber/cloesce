@@ -3,7 +3,7 @@ import * as Cloesce from "./backend.js";
 
 const A = Cloesce.A.impl({
     async create(e, a) {
-        return (await this.Orm.save(e, a))!;
+        return (await this.Orm.save(e, a)).value!;
     },
     withoutB(self) {
         return self;
@@ -16,7 +16,7 @@ const B = Cloesce.B.impl({
 
 const Person = Cloesce.Person.impl({
     async create(e, person) {
-        return (await this.Orm.save(e, person))!;
+        return (await this.Orm.save(e, person)).value!;
     },
 
     withoutDogs(self) {
@@ -31,7 +31,7 @@ const Dog = Cloesce.Dog.impl({
 
 const Student = Cloesce.Student.impl({
     async create(e, student) {
-        return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.include))!;
+        return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.include)).value!;
     },
     none(self) {
         return self;

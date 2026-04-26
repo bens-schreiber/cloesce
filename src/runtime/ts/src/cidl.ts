@@ -1,5 +1,6 @@
-/** NOTE: These definitions mirror the definitions in the Compiler */
+import { CloesceResult } from "./common";
 
+/** NOTE: These definitions mirror the definitions in the Compiler */
 export type CrudKind = "Save" | "Get" | "List";
 
 export type CidlType =
@@ -130,8 +131,8 @@ export interface DataSourceMethod {
 
 export interface DataSourceImpl {
   include: IncludeTree;
-  get: (env: any, ...args: unknown[]) => unknown;
-  list?: (env: any, ...args: unknown[]) => unknown;
+  get: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
+  list?: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
 }
 
 export interface DataSource {

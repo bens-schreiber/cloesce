@@ -8,6 +8,7 @@
 ### Changed
 - Renamed `double` to `real` to be more semantically correct
 - Client CRUD methods now accept the data source as an object with arguments nested inside.
+- All ORM methods return a `CloesceResult` object which yields a detailed list of errors (validation, hydration, etc.) instead of throwing immediately.
 
 ### Fixed
 
