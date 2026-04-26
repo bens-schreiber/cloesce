@@ -187,7 +187,11 @@
               "cidl_type": {
                 "Nullable": "String"
               },
-              "validators": []
+              "validators": [
+                {
+                  "Length": 10
+                }
+              ]
             },
             {
               "name": "Default_id",
