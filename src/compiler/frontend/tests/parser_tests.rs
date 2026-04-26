@@ -656,7 +656,10 @@ fn model_kv_r2_paginated() {
 
         [use get, save, list]
         model PureKv {
-            keyfield { key secondary }
+            keyfield { 
+                key: string
+                secondary: int 
+            }
             paginated {
                 kv(kv_ns, "entry/{key}/{secondary}") { entry: json }
             }

@@ -759,6 +759,7 @@ fn resolve_validators<'src, 'p>(
                 symbol,
                 validator: spd,
             });
+            continue;
         }
 
         // All current validators take exactly one argument.
@@ -777,7 +778,7 @@ fn resolve_validators<'src, 'p>(
             "lt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
             "lte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual),
             "step" => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
-            "length" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            "len" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
             "minlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
             "maxlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
             "regex" => match arg {

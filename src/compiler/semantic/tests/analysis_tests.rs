@@ -589,7 +589,7 @@ fn kv_r2_errors() {
     let src = &with_env(
         r#"
         model Foo {
-            keyfield { field }
+            keyfield { field: string }
             kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
                 foo: json
             }
@@ -1126,13 +1126,15 @@ fn validator_errors() {
         model User {
             primary { id: int }
 
-            [bogusvalidator 42]       // ValidatorUnknown
-            name: string
+            keyfield {
+                [bogusvalidator 42]       // ValidatorUnknown
+                name: string
+            }
 
             [gt 1 2]                  // ValidatorInvalidArity (too many args)
             [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
             [step 2.5]                // ValidatorInvalidArgument (float to step)
-            [len 3.14]             // ValidatorInvalidForType (length on non-string)
+            [len 3.14]                // ValidatorInvalidForType (length on non-string)
             [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
             age: int
         }

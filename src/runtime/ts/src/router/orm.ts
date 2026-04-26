@@ -27,7 +27,7 @@ import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 type HydrateArgs = {
   ast: Cidl;
   includeTree: IncludeTree<any> | null;
-  keyFields: Record<string, string>;
+  keyFields: Record<string, unknown>;
   env: any;
   promises: Promise<CloesceResult<void>>[];
 };
@@ -139,7 +139,7 @@ export class Orm {
   async hydrate<T extends object>(
     meta: Model,
     base: any,
-    keyFields: Record<string, string>,
+    keyFields: Record<string, unknown>,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T>> {
     base ??= {};
@@ -366,7 +366,7 @@ export class Orm {
     meta: Model,
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
-    keyFields: Record<string, string>,
+    keyFields: Record<string, unknown>,
   ): Promise<CloesceResult<T | null>> {
     if (!query || !meta.d1_binding) {
       // No query provided, hydrate any non-SQL fields
@@ -427,12 +427,12 @@ export class Orm {
 function resolveKey(
   format: string,
   current: any,
-  keyFields: Record<string, string>,
+  keyFields: Record<string, unknown>,
 ): string | null {
   try {
     return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
       const paramValue = keyFields[paramName] ?? current[paramName];
-      if (!paramValue) throw null;
+      if (paramValue === undefined) throw null;
       return String(paramValue);
     });
   } catch {
@@ -534,7 +534,9 @@ export function hydrateType(
     }
 
     for (const field of modelMeta.key_fields) {
-      value[field.name] = args.keyFields[field.name] ?? value[field.name];
+      const raw = args.keyFields[field.name] ?? value[field.name];
+      const hydrated = hydrateType(raw, field.cidl_type, args);
+      value[field.name] = hydrated !== undefined ? hydrated : raw;
     }
 
     for (const kv of modelMeta.kv_fields) {

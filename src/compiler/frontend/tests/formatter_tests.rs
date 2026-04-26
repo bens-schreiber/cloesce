@@ -92,6 +92,12 @@ fn comments_retained() {
     model BasicModel { //C
         //7
         primary { //D
+            // gt above
+            [gt 0] // gt side
+            // gt below
+            // lt above
+            [lt 100] // lt side
+            // lt below
             id: int //8
         } //9
 

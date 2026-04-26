@@ -1,13 +1,13 @@
 use chumsky::prelude::*;
 
-use ast::{CidlType, CrudKind};
+use ast::CrudKind;
 
 use crate::{
     AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, Symbol,
-    UseTag, UseTagParamKind,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag,
+    UseTagParamKind,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol, validator_tag},
+    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
 };
 
 /// `nav { navName }`
@@ -187,19 +187,11 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
-    // `keyfield { ([tag]* ident)* }`
+    // `keyfield { ([tag]* ident: cidl_type)* }`
     let keyfield_block = {
         just(Token::Ident("keyfield"))
             .ignore_then(
-                validator_tag()
-                    .repeated()
-                    .collect::<Vec<_>>()
-                    .then(symbol())
-                    .map(|(validator_tags, symbol)| Symbol {
-                        tags: validator_tags,
-                        cidl_type: CidlType::String, // keyfields are always strings
-                        ..symbol
-                    })
+                typed_symbol()
                     .repeated()
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LBrace), just(Token::RBrace)),

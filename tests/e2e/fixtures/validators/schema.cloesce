@@ -22,7 +22,7 @@ model Validator {
 
     keyfield {
         [len 10]
-        name
+        name: string
     }
 
     kv(store, "some_crap/{email}/{name}") {

@@ -15,7 +15,7 @@ impl CrudExpansion {
                         for field in &model.key_fields {
                             parameters.push(ValidatedField {
                                 name: field.name.clone(),
-                                cidl_type: CidlType::String,
+                                cidl_type: CidlType::nullable(field.cidl_type.clone()),
                                 validators: vec![],
                             });
                         }

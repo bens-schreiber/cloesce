@@ -745,7 +745,14 @@ fn key_format_interpolation(
             .unwrap();
 
         let replacement = match param_value {
-            Value::String(s) if matches!(field_meta.cidl_type, CidlType::String) => s.clone(),
+            Value::String(s)
+                if matches!(
+                    field_meta.cidl_type.root_type(),
+                    CidlType::String | CidlType::DateIso | CidlType::Json
+                ) =>
+            {
+                s.clone()
+            }
             Value::Number(n)
                 if matches!(
                     field_meta.cidl_type,

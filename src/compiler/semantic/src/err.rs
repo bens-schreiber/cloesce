@@ -101,6 +101,10 @@ pub enum SemanticError<'src, 'p> {
         cycle: Vec<&'src str>,
     },
 
+    KeyFieldInvalidType {
+        field: &'p Symbol<'src>,
+    },
+
     /// A KV tag references an env binding that is not a KV namespace
     KvInvalidBinding {
         binding: &'p Symbol<'src>,
@@ -288,7 +292,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::UnresolvedSymbol { symbol } => {
             let (path, range) = span_parts(&symbol.span, file_table);
             report!(path.clone(), range.clone())
@@ -299,12 +302,10 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::MissingWranglerEnvBlock => {
             eprintln!("error: project has models but no `env` block is defined");
             return;
         }
-
         SemanticError::D1ModelMissingD1Binding { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
@@ -318,7 +319,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::D1ModelInvalidD1Binding { model, binding } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
@@ -338,7 +338,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::D1ModelMultipleD1Bindings { model, bindings } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let mut report = report!(model_path.clone(), model_range.clone())
@@ -361,7 +360,6 @@ fn display(
             }
             report
         }
-
         SemanticError::D1ModelMissingPrimaryKey { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
@@ -375,7 +373,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::InvalidColumnType { column } => {
             let (path, range) = span_parts(&column.span, file_table);
             report!(path.clone(), range.clone())
@@ -386,12 +383,11 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "only string, int, double, date, json, bool, and blob are allowed",
+                            "only string, int, real, uint, date, json, bool, and blob are allowed",
                         )
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::NullablePrimaryKey { column } => {
             let (path, range) = span_parts(&column.span, file_table);
             report!(path.clone(), range.clone())
@@ -405,7 +401,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ForeignKeyReferencesSelf { model, foreign_key } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (fk_path, fk_range) = span_parts(&foreign_key.span, file_table);
@@ -425,7 +420,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ForeignKeyReferencesDifferentDatabase {
             model,
             fk_model,
@@ -454,7 +448,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ForeignKeyInvalidColumnType { field } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
@@ -468,7 +461,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::InconsistentModelAdjacency {
             first_model,
             second_model,
@@ -492,7 +484,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ForeignKeyInconsistentFieldAdj {
             span,
             adj_count,
@@ -509,7 +500,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::NavigationReferencesDifferentDatabase { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
@@ -525,7 +515,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::NavigationMissingReciprocalM2M { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
@@ -536,7 +525,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::NavigationAmbiguousM2M { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
@@ -547,7 +535,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::CyclicalRelationship { cycle } => {
             eprintln!(
                 "error: cyclical relationship detected among: {}",
@@ -555,7 +542,6 @@ fn display(
             );
             return;
         }
-
         SemanticError::KvInvalidBinding { binding } => {
             let (path, range) = span_parts(&binding.span, file_table);
             report!(path.clone(), range.clone())
@@ -571,7 +557,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::R2InvalidBinding { binding } => {
             let (path, range) = span_parts(&binding.span, file_table);
             report!(path.clone(), range.clone())
@@ -587,7 +572,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::KvR2UnknownKeyVariable { field, variable } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
@@ -600,7 +584,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::KvR2InvalidKeyFormat { field, reason } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
@@ -611,7 +594,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::PlainOldObjectInvalidFieldType { field } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
@@ -627,7 +609,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::DataSourceUnknownModelReference { source } => {
             let (path, range) = span_parts(&source.span, file_table);
             report!(path.clone(), range.clone())
@@ -641,7 +622,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::DataSourceInvalidIncludeTreeReference {
             source,
             model,
@@ -668,7 +648,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::DataSourceInvalidMethodParam { source, param } => {
             let (param_path, param_range) = span_parts(&param.span, file_table);
             let (source_path, source_range) = span_parts(&source.span, file_table);
@@ -679,7 +658,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((param_path, param_range))
-                        .with_message("only string, int, double, date, bool, and blob are allowed as method params")
+                        .with_message("only string, int, real, uint, date, json, bool, and blob are allowed as method params")
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -688,7 +667,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::DataSourceUnknownSqlParam { source, name } => {
             let (path, range) = span_parts(&source.span, file_table);
             report!(path.clone(), range.clone())
@@ -702,7 +680,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::UnsupportedCrudOperation { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
@@ -716,7 +693,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ApiUnknownNamespaceReference { api } => {
             let (path, range) = span_parts(&api.span, file_table);
             report!(path.clone(), range.clone())
@@ -730,7 +706,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ApiUnknownDataSourceReference {
             method,
             data_source,
@@ -750,7 +725,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ApiInvalidReturn { method } => {
             let (path, range) = span_parts(&method.span, file_table);
             report!(path.clone(), range.clone())
@@ -764,7 +738,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ApiInvalidParam { method, param } => {
             let (param_path, param_range) = span_parts(&param.span, file_table);
             let (method_path, method_range) = span_parts(&method.span, file_table);
@@ -784,7 +757,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ApiReservedMethod { method } => {
             let (path, range) = span_parts(&method.span, file_table);
             report!(path.clone(), range.clone())
@@ -797,7 +769,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-
         SemanticError::ValidatorUnknown { validator, symbol } => {
             let (path, range) = span_parts(&symbol.span, file_table);
             let (v_path, v_range) = span_parts(&validator.span, file_table);
@@ -814,7 +785,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ValidatorInvalidArity { validator, symbol } => {
             let (path, range) = span_parts(&symbol.span, file_table);
             let (v_path, v_range) = span_parts(&validator.span, file_table);
@@ -834,7 +804,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ValidatorInvalidArgument {
             validator,
             symbol,
@@ -858,7 +827,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-
         SemanticError::ValidatorInvalidForType { validator, symbol } => {
             let (path, range) = span_parts(&symbol.span, file_table);
             let (v_path, v_range) = span_parts(&validator.span, file_table);
@@ -876,6 +844,21 @@ fn display(
                     Label::new((path, range))
                         .with_message("applied to this field")
                         .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::KeyFieldInvalidType { field } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "key field '{}' has a type that is not a valid SQLite type",
+                    field.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "key fields must be a valid SQLite type (string, int, real, uint, date, json, bool, or blob)"
+                        )
+                        .with_color(Color::Red),
                 )
         }
     };

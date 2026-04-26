@@ -259,11 +259,11 @@ impl<'src> FmtCtx<'src> {
                 Doc::nil()
             };
             tags_doc = tags_doc
-                .then(Doc::hardline(indent))
                 .then(tag_leading)
                 .then(tag_sep)
                 .then(tag_content)
-                .then(tag_trailing);
+                .then(tag_trailing)
+                .then(Doc::hardline(indent));
         }
 
         let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
@@ -284,8 +284,14 @@ impl<'src> FmtCtx<'src> {
             Doc::nil()
         };
 
+        let pre_leading = if sym.tags.is_empty() {
+            Doc::hardline(indent)
+        } else {
+            Doc::nil()
+        };
+
         if inline {
-            let leading_sep = if has_leading_comments {
+            let leading_sep = if has_leading_comments && sym.tags.is_empty() {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -300,7 +306,7 @@ impl<'src> FmtCtx<'src> {
         }
 
         tags_doc
-            .then(Doc::hardline(indent))
+            .then(pre_leading)
             .then(leading)
             .then(content_sep)
             .then(content)

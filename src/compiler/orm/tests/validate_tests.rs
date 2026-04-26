@@ -488,7 +488,7 @@ fn objects_partials() {
             }
 
             model PureKVModel {
-                keyfield { id }
+                keyfield { id: string }
 
                 kv(namespace, "path/to/data/{id}") { data: json }
                 kv(otherNamespace, "path/to/other/{id}") { otherData: string }
@@ -1084,7 +1084,7 @@ fn validators_in_model() {
 
             keyfield {
                 [maxlen 20]
-                kf
+                kf: string
             }
         }
         "#,

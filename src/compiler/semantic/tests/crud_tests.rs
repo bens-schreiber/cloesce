@@ -73,8 +73,8 @@ fn crud_key_params() {
             }
 
             keyfield {
-                category
-                subcategory
+                category: string
+                subcategory: string
             }
 
             kv(my_kv, "{category}/{subcategory}") {

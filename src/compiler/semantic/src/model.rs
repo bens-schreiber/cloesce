@@ -258,6 +258,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::KeyField(fields) => {
                     for field in fields {
+                        if !is_valid_sql_type(&field.cidl_type) {
+                            ma.sink.push(SemanticError::KeyFieldInvalidType { field });
+                            continue;
+                        }
+
                         let validators = match resolve_validators(field) {
                             Ok(v) => v,
                             Err(errs) => {
@@ -268,7 +273,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
                         self.key_fields.push(ValidatedField {
                             name: field.name.into(),
-                            cidl_type: CidlType::String,
+                            cidl_type: field.cidl_type.clone(),
                             validators,
                         });
                     }

@@ -112,7 +112,9 @@
           "parameters": [
             {
               "name": "keyParam",
-              "cidl_type": "String",
+              "cidl_type": {
+                "Nullable": "String"
+              },
               "validators": []
             },
             {
@@ -322,7 +324,9 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "String",
+              "cidl_type": {
+                "Nullable": "String"
+              },
               "validators": []
             },
             {
@@ -420,7 +424,9 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "String",
+              "cidl_type": {
+                "Nullable": "String"
+              },
               "validators": []
             },
             {

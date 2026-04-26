@@ -177,7 +177,7 @@ fn default_data_source_methods() {
             }
 
             keyfield {
-                tag
+                tag: string
             }
 
             kv(my_kv, "{tag}") {

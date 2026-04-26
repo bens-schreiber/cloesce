@@ -184,7 +184,9 @@
           "parameters": [
             {
               "name": "name",
-              "cidl_type": "String",
+              "cidl_type": {
+                "Nullable": "String"
+              },
               "validators": []
             },
             {
