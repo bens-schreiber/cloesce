@@ -1,9 +1,9 @@
 # Proposal: Validator Tags
 
 - **Author(s):** Ben Schreiber
-- **Status:** **Draft** | Review | Accepted | Rejected | Implemented
+- **Status:** Draft | Review | Accepted | Rejected | **Implemented**
 - **Created:** 2026-04-21
-- **Last Updated:** 2026-04-21
+- **Last Updated:** 2026-04-26
 
 ---
 
@@ -255,44 +255,6 @@ const result = await Foo.$get({
 This is clean at the callsite, but requires generating a distinct input type per source method, adding schema noise with no meaning outside this narrow context.
 
 **Chosen approach: prefix internally, present as nested object.** Use the prefixed representation in the compiled AST and generated schema (keeping codegen simple and unambiguous), but emit client-side TypeScript that surfaces the parameters as a nested object keyed by source name. This isolates the structural complexity to the codegen layer and keeps both the schema and client code clean.
-
-## Improving Error Messages
-
-Currently, when the `validate` function fails, it returns a generic error message that doesn't specify which field failed validation, what it expected, or what the actual value was.
-
-In some contexts a generic message is preferable, such as when an API is not intended for public use and the developer does not want to leak implementation details. However, in most cases, it would be more helpful to return a detailed error message that includes:
-- The name of the field that failed validation
-- The validators that were applied to that field
-- The actual value that was provided
-
-To this end, we can introduce a new configuration to the `cloesce.jsonc` file that allows users to specify the level of detail included in validation error messages. For example:
-
-```jsonc
-{
-    "bad_request_error_detail": "detailed" // or "generic", defaults to "detailed"
-}
-```
-
-The backend runtime checks this configuration when constructing the `400 Bad Request` response body on validation failure.
-
-This means that configuration details will need to be embedded in the Cloesce AST:
-```rs
-enum BadRequestErrorDetail {
-    Generic,
-
-    #[default]
-    Detailed
-}
-
-struct Config {
-    bad_request_error_detail: BadRequestErrorDetail
-}
-
-struct CloesceAst {
-    // ...
-    config: Config
-}
-```
 
 ---
 
