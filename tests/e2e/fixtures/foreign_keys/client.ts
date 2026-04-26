@@ -8,20 +8,20 @@ export class A {
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `http://localhost:5716/api/A/create`
     );
-    const payload: any = {};
-    payload["a"] = a;
+    const __payload: any = {};
+    __payload["a"] = a;
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       A,
       false
@@ -30,19 +30,19 @@ export class A {
   async withoutB(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5716/api/A/${id}/withoutB`
+    const __baseUrl = new URL(
+      `http://localhost:5716/api/A/${__id}/withoutB`
     );
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       A,
       false
@@ -52,22 +52,22 @@ export class A {
     args: { Default: DeepPartial<A> } | { WithB: DeepPartial<A> } | { WithoutB: DeepPartial<A> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/A/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       A,
       false
@@ -77,22 +77,22 @@ export class A {
     args: { Default: { id: number; }} | { WithB: { id: number; }} | { WithoutB: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5716/api/A/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("WithB_id", String(args?.WithB?.id ?? null));
-    baseUrl.searchParams.append("WithoutB_id", String(args?.WithoutB?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("WithB_id", String(args?.WithB?.id ?? null));
+    __baseUrl.searchParams.append("WithoutB_id", String(args?.WithoutB?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       A,
       false
@@ -100,9 +100,9 @@ export class A {
   }
 
   static fromJson(data: any): A {
-    const res = Object.assign(new A(), data);
-    res["b"] &&= B.fromJson(res.b);
-    return res;
+    const __res = Object.assign(new A(), data);
+    __res["b"] &&= B.fromJson(__res.b);
+    return __res;
   }
 }
 export class B {
@@ -111,22 +111,22 @@ export class B {
   async testMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5716/api/B/${id}/testMethod`
+    const __baseUrl = new URL(
+      `http://localhost:5716/api/B/${__id}/testMethod`
     );
-    const payload: any = {};
+    const __payload: any = {};
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       undefined,
       false
@@ -136,22 +136,22 @@ export class B {
     args: { Default: DeepPartial<B> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/B/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       B,
       false
@@ -161,20 +161,20 @@ export class B {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5716/api/B/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       B,
       false
@@ -182,11 +182,11 @@ export class B {
   }
 
   static fromJson(data: any): B {
-    const res = Object.assign(new B(), data);
-    for (let i = 0; i < res.a?.length; i++) {
-      res.a[i] = A.fromJson(res.a[i]);
+    const __res = Object.assign(new B(), data);
+    for (let i = 0; i < __res.a?.length; i++) {
+      __res.a[i] = A.fromJson(__res.a[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Course {
@@ -196,22 +196,22 @@ export class Course {
     args: { Default: DeepPartial<Course> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Course/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Course,
       false
@@ -219,11 +219,11 @@ export class Course {
   }
 
   static fromJson(data: any): Course {
-    const res = Object.assign(new Course(), data);
-    for (let i = 0; i < res.students?.length; i++) {
-      res.students[i] = Student.fromJson(res.students[i]);
+    const __res = Object.assign(new Course(), data);
+    for (let i = 0; i < __res.students?.length; i++) {
+      __res.students[i] = Student.fromJson(__res.students[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Person {
@@ -233,20 +233,20 @@ export class Person {
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Person/create`
     );
-    const payload: any = {};
-    payload["person"] = person;
+    const __payload: any = {};
+    __payload["person"] = person;
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Person,
       false
@@ -255,19 +255,19 @@ export class Person {
   async withoutDogs(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5716/api/Person/${id}/withoutDogs`
+    const __baseUrl = new URL(
+      `http://localhost:5716/api/Person/${__id}/withoutDogs`
     );
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Person,
       false
@@ -277,22 +277,22 @@ export class Person {
     args: { Default: DeepPartial<Person> } | { WithDogs: DeepPartial<Person> } | { WithoutDogs: DeepPartial<Person> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Person/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Person,
       false
@@ -302,22 +302,22 @@ export class Person {
     args: { Default: { id: number; }} | { WithDogs: { id: number; }} | { WithoutDogs: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Person/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("WithDogs_id", String(args?.WithDogs?.id ?? null));
-    baseUrl.searchParams.append("WithoutDogs_id", String(args?.WithoutDogs?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("WithDogs_id", String(args?.WithDogs?.id ?? null));
+    __baseUrl.searchParams.append("WithoutDogs_id", String(args?.WithoutDogs?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Person,
       false
@@ -325,11 +325,11 @@ export class Person {
   }
 
   static fromJson(data: any): Person {
-    const res = Object.assign(new Person(), data);
-    for (let i = 0; i < res.dogs?.length; i++) {
-      res.dogs[i] = Dog.fromJson(res.dogs[i]);
+    const __res = Object.assign(new Person(), data);
+    for (let i = 0; i < __res.dogs?.length; i++) {
+      __res.dogs[i] = Dog.fromJson(__res.dogs[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Student {
@@ -339,20 +339,20 @@ export class Student {
     student: Student,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const baseUrl = new URL(
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Student/create`
     );
-    const payload: any = {};
-    payload["student"] = student;
+    const __payload: any = {};
+    __payload["student"] = student;
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -361,19 +361,19 @@ export class Student {
   async none(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5716/api/Student/${id}/none`
+    const __baseUrl = new URL(
+      `http://localhost:5716/api/Student/${__id}/none`
     );
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -383,22 +383,22 @@ export class Student {
     args: { Default: DeepPartial<Student> } | { None: DeepPartial<Student> } | { WithCoursesStudentsCourses: DeepPartial<Student> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Student/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -408,22 +408,22 @@ export class Student {
     args: { Default: { id: number; }} | { None: { id: number; }} | { WithCoursesStudentsCourses: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Student/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
-    baseUrl.searchParams.append("WithCoursesStudentsCourses_id", String(args?.WithCoursesStudentsCourses?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
+    __baseUrl.searchParams.append("WithCoursesStudentsCourses_id", String(args?.WithCoursesStudentsCourses?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -431,11 +431,11 @@ export class Student {
   }
 
   static fromJson(data: any): Student {
-    const res = Object.assign(new Student(), data);
-    for (let i = 0; i < res.courses?.length; i++) {
-      res.courses[i] = Course.fromJson(res.courses[i]);
+    const __res = Object.assign(new Student(), data);
+    for (let i = 0; i < __res.courses?.length; i++) {
+      __res.courses[i] = Course.fromJson(__res.courses[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Dog {
@@ -445,22 +445,22 @@ export class Dog {
   async testMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5716/api/Dog/${id}/testMethod`
+    const __baseUrl = new URL(
+      `http://localhost:5716/api/Dog/${__id}/testMethod`
     );
-    const payload: any = {};
+    const __payload: any = {};
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       undefined,
       false
@@ -470,22 +470,22 @@ export class Dog {
     args: { Default: DeepPartial<Dog> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5716/api/Dog/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Dog,
       false
@@ -493,9 +493,9 @@ export class Dog {
   }
 
   static fromJson(data: any): Dog {
-    const res = Object.assign(new Dog(), data);
-    res["person"] &&= Person.fromJson(res.person);
-    return res;
+    const __res = Object.assign(new Dog(), data);
+    __res["person"] &&= Person.fromJson(__res.person);
+    return __res;
   }
 }
 

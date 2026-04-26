@@ -8,20 +8,20 @@ export class Course {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Course/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Course,
       false
@@ -31,20 +31,20 @@ export class Course {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course[]>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Course/$list`
     );
-    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Course,
       true
@@ -54,22 +54,22 @@ export class Course {
     args: { Default: DeepPartial<Course> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Course/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Course,
       false
@@ -77,11 +77,11 @@ export class Course {
   }
 
   static fromJson(data: any): Course {
-    const res = Object.assign(new Course(), data);
-    for (let i = 0; i < res.studentCourses?.length; i++) {
-      res.studentCourses[i] = StudentCourse.fromJson(res.studentCourses[i]);
+    const __res = Object.assign(new Course(), data);
+    for (let i = 0; i < __res.studentCourses?.length; i++) {
+      __res.studentCourses[i] = StudentCourse.fromJson(__res.studentCourses[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Student {
@@ -93,23 +93,23 @@ export class Student {
     args: { CoursesOrderedDescending: { id: number; name: string; }} | { Default: { id: number; name: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Student/$get`
     );
-    baseUrl.searchParams.append("CoursesOrderedDescending_id", String(args?.CoursesOrderedDescending?.id ?? null));
-    baseUrl.searchParams.append("CoursesOrderedDescending_name", String(args?.CoursesOrderedDescending?.name ?? null));
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("Default_name", String(args?.Default?.name ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("CoursesOrderedDescending_id", String(args?.CoursesOrderedDescending?.id ?? null));
+    __baseUrl.searchParams.append("CoursesOrderedDescending_name", String(args?.CoursesOrderedDescending?.name ?? null));
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("Default_name", String(args?.Default?.name ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -119,24 +119,24 @@ export class Student {
     args: { CoursesOrderedDescending: { lastId: number; lastName: string; limit: number; }} | { Default: { lastSeen_id: number; lastSeen_name: string; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student[]>> {
-    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Student/$list`
     );
-    baseUrl.searchParams.append("CoursesOrderedDescending_lastId", String(args?.CoursesOrderedDescending?.lastId ?? null));
-    baseUrl.searchParams.append("CoursesOrderedDescending_lastName", String(args?.CoursesOrderedDescending?.lastName ?? null));
-    baseUrl.searchParams.append("CoursesOrderedDescending_limit", String(args?.CoursesOrderedDescending?.limit ?? null));
-    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("Default_lastSeen_name", String(args?.Default?.lastSeen_name ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("CoursesOrderedDescending_lastId", String(args?.CoursesOrderedDescending?.lastId ?? null));
+    __baseUrl.searchParams.append("CoursesOrderedDescending_lastName", String(args?.CoursesOrderedDescending?.lastName ?? null));
+    __baseUrl.searchParams.append("CoursesOrderedDescending_limit", String(args?.CoursesOrderedDescending?.limit ?? null));
+    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("Default_lastSeen_name", String(args?.Default?.lastSeen_name ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       true
@@ -146,22 +146,22 @@ export class Student {
     args: { CoursesOrderedDescending: DeepPartial<Student> } | { Default: DeepPartial<Student> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "CoursesOrderedDescending" | "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/Student/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Student,
       false
@@ -169,11 +169,11 @@ export class Student {
   }
 
   static fromJson(data: any): Student {
-    const res = Object.assign(new Student(), data);
-    for (let i = 0; i < res.studentCourses?.length; i++) {
-      res.studentCourses[i] = StudentCourse.fromJson(res.studentCourses[i]);
+    const __res = Object.assign(new Student(), data);
+    for (let i = 0; i < __res.studentCourses?.length; i++) {
+      __res.studentCourses[i] = StudentCourse.fromJson(__res.studentCourses[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class StudentCourse {
@@ -186,25 +186,25 @@ export class StudentCourse {
     args: { Default: { studentId: number; studentName: string; courseId: number; }} | { WithStudentCourse: { studentId: number; studentName: string; courseId: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
-    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$get`
     );
-    baseUrl.searchParams.append("Default_studentId", String(args?.Default?.studentId ?? null));
-    baseUrl.searchParams.append("Default_studentName", String(args?.Default?.studentName ?? null));
-    baseUrl.searchParams.append("Default_courseId", String(args?.Default?.courseId ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_studentId", String(args?.WithStudentCourse?.studentId ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_studentName", String(args?.WithStudentCourse?.studentName ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_courseId", String(args?.WithStudentCourse?.courseId ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_studentId", String(args?.Default?.studentId ?? null));
+    __baseUrl.searchParams.append("Default_studentName", String(args?.Default?.studentName ?? null));
+    __baseUrl.searchParams.append("Default_courseId", String(args?.Default?.courseId ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_studentId", String(args?.WithStudentCourse?.studentId ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_studentName", String(args?.WithStudentCourse?.studentName ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_courseId", String(args?.WithStudentCourse?.courseId ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       StudentCourse,
       false
@@ -214,26 +214,26 @@ export class StudentCourse {
     args: { Default: { lastSeen_studentId: number; lastSeen_studentName: string; lastSeen_courseId: number; limit: number; }} | { WithStudentCourse: { lastSeen_studentId: number; lastSeen_studentName: string; lastSeen_courseId: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse[]>> {
-    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$list`
     );
-    baseUrl.searchParams.append("Default_lastSeen_studentId", String(args?.Default?.lastSeen_studentId ?? null));
-    baseUrl.searchParams.append("Default_lastSeen_studentName", String(args?.Default?.lastSeen_studentName ?? null));
-    baseUrl.searchParams.append("Default_lastSeen_courseId", String(args?.Default?.lastSeen_courseId ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentId", String(args?.WithStudentCourse?.lastSeen_studentId ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentName", String(args?.WithStudentCourse?.lastSeen_studentName ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_lastSeen_courseId", String(args?.WithStudentCourse?.lastSeen_courseId ?? null));
-    baseUrl.searchParams.append("WithStudentCourse_limit", String(args?.WithStudentCourse?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_lastSeen_studentId", String(args?.Default?.lastSeen_studentId ?? null));
+    __baseUrl.searchParams.append("Default_lastSeen_studentName", String(args?.Default?.lastSeen_studentName ?? null));
+    __baseUrl.searchParams.append("Default_lastSeen_courseId", String(args?.Default?.lastSeen_courseId ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentId", String(args?.WithStudentCourse?.lastSeen_studentId ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_lastSeen_studentName", String(args?.WithStudentCourse?.lastSeen_studentName ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_lastSeen_courseId", String(args?.WithStudentCourse?.lastSeen_courseId ?? null));
+    __baseUrl.searchParams.append("WithStudentCourse_limit", String(args?.WithStudentCourse?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       StudentCourse,
       true
@@ -243,22 +243,22 @@ export class StudentCourse {
     args: { Default: DeepPartial<StudentCourse> } | { WithStudentCourse: DeepPartial<StudentCourse> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
-    const resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithStudentCourse" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5139/api/StudentCourse/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       StudentCourse,
       false
@@ -266,10 +266,10 @@ export class StudentCourse {
   }
 
   static fromJson(data: any): StudentCourse {
-    const res = Object.assign(new StudentCourse(), data);
-    res["student"] &&= Student.fromJson(res.student);
-    res["course"] &&= Course.fromJson(res.course);
-    return res;
+    const __res = Object.assign(new StudentCourse(), data);
+    __res["student"] &&= Student.fromJson(__res.student);
+    __res["course"] &&= Course.fromJson(__res.course);
+    return __res;
   }
 }
 

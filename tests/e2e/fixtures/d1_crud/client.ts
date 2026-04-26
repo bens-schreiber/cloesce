@@ -6,22 +6,22 @@ export class CrudHaver {
   async notCrud(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5391/api/CrudHaver/${id}/notCrud`
+    const __baseUrl = new URL(
+      `http://localhost:5391/api/CrudHaver/${__id}/notCrud`
     );
-    const payload: any = {};
+    const __payload: any = {};
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       undefined,
       false
@@ -31,22 +31,22 @@ export class CrudHaver {
     args: { Default: DeepPartial<CrudHaver> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       CrudHaver,
       false
@@ -56,20 +56,20 @@ export class CrudHaver {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       CrudHaver,
       false
@@ -79,20 +79,20 @@ export class CrudHaver {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5391/api/CrudHaver/$list`
     );
-    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       CrudHaver,
       true
@@ -100,8 +100,8 @@ export class CrudHaver {
   }
 
   static fromJson(data: any): CrudHaver {
-    const res = Object.assign(new CrudHaver(), data);
-    return res;
+    const __res = Object.assign(new CrudHaver(), data);
+    return __res;
   }
 }
 export class Parent {
@@ -113,22 +113,22 @@ export class Parent {
     args: { Default: DeepPartial<Parent> } | { WithChildren: DeepPartial<Parent> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
-    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5391/api/Parent/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Parent,
       false
@@ -138,21 +138,21 @@ export class Parent {
     args: { Default: { id: number; }} | { WithChildren: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
-    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
-    const resolvedArgs: any = args[resolvedKind];
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
+    const __resolvedArgs: any = args[__resolvedKind];
+    const __baseUrl = new URL(
       `http://localhost:5391/api/Parent/$get`
     );
-    baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    baseUrl.searchParams.append("WithChildren_id", String(args?.WithChildren?.id ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __baseUrl.searchParams.append("WithChildren_id", String(args?.WithChildren?.id ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Parent,
       false
@@ -162,22 +162,22 @@ export class Parent {
     args: { Default: { lastSeen_id: number; limit: number; }} | { WithChildren: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
-    const resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" | "WithChildren" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5391/api/Parent/$list`
     );
-    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("WithChildren_lastSeen_id", String(args?.WithChildren?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("WithChildren_limit", String(args?.WithChildren?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("WithChildren_lastSeen_id", String(args?.WithChildren?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("WithChildren_limit", String(args?.WithChildren?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Parent,
       true
@@ -185,12 +185,12 @@ export class Parent {
   }
 
   static fromJson(data: any): Parent {
-    const res = Object.assign(new Parent(), data);
-    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
-    for (let i = 0; i < res.children?.length; i++) {
-      res.children[i] = Child.fromJson(res.children[i]);
+    const __res = Object.assign(new Parent(), data);
+    __res["favoriteChild"] &&= Child.fromJson(__res.favoriteChild);
+    for (let i = 0; i < __res.children?.length; i++) {
+      __res.children[i] = Child.fromJson(__res.children[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Child {
@@ -199,9 +199,9 @@ export class Child {
   parent: Parent | undefined;
 
   static fromJson(data: any): Child {
-    const res = Object.assign(new Child(), data);
-    res["parent"] &&= Parent.fromJson(res.parent);
-    return res;
+    const __res = Object.assign(new Child(), data);
+    __res["parent"] &&= Parent.fromJson(__res.parent);
+    return __res;
   }
 }
 

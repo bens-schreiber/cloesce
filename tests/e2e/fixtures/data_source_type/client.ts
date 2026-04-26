@@ -4,8 +4,8 @@ export class Poo {
   ds: "Baz" | "Default" = "Default";
 
   static fromJson(data: any): Poo {
-    const res = Object.assign(new Poo(), data);
-    return res;
+    const __res = Object.assign(new Poo(), data);
+    return __res;
   }
 }
 export class Foo {
@@ -17,26 +17,26 @@ export class Foo {
     poop: Poo,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5719/api/Foo/${id}/bar`
+    const __baseUrl = new URL(
+      `http://localhost:5719/api/Foo/${__id}/bar`
     );
-    const payload: any = {};
-    baseUrl.searchParams.append("customDs", String(customDs));
-    baseUrl.searchParams.append("oneDs", String(oneDs));
-    baseUrl.searchParams.append("noDs", String(noDs));
-    payload["poop"] = poop;
+    const __payload: any = {};
+    __baseUrl.searchParams.append("customDs", String(customDs));
+    __baseUrl.searchParams.append("oneDs", String(oneDs));
+    __baseUrl.searchParams.append("noDs", String(noDs));
+    __payload["poop"] = poop;
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       undefined,
       false
@@ -44,24 +44,24 @@ export class Foo {
   }
 
   static fromJson(data: any): Foo {
-    const res = Object.assign(new Foo(), data);
-    return res;
+    const __res = Object.assign(new Foo(), data);
+    return __res;
   }
 }
 export class NoDs {
   id: number;
 
   static fromJson(data: any): NoDs {
-    const res = Object.assign(new NoDs(), data);
-    return res;
+    const __res = Object.assign(new NoDs(), data);
+    return __res;
   }
 }
 export class OneDs {
   id: number;
 
   static fromJson(data: any): OneDs {
-    const res = Object.assign(new OneDs(), data);
-    return res;
+    const __res = Object.assign(new OneDs(), data);
+    return __res;
   }
 }
 

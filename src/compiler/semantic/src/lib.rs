@@ -808,7 +808,7 @@ fn resolve_validators<'src, 'p>(
                 };
             }
             "regex" => match &args[0] {
-                ValidatorLiteral::Regex(s) => resolved.push(Validator::Regex(s)),
+                ValidatorLiteral::Regex(s) => resolved.push(Validator::Regex((*s).into())),
                 _ => sink.push(SemanticError::ValidatorInvalidArgument {
                     symbol,
                     validator: tag,

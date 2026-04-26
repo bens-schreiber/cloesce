@@ -7,19 +7,19 @@ export class Hamburger {
   async noLettuceToppings(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5403/api/Hamburger/${id}/noLettuceToppings`
+    const __baseUrl = new URL(
+      `http://localhost:5403/api/Hamburger/${__id}/noLettuceToppings`
     );
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Topping,
       true
@@ -28,19 +28,19 @@ export class Hamburger {
   async onlyBaconToppings(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
-    const id = [
+    const __id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5403/api/Hamburger/${id}/onlyBaconToppings`
+    const __baseUrl = new URL(
+      `http://localhost:5403/api/Hamburger/${__id}/onlyBaconToppings`
     );
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Topping,
       true
@@ -50,22 +50,22 @@ export class Hamburger {
     args: { BurgersWithLettuceOrdered: DeepPartial<Hamburger> } | { Default: DeepPartial<Hamburger> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
-    const resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5403/api/Hamburger/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Hamburger,
       false
@@ -75,22 +75,22 @@ export class Hamburger {
     args: { BurgersWithLettuceOrdered: { lastId: number; limit: number; }} | { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger[]>> {
-    const resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5403/api/Hamburger/$list`
     );
-    baseUrl.searchParams.append("BurgersWithLettuceOrdered_lastId", String(args?.BurgersWithLettuceOrdered?.lastId ?? null));
-    baseUrl.searchParams.append("BurgersWithLettuceOrdered_limit", String(args?.BurgersWithLettuceOrdered?.limit ?? null));
-    baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    __baseUrl.searchParams.append("BurgersWithLettuceOrdered_lastId", String(args?.BurgersWithLettuceOrdered?.lastId ?? null));
+    __baseUrl.searchParams.append("BurgersWithLettuceOrdered_limit", String(args?.BurgersWithLettuceOrdered?.limit ?? null));
+    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Hamburger,
       true
@@ -98,11 +98,11 @@ export class Hamburger {
   }
 
   static fromJson(data: any): Hamburger {
-    const res = Object.assign(new Hamburger(), data);
-    for (let i = 0; i < res.toppings?.length; i++) {
-      res.toppings[i] = Topping.fromJson(res.toppings[i]);
+    const __res = Object.assign(new Hamburger(), data);
+    for (let i = 0; i < __res.toppings?.length; i++) {
+      __res.toppings[i] = Topping.fromJson(__res.toppings[i]);
     }
-    return res;
+    return __res;
   }
 }
 export class Topping {
@@ -113,22 +113,22 @@ export class Topping {
     args: { Default: DeepPartial<Topping> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
-    const resolvedKind: "Default" = dsKey(args) as any;
-    const baseUrl = new URL(
+    const __resolvedKind: "Default" = dsKey(args) as any;
+    const __baseUrl = new URL(
       `http://localhost:5403/api/Topping/$save`
     );
-    const payload: any = {};
-    payload["model"] = args[resolvedKind];
-    baseUrl.searchParams.append("__datasource", resolvedKind);
+    const __payload: any = {};
+    __payload["model"] = args[__resolvedKind];
+    __baseUrl.searchParams.append("__datasource", __resolvedKind);
 
-    const res = await fetchImpl(baseUrl, {
+    const __res = await fetchImpl(__baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      body: requestBody(MediaType.Json, __payload),
     });
 
     return await HttpResult.fromResponse(
-      res,
+      __res,
       MediaType.Json,
       Topping,
       false
@@ -136,11 +136,11 @@ export class Topping {
   }
 
   static fromJson(data: any): Topping {
-    const res = Object.assign(new Topping(), data);
-    for (let i = 0; i < res.hamburger?.length; i++) {
-      res.hamburger[i] = Hamburger.fromJson(res.hamburger[i]);
+    const __res = Object.assign(new Topping(), data);
+    for (let i = 0; i < __res.hamburger?.length; i++) {
+      __res.hamburger[i] = Hamburger.fromJson(__res.hamburger[i]);
     }
-    return res;
+    return __res;
   }
 }
 

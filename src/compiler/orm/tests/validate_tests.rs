@@ -1052,7 +1052,7 @@ fn validator_regex() {
     {
         let result = validate_cidl_type(
             CidlType::String,
-            &[Validator::Regex("^[a-z]+$")],
+            &[Validator::Regex("^[a-z]+$".into())],
             Some(json!("hello123")),
             &ast,
             false,
@@ -1067,7 +1067,7 @@ fn validator_regex() {
     {
         let result = validate_cidl_type(
             CidlType::String,
-            &[Validator::Regex("^[a-z]+$")],
+            &[Validator::Regex("^[a-z]+$".into())],
             Some(json!("hello")),
             &ast,
             false,

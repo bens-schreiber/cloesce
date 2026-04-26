@@ -1,0 +1,386 @@
+{
+  "hash": 12943445999625665821,
+  "wrangler_env": {
+    "d1_bindings": [
+      "db"
+    ],
+    "kv_bindings": [
+      "store"
+    ],
+    "r2_bindings": [],
+    "vars": []
+  },
+  "models": {
+    "Validator": {
+      "hash": 11924306774175608156,
+      "name": "Validator",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 5506969935928112087,
+          "field": {
+            "name": "id",
+            "cidl_type": "Uint",
+            "validators": [
+              {
+                "LessThan": {
+                  "Int": 100
+                }
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 15344942205672937722,
+          "field": {
+            "name": "email",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+              },
+              {
+                "MaxLength": 255
+              },
+              {
+                "MinLength": 5
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "data",
+            "cidl_type": {
+              "KvObject": "String"
+            },
+            "validators": [
+              {
+                "MaxLength": 500
+              }
+            ]
+          },
+          "format": "some_crap/{email}/{name}",
+          "format_parameters": [
+            {
+              "name": "email",
+              "cidl_type": "String"
+            },
+            {
+              "name": "name",
+              "cidl_type": "String"
+            }
+          ],
+          "binding": "store",
+          "list_prefix": false
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [
+        {
+          "name": "name",
+          "cidl_type": "String",
+          "validators": [
+            {
+              "Length": 10
+            }
+          ]
+        }
+      ],
+      "apis": [
+        {
+          "name": "someMethod",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Uint",
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
+              "name": "name",
+              "cidl_type": "String",
+              "validators": [
+                {
+                  "Length": 10
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Validator"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Validator"
+                }
+              },
+              "validators": []
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Validator"
+                }
+              },
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Validator"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "name",
+              "cidl_type": "String",
+              "validators": []
+            },
+            {
+              "name": "Default_id",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
+              "name": "None_id",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Validator"
+                }
+              },
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$list",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "Validator"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "Default_lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Default_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
+            },
+            {
+              "name": "None_lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
+              "name": "None_limit",
+              "cidl_type": {
+                "Nullable": "Uint"
+              },
+              "validators": []
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Validator"
+                }
+              },
+              "validators": []
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Uint",
+                "validators": [
+                  {
+                    "LessThan": {
+                      "Int": 100
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Uint",
+                "validators": []
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Uint",
+                "validators": [
+                  {
+                    "LessThan": {
+                      "Int": 100
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "None": {
+          "name": "None",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Uint",
+                "validators": [
+                  {
+                    "LessThan": {
+                      "Int": 100
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Uint",
+                "validators": []
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Uint",
+                "validators": [
+                  {
+                    "LessThan": {
+                      "Int": 100
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save",
+        "Get",
+        "List"
+      ]
+    }
+  },
+  "services": {},
+  "poos": {},
+  "injects": []
+}

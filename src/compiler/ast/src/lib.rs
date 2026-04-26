@@ -157,7 +157,9 @@ pub enum Validator<'src> {
     Length(usize),
     MinLength(usize),
     MaxLength(usize),
-    Regex(&'src str),
+
+    #[serde(borrow)]
+    Regex(Cow<'src, str>),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Hash)]
