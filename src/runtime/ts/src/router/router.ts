@@ -517,7 +517,7 @@ async function validateRequest(
 ): Promise<Either<HttpResult, RequestParamMap>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (c: RouterError, reason: string) =>
-    exit(400, c, `Invalid Request Body: ${reason}`);
+    exit(400, c, `Invalid Request: ${reason}`);
 
   // Validate instantiated invocation
   if (route.kind === "model" && !route.method.is_static) {
