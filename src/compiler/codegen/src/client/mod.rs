@@ -170,7 +170,7 @@ impl ClientTemplate<'_> {
     }
 
     /// Returns the un-prefixed parameter name given a data source name and a prefixed param name.
-    /// e.g. ds_name="Default", param_name="Default_id" → "id"
+    /// e.g. ds_name="Default", param_name="Default_id" => "id"
     fn strip_ds_prefix<'a>(&self, ds_name: &str, param_name: &'a str) -> &'a str {
         let prefix = format!("{}_", ds_name);
         param_name

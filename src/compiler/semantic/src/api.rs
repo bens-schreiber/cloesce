@@ -1,3 +1,5 @@
+use std::ops::Not;
+
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
@@ -199,12 +201,20 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
 
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
                     // GET requests do not support Object parameters
-                    ensure!(method.http_verb != HttpVerb::Get, self.sink, err);
+                    ensure!(
+                        matches!(method.http_verb, HttpVerb::Get).not(),
+                        self.sink,
+                        err
+                    );
                 }
 
                 CidlType::R2Object => {
                     // GET requests do not support R2Object parameters
-                    ensure!(method.http_verb != HttpVerb::Get, self.sink, err);
+                    ensure!(
+                        matches!(method.http_verb, HttpVerb::Get).not(),
+                        self.sink,
+                        err
+                    );
                 }
 
                 CidlType::Stream => {

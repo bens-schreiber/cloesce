@@ -192,7 +192,8 @@ pub unsafe extern "C" fn select_model(
         }
     };
 
-    let res = AST.with(|ast| SelectModel::query(model_name, from, include_tree, &ast.borrow()));
+    let res =
+        AST.with(|ast| SelectModel::query(model_name, from, include_tree.as_ref(), &ast.borrow()));
     match res {
         Ok(res) => {
             let bytes = res.into_bytes();

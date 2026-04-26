@@ -357,7 +357,7 @@ fn service_block() {
         .iter()
         .find(|m| m.block.symbol.name == "createItem")
         .unwrap();
-    assert_eq!(create.block.http_verb, HttpVerb::Post);
+    assert!(matches!(create.block.http_verb, HttpVerb::Post));
     // no SelfParam means it's static
     assert!(
         create
@@ -378,7 +378,7 @@ fn service_block() {
         .iter()
         .find(|m| m.block.symbol.name == "listItems")
         .unwrap();
-    assert_eq!(list.block.http_verb, HttpVerb::Get);
+    assert!(matches!(list.block.http_verb, HttpVerb::Get));
     // has a SelfParam means it's an instance method
     assert!(list.block.parameters.iter().any(|p| matches!(
         &p.block,
@@ -447,9 +447,9 @@ fn model_primary_unique_optional_foreign() {
         })
         .collect();
     assert!(
-        cruds.contains(&CrudKind::List)
-            && cruds.contains(&CrudKind::Get)
-            && cruds.contains(&CrudKind::Save)
+        cruds.iter().any(|c| matches!(c, CrudKind::Get))
+            && cruds.iter().any(|c| matches!(c, CrudKind::Save))
+            && cruds.iter().any(|c| matches!(c, CrudKind::List))
     );
 
     let col = m
@@ -807,9 +807,9 @@ fn model_kv_r2_paginated() {
         })
         .collect();
     assert!(
-        kv_cruds.contains(&CrudKind::Get)
-            && kv_cruds.contains(&CrudKind::Save)
-            && kv_cruds.contains(&CrudKind::List)
+        kv_cruds.iter().any(|c| matches!(c, CrudKind::Get))
+            && kv_cruds.iter().any(|c| matches!(c, CrudKind::Save))
+            && kv_cruds.iter().any(|c| matches!(c, CrudKind::List))
     );
 
     let keyfields: Vec<&str> = kv_model

@@ -10,7 +10,7 @@ pub fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum OrmErrorKind {
     SerializeError { message: String },
 

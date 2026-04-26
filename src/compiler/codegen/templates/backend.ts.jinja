@@ -96,12 +96,12 @@ export namespace {{ model.name }} {
     export namespace Key {
 {%- for kv in &model.kv_fields %}
         export function {{ kv.field.name }}({% for param in &kv.format_parameters %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }},{% endfor %}): string {
-            return {{ self.mapper.kv_key_format(kv) }};
+            return {{ self.mapper.interpolate_format(&kv.format, &kv.format_parameters) }};
         }
 {%- endfor %}
 {%- for r2 in &model.r2_fields %}
         export function {{ r2.field.name }}({% for param in &r2.format_parameters %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }},{% endfor %}): string {
-            return {{ self.mapper.r2_key_format(r2) }};
+            return {{ self.mapper.interpolate_format(&r2.format, &r2.format_parameters) }};
         }
 {%- endfor %}
     }

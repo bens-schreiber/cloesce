@@ -52,7 +52,7 @@ fn adds_crud_methods_to_models() {
         vec!["Default_orderId", "Default_productId", "__datasource"]
     );
 
-    assert_eq!(get_method.http_verb, HttpVerb::Get);
+    assert!(matches!(get_method.http_verb, HttpVerb::Get));
     assert!(get_method.is_static);
 }
 

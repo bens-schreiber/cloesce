@@ -1,10 +1,17 @@
-use ast::{CidlType, CloesceAst, Field, IncludeTree, KvField, MediaType, R2Field};
+use ast::{CidlType, CloesceAst, Field, IncludeTree, MediaType};
 
 pub trait LanguageTypeMapper {
+    /// Maps a [CidlType] to a type in the target language
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;
+
+    /// Maps a [MediaType] to a type in the target language
     fn media_type(&self, ty: &MediaType) -> String;
-    fn kv_key_format(&self, kv: &KvField) -> String;
-    fn r2_key_format(&self, r2: &R2Field) -> String;
+
+    /// Converts a format string to the target languages string interpolation syntax,
+    /// using the provided parameters to identify placeholders
+    fn interpolate_format(&self, format: &str, parameters: &[Field]) -> String;
+
+    /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
 }
 
@@ -51,18 +58,11 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
             CidlType::Object { name, .. } => self.namespace(ast, name),
-            CidlType::Nullable(inner) => {
-                if matches!(inner.as_ref(), CidlType::Void) {
-                    return "null".to_string();
-                }
-
-                let inner_ts = self.cidl_type(inner, ast);
-                format!("{} | null", inner_ts)
-            }
-            CidlType::Array(inner) => {
-                let inner_ts = self.cidl_type(inner, ast);
-                format!("{}[]", inner_ts)
-            }
+            CidlType::Nullable(inner) => match inner.as_ref() {
+                CidlType::Void => "null".to_string(),
+                _ => format!("{} | null", self.cidl_type(inner, ast)),
+            },
+            CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, ast)),
             CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {
@@ -91,14 +91,8 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
-            CidlType::KvObject(inner) => {
-                let inner_ts = self.cidl_type(inner, ast);
-                format!("KValue<{inner_ts}>")
-            }
-            CidlType::Paginated(inner) => {
-                let inner_ts = self.cidl_type(inner, ast);
-                format!("Paginated<{inner_ts}>")
-            }
+            CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, ast)),
+            CidlType::Paginated(inner) => format!("Paginated<{}>", self.cidl_type(inner, ast)),
             CidlType::R2Object => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
                 TypeScriptMapperKind::ClientApi => "R2Object".to_string(),
@@ -106,7 +100,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::Inject { name } => self.namespace(ast, name),
             CidlType::Env => "Env".to_string(),
             CidlType::UnresolvedReference { name } => {
-                unreachable!("Unresolved reference should have been resolved by this point: {name}")
+                unreachable!("references should have been resolved by this point: {name}")
             }
         }
     }
@@ -118,25 +112,17 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn kv_key_format(&self, kv: &KvField) -> String {
-        interpolate_format(kv.format, &kv.format_parameters)
-    }
-
-    fn r2_key_format(&self, r2: &R2Field) -> String {
-        interpolate_format(r2.format, &r2.format_parameters)
+    fn interpolate_format(&self, format: &str, parameters: &[Field]) -> String {
+        let result = parameters.iter().fold(format.to_string(), |acc, field| {
+            acc.replace(
+                &format!("{{{}}}", field.name),
+                &format!("${{{}}}", field.name),
+            )
+        });
+        format!("`{result}`")
     }
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
         serde_json::to_string(&tree).unwrap()
     }
-}
-
-fn interpolate_format(format: &str, parameters: &[Field]) -> String {
-    let mut result = format.to_string();
-    for field in parameters {
-        let placeholder = format!("{{{}}}", field.name);
-        let replacement = format!("${{{}}}", field.name);
-        result = result.replace(&placeholder, &replacement);
-    }
-    format!("`{result}`")
 }
