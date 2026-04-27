@@ -25,8 +25,6 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Set version from latest release tag
         run: |
