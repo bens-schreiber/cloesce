@@ -437,14 +437,10 @@ export class ModelWithCruds {
   name: string;
   categoryId: number;
   static async $get(
-    args:
-      { ByName: { name: string; }} |
-      { Default: { id: number; }},
+    args: { ByName: { name: string; }} | { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
-    const __$resolvedKind:
-        "ByName" | 
-        "Default" = dsKey(args) as any;
+    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
     const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get`
@@ -465,14 +461,10 @@ export class ModelWithCruds {
     );
   }
   static async $save(
-    args:
-      { ByName: DeepPartial<ModelWithCruds> } |
-      { Default: DeepPartial<ModelWithCruds> },
+    args: { ByName: DeepPartial<ModelWithCruds> } | { Default: DeepPartial<ModelWithCruds> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
-    const __$resolvedKind:
-        "ByName" | 
-        "Default" = dsKey(args) as any;
+    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$save`
     );
@@ -494,14 +486,10 @@ export class ModelWithCruds {
     );
   }
   static async $list(
-    args:
-      { ByName: { name: string; limit: number; }} |
-      { Default: { lastSeen_id: number; limit: number; }},
+    args: { ByName: { name: string; limit: number; }} | { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
-    const __$resolvedKind:
-        "ByName" | 
-        "Default" = dsKey(args) as any;
+    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
