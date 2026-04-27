@@ -4,6 +4,7 @@
     "**/dist/",
     "**/build/",
     // generated
+    "**/tests/snapshots/",
     "tests/e2e/fixtures/*/backend.ts",
     "tests/e2e/fixtures/*/client.ts",
     "tests/e2e/fixtures/**/*.json",

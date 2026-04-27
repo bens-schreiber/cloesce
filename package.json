@@ -1,5 +1,5 @@
 {
-  "name": "cloesce",
+  "name": "root",
   "private": true,
   "scripts": {
     "lint": "oxlint",

@@ -23,7 +23,4 @@
       "path": "examples",
     },
   ],
-  "settings": {
-    "cSpell.words": ["Cloesce", "Codegen"],
-  },
 }

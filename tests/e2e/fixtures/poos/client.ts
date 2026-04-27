@@ -6,6 +6,8 @@ export class PooA {
 
   static fromJson(data: any): PooA {
     const __$res = Object.assign(new PooA(), data);
+
+
     return __$res;
   }
 }
@@ -14,6 +16,7 @@ export class PooB {
 
   static fromJson(data: any): PooB {
     const __$res = Object.assign(new PooB(), data);
+
     return __$res;
   }
 }
@@ -23,7 +26,9 @@ export class PooC {
 
   static fromJson(data: any): PooC {
     const __$res = Object.assign(new PooC(), data);
+
     __$res["a"] &&= PooA.fromJson(__$res.a);
+
     for (let i = 0; i < __$res.b?.length; i++) {
       __$res.b[i] = PooB.fromJson(__$res.b[i]);
     }

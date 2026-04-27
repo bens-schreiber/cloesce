@@ -86,7 +86,8 @@ Before building, ensure you have the required dependencies installed:
 **Required:**
 
 - [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` target)
-- [Node.js](https://nodejs.org/) and npm
+- [Node.js](https://nodejs.org/)
+- [Pnpm](https://pnpm.io/installation)
 
 **Optional:**
 

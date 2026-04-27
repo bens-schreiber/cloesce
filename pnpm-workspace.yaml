@@ -1,3 +1,8 @@
 packages:
   - src/runtime/ts
   - tests/e2e
+  - examples/weather
+allowBuilds:
+  esbuild: true
+  sharp: false
+  workerd: true

@@ -5,6 +5,7 @@ export class Poo {
 
   static fromJson(data: any): Poo {
     const __$res = Object.assign(new Poo(), data);
+
     return __$res;
   }
 }
