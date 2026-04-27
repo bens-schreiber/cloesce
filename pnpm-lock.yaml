@@ -7,7 +7,7 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       oxfmt:
         specifier: ^0.46.0
         version: 0.46.0
