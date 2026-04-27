@@ -8,6 +8,7 @@
     "tests/e2e/fixtures/*/client.ts",
     "tests/e2e/fixtures/**/*.json",
     "tests/e2e/fixtures/**/*.jsonc",
-    "examples/**/*"
+    "examples/**/*",
+    ".cargo/**/*"
   ]
 }
