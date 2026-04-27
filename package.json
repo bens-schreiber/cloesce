@@ -2,10 +2,10 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check"
+    "lint": "oxlint src/ tests/",
+    "lint:fix": "oxlint --fix src/ tests/",
+    "fmt": "oxfmt src/ tests/ docs/ proposals/ CHANGELOG.md",
+    "fmt:check": "oxfmt --check src/ tests/ docs/ proposals/ CHANGELOG.md"
   },
   "devDependencies": {
     "oxfmt": "^0.46.0",
