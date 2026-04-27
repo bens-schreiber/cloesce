@@ -1,6 +1,7 @@
 # Building and Migrating
 
 Building a Cloesce project consists of three steps
+
 1. Compilation
 2. Running database migrations
 3. Building your frontend code
@@ -8,16 +9,17 @@ Building a Cloesce project consists of three steps
 ## Cloesce Config
 
 A cloesce config may be defined in a `cloesce.jsonc` file in your project root. This file is used to configure various aspects of the Cloesce compiler and generated code, such as source paths for your schema, the output directory for generated files, and the format of the generated Wrangler configuration file.
+
 ```jsonc
 {
-    "src_paths": ["./src/schema"],
-    "workers_url": "http://localhost:5000/api",
-    "wrangler_config_format": "jsonc" // or "toml"
+  "src_paths": ["./src/schema"],
+  "workers_url": "http://localhost:5000/api",
+  "wrangler_config_format": "jsonc", // or "toml"
 }
 ```
 
-
 If you have multiple environments (e.g., staging, tests, production), you can define multiple config files by prefixing the name: `staging.cloesce.jsonc`, `production.cloesce.jsonc`, etc. Then, specify which environment to use when running the CLI command:
+
 ```bash
 cloesce --env staging ...
 ```
@@ -34,11 +36,11 @@ This command looks for a `cloesce.jsonc` file in your current directory, which c
 
 After compilation, a `.cloesce` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build.
 
-| File        | Description |
-|-------------|-------------|
-| `cidl.json` | The Cloesce Interface Definition Language AST exported to JSON. This file is used internally by Cloesce during migrations, and is utilized by the generated backend code as a source of truth for the structure of your Models and their linked features. |
-| `client.ts` | The generated client code for accessing your Models from the frontend. Import this file in your frontend code to interact with your Cloesce Models over HTTP. |
-| `backend.ts` | The generated Cloesce ORM and API stubs for your backend. All Cloesce features translate to a namespace or interface in this file. |
+| File         | Description                                                                                                                                                                                                                                               |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cidl.json`  | The Cloesce Interface Definition Language AST exported to JSON. This file is used internally by Cloesce during migrations, and is utilized by the generated backend code as a source of truth for the structure of your Models and their linked features. |
+| `client.ts`  | The generated client code for accessing your Models from the frontend. Import this file in your frontend code to interact with your Cloesce Models over HTTP.                                                                                             |
+| `backend.ts` | The generated Cloesce ORM and API stubs for your backend. All Cloesce features translate to a namespace or interface in this file.                                                                                                                        |
 
 ## Generating Migrations
 

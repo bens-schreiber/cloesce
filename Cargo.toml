@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "src/compiler/cli",
-    "src/compiler/ast",
-    "src/compiler/frontend",
-    "src/compiler/semantic",
-    "src/compiler/codegen",
-    "src/compiler/compiler-test",
-    "src/compiler/migrations",
-    "src/compiler/orm",
-    "tests/regression",
+  "src/compiler/cli",
+  "src/compiler/ast",
+  "src/compiler/frontend",
+  "src/compiler/semantic",
+  "src/compiler/codegen",
+  "src/compiler/compiler-test",
+  "src/compiler/migrations",
+  "src/compiler/orm",
+  "tests/regression",
 ]
 resolver = "3"
 

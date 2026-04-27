@@ -1,6 +1,3 @@
 {
-    "recommendations": [
-        "rust-lang.rust-analyzer",
-        "vitest.explorer"
-    ]
+  "recommendations": ["rust-lang.rust-analyzer", "vitest.explorer"]
 }

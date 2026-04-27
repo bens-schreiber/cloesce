@@ -96,9 +96,10 @@ impl<'a> UpsertModel<'a> {
             let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
                 serde_json::from_str(&include_tree_json_str).unwrap_or_default();
-            let select_query = SelectModel::query(model_name, None, Some(include_tree_typed), ast)?
-                .trim_start_matches("SELECT ")
-                .to_string();
+            let select_query =
+                SelectModel::query(model_name, None, Some(&include_tree_typed), ast)?
+                    .trim_start_matches("SELECT ")
+                    .to_string();
 
             let mut select = Query::select();
             let mut select_root_model = select.expr(Expr::cust(&select_query));

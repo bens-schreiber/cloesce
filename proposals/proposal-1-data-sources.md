@@ -26,16 +26,16 @@ To illustrate the problems with the current implementation, consider this Model:
 ```ts
 @Model(["LIST"])
 class User {
-    id: Integer;
-    name: String;
+  id: Integer;
+  name: String;
 
-    posts: Post[];
+  posts: Post[];
 
-    @R2("{id}", bucket)
-    object: R2ObjectBody | undefined;
+  @R2("{id}", bucket)
+  object: R2ObjectBody | undefined;
 
-    @KV("{id}", namespace)
-    metadata: KValue<unknown> | undefined;
+  @KV("{id}", namespace)
+  metadata: KValue<unknown> | undefined;
 }
 ```
 
@@ -47,18 +47,18 @@ To fix this, the current solution is to create a Data Source that includes all o
 
 ```ts
 class User {
-    // ...
+  // ...
 
-    static readonly includeAll: IncludeTree<User> = {
-        posts: {},
-        object: {},
-        metadata: {}
-    }
+  static readonly includeAll: IncludeTree<User> = {
+    posts: {},
+    object: {},
+    metadata: {},
+  };
 }
 
-User.LIST("includeAll");    // yields all data
-User.LIST("none");          // yields no data
-User.LIST();                // yields no data, as the default Data Source is "none"
+User.LIST("includeAll"); // yields all data
+User.LIST("none"); // yields no data
+User.LIST(); // yields no data, as the default Data Source is "none"
 ```
 
 For CRUD methods like `LIST`, `GET`, and `SAVE`, this is the intended functionality — generic generated methods should let the client decide what they want to fetch.
@@ -68,24 +68,24 @@ However, for custom instance methods, this doesn't make any sense. For example, 
 ```ts
 @Model(["LIST"])
 class User {
-    id: Integer;
-    name: String;
+  id: Integer;
+  name: String;
 
-    posts: Post[];
+  posts: Post[];
 
-    @R2("{id}", bucket)
-    object: R2ObjectBody | undefined;
+  @R2("{id}", bucket)
+  object: R2ObjectBody | undefined;
 
-    @KV("{id}", namespace)
-    metadata: KValue<unknown> | undefined;
+  @KV("{id}", namespace)
+  metadata: KValue<unknown> | undefined;
 
-    @GET
-    downloadObject(): HttpResult<ReadableStream> {
-        if (!this.object) {
-            return HttpResult.fail(404, "Object not found");
-        }
-        return HttpResult.ok(200, this.object.body);
+  @GET
+  downloadObject(): HttpResult<ReadableStream> {
+    if (!this.object) {
+      return HttpResult.fail(404, "Object not found");
     }
+    return HttpResult.ok(200, this.object.body);
+  }
 }
 ```
 
@@ -96,11 +96,11 @@ Second, the `"includeAll"` Data Source fetches `posts` and `metadata`, which are
 ```ts
 @Model()
 class User {
-    // ...
+  // ...
 
-    static readonly onlyObject: IncludeTree<User> = {
-        object: {}
-    }
+  static readonly onlyObject: IncludeTree<User> = {
+    object: {},
+  };
 }
 ```
 
@@ -115,20 +115,20 @@ For example, if a client wants to fetch all `User`s with their `posts`, alphabet
 ```ts
 @Model(["LIST"])
 class User {
-    // ...
-    
-    @GET
-    static async listAlphabetically(@Inject env: Env): Promise<User[]> {
-        const db = env.db;
-        const joined = Orm.select(User, {
-            includeTree: { posts: {} },
-            from: "SELECT * FROM User WHERE name >= 'A' AND name <= 'J' ORDER BY name ASC"
-        });
+  // ...
 
-        const result = await db.prepare(joined);
-        const mapped = Orm.map(User, result.results, { posts: {}});
-        return mapped;
-    }
+  @GET
+  static async listAlphabetically(@Inject env: Env): Promise<User[]> {
+    const db = env.db;
+    const joined = Orm.select(User, {
+      includeTree: { posts: {} },
+      from: "SELECT * FROM User WHERE name >= 'A' AND name <= 'J' ORDER BY name ASC",
+    });
+
+    const result = await db.prepare(joined);
+    const mapped = Orm.map(User, result.results, { posts: {} });
+    return mapped;
+  }
 }
 ```
 
@@ -143,15 +143,17 @@ The current default Data Source of "none" is not a good default for most use cas
 ## Goals and Non-Goals
 
 ### Goals
+
 - Separate Data Sources from the Include Tree, giving them a distinct purpose
 - Move control of Data Sources from the client to each Model method
 - Allow Data Sources to specify SQL Select statements, giving more control over filtering and ordering
 - Create a "default" Data Source that populates the Include Tree with near relationships
 
 ### Non-Goals
+
 - Validation of SQL in Data Sources
 
-> *Note*: Validation of Data Source SQL could be a future feature. The ORM map function will fail if the result is malformed in some way, and this could be caught at compile time with some clever analysis of the statement, but this is not a priority for the initial implementation of Data Sources, and is not necessary to achieve the goals of this proposal.
+> _Note_: Validation of Data Source SQL could be a future feature. The ORM map function will fail if the result is malformed in some way, and this could be caught at compile time with some clever analysis of the statement, but this is not a priority for the initial implementation of Data Sources, and is not necessary to achieve the goals of this proposal.
 
 ---
 
@@ -163,8 +165,8 @@ This proposal introduces a new `DataSource` interface to the frontend. It will r
 
 ```ts
 interface DataSource<T> {
-    includeTree?: IncludeTree<T>;
-    select?: (joined: (from?: string) => string) => string;
+  includeTree?: IncludeTree<T>;
+  select?: (joined: (from?: string) => string) => string;
 }
 ```
 
@@ -172,9 +174,9 @@ interface DataSource<T> {
 
 - `select` is a function that accepts a `joined` function (literally `Orm.select` using the Data Source's `includeTree`), and returns a SQL Select statement. This allows the Data Source to specify complex filtering and ordering logic, while still relying on the compiler to determine the necessary joins based on the `includeTree`.
 
-> *Note*: If `includeTree` is not defined, the `joined` function in `select` will be called with an empty `includeTree`. This has some use cases, such as when a developer wants to extend the default Data Source functionality (see the next section for an example), but for the most part, Data Sources should have an `includeTree` defined.
+> _Note_: If `includeTree` is not defined, the `joined` function in `select` will be called with an empty `includeTree`. This has some use cases, such as when a developer wants to extend the default Data Source functionality (see the next section for an example), but for the most part, Data Sources should have an `includeTree` defined.
 
-> *Note*: It is possible to have a malformed SQL statement in `select` which will cause a runtime error. Additionally, a query that returns data in an order that `Orm.map` cannot handle may fail silently or throw an error. Validation of the SQL statement is out of scope for this proposal, but could be a future feature.
+> _Note_: It is possible to have a malformed SQL statement in `select` which will cause a runtime error. Additionally, a query that returns data in an order that `Orm.map` cannot handle may fail silently or throw an error. Validation of the SQL statement is out of scope for this proposal, but could be a future feature.
 
 ### Default Data Source
 
@@ -183,34 +185,36 @@ During the generator step of compilation, Cloesce will search each Model for a D
 This allows for a more intuitive default for how Models should be hydrated, while still giving developers the option to create more specific Data Sources for specific use cases.
 
 For example, given this Model:
+
 ```ts
 // ... basic Toy and Post models
 
 @Model()
 class Dog {
-    // ...
-    user: User;
-    toys: Toy[];
+  // ...
+  user: User;
+  toys: Toy[];
 }
 
 @Model()
 class User {
-    // ...
-    dog: Dog;
+  // ...
+  dog: Dog;
 
-    posts: Post[];
+  posts: Post[];
 
-    user: User | null;
+  user: User | null;
 
-    @R2("{id}", bucket)
-    object: R2ObjectBody | undefined;
+  @R2("{id}", bucket)
+  object: R2ObjectBody | undefined;
 
-    @KV("{id}", namespace)
-    metadata: KValue<unknown> | undefined;
+  @KV("{id}", namespace)
+  metadata: KValue<unknown> | undefined;
 }
 ```
 
 the default Data Source for `User` would be:
+
 ```ts
 const default: DataSource<User> = {
     includeTree: {
@@ -246,30 +250,30 @@ For example:
 ```ts
 @Model()
 class User {
-    // ...
+  // ...
 
-    static readonly includeAll: DataSource<User> = {
-        includeTree: {
-            dog: {
-                toys: {}
-            },
-            posts: {},
-            object: {},
-            metadata: {}
-        }
-    }
+  static readonly includeAll: DataSource<User> = {
+    includeTree: {
+      dog: {
+        toys: {},
+      },
+      posts: {},
+      object: {},
+      metadata: {},
+    },
+  };
 
-    static readonly onlyNameAndPosts: DataSource<User> = {
-        includeTree: {
-            posts: {}
-        },
-        select: (joined) => `${joined()} WHERE name IS NOT NULL`
-    }
+  static readonly onlyNameAndPosts: DataSource<User> = {
+    includeTree: {
+      posts: {},
+    },
+    select: (joined) => `${joined()} WHERE name IS NOT NULL`,
+  };
 
-    @GET
-    acceptAndReturnDataSource(ds: DataSource<User>): DataSource<User> {
-        return ds;
-    }
+  @GET
+  acceptAndReturnDataSource(ds: DataSource<User>): DataSource<User> {
+    return ds;
+  }
 }
 ```
 
@@ -282,24 +286,24 @@ By default, all instance methods of a Model will hydrate using the "default" Dat
 ```ts
 @Model()
 class User {
-    // ...
+  // ...
 
-    static readonly includeAll: DataSource<User> = {
-        includeTree: {
-            dog: {},
-            posts: {}
-        }
-    }
+  static readonly includeAll: DataSource<User> = {
+    includeTree: {
+      dog: {},
+      posts: {},
+    },
+  };
 
-    @GET()
-    foo() {
-        // hydrated with the same DS as Orm.defaultDataSource(User)
-    }
+  @GET()
+  foo() {
+    // hydrated with the same DS as Orm.defaultDataSource(User)
+  }
 
-    @GET(User.includeAll)
-    bar() {
-        // hydrated with User.includeAll
-    }
+  @GET(User.includeAll)
+  bar() {
+    // hydrated with User.includeAll
+  }
 }
 ```
 
@@ -311,30 +315,29 @@ A method can also define a Data Source inline, or via a constant defined outside
 
 ```ts
 const privateDataSource: DataSource<User> = {
-    includeTree: {
-        posts: {}
-    },
-    select: (joined) => `${joined()} WHERE name IS NOT NULL`
-}
+  includeTree: {
+    posts: {},
+  },
+  select: (joined) => `${joined()} WHERE name IS NOT NULL`,
+};
 
 @Model()
 class User {
-    // ...
+  // ...
 
-    @GET(privateDataSource)
-    foo() {
-        // hydrated with privateDataSource
-    }
+  @GET(privateDataSource)
+  foo() {
+    // hydrated with privateDataSource
+  }
 
-    @GET({ posts: {} }, joined => `${joined()} WHERE name IS NOT NULL`)
-    bar() {
-        // hydrated with the same DS as privateDataSource, but defined inline on the decorator
-    }
+  @GET({ posts: {} }, (joined) => `${joined()} WHERE name IS NOT NULL`)
+  bar() {
+    // hydrated with the same DS as privateDataSource, but defined inline on the decorator
+  }
 }
 ```
 
 Neither of these Data Sources will be available on the client.
-
 
 ### ORM Methods
 
@@ -342,14 +345,13 @@ All ORM methods that previously accepted an `IncludeTree` will now accept a `Dat
 
 ```ts
 const users = await Orm.select(User, {
-    dataSource: User.onlyNameAndPosts
+  dataSource: User.onlyNameAndPosts,
 });
 ```
 
 These methods will respect both the `includeTree` and `select` properties of the Data Source, meaning they will perform the necessary joins based on the `includeTree`, and use the SQL statement returned by `select` if one exists.
 
 They will default to the "default" Data Source if no Data Source is provided.
-
 
 ### Implementation Details
 

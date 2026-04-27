@@ -167,7 +167,7 @@ impl<'src> DataSourceExpansion {
         tree: IncludeTree<'src>,
         ast: &CloesceAst,
     ) -> DataSource<'src> {
-        let Ok(include_sql) = SelectModel::query(model.name, None, Some(tree.clone()), ast) else {
+        let Ok(include_sql) = SelectModel::query(model.name, None, Some(&tree), ast) else {
             // Model doesn't have any D1 fields, no SQL needed.
             return DataSource {
                 name: "Default",
@@ -378,8 +378,9 @@ impl<'src> DataSourceExpansion {
                     .data_sources
                     .iter()
                     .map(|(ds_name, ds)| {
-                        let sql = SelectModel::query(model.name, None, Some(ds.tree.clone()), ast)
-                            .expect("select model to work");
+                        let sql =
+                            SelectModel::query(model.name, None, Some(&ds.tree), ast).unwrap();
+
                         let get = ds
                             .get
                             .is_none()

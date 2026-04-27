@@ -19,9 +19,7 @@ class ConsoleBuffer {
   }
 
   capture(tag: string, ...args: any[]) {
-    const msg = args
-      .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
-      .join(" ");
+    const msg = args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
     for (const line of msg.split("\n")) {
       if (line.trim()) this.logs.push(`[${this.prefix}|${tag}] ${line}`);
     }
@@ -62,9 +60,7 @@ export async function startWrangler(fixturesPath: string, workersUrl: string) {
 
   return async () => {
     await new Promise<void>((resolve, reject) => {
-      kill(wranglerProcess!.pid!, "SIGTERM", (err) =>
-        err ? reject(err) : resolve(),
-      );
+      kill(wranglerProcess!.pid!, "SIGTERM", (err) => (err ? reject(err) : resolve()));
     });
     buffer.flush();
   };
@@ -87,13 +83,9 @@ async function _startWrangler(
     );
   }
 
-  await runCmd(
-    "Building Wrangler",
-    "npx wrangler --config wrangler.toml build",
-    {
-      cwd: fixturesPath,
-    },
-  );
+  await runCmd("Building Wrangler", "npx wrangler --config wrangler.toml build", {
+    cwd: fixturesPath,
+  });
 
   const port = portFromUrl(workersUrl);
   const wranglerProcess = spawn(
@@ -111,12 +103,8 @@ async function _startWrangler(
     { cwd: fixturesPath, stdio: "pipe" },
   );
 
-  wranglerProcess.stdout?.on("data", (data) =>
-    buffer.capture("wrangler", data.toString()),
-  );
-  wranglerProcess.stderr?.on("data", (data) =>
-    buffer.capture("wrangler", data.toString()),
-  );
+  wranglerProcess.stdout?.on("data", (data) => buffer.capture("wrangler", data.toString()));
+  wranglerProcess.stderr?.on("data", (data) => buffer.capture("wrangler", data.toString()));
   wranglerProcess.on("exit", (code) =>
     buffer.capture("wrangler", `⚠️ Wrangler process exited with code ${code}`),
   );

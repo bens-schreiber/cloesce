@@ -1,19 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, withRes } from "../src/setup";
-import {
-  Student,
-  Course,
-  StudentCourse,
-} from "../fixtures/composite_keys/client";
+import { Student, Course, StudentCourse } from "../fixtures/composite_keys/client";
 import config from "../fixtures/composite_keys/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  stopWrangler = await startWrangler(
-    "./fixtures/composite_keys",
-    config.workers_url!,
-  );
+  stopWrangler = await startWrangler("./fixtures/composite_keys", config.workers_url!);
 }, 30_000);
 
 afterAll(async () => {
@@ -145,14 +138,8 @@ describe("Student Enrollment", () => {
       },
     });
 
-    expect(
-      courseRes1.ok,
-      withRes("POST course 1 should be OK", courseRes1),
-    ).toBe(true);
-    expect(
-      courseRes2.ok,
-      withRes("POST course 2 should be OK", courseRes2),
-    ).toBe(true);
+    expect(courseRes1.ok, withRes("POST course 1 should be OK", courseRes1)).toBe(true);
+    expect(courseRes2.ok, withRes("POST course 2 should be OK", courseRes2)).toBe(true);
 
     course1 = courseRes1.data!;
     course2 = courseRes2.data!;
@@ -268,10 +255,7 @@ describe("Student Enrollment", () => {
         limit: 100,
       },
     });
-    expect(
-      $listRes.ok,
-      withRes("$list with coursesOrderedDesc should be OK", $listRes),
-    ).toBe(true);
+    expect($listRes.ok, withRes("$list with coursesOrderedDesc should be OK", $listRes)).toBe(true);
     expect($listRes.data).toBeDefined();
     expect(Array.isArray($listRes.data)).toBe(true);
 
@@ -297,10 +281,7 @@ describe("Student Enrollment", () => {
         limit: 100,
       },
     });
-    expect(
-      orderRes.ok,
-      withRes("$list with coursesOrderedDesc should be OK", orderRes),
-    ).toBe(true);
+    expect(orderRes.ok, withRes("$list with coursesOrderedDesc should be OK", orderRes)).toBe(true);
 
     if (orderRes.data!.length > 1) {
       // Verify descending order by studentId
@@ -311,9 +292,7 @@ describe("Student Enrollment", () => {
         // studentId should be descending
         if (current.id === next.id) {
           // If ids are equal, name should be descending
-          expect(current.name.localeCompare(next.name)).toBeGreaterThanOrEqual(
-            0,
-          );
+          expect(current.name.localeCompare(next.name)).toBeGreaterThanOrEqual(0);
         } else {
           expect(current.id).toBeGreaterThanOrEqual(next.id);
         }
@@ -328,10 +307,9 @@ describe("Student Enrollment", () => {
         limit: 100,
       },
     });
-    expect(
-      coursesRes.ok,
-      withRes("$list with coursesOrderedDesc should be OK", coursesRes),
-    ).toBe(true);
+    expect(coursesRes.ok, withRes("$list with coursesOrderedDesc should be OK", coursesRes)).toBe(
+      true,
+    );
 
     const studentWithCourses = coursesRes.data!.find(
       (s) => s.studentCourses && s.studentCourses.length > 0,
@@ -364,10 +342,7 @@ describe("Student Enrollment", () => {
 
     expect(
       res.ok,
-      withRes(
-        "POST StudentCourse with nested Student and Course should be OK",
-        res,
-      ),
+      withRes("POST StudentCourse with nested Student and Course should be OK", res),
     ).toBe(true);
     expect(res.data).toEqual({
       studentId: 10,

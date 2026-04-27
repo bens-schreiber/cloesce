@@ -5,16 +5,16 @@ export class Foo {
   static async blockedMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __baseUrl = new URL(
+    const __$baseUrl = new URL(
       `http://localhost:5560/api/Foo/blockedMethod`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -23,16 +23,16 @@ export class Foo {
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const __baseUrl = new URL(
+    const __$baseUrl = new URL(
       `http://localhost:5560/api/Foo/getInjectedThing`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -42,22 +42,22 @@ export class Foo {
     args: { Default: DeepPartial<Foo> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5560/api/Foo/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Foo,
       false
@@ -65,11 +65,10 @@ export class Foo {
   }
 
   static fromJson(data: any): Foo {
-    const __res = Object.assign(new Foo(), data);
-    return __res;
+    const __$res = Object.assign(new Foo(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -79,7 +78,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

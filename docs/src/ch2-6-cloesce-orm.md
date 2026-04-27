@@ -48,6 +48,7 @@ The generated backend code will create a method `User.Source.ByName` with `get` 
 Always accessible is the Default Data Source (`User.Source.Default`), which provides basic `get` and `list` methods without any custom SQL.
 
 When implementing a Cloesce Model, these generated methods are placed directly on to the model:
+
 ```ts
 const User = clo.User.impl({});
 
@@ -77,7 +78,7 @@ model Boss {
     primary {
         id: int
     }
-    
+
     // ...
 }
 
@@ -95,7 +96,7 @@ source WithAll for Boss {
 `Orm.select(Boss.Meta, null, Boss.Source.WithAll.include)` produces:
 
 ```sql
-SELECT 
+SELECT
     "Boss"."id" AS "id",
     "Person_1"."id" AS "persons.id",
     "Person_1"."bossId" AS "persons.bossId",
@@ -104,11 +105,11 @@ SELECT
     "Cat_3"."id" AS "persons.cats.id",
     "Cat_3"."personId" AS "persons.cats.personId"
 FROM "Boss"
-LEFT JOIN "Person" AS "Person_1" 
+LEFT JOIN "Person" AS "Person_1"
     ON "Boss"."id" = "Person_1"."bossId"
-LEFT JOIN "Dog" AS "Dog_2" 
+LEFT JOIN "Dog" AS "Dog_2"
     ON "Person_1"."id" = "Dog_2"."personId"
-LEFT JOIN "Cat" AS "Cat_3" 
+LEFT JOIN "Cat" AS "Cat_3"
     ON "Person_1"."id" = "Cat_3"."personId"
 ```
 

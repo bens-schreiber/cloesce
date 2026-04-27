@@ -6,14 +6,14 @@
 
 **Cloesce** is a schema language (or IDL) that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). It provides a single source of truth for your application, with a single language to define:
 
-| Feature              | Support |
-|----------------------|--------|
-| ORM                  | ✅     |
-| RPC stubs            | ✅     |
-| Middleware           | ✅     |
-| IaC                  | ✅     |
-| SQL Migrations       | ✅     |
-| Runtime Validation   | ✅     |
+| Feature            | Support |
+| ------------------ | ------- |
+| ORM                | ✅      |
+| RPC stubs          | ✅      |
+| Middleware         | ✅      |
+| IaC                | ✅      |
+| SQL Migrations     | ✅      |
+| Runtime Validation | ✅      |
 
 ## Contributing
 

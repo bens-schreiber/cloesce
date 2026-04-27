@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Deserialize, Serialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Default)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
     #[default]
     Void,
@@ -129,7 +129,7 @@ impl<'src> CidlType<'src> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq)]
 pub enum HttpVerb {
     Get,
     Post,
@@ -138,7 +138,7 @@ pub enum HttpVerb {
     Delete,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
 pub enum Number {
     Int(i64),
     Float(f64),
@@ -153,7 +153,15 @@ impl std::fmt::Display for Number {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Hash)]
+pub struct Field<'src> {
+    pub name: Cow<'src, str>,
+
+    #[serde(borrow)]
+    pub cidl_type: CidlType<'src>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub enum Validator<'src> {
     // Numeric validators
     GreaterThan(Number),
@@ -171,16 +179,8 @@ pub enum Validator<'src> {
     Regex(Cow<'src, str>),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Hash)]
-pub struct Field<'src> {
-    pub name: Cow<'src, str>,
-
-    #[serde(borrow)]
-    pub cidl_type: CidlType<'src>,
-}
-
 /// A [Field] that can have some number of  [Validator]s applied to it.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct ValidatedField<'src> {
     pub name: Cow<'src, str>,
 
@@ -199,12 +199,12 @@ impl Hash for ValidatedField<'_> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
 /// A D1 Navigation field, representing a relationship to another model
 /// through a foreign key or composite foreign key.
-#[derive(Deserialize, Serialize, Debug, Clone, Hash)]
+#[derive(Deserialize, Serialize, Hash)]
 pub enum NavigationFieldKind<'src> {
     OneToOne {
         /// The columns on the current model that reference the other model's primary key.
@@ -224,7 +224,7 @@ pub enum NavigationFieldKind<'src> {
     ManyToMany,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct NavigationField<'src> {
     #[serde(default)]
     pub hash: u64,
@@ -248,7 +248,7 @@ impl<'src> NavigationField<'src> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Hash)]
+#[derive(Deserialize, Serialize, Hash)]
 pub struct ForeignKeyReference<'src> {
     #[serde(borrow)]
     pub model_name: &'src str,
@@ -257,7 +257,7 @@ pub struct ForeignKeyReference<'src> {
     pub column_name: &'src str,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct Column<'src> {
     #[serde(default)]
     pub hash: u64,
@@ -275,20 +275,20 @@ pub struct Column<'src> {
     /// An ID indicating which composite key this column belongs to, if any.
     /// Columns with the same composite_id belong to the same composite key.
     ///
-    /// A primary key, will not fill this slot as a composite key as it's already identified as
-    /// a key by being in the primary_key_columns list. Thus, a column that makes up
-    /// a primary key can be apart of a composite foreign key.
+    /// NOTE: A primary key will not fill this slot as a composite key as it's already
+    /// identified as a key by being in the primary_key_columns list. Thus, a column
+    /// that makes up a primary key can be a part of a composite foreign key.
     pub composite_id: Option<usize>,
 }
 
-#[derive(Deserialize, Serialize, Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Deserialize, Serialize, Clone)]
 pub enum CrudKind {
     Get,
     List,
     Save,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct DataSourceMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
@@ -297,7 +297,7 @@ pub struct DataSourceMethod<'src> {
     pub raw_sql: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct DataSource<'src> {
     #[serde(borrow)]
     pub name: &'src str,
@@ -314,7 +314,7 @@ pub struct DataSource<'src> {
     pub is_internal: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct KvField<'src> {
     #[serde(borrow)]
     pub field: ValidatedField<'src>,
@@ -331,7 +331,7 @@ pub struct KvField<'src> {
     pub list_prefix: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct R2Field<'src> {
     #[serde(borrow)]
     pub field: Field<'src>,
@@ -348,13 +348,13 @@ pub struct R2Field<'src> {
     pub list_prefix: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, PartialEq)]
 pub enum MediaType {
     Json,
     Octet,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct ApiMethod<'src> {
     #[serde(borrow)]
     pub name: &'src str,
@@ -380,7 +380,7 @@ pub struct ApiMethod<'src> {
     pub parameters: Vec<ValidatedField<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct Model<'src> {
     #[serde(default)]
     pub hash: u64,
@@ -450,7 +450,7 @@ impl Model<'_> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct Service<'src> {
     #[serde(borrow)]
     pub name: &'src str,
@@ -462,7 +462,7 @@ pub struct Service<'src> {
     pub apis: Vec<ApiMethod<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct PlainOldObject<'src> {
     #[serde(borrow)]
     pub name: &'src str,
@@ -471,7 +471,7 @@ pub struct PlainOldObject<'src> {
     pub fields: Vec<ValidatedField<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize)]
 pub struct WranglerEnv<'src> {
     #[serde(borrow)]
     pub d1_bindings: Vec<&'src str>,
@@ -486,7 +486,7 @@ pub struct WranglerEnv<'src> {
     pub vars: Vec<Field<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct CloesceAst<'src> {
     #[serde(default)]
     pub hash: u64,

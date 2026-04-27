@@ -9,14 +9,13 @@ jobs:
       deployments: write
     name: Build TypeDoc and Deploy to Cloudflare Pages
     steps:
-
       - name: Checkout code
         uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Set version from latest NPM
         working-directory: src/runtime/ts

@@ -3,6 +3,7 @@
 If you fetch a Model you may notice that Cloesce will leave `undefined` or empty arrays in deeply nested composition with other Models. This is intentional, and is handled by Data Sources.
 
 ## What are Data Sources?
+
 > [!IMPORTANT]
 > All scalar properties (e.g., `string`, `int`, `bool`, etc.) are always included in query results. Include Trees are only necessary for Navigation Fields.
 
@@ -46,13 +47,15 @@ Data Sources, through their `include` block, allow developers to explicitly stat
 Cloesce will create a default Data Source for each model called `Default`. This Data Source will include all KV, R2, and D1 properties, but will avoid both circular references and nested relationships in arrays.
 
 For example, in the `Person` and `Dog` Models above, the default include for `Person` would be:
+
 ```cloesce
 include {
-    dogs 
+    dogs
 }
 ```
 
 The default Data Source for `Dog` would be:
+
 ```cloesce
 include {
     owner {
@@ -116,6 +119,7 @@ We also overrode the default Data Source for `Person` to be an empty include tre
 On top of creating the structure of hydrated data, Data Sources are also responsible for the underlying SQL queries to fetch that data. Each Data Source comes with two default implementations for the methods: `get` and `list`.
 
 `get` is responsible for fetching a single instance of the Model, while `list` is responsible for fetching multiple instances. Both queries may take any parameters. A default implementation is provided for both methods.
+
 - `get` defaults to fetching a single instance based on the primary key(s) of the Model.
 - `list` defaults to fetching multiple instances based on a cursor-based pagination strategy using the primary key(s) of the Model.
 
@@ -146,6 +150,7 @@ source Custom for Person {
 ```
 
 Every Data Source will be generated to the backend as a type safe query. By default, all Data Sources are exposed to the client for querying. However, should a Data Source be only intended for interal use, it can be marked with the `internal` tag:
+
 ```cloesce
 
 [internal]

@@ -100,8 +100,9 @@ async fn one_to_one(db: SqlitePool) {
     .to_string();
 
     // Act
-    let select_stmt = SelectModel::query("Person", None, include(json!({"dog": {}})), &ast)
-        .expect("SelectModel::query to work");
+    let select_stmt =
+        SelectModel::query("Person", None, include(json!({"dog": {}})).as_ref(), &ast)
+            .expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -197,7 +198,8 @@ async fn one_to_many(db: SqlitePool) {
                 "dogs": {},
                 "cats": {}
             }
-        })),
+        }))
+        .as_ref(),
         &ast,
     )
     .expect("list models to work");
@@ -276,8 +278,13 @@ async fn many_to_many(db: SqlitePool) {
     .to_string();
 
     // Act
-    let select_stmt = SelectModel::query("Student", None, include(json!({"courses": {}})), &ast)
-        .expect("SelectModel::query to work");
+    let select_stmt = SelectModel::query(
+        "Student",
+        None,
+        include(json!({"courses": {}})).as_ref(),
+        &ast,
+    )
+    .expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -339,8 +346,13 @@ async fn composite_one_to_one(db: SqlitePool) {
         .to_string();
 
     // Act
-    let select_stmt = SelectModel::query("Enrollment", None, include(json!({"student": {}})), &ast)
-        .expect("SelectModel::query to work");
+    let select_stmt = SelectModel::query(
+        "Enrollment",
+        None,
+        include(json!({"student": {}})).as_ref(),
+        &ast,
+    )
+    .expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -411,8 +423,9 @@ async fn composite_one_to_many(db: SqlitePool) {
         .to_string();
 
     // Act
-    let select_stmt = SelectModel::query("Order", None, include(json!({"items": {}})), &ast)
-        .expect("SelectModel::query to work");
+    let select_stmt =
+        SelectModel::query("Order", None, include(json!({"items": {}})).as_ref(), &ast)
+            .expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -497,8 +510,13 @@ async fn composite_many_to_many(db: SqlitePool) {
         .to_string();
 
     // Act
-    let select_stmt = SelectModel::query("Teacher", None, include(json!({"courses": {}})), &ast)
-        .expect("SelectModel::query to work");
+    let select_stmt = SelectModel::query(
+        "Teacher",
+        None,
+        include(json!({"courses": {}})).as_ref(),
+        &ast,
+    )
+    .expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -580,7 +598,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
         "#.to_string();
 
     // Act
-    let sql = SelectModel::query("Horse", None, include(include_tree), &ast)
+    let sql = SelectModel::query("Horse", None, include(include_tree).as_ref(), &ast)
         .expect("list models to work");
 
     // Assert

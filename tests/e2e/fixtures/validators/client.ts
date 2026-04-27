@@ -10,25 +10,25 @@ export class Validator {
     name: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.name)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5038/api/Validator/${__id}/someMethod`
+    const __$baseUrl = new URL(
+      `http://localhost:5038/api/Validator/${__$id}/someMethod`
     );
-    const __payload: any = {};
-    __payload["id"] = id;
-    __payload["name"] = name;
+    const __$payload: any = {};
+    __$payload["id"] = id;
+    __$payload["name"] = name;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -38,22 +38,22 @@ export class Validator {
     args: { Default: DeepPartial<Validator> } | { None: DeepPartial<Validator> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
-    const __resolvedKind: "Default" | "None" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Validator,
       false
@@ -63,22 +63,22 @@ export class Validator {
     args: { Default: { name: string; id: number; }} | { None: { name: string; id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
-    const __resolvedKind: "Default" | "None" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$get`
     );
-    __baseUrl.searchParams.append("name", String(__resolvedArgs?.name ?? null));
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("name", String(__$resolvedArgs?.name ?? null));
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Validator,
       false
@@ -88,22 +88,22 @@ export class Validator {
     args: { Default: { lastSeen_id: number; limit: number; }} | { None: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator[]>> {
-    const __resolvedKind: "Default" | "None" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("None_lastSeen_id", String(args?.None?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("None_limit", String(args?.None?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("None_lastSeen_id", String(args?.None?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("None_limit", String(args?.None?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Validator,
       true
@@ -111,12 +111,11 @@ export class Validator {
   }
 
   static fromJson(data: any): Validator {
-    const __res = Object.assign(new Validator(), data);
-    if (__res.data) __res.data = Object.assign(new KValue(), __res.data);
-    return __res;
+    const __$res = Object.assign(new Validator(), data);
+    if (__$res.data) __$res.data = Object.assign(new KValue(), __$res.data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -126,7 +125,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

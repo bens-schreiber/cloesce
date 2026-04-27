@@ -157,7 +157,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Validator"
@@ -220,7 +220,7 @@
               ]
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Validator"
@@ -288,7 +288,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Validator"

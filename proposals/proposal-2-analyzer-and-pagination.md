@@ -47,9 +47,9 @@ In the current implementation, a field containing a list of KV or R2 objects is 
 ```ts
 // Shared between backend and client
 interface Paginated<T> {
-    results: T[];
-    cursor: string | null;
-    complete: boolean; // true if cursor is null, or if KV indicates list_complete
+  results: T[];
+  cursor: string | null;
+  complete: boolean; // true if cursor is null, or if KV indicates list_complete
 }
 ```
 
@@ -92,36 +92,35 @@ Instead of a single `select` string, developers can define separate `get` and `l
 
 ```ts
 interface DataSource<T> {
-    includeTree?: IncludeTree;
-    get?: (joined: () => string) => string;
-    list?: (joined: () => string) => string;
-    listParams?: ("lastSeen" | "limit" | "offset")[]
+  includeTree?: IncludeTree;
+  get?: (joined: () => string) => string;
+  list?: (joined: () => string) => string;
+  listParams?: ("lastSeen" | "limit" | "offset")[];
 }
 
 const customDs: DataSource<User> = {
-    includeTree: {
-        posts: {}
-    },
+  includeTree: {
+    posts: {},
+  },
 
-    // NOTE: This is equivalent to the default `get` implementation
-    get: (joined) => `
+  // NOTE: This is equivalent to the default `get` implementation
+  get: (joined) => `
         WITH joined AS (${joined()})
         SELECT * FROM joined WHERE id = ?
     `,
 
-    // NOTE: This is equivalent to the default `list` implementation
-    list: (joined) => `
+  // NOTE: This is equivalent to the default `list` implementation
+  list: (joined) => `
         WITH joined AS (${joined()})
         SELECT * FROM joined WHERE id > ? ORDER BY id LIMIT ?
     `,
-    listParams: ["lastSeen", "limit"]
-}
+  listParams: ["lastSeen", "limit"],
+};
 ```
 
 Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If a `list` is provided and `listParams` are not provided, an empty array is assumed and no bindings can be utilized. If no `list` is provided, the default pagination query is used and `lastSeen` and `limit` are assumed as parameters.
 
 `get` is assumed to accept a single parameter for the primary key.
-
 
 > [!NOTE]
 > A `Paginated` type is not necessary for D1, as only the root level of a query can be paginated.
@@ -137,87 +136,87 @@ The Cloesce grammar will be updated to include the `Paginated` type. The hydrati
 ### D1
 
 The ORM `list` method will be updated to accept an arguments struct:
+
 ```ts
 interface ListArgs {
-    lastSeen?: unknown; // type depends on the primary key type
-    limit?: number;
-    offset?: number;
+  lastSeen?: unknown; // type depends on the primary key type
+  limit?: number;
+  offset?: number;
 }
 ```
 
-When `list` is called, e.g., `orm.list(User)`, the ORM will check if the `User` model has a custom `list` method on its Data Source. If it does not, it will assume we are using the default seek method for pagination, using the `lastSeen` and `limit` parameters from `ListArgs` (with defaults if they are not provided) to bind the query parameters. 
+When `list` is called, e.g., `orm.list(User)`, the ORM will check if the `User` model has a custom `list` method on its Data Source. If it does not, it will assume we are using the default seek method for pagination, using the `lastSeen` and `limit` parameters from `ListArgs` (with defaults if they are not provided) to bind the query parameters.
 
 If a custom `list` method is defined, the ORM will bind parameters from the names specified in `listParams` (or `lastSeen` and `limit` by default) to the query in the order they are defined. If a parameter is not provided by the caller, the ORM will use a default value (`0` for `lastSeen`, `1000` for `limit`, and `0` for `offset`) if the parameter is expected by the query.
 
 ### LIST CRUD Method
 
-All `LIST` methods generated for the client will be updated to accept the same arguments struct as the ORM `list` method, allowing clients to also take advantage of pagination in their queries. 
+All `LIST` methods generated for the client will be updated to accept the same arguments struct as the ORM `list` method, allowing clients to also take advantage of pagination in their queries.
 
-Note that this CRUD method will not validate input other than ensuring the parameters are of the correct type (e.g., `number` for `limit`). If a developer wanted to limit pagination size or enforce that `lastSeen` is provided, they would need to implement a custom method on their model that performs those checks and then calls `orm.list` with the appropriate parameters.
----
+## Note that this CRUD method will not validate input other than ensuring the parameters are of the correct type (e.g., `number` for `limit`). If a developer wanted to limit pagination size or enforce that `lastSeen` is provided, they would need to implement a custom method on their model that performs those checks and then calls `orm.list` with the appropriate parameters.
 
 ## Example
 
 ```ts
 @Model()
 class Post {
-    id: Integer;
-    title: string;
+  id: Integer;
+  title: string;
 
-    userId: Integer;
+  userId: Integer;
 }
 
 @Model(["LIST"])
 class User {
-    id: Integer;
-    name: string;
+  id: Integer;
+  name: string;
 
-    posts: Post[];
+  posts: Post[];
 
-    @KV("settings/{id}", namespace)
-    settings: Paginated<KValue<unknown>>;
+  @KV("settings/{id}", namespace)
+  settings: Paginated<KValue<unknown>>;
 
-    @R2("files/{id}", bucket)
-    files: Paginated<R2ObjectBody>;
+  @R2("files/{id}", bucket)
+  files: Paginated<R2ObjectBody>;
 
-    static readonly orderedByName: DataSource<User> = {
-        includeTree: {
-            posts: {}
-        },
-        get: (joined) => `
+  static readonly orderedByName: DataSource<User> = {
+    includeTree: {
+      posts: {},
+    },
+    get: (joined) => `
             WITH joined AS (${joined()})
             SELECT * FROM joined WHERE id = ?
         `,
 
-        // NOTE: If the parameters appeared many times in the query, we could use positional
-        // parameters (e.g., $1, $2), which uses the order of parameters in listParams to bind them correctly.
-        list: (joined) => `
+    // NOTE: If the parameters appeared many times in the query, we could use positional
+    // parameters (e.g., $1, $2), which uses the order of parameters in listParams to bind them correctly.
+    list: (joined) => `
             WITH joined AS (${joined()})
             SELECT * FROM joined ORDER BY name LIMIT ? OFFSET ?
         `,
-        listParams: ["limit", "offset"]
-    }
+    listParams: ["limit", "offset"],
+  };
 }
 ```
 
 ```ts
 const usersByName = await orm.list(User, {
-    include: User.orderedByName,
-    limit: 3000,
-    offset: 1000,
+  include: User.orderedByName,
+  limit: 3000,
+  offset: 1000,
 });
 
 const usersById = await orm.list(User, {
-    include: undefined, // use default include tree
-    lastSeen: 100,
-    limit: 1000,
+  include: undefined, // use default include tree
+  lastSeen: 100,
+  limit: 1000,
 });
 
 // Iterating through KV results beyond the first page using the cursor
 const someUser = usersByName[0];
 let result = await env.namespace.list({ cursor: someUser.settings.cursor });
 while (!result.list_complete) {
-    // process result.keys
-    result = await env.namespace.list({ cursor: result.cursor });
+  // process result.keys
+  result = await env.namespace.list({ cursor: result.cursor });
 }
 ```

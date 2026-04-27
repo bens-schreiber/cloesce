@@ -64,9 +64,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.UnknownPrefix,
-    );
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.UnknownPrefix);
   });
 
   test("Unknown Route => 404", () => {
@@ -82,9 +80,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.UnknownRoute,
-    );
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.UnknownRoute);
   });
 
   test("Unknown Method => 404", () => {
@@ -102,21 +98,14 @@ describe("Match Route", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.UnknownRoute,
-    );
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.UnknownRoute);
   });
 
   test("Unmatched Verb => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
     const ast = createAst({
-      models: [
-        ModelBuilder.model("Model")
-          .idPk()
-          .method("method", "Delete", [], "Void")
-          .build(),
-      ],
+      models: [ModelBuilder.model("Model").idPk().method("method", "Delete", [], "Void").build()],
     });
     const env = mockWranglerEnv();
     const registry = createRegistry();
@@ -127,21 +116,14 @@ describe("Match Route", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.UnmatchedHttpVerb,
-    );
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.UnmatchedHttpVerb);
   });
 
   test("Matches static method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method", "POST");
     const ast = createAst({
-      models: [
-        ModelBuilder.model("Model")
-          .idPk()
-          .method("method", "Post", [], "Void")
-          .build(),
-      ],
+      models: [ModelBuilder.model("Model").idPk().method("method", "Post", [], "Void").build()],
     });
     const env = mockWranglerEnv();
     const registry = createRegistry(ast.models["Model"]);
@@ -196,10 +178,7 @@ describe("Match Route", () => {
 
   test("Matches instantiated method with key params", () => {
     // Arrange
-    const request = createRequest(
-      "http://foo.com/api/Model/0/value1/value2/method",
-      "POST",
-    );
+    const request = createRequest("http://foo.com/api/Model/0/value1/value2/method", "POST");
     const ast = createAst({
       models: [
         ModelBuilder.model("Model")
@@ -283,9 +262,7 @@ describe("Match Route", () => {
     const request = createRequest("http://foo.com/api/Service/method", "POST");
     const ast = createAst({
       services: [
-        ServiceBuilder.service("Service")
-          .method("method", "Post", true, [], "Void")
-          .build(),
+        ServiceBuilder.service("Service").method("method", "Post", true, [], "Void").build(),
       ],
     });
     const env = mockWranglerEnv();
@@ -312,9 +289,7 @@ describe("Match Route", () => {
     const request = createRequest("http://foo.com/api/Service/method", "POST");
     const ast = createAst({
       services: [
-        ServiceBuilder.service("Service")
-          .method("method", "Post", false, [], "Void")
-          .build(),
+        ServiceBuilder.service("Service").method("method", "Post", false, [], "Void").build(),
       ],
     });
     const env = mockWranglerEnv();
@@ -346,12 +321,7 @@ describe("Namespace Middleware", () => {
     // Arrange
     const env = mockWranglerEnv();
     const ast = createAst({
-      models: [
-        ModelBuilder.model("Foo")
-          .idPk()
-          .method("method", "Post", [], "Void")
-          .build(),
-      ],
+      models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
     });
 
     await RuntimeContainer.init(ast, api);
@@ -369,14 +339,7 @@ describe("Namespace Middleware", () => {
     });
 
     // Act
-    const res = await (app as any).router(
-      request,
-      env,
-      ast,
-      undefined,
-      di,
-      api,
-    );
+    const res = await (app as any).router(request, env, ast, undefined, di, api);
 
     // Assert
     expect(res.status).toBe(500);
@@ -410,13 +373,7 @@ describe("Request Validation", () => {
     const envMock = {} as any;
 
     // Act
-    const res = await _cloesceInternal.validateRequest(
-      request,
-      wasmMock,
-      astMock,
-      envMock,
-      route,
-    );
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, astMock, envMock, route);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -428,10 +385,7 @@ describe("Request Validation", () => {
   test("Request Missing JSON Body => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method("method", "Post", [], "Void")
-      .build();
+    const model = ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build();
 
     const route: MatchedRoute = {
       kind: "model",
@@ -447,19 +401,11 @@ describe("Request Validation", () => {
     const envMock = {} as any;
 
     // Act
-    const res = await _cloesceInternal.validateRequest(
-      request,
-      wasmMock,
-      astMock,
-      envMock,
-      route,
-    );
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, astMock, envMock, route);
 
     // Assert
     expect(res.isLeft()).toBe(true);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.RequestMissingBody,
-    );
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.RequestMissingBody);
   });
 });
 
@@ -472,12 +418,7 @@ describe("Method Middleware", () => {
     // Arrange
     const env = mockWranglerEnv();
     const ast = createAst({
-      models: [
-        ModelBuilder.model("Foo")
-          .idPk()
-          .method("method", "Post", [], "Void")
-          .build(),
-      ],
+      models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
     });
 
     await RuntimeContainer.init(ast, api);
@@ -487,11 +428,7 @@ describe("Method Middleware", () => {
       method: mockImpl,
     } as any);
 
-    const request = createRequest(
-      "http://foo.com/api/Foo/method",
-      "POST",
-      JSON.stringify({}),
-    );
+    const request = createRequest("http://foo.com/api/Foo/method", "POST", JSON.stringify({}));
 
     const di = createDi();
 
@@ -500,14 +437,7 @@ describe("Method Middleware", () => {
     });
 
     // Act
-    const res = await (app as any).router(
-      request,
-      env,
-      ast,
-      undefined,
-      di,
-      api,
-    );
+    const res = await (app as any).router(request, env, ast, undefined, di, api);
 
     // Assert
     expect(res.status).toBe(500);
@@ -520,10 +450,7 @@ describe("Method Dispatch", () => {
     // Arrange
 
     const di = createDi();
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method("testMethod", "Get", [], "Void")
-      .build();
+    const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
       kind: "model",

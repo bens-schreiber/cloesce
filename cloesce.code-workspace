@@ -1,32 +1,26 @@
 {
-	"folders": [
-		{
-			"path": "."
-		},
-		{
-			"name": "compiler",
-			"path": "src/compiler"
-		},
-		{
-			"name": "ts",
-			"path": "src/runtime/ts"
-		},
-		{
-			"path": "tests/e2e"
-		},
-		{
-			"name": "regression",
-			"path": "tests/regression"
-		},
-		{
-			"name": "examples",
-			"path": "examples"
-		},
-	],
-	"settings": {
-		"cSpell.words": [
-			"Cloesce",
-			"Codegen"
-		]
-	}
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "name": "compiler",
+      "path": "src/compiler",
+    },
+    {
+      "name": "ts",
+      "path": "src/runtime/ts",
+    },
+    {
+      "path": "tests/e2e",
+    },
+    {
+      "name": "regression",
+      "path": "tests/regression",
+    },
+    {
+      "name": "examples",
+      "path": "examples",
+    },
+  ],
 }

@@ -31,18 +31,16 @@ In `schema/schema.clo` you will find two example Models, `Weather` and `WeatherR
 
 The `Weather` Model consists of:
 
-| Feature | Type / Description | Source / Layer |
-|---------|-----------------|----------------|
-| `id` | Primary Key | D1 |
-| `weatherReport` | One-to-One relationship | D1 |
-| `dateTime` | Scalar column | D1 |
-| `temperature` | Scalar column | D1 |
-| `condition` | Scalar column | D1 |
-| `photo` | R2 object, key format `weather/photo/{id}.jpg` | R2 |
-| `uploadPhoto` | API endpoint | Workers |
-| `downloadPhoto` | API endpoint | Workers |
-
-
+| Feature         | Type / Description                             | Source / Layer |
+| --------------- | ---------------------------------------------- | -------------- |
+| `id`            | Primary Key                                    | D1             |
+| `weatherReport` | One-to-One relationship                        | D1             |
+| `dateTime`      | Scalar column                                  | D1             |
+| `temperature`   | Scalar column                                  | D1             |
+| `condition`     | Scalar column                                  | D1             |
+| `photo`         | R2 object, key format `weather/photo/{id}.jpg` | R2             |
+| `uploadPhoto`   | API endpoint                                   | Workers        |
+| `downloadPhoto` | API endpoint                                   | Workers        |
 
 The `WeatherReport` Model consists of:
 | Feature | Type / Description | Source / Layer |
@@ -75,6 +73,7 @@ model WeatherReport {
 }
 
 ```
+
 </details>
 
 <details>
@@ -92,7 +91,7 @@ model Weather {
         weatherReportId
         nav { weatherReport }
     }
-    
+
     r2 (bucket, "weather/photos/{id}.jpg") {
         photo
     }
@@ -112,6 +111,7 @@ source R2Only for Weather {
     include { photo }
 }
 ```
+
 </details>
 
 Read more about how Models work in the [Models](./ch2-0-models.md) chapter.
@@ -124,25 +124,24 @@ While Cloesce has a default Workers entrypoint in the generated backend code, al
 
 ```ts
 export const Weather = clo.Weather.impl({
-    async uploadPhoto(self, e, s: CfReadableStream) {
-        const key = this.Key.photo(self.id);
-        await e.bucket.put(key, s);
-    },
+  async uploadPhoto(self, e, s: CfReadableStream) {
+    const key = this.Key.photo(self.id);
+    await e.bucket.put(key, s);
+  },
 
-    downloadPhoto(self) {
-        if (!self.photo) {
-            return HttpResult.fail(404, "Photo not found");
-        }
-        return HttpResult.ok(200, self.photo.body);
+  downloadPhoto(self) {
+    if (!self.photo) {
+      return HttpResult.fail(404, "Photo not found");
     }
+    return HttpResult.ok(200, self.photo.body);
+  },
 });
 
 export default {
-    async fetch(request: Request, env: clo.Env): Promise<Response> {
-        const app = (await clo.cloesce())
-            .register(Weather);
+  async fetch(request: Request, env: clo.Env): Promise<Response> {
+    const app = (await clo.cloesce()).register(Weather);
 
-        return await app.run(request, env);
-    }
+    return await app.run(request, env);
+  },
 };
 ```

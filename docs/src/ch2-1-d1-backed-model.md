@@ -4,10 +4,10 @@
 
 ## Defining a Model
 
-> [!NOTE] 
+> [!NOTE]
 > In `v0.3.0`, all symbols within a file are globally scoped, so you can split your Models and APIs across multiple files as you see fit.
 
-All Cloesce models are defined within a `.clo` or `.cloesce` file. 
+All Cloesce models are defined within a `.clo` or `.cloesce` file.
 
 ```cloesce
 // my-model.clo
@@ -32,16 +32,17 @@ The above code defines a Model "User" stored in the D1 database `db`, with sever
 
 Cloesce supports a variety of column types for D1 Models. These are the supported TypeScript types and their corresponding SQLite types:
 
-| TypeScript Type | SQLite Type | Notes |
-|-----------------|-------------|-------|
-| `int` | `INTEGER` | Represents an integer value |
-| `string` | `TEXT` | Represents a string value |
-| `bool` | `INTEGER` | 0 for false, 1 for true |
-| `date` | `TEXT` | Stored in ISO 8601 format |
-| `double` | `REAL` | Represents a floating-point number |
-| `blob` | `BLOB` | Represents binary data |
+| TypeScript Type | SQLite Type | Notes                              |
+| --------------- | ----------- | ---------------------------------- |
+| `int`           | `INTEGER`   | Represents an integer value        |
+| `string`        | `TEXT`      | Represents a string value          |
+| `bool`          | `INTEGER`   | 0 for false, 1 for true            |
+| `date`          | `TEXT`      | Stored in ISO 8601 format          |
+| `double`        | `REAL`      | Represents a floating-point number |
+| `blob`          | `BLOB`      | Represents binary data             |
 
 All of these types by themselves are `NOT NULL` by default. To make a property nullable, you may wrap it in an `Option` generic:
+
 ```cloesce
 model User {
     optionalField: Option<string>
@@ -53,7 +54,7 @@ Notably, an `int` primary key is automatically set to `AUTOINCREMENT` in D1, so 
 ## Migrating the Database
 
 > [!IMPORTANT]
-> Any change in a D1 backed Model definition (adding, removing, or modifying properties; renaming Models) requires a new migration to be created. 
+> Any change in a D1 backed Model definition (adding, removing, or modifying properties; renaming Models) requires a new migration to be created.
 >
 > The migration command will generate a new migration file in the `migrations/` directory.
 

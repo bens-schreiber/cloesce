@@ -7,14 +7,14 @@ fn test_serialize_wrangler_spec() {
     {
         WranglerGenerator::Toml(toml::from_str("").unwrap())
             .as_spec(None)
-            .unwrap();
+            .expect("Empty TOML should produce a valid spec");
     }
 
     // Empty JSON
     {
         WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
             .as_spec(None)
-            .unwrap();
+            .expect("Empty JSON should produce a valid spec");
     }
 }
 

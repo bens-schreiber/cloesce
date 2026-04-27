@@ -13,9 +13,7 @@ export class InternalError extends Error {
 
 /** @internal */
 export class Either<L, R> {
-  private constructor(
-    private readonly inner: { ok: true; right: R } | { ok: false; left: L },
-  ) {}
+  private constructor(private readonly inner: { ok: true; right: R } | { ok: false; left: L }) {}
 
   get value(): L | R {
     return this.inner.ok ? this.inner.right : this.inner.left;
@@ -55,15 +53,11 @@ export class Either<L, R> {
   }
 
   map<B>(fn: (val: R) => B): Either<L, B> {
-    return this.inner.ok
-      ? Either.right(fn(this.inner.right))
-      : Either.left(this.inner.left);
+    return this.inner.ok ? Either.right(fn(this.inner.right)) : Either.left(this.inner.left);
   }
 
   mapLeft<B>(fn: (val: L) => B): Either<B, R> {
-    return this.inner.ok
-      ? Either.right(this.inner.right)
-      : Either.left(fn(this.inner.left));
+    return this.inner.ok ? Either.right(this.inner.right) : Either.left(fn(this.inner.left));
   }
 }
 
@@ -99,9 +93,7 @@ export class CloesceError {
     return { value: null, errors: [{ kind: "generic", error }] };
   }
 
-  static async catchGeneric<T>(
-    fn: () => Promise<T>,
-  ): Promise<CloesceResult<T>> {
+  static async catchGeneric<T>(fn: () => Promise<T>): Promise<CloesceResult<T>> {
     try {
       return { value: await fn(), errors: [] };
     } catch (e) {

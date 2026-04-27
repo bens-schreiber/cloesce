@@ -7,19 +7,19 @@ export class Hamburger {
   async noLettuceToppings(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5403/api/Hamburger/${__id}/noLettuceToppings`
+    const __$baseUrl = new URL(
+      `http://localhost:5403/api/Hamburger/${__$id}/noLettuceToppings`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Topping,
       true
@@ -28,19 +28,19 @@ export class Hamburger {
   async onlyBaconToppings(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5403/api/Hamburger/${__id}/onlyBaconToppings`
+    const __$baseUrl = new URL(
+      `http://localhost:5403/api/Hamburger/${__$id}/onlyBaconToppings`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Topping,
       true
@@ -50,22 +50,22 @@ export class Hamburger {
     args: { BurgersWithLettuceOrdered: DeepPartial<Hamburger> } | { Default: DeepPartial<Hamburger> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
-    const __resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5403/api/Hamburger/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Hamburger,
       false
@@ -75,22 +75,22 @@ export class Hamburger {
     args: { BurgersWithLettuceOrdered: { lastId: number; limit: number; }} | { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger[]>> {
-    const __resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "BurgersWithLettuceOrdered" | "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5403/api/Hamburger/$list`
     );
-    __baseUrl.searchParams.append("BurgersWithLettuceOrdered_lastId", String(args?.BurgersWithLettuceOrdered?.lastId ?? null));
-    __baseUrl.searchParams.append("BurgersWithLettuceOrdered_limit", String(args?.BurgersWithLettuceOrdered?.limit ?? null));
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("BurgersWithLettuceOrdered_lastId", String(args?.BurgersWithLettuceOrdered?.lastId ?? null));
+    __$baseUrl.searchParams.append("BurgersWithLettuceOrdered_limit", String(args?.BurgersWithLettuceOrdered?.limit ?? null));
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Hamburger,
       true
@@ -98,11 +98,11 @@ export class Hamburger {
   }
 
   static fromJson(data: any): Hamburger {
-    const __res = Object.assign(new Hamburger(), data);
-    for (let i = 0; i < __res.toppings?.length; i++) {
-      __res.toppings[i] = Topping.fromJson(__res.toppings[i]);
+    const __$res = Object.assign(new Hamburger(), data);
+    for (let i = 0; i < __$res.toppings?.length; i++) {
+      __$res.toppings[i] = Topping.fromJson(__$res.toppings[i]);
     }
-    return __res;
+    return __$res;
   }
 }
 export class Topping {
@@ -113,22 +113,22 @@ export class Topping {
     args: { Default: DeepPartial<Topping> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5403/api/Topping/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Topping,
       false
@@ -136,14 +136,13 @@ export class Topping {
   }
 
   static fromJson(data: any): Topping {
-    const __res = Object.assign(new Topping(), data);
-    for (let i = 0; i < __res.hamburger?.length; i++) {
-      __res.hamburger[i] = Hamburger.fromJson(__res.hamburger[i]);
+    const __$res = Object.assign(new Topping(), data);
+    for (let i = 0; i < __$res.hamburger?.length; i++) {
+      __$res.hamburger[i] = Hamburger.fromJson(__$res.hamburger[i]);
     }
-    return __res;
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -153,7 +152,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

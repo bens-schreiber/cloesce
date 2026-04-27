@@ -9,24 +9,24 @@ export class NullabilityChecks {
     b: string | null,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5904/api/NullabilityChecks/${__id}/primitiveTypes`
+    const __$baseUrl = new URL(
+      `http://localhost:5904/api/NullabilityChecks/${__$id}/primitiveTypes`
     );
-    const __payload: any = {};
-    __payload["a"] = a;
-    __payload["b"] = b;
+    const __$payload: any = {};
+    __$payload["a"] = a;
+    __$payload["b"] = b;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -36,23 +36,23 @@ export class NullabilityChecks {
     a: NullabilityChecks | null,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5904/api/NullabilityChecks/${__id}/modelTypes`
+    const __$baseUrl = new URL(
+      `http://localhost:5904/api/NullabilityChecks/${__$id}/modelTypes`
     );
-    const __payload: any = {};
-    __payload["a"] = a;
+    const __$payload: any = {};
+    __$payload["a"] = a;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       NullabilityChecks,
       false
@@ -61,22 +61,22 @@ export class NullabilityChecks {
   async injectableTypes(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5904/api/NullabilityChecks/${__id}/injectableTypes`
+    const __$baseUrl = new URL(
+      `http://localhost:5904/api/NullabilityChecks/${__$id}/injectableTypes`
     );
-    const __payload: any = {};
+    const __$payload: any = {};
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -87,24 +87,24 @@ export class NullabilityChecks {
     b: NullabilityChecks[] | null,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5904/api/NullabilityChecks/${__id}/arrayTypes`
+    const __$baseUrl = new URL(
+      `http://localhost:5904/api/NullabilityChecks/${__$id}/arrayTypes`
     );
-    const __payload: any = {};
-    __payload["a"] = a;
-    __payload["b"] = b;
+    const __$payload: any = {};
+    __$payload["a"] = a;
+    __$payload["b"] = b;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       true
@@ -113,22 +113,22 @@ export class NullabilityChecks {
   async httpResultTypes(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5904/api/NullabilityChecks/${__id}/httpResultTypes`
+    const __$baseUrl = new URL(
+      `http://localhost:5904/api/NullabilityChecks/${__$id}/httpResultTypes`
     );
-    const __payload: any = {};
+    const __$payload: any = {};
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       NullabilityChecks,
       true
@@ -136,11 +136,10 @@ export class NullabilityChecks {
   }
 
   static fromJson(data: any): NullabilityChecks {
-    const __res = Object.assign(new NullabilityChecks(), data);
-    return __res;
+    const __$res = Object.assign(new NullabilityChecks(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -150,7 +149,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

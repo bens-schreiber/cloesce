@@ -1,24 +1,6 @@
-import {
-  OrmWasmExports,
-  WasmResource,
-  loadOrmWasm,
-  invokeOrmWasm,
-} from "./wasm.js";
-import {
-  Cidl,
-  Model,
-  ApiMethod,
-  Service,
-  CrudKind,
-  DataSource,
-  CidlType,
-} from "../cidl.js";
-import {
-  CloesceError,
-  CloesceResult,
-  Either,
-  InternalError,
-} from "../common.js";
+import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
+import { Cidl, Model, ApiMethod, Service, CrudKind, DataSource, CidlType } from "../cidl.js";
+import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
@@ -165,8 +147,7 @@ export class CloesceApp {
     this.namespaceMiddleware.set(tag, [m]);
   }
 
-  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
-    new Map();
+  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> = new Map();
 
   /**
    * Registers middleware for a specific method on a namespace
@@ -223,9 +204,7 @@ export class CloesceApp {
       type ServiceInit = {
         init?: (self: any) => Promise<HttpResult<void> | void>;
       };
-      const serviceApi = this.apiRegistry.get(serviceMeta.name) as
-        | ServiceInit
-        | undefined;
+      const serviceApi = this.apiRegistry.get(serviceMeta.name) as ServiceInit | undefined;
       if (serviceApi?.init) {
         const res = await serviceApi.init(service);
         if (res) {
@@ -267,9 +246,7 @@ export class CloesceApp {
     const params = validation.unwrap();
 
     // Method middleware
-    for (const m of this.methodMiddleware
-      .get(route.namespace)
-      ?.get(route.method.name) ?? []) {
+    for (const m of this.methodMiddleware.get(route.namespace)?.get(route.method.name) ?? []) {
       const res = await m(di);
       if (res) {
         return res;
@@ -305,21 +282,11 @@ export class CloesceApp {
     }
 
     try {
-      const httpResult = await this.router(
-        request,
-        env,
-        ast,
-        wasm,
-        di,
-        workerUrl,
-      );
+      const httpResult = await this.router(request, env, ast, wasm, di, workerUrl);
 
       // Log any 500 errors
       if (httpResult.status === 500) {
-        console.error(
-          "A caught error occurred in the Cloesce Router: ",
-          httpResult.message,
-        );
+        console.error("A caught error occurred in the Cloesce Router: ", httpResult.message);
       }
 
       return httpResult.toResponse();
@@ -341,19 +308,14 @@ export class CloesceApp {
       }
 
       const res = HttpResult.fail(500, JSON.stringify(debug));
-      console.error(
-        "An uncaught error occurred in the Cloesce Router: ",
-        debug,
-      );
+      console.error("An uncaught error occurred in the Cloesce Router: ", debug);
       return res.toResponse();
     }
   }
 }
 
 /** @internal */
-export type ApiImplementation = (
-  ...args: unknown[]
-) => Promise<unknown> | unknown;
+export type ApiImplementation = (...args: unknown[]) => Promise<unknown> | unknown;
 
 /** @internal */
 export type MatchedRoute = {
@@ -385,8 +347,7 @@ function matchRoute(
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (c: RouterError) => exit(404, c, "Unknown route");
-  const notImplemented = () =>
-    exit(501, RouterError.NotImplemented, "Not implemented");
+  const notImplemented = () => exit(501, RouterError.NotImplemented, "Not implemented");
 
   for (const p of prefix) {
     if (parts.shift() !== p) return notFound(RouterError.UnknownPrefix);
@@ -416,9 +377,7 @@ function matchRoute(
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
-    const impl = registry.get(service.name)?.[method.name] as
-      | ApiImplementation
-      | undefined;
+    const impl = registry.get(service.name)?.[method.name] as ApiImplementation | undefined;
     if (!impl) {
       return notImplemented();
     }
@@ -545,9 +504,7 @@ async function validateRequest(
 
   // Filter out injected parameters
   const requiredParams = route.method.parameters.filter(
-    (p) =>
-      p.cidl_type !== "Env" &&
-      !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
+    (p) => p.cidl_type !== "Env" && !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract all method parameters from the body
@@ -576,10 +533,7 @@ async function validateRequest(
         }
       }
     } catch {
-      return invalidRequest(
-        RouterError.RequestMissingBody,
-        "Request body is missing or malformed",
-      );
+      return invalidRequest(RouterError.RequestMissingBody, "Request body is missing or malformed");
     }
   }
 
@@ -646,8 +600,7 @@ async function hydrate(
   }
 
   const meta = route.model!;
-  const dataSource: DataSource =
-    meta.data_sources[route.method.data_source ?? "Default"];
+  const dataSource: DataSource = meta.data_sources[route.method.data_source ?? "Default"];
 
   // Error state: If some outside force tweaked the database schema, or some outage caused the
   // data store to return an error, hydration may fail.
@@ -666,9 +619,7 @@ async function hydrate(
     );
 
     if (result.errors.length > 0) {
-      return hydrationFailed(
-        CloesceError.displayErrors(result as CloesceResult<never>),
-      );
+      return hydrationFailed(CloesceError.displayErrors(result as CloesceResult<never>));
     }
 
     // Result will only be null if the record does not exist for a D1 query
@@ -710,8 +661,7 @@ async function methodDispatch(
   }
 
   const wrapResult = (res: any): HttpResult => {
-    const httpResult =
-      res instanceof HttpResult ? res : HttpResult.ok(200, res);
+    const httpResult = res instanceof HttpResult ? res : HttpResult.ok(200, res);
     return httpResult.setMediaType(route.method.return_media);
   };
 
@@ -734,19 +684,14 @@ function exit(
   message: string,
   debugMessage: string = "",
 ): Either<HttpResult<void>, never> {
-  return Either.left(
-    HttpResult.fail(status, `${message} (ErrorCode: ${state}${debugMessage})`),
-  );
+  return Either.left(HttpResult.fail(status, `${message} (ErrorCode: ${state}${debugMessage})`));
 }
 
 /**
  * Finds an injected dependency from the DI container.
  * @returns The injected dependency, or undefined if not found.
  */
-function resolveInjected(
-  di: DependencyContainer,
-  ty: CidlType,
-): any | undefined {
+function resolveInjected(di: DependencyContainer, ty: CidlType): any | undefined {
   let tag = null;
   if (typeof ty === "object" && "Inject" in ty) {
     tag = ty.Inject.name;
@@ -758,9 +703,7 @@ function resolveInjected(
 
   const injected = di.get({ tag });
   if (injected === undefined) {
-    console.warn(
-      `Unable to find injected dependency for ${tag}. Leaving as undefined.`,
-    );
+    console.warn(`Unable to find injected dependency for ${tag}. Leaving as undefined.`);
   }
   return injected;
 }

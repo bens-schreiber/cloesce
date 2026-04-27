@@ -4,14 +4,14 @@ export class FooService {
   static async staticMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const __baseUrl = new URL("http://localhost:5144/api/FooService/staticMethod");
+    const __$baseUrl = new URL("http://localhost:5144/api/FooService/staticMethod");
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -20,14 +20,14 @@ export class FooService {
   static async instantiatedMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const __baseUrl = new URL("http://localhost:5144/api/FooService/instantiatedMethod");
+    const __$baseUrl = new URL("http://localhost:5144/api/FooService/instantiatedMethod");
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -38,21 +38,20 @@ export class BarService {
   static async useFoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const __baseUrl = new URL("http://localhost:5144/api/BarService/useFoo");
+    const __$baseUrl = new URL("http://localhost:5144/api/BarService/useFoo");
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
     );
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -62,7 +61,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

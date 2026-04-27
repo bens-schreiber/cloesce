@@ -4,8 +4,9 @@ export class Poo {
   ds: "Baz" | "Default" = "Default";
 
   static fromJson(data: any): Poo {
-    const __res = Object.assign(new Poo(), data);
-    return __res;
+    const __$res = Object.assign(new Poo(), data);
+
+    return __$res;
   }
 }
 export class Foo {
@@ -17,26 +18,26 @@ export class Foo {
     poop: Poo,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5719/api/Foo/${__id}/bar`
+    const __$baseUrl = new URL(
+      `http://localhost:5719/api/Foo/${__$id}/bar`
     );
-    const __payload: any = {};
-    __baseUrl.searchParams.append("customDs", String(customDs));
-    __baseUrl.searchParams.append("oneDs", String(oneDs));
-    __baseUrl.searchParams.append("noDs", String(noDs));
-    __payload["poop"] = poop;
+    const __$payload: any = {};
+    __$baseUrl.searchParams.append("customDs", String(customDs));
+    __$baseUrl.searchParams.append("oneDs", String(oneDs));
+    __$baseUrl.searchParams.append("noDs", String(noDs));
+    __$payload["poop"] = poop;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -44,27 +45,26 @@ export class Foo {
   }
 
   static fromJson(data: any): Foo {
-    const __res = Object.assign(new Foo(), data);
-    return __res;
+    const __$res = Object.assign(new Foo(), data);
+    return __$res;
   }
 }
 export class NoDs {
   id: number;
 
   static fromJson(data: any): NoDs {
-    const __res = Object.assign(new NoDs(), data);
-    return __res;
+    const __$res = Object.assign(new NoDs(), data);
+    return __$res;
   }
 }
 export class OneDs {
   id: number;
 
   static fromJson(data: any): OneDs {
-    const __res = Object.assign(new OneDs(), data);
-    return __res;
+    const __$res = Object.assign(new OneDs(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -74,7 +74,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

@@ -6,11 +6,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{Args, Parser, Subcommand};
 use frontend::{
     err::DisplayError,
     lexer::{CloesceLexer, LexTarget},
 };
+
+use clap::{Args, Parser, Subcommand};
 use serde::Deserialize;
 use tracing_subscriber::FmtSubscriber;
 
@@ -22,7 +23,6 @@ struct ParsedCloesceConfig {
     out_path: String,
     workers_url: String,
     migrations_path: String,
-    #[serde(default)]
     wrangler_config_format: WranglerConfigFormat,
 }
 
@@ -56,12 +56,6 @@ impl CloesceConfig {
     fn wrangler_path(&self) -> PathBuf {
         self.root
             .join(self.parsed.wrangler_config_format.wrangler_file_name())
-    }
-
-    /// The path to the generated CIDL file (a merkle-hashed JSON snapshot of the AST).
-    #[allow(dead_code)]
-    fn cidl_path(&self) -> PathBuf {
-        self.cloesce_dir().join("cidl.json")
     }
 
     fn load(root: &Path, env: Option<String>) -> Result<CloesceConfig, String> {
@@ -172,13 +166,12 @@ impl WranglerConfigFormat {
 }
 
 #[derive(Parser)]
-#[command(name = "cloesce")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
 
     // Determine which environment to compile for.
-    #[arg(long)]
+    #[arg(long, global = true)]
     env: Option<String>,
 }
 
@@ -191,7 +184,6 @@ enum Command {
 }
 
 #[derive(Args)]
-#[command(name = "migrate")]
 struct MigrateArgs {
     #[arg(long, conflicts_with = "all", required_unless_present = "all")]
     binding: Option<String>,
@@ -224,7 +216,6 @@ fn open_file_or_create(path: &Path) -> Result<File, String> {
 }
 
 #[derive(Args)]
-#[command(name = "migrate")]
 struct FormatArgs {
     #[arg(long)]
     check: bool,
@@ -240,14 +231,15 @@ fn main() {
 
     // Spawn a separate thread as to not impede the compiler.
     // `version` command will always force a fetch
-    let is_version_cmd = matches!(cli.command, Command::Version);
     let update_check = if cfg!(debug_assertions) {
         None
     } else {
+        let is_version_cmd = matches!(cli.command, Command::Version);
         Some(std::thread::spawn(move || {
             version::fetch_latest_version(is_version_cmd)
         }))
     };
+
     let run = || -> Result<(), String> {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
 
@@ -517,7 +509,10 @@ mod migrate {
 
             #[cfg(not(feature = "regression-tests"))]
             {
-                (config.wrangler_path(), config.cidl_path())
+                (
+                    config.wrangler_path(),
+                    config.cloesce_dir().join("cidl.json"),
+                )
             }
         };
 

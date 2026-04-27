@@ -61,9 +61,7 @@ describe("Basic", () => {
     });
     expect(res.ok, withRes("$list should be OK", res)).toBe(true);
     expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
-    models.forEach((m) =>
-      expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m),
-    );
+    models.forEach((m) => expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m));
   });
 });
 

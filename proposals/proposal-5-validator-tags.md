@@ -15,21 +15,22 @@ This proposal introduces a set of [Zod](https://zod.dev) inspired "validator tag
 
 ## Motivation
 
-Cloesce has a simple goal: replace schema languages with a single unified one. 
+Cloesce has a simple goal: replace schema languages with a single unified one.
 
 In the TypeScript ecosystem, Zod is the de facto standard for validation of input data, done by defining a schema that describes the expected shape, types, and constraints of data. For example:
 
 ```ts
 const UserSchema = z.object({
-    id: z.string().length(5).uppercase(),
-    age: z.number().int().gt(0),
-    email: z.string().email()
+  id: z.string().length(5).uppercase(),
+  age: z.number().int().gt(0),
+  email: z.string().email(),
 });
 ```
 
 While Cloesce is capable of expressing the structure and types of data, it lacks any fine-grained way to express constraints on that data.
 
 A workaround to this problem is writing validation logic within API implementations, but this approach has two big drawbacks:
+
 1. We lose the ability to implicitly inherit validation logic across Cloesce constructs
 2. Method dispatch occurs after hydration, so we lose the ability to fail fast on invalid input before performing any unnecessary work.
 
@@ -66,6 +67,7 @@ api Foo {
 - Ensure that validators are inherited by all CRUD methods of a model, as well as any API that references that field.
 
 ### Non-Goals
+
 - Custom user-implemented validators (i.e., generating a backend stub to be invoked at runtime)
 
 ---
@@ -75,6 +77,7 @@ api Foo {
 ### Frontend
 
 A Validator Tag is a special type of tag that can be applied to fields of models and plain old objects, API parameters, and Data Source parameters. They may accept arguments such as:
+
 - Integer literals (e.g. `5`, `10`)
 - Real number literals (e.g. `3.14`, `0.01`)
 - String literals (e.g. `"^[a-zA-Z0-9]+$"`)
@@ -90,6 +93,7 @@ ValidatorTag
 ```
 
 A tag is allowed in all of these cases:
+
 ```
 model Foo {
     primary {
@@ -143,6 +147,7 @@ source Default for Foo {
 ### Available Validators
 
 **Numerical Validators (Integer and Real)**
+
 - `[gt n]`: Validates that a number is greater than n, where n is an integer or real literal.
 - `[gte n]`: Validates that a number is greater than or equal to n, where n is an integer or real literal.
 - `[lt n]`: Validates that a number is less than n, where n is an integer or real literal.
@@ -150,6 +155,7 @@ source Default for Foo {
 - `[step n]`: Validates that a number is a multiple of n, where n is an integer or real literal.
 
 **String Validators**
+
 - `[length n]`: Validates that a string has a length of n, where n is an integer literal.
 - `[min n]`: Validates that a string has a minimum length of n, where n is an integer literal.
 - `[max n]`: Validates that a string has a maximum length of n, where n is an integer literal.
@@ -195,7 +201,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 First, it's overdue that we rename `double` to `real`. Since Cloesce compiles to multiple languages, we don't really know what the underlying representation of a floating point number will be, and `real` is a more general term that can encompass both single and double precision floats (it is also the SQLite type for floating point numbers).
 
-`real` and `int` will represent a number that can be positive or negative. 
+`real` and `int` will represent a number that can be positive or negative.
 
 `uint` will be introduced to represent an unsigned integer which must be greater than or equal to 0 at runtime.
 
@@ -204,6 +210,7 @@ First, it's overdue that we rename `double` to `real`. Since Cloesce compiles to
 ## Implementation
 
 The implementation of this proposal will involve:
+
 1. Extending the lexer to recognize literals
 2. Adding a new `ValidatorTag` node to the AST, composed within a field or parameter definition
 3. Semantic analysis to ensure that validators are applied to compatible types (e.g. you can't apply `[length 5]` to an `int` field), and test regex literals for validity,
@@ -248,7 +255,7 @@ const result = await Foo.$get({ A_id: "hello" });
 
 ```ts
 const result = await Foo.$get({
-    A: { id: "hello" }
+  A: { id: "hello" },
 });
 ```
 

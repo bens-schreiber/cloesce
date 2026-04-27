@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "*.toml",
+    "*.jsonc",
+    "*.json",
+    "**/dist/",
+    "**/build/",
+    "**/book/",
+    "**/tests/snapshots/",
+    "tests/e2e/fixtures/*/backend.ts",
+    "tests/e2e/fixtures/*/client.ts",
+  ]
+}

@@ -15,7 +15,7 @@ WASM_TARGET := wasm32-unknown-unknown
 check-deps:
 	@echo "CLOESCE: Checking required dependencies..."
 	@command -v cargo >/dev/null 2>&1 || { echo "❌ cargo not found. Install Rust: https://rustup.rs/"; exit 1; }
-	@command -v npm >/dev/null 2>&1 || { echo "❌ npm not found. Install Node.js: https://nodejs.org/"; exit 1; }
+	@command -v pnpm >/dev/null 2>&1 || { echo "❌ pnpm not found. Install Pnpm: https://pnpm.io/installation/"; exit 1; }
 	@command -v pandoc >/dev/null 2>&1 || echo "⚠️  pandoc not found (optional, for docs). Install pandoc: https://github.com/jgm/pandoc"
 	@command -v mdbook >/dev/null 2>&1 || echo "⚠️  mdbook not found (optional, for docs). Install mdbook: cargo install mdbook"
 	@rustup target list --installed | grep -q $(WASM_TARGET) || { echo "❌ $(WASM_TARGET) target not installed. Run: rustup target add $(WASM_TARGET)"; exit 1; }
@@ -23,21 +23,18 @@ check-deps:
 
 format:
 	@echo "CLOESCE: Formatting Rust and TypeScript code..."
-	npm run format:fix --prefix $(TS_DIR)
+	pnpm run fmt
 	cargo fmt --all --manifest-path $(CARGO_MANIFEST)
-	npm run format:fix --prefix $(E2E_DIR)
 
 .PHONY: format-check
 format-check:
 	@echo "CLOESCE: Checking Rust and TypeScript code formatting..."
 	cargo fmt --all --manifest-path $(CARGO_MANIFEST) -- --check
-	npm run format --prefix $(TS_DIR) -- --check
-	npm run format --prefix $(E2E_DIR) -- --check
+	pnpm run fmt:check
 
 	@echo "CLOESCE: Linting Rust and TypeScript code..."
 	cargo clippy --manifest-path $(CARGO_MANIFEST) --all-targets --all-features -- -D warnings
-	npx --prefix $(TS_DIR) oxlint . --deny-warnings
-	npx --prefix $(E2E_DIR) oxlint . --deny-warnings
+	pnpm run lint
 
 # Cross-compilation targets for release binaries
 CROSS_TARGETS := \
@@ -84,22 +81,21 @@ package-cross:
 .PHONY: build-src
 build-src:
 	@echo "CLOESCE: Installing dependencies for Rust and TypeScript code..."
-	npm install --prefix $(TS_DIR)
-	npm install --prefix $(E2E_DIR)
+	pnpm install
 
 	@echo "CLOESCE: Building Rust and TypeScript code..."
 	cargo build --release --manifest-path $(CARGO_MANIFEST) --bin cloesce
 	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
 
-	npm run build --prefix $(TS_DIR)
+	pnpm --filter cloesce run build
 
 .PHONY: test
 test:
 	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
-	npm run test --prefix $(TS_DIR)
+	pnpm --filter cloesce run test
 	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
-	npm run test --prefix $(E2E_DIR)
+	pnpm --filter e2e run test
 
 .PHONY: build-docs
 build-docs:
@@ -117,15 +113,23 @@ build-docs:
 .PHONY: build-typedoc
 build-typedoc:
 	@echo "CLOESCE: Building TypeScript documentation using TypeDoc..."
-	cd ./$(TS_DIR) && npx typedoc --out build
+	cd ./$(TS_DIR) && pnpm exec typedoc --out build
 
 .PHONY: clean
 clean:
 	@echo "CLOESCE: Cleaning build artifacts..."
 	cargo clean --manifest-path $(CARGO_MANIFEST)
-	rm -rf $(TS_DIR)/build
+	rm -rf node_modules
+	rm -rf examples/node_modules
+
 	rm -rf $(TS_DIR)/node_modules
+	rm -rf $(TS_DIR)/build
+	rm -rf $(TS_DIR)/dist
+
 	rm -rf $(E2E_DIR)/node_modules
+	rm -rf $(E2E_DIR)/fixtures/*/dist
+	rm -rf $(E2E_DIR)/fixtures/*/.wrangler
+
 	rm -rf $(DOCS_DIR)/book
 	@echo "✅ Build artifacts removed!"
 

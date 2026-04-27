@@ -17,7 +17,7 @@ impl<'a> SelectModel<'a> {
     pub fn query(
         model_name: &str,
         from: Option<String>,
-        include_tree: Option<IncludeTree>,
+        include_tree: Option<&IncludeTree>,
         ast: &'a CloesceAst<'a>,
     ) -> Result<String> {
         let model = match ast.models.get(model_name) {
@@ -50,8 +50,10 @@ impl<'a> SelectModel<'a> {
             query,
         };
 
-        let include_tree = include_tree.unwrap_or_default();
-        sm.dfs(model, &include_tree, model.name.to_string(), None);
+        let empty_tree = IncludeTree::default();
+        let include_tree = include_tree.unwrap_or(&empty_tree);
+
+        sm.dfs(model, include_tree, model.name.to_string(), None);
         let res = sm.query.to_string(SqliteQueryBuilder);
 
         // Dumb hack to support custom FROM clauses

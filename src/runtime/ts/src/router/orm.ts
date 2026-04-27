@@ -9,19 +9,8 @@ import type {
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import {
-  Model,
-  CidlType,
-  Cidl,
-  getNavigationCidlType,
-  KvField,
-} from "../cidl.js";
-import {
-  CloesceError,
-  CloesceResult,
-  InternalError,
-  u8ToB64,
-} from "../common.js";
+import { Model, CidlType, Cidl, getNavigationCidlType, KvField } from "../cidl.js";
+import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 type HydrateArgs = {
@@ -59,20 +48,10 @@ export class Orm {
    *
    * Capable of mapping only queries returned from `Orm.select`, which are aliased in an Object Oriented fashion.
    */
-  static map<T extends object>(
-    meta: Model,
-    d1Results: D1Result,
-    includeTree: IncludeTree<T>,
-  ): T[] {
+  static map<T extends object>(meta: Model, d1Results: D1Result, includeTree: IncludeTree<T>): T[] {
     const { wasm } = RuntimeContainer.get();
-    const d1ResultsRes = WasmResource.fromString(
-      JSON.stringify(d1Results.results),
-      wasm,
-    );
-    const includeTreeRes = WasmResource.fromString(
-      JSON.stringify(includeTree),
-      wasm,
-    );
+    const d1ResultsRes = WasmResource.fromString(JSON.stringify(d1Results.results), wasm);
+    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
     const mapQueryRes = invokeOrmWasm(
       wasm.map,
       [WasmResource.fromString(meta.name, wasm), d1ResultsRes, includeTreeRes],
@@ -111,10 +90,7 @@ export class Orm {
 
     const { wasm } = RuntimeContainer.get();
     const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
-    const includeTreeRes = WasmResource.fromString(
-      JSON.stringify(includeTree),
-      wasm,
-    );
+    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
     const selectQueryRes = invokeOrmWasm(
       wasm.select_model,
       [WasmResource.fromString(meta.name, wasm), fromRes, includeTreeRes],
@@ -122,9 +98,7 @@ export class Orm {
     );
 
     if (selectQueryRes.isLeft()) {
-      throw new InternalError(
-        `Select generation failed: ${selectQueryRes.value}`,
-      );
+      throw new InternalError(`Select generation failed: ${selectQueryRes.value}`);
     }
 
     return selectQueryRes.unwrap();
@@ -214,9 +188,7 @@ export class Orm {
 
     // Collect all KV uploads that can be performed concurrently with the SQL upsert
     const kvUploadPromises = upsertRes.kv_uploads.map(async (upload) => {
-      const namespace: KVNamespace | undefined = (this.env as any)[
-        upload.namespace_binding
-      ];
+      const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
       if (!namespace) {
         throw new InternalError(
           `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
@@ -235,9 +207,7 @@ export class Orm {
     const db: D1Database | undefined = meta.d1_binding
       ? (this.env as any)[meta.d1_binding]
       : undefined;
-    const queries = upsertRes.sql.map((s) =>
-      db!.prepare(s.query).bind(...s.values),
-    );
+    const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
@@ -269,11 +239,7 @@ export class Orm {
       { model: base, meta, tree: includeTree },
     ];
     while (q.length > 0) {
-      const {
-        model: currentModel,
-        meta: currentMeta,
-        tree: currentTree,
-      } = q.shift()!;
+      const { model: currentModel, meta: currentMeta, tree: currentTree } = q.shift()!;
 
       // Key fields
       for (const field of currentMeta.key_fields) {
@@ -310,41 +276,37 @@ export class Orm {
 
     // Execute all delayed KV uploads that depended on SQL results
     const delayedUploadResults = await Promise.all(
-      upsertRes.kv_delayed_uploads.map(
-        async (upload): Promise<CloesceResult<void>> => {
-          let current: any = base;
-          for (const pathPart of upload.path) {
-            current = current[pathPart];
-            if (current === undefined) {
-              throw new InternalError(
-                `Failed to resolve path ${upload.path.join(".")} for delayed KV upload.`,
-              );
-            }
-          }
-
-          const namespace: KVNamespace | undefined = (this.env as any)[
-            upload.namespace_binding
-          ];
-          if (!namespace) {
+      upsertRes.kv_delayed_uploads.map(async (upload): Promise<CloesceResult<void>> => {
+        let current: any = base;
+        for (const pathPart of upload.path) {
+          current = current[pathPart];
+          if (current === undefined) {
             throw new InternalError(
-              `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
+              `Failed to resolve path ${upload.path.join(".")} for delayed KV upload.`,
             );
           }
+        }
 
-          const key = resolveKey(upload.key, current, {});
-          if (!key) {
-            throw new InternalError(
-              `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
-            );
-          }
-
-          return CloesceError.catchGeneric(() =>
-            namespace.put(key, JSON.stringify(upload.value), {
-              metadata: upload.metadata,
-            }),
+        const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
+        if (!namespace) {
+          throw new InternalError(
+            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
           );
-        },
-      ),
+        }
+
+        const key = resolveKey(upload.key, current, {});
+        if (!key) {
+          throw new InternalError(
+            `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
+          );
+        }
+
+        return CloesceError.catchGeneric(() =>
+          namespace.put(key, JSON.stringify(upload.value), {
+            metadata: upload.metadata,
+          }),
+        );
+      }),
     );
 
     const delayedUploadErrors = CloesceError.drain(delayedUploadResults);
@@ -407,9 +369,7 @@ export class Orm {
 
     const results = Orm.map(meta, rows, includeTree);
     const hydratedResults = await Promise.all(
-      results.map((modelJson) =>
-        this.hydrate<T>(meta, modelJson, {}, includeTree),
-      ),
+      results.map((modelJson) => this.hydrate<T>(meta, modelJson, {}, includeTree)),
     );
 
     const errors = hydratedResults.flatMap((r) => r.errors);
@@ -452,11 +412,7 @@ function resolveKey(
  *
  * @returns The hydrated value if a transformation was necessary, or undefined if the value was mutated in place.
  */
-export function hydrateType(
-  value: any,
-  cidlType: CidlType,
-  args: HydrateArgs,
-): any | undefined {
+export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): any | undefined {
   if (value === null || value === undefined) {
     return value;
   }
@@ -522,14 +478,10 @@ export function hydrateType(
     for (const nav of modelMeta.navigation_fields) {
       const tree = args.includeTree ? args.includeTree[nav.field.name] : null;
       if (tree === undefined) continue;
-      const res = hydrateType(
-        value[nav.field.name],
-        getNavigationCidlType(nav),
-        {
-          ...args,
-          includeTree: tree,
-        },
-      );
+      const res = hydrateType(value[nav.field.name], getNavigationCidlType(nav), {
+        ...args,
+        includeTree: tree,
+      });
       if (res) value[nav.field.name] = res;
     }
 
@@ -541,10 +493,7 @@ export function hydrateType(
 
     for (const kv of modelMeta.kv_fields) {
       const key = resolveKey(kv.format, value, args.keyFields);
-      if (
-        (args.includeTree && args.includeTree[kv.field.name] === undefined) ||
-        !key
-      ) {
+      if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
         if (kv.list_prefix) {
           value[kv.field.name] = {
             results: [],
@@ -564,10 +513,7 @@ export function hydrateType(
 
     for (const r2 of modelMeta.r2_fields) {
       const key = resolveKey(r2.format, value, args.keyFields);
-      if (
-        (args.includeTree && args.includeTree[r2.field.name] === undefined) ||
-        !key
-      ) {
+      if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
         if (r2.list_prefix) {
           value[r2.field.name] = {
             results: [],
@@ -582,9 +528,7 @@ export function hydrateType(
         r2.list_prefix
           ? CloesceError.catchGeneric(async () => {
               const list = await bucket.list({ prefix: key });
-              const results = await Promise.all(
-                list.objects.map((obj) => bucket.get(obj.key)),
-              );
+              const results = await Promise.all(list.objects.map((obj) => bucket.get(obj.key)));
               const cursor = list.truncated ? (list.cursor ?? null) : null;
               value[r2.field.name] = {
                 results,
@@ -626,11 +570,7 @@ function hydrateKVList(
       const results = await Promise.all(
         res.keys.map(
           async (k: any) =>
-            new KValue(
-              k.name,
-              await namespace.get(k.name, { type: "stream" }),
-              null,
-            ),
+            new KValue(k.name, await namespace.get(k.name, { type: "stream" }), null),
         ),
       );
       current[kv.field.name] = {
@@ -643,16 +583,11 @@ function hydrateKVList(
 
     const results = await Promise.all(
       res.keys.map(async (k: any) => {
-        const { value: raw, metadata } = await namespace.getWithMetadata(
-          k.name,
-          { type: "json" },
-        );
+        const { value: raw, metadata } = await namespace.getWithMetadata(k.name, { type: "json" });
         return new KValue(k.name, raw, metadata);
       }),
     );
-    current[kv.field.name] = { results, cursor, complete } as Paginated<
-      KValue<unknown>
-    >;
+    current[kv.field.name] = { results, cursor, complete } as Paginated<KValue<unknown>>;
   });
 }
 
@@ -664,11 +599,7 @@ function hydrateKVSingle(
 ): Promise<CloesceResult<void>> {
   return CloesceError.catchGeneric(async () => {
     if (kv.field.cidl_type === "Stream") {
-      current[kv.field.name] = new KValue(
-        key,
-        await namespace.get(key, { type: "stream" }),
-        null,
-      );
+      current[kv.field.name] = new KValue(key, await namespace.get(key, { type: "stream" }), null);
       return;
     }
     const { value: raw, metadata } = await namespace.getWithMetadata(key, {

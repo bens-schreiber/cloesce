@@ -13,7 +13,7 @@ import { cloesce } from "@cloesce/backend";
 beforeAll(() => cloesce());
 ```
 
-Cloesce needs only the CIDL (generated during compilation)  to be used in tests. This means you can write tests for your Models and Services without needing to run a full Cloudflare Worker environment.
+Cloesce needs only the CIDL (generated during compilation) to be used in tests. This means you can write tests for your Models and Services without needing to run a full Cloudflare Worker environment.
 
 ORM methods rely on Cloudflare Workers bindings (D1, KV, R2, etc.), so you will need to mock these bindings in your test environment. The best choice for this is [Miniflare](https://developers.cloudflare.com/workers/testing/miniflare/), which provides an in memory implementation of Cloudflare Workers runtime and bindings.
 

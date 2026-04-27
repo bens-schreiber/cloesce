@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, Field, MediaType, NavigationFieldKind, Number, Validator};
+use ast::{CidlType, MediaType, NavigationFieldKind, Number, Validator};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::SemanticError};
 
@@ -663,12 +663,10 @@ fn kv_and_d1_coexist() {
     assert!(user.d1_binding.is_some());
     assert_eq!(user.kv_fields.len(), 1);
     assert_eq!(user.columns.len(), 1,);
+    assert_eq!(user.kv_fields[0].format_parameters[0].name, "id");
     assert_eq!(
-        user.kv_fields[0].format_parameters[0],
-        Field {
-            name: "id".into(),
-            cidl_type: CidlType::Int,
-        }
+        user.kv_fields[0].format_parameters[0].cidl_type,
+        CidlType::Int
     );
 }
 

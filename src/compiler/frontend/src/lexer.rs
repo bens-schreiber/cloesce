@@ -77,6 +77,7 @@ pub enum Token<'src> {
     RegexLit(&'src str),
 
     // Identifiers (must come after keywords)
+    // NOTE: `$` is intentionally excluded since it is used for generated content
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]
     Ident(&'src str),
 
