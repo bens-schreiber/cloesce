@@ -8,20 +8,20 @@ export class Dog {
     dog: DeepPartial<Dog>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
-    const __baseUrl = new URL(
+    const __$baseUrl = new URL(
       `http://localhost:5288/api/Dog/create`
     );
-    const __payload: any = {};
-    __payload["dog"] = dog;
+    const __$payload: any = {};
+    __$payload["dog"] = dog;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Dog,
       false
@@ -30,19 +30,19 @@ export class Dog {
   async getPartialSelf(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DeepPartial<Dog>>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5288/api/Dog/${__id}/getPartialSelf`
+    const __$baseUrl = new URL(
+      `http://localhost:5288/api/Dog/${__$id}/getPartialSelf`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -52,22 +52,22 @@ export class Dog {
     args: { Default: DeepPartial<Dog> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5288/api/Dog/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Dog,
       false
@@ -75,11 +75,10 @@ export class Dog {
   }
 
   static fromJson(data: any): Dog {
-    const __res = Object.assign(new Dog(), data);
-    return __res;
+    const __$res = Object.assign(new Dog(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -89,7 +88,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

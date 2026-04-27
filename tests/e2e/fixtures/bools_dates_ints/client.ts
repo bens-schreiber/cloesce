@@ -8,22 +8,22 @@ export class Weather {
     args: { Default: DeepPartial<Weather> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5293/api/Weather/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Weather,
       false
@@ -33,20 +33,20 @@ export class Weather {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5293/api/Weather/$get`
     );
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Weather,
       false
@@ -54,11 +54,10 @@ export class Weather {
   }
 
   static fromJson(data: any): Weather {
-    const __res = Object.assign(new Weather(), data);
-    return __res;
+    const __$res = Object.assign(new Weather(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -68,7 +67,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

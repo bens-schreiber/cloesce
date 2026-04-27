@@ -58,11 +58,6 @@ impl CloesceConfig {
             .join(self.parsed.wrangler_config_format.wrangler_file_name())
     }
 
-    /// The path to the generated CIDL file (a snapshot of the AST).
-    fn cidl_path(&self) -> PathBuf {
-        self.cloesce_dir().join("cidl.json")
-    }
-
     fn load(root: &Path, env: Option<String>) -> Result<CloesceConfig, String> {
         let config_path = if let Some(env) = env.as_ref() {
             root.join(format!("{}.cloesce.jsonc", env))
@@ -514,7 +509,10 @@ mod migrate {
 
             #[cfg(not(feature = "regression-tests"))]
             {
-                (config.wrangler_path(), config.cidl_path())
+                (
+                    config.wrangler_path(),
+                    config.cloesce_dir().join("cidl.json"),
+                )
             }
         };
 

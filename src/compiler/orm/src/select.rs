@@ -53,7 +53,7 @@ impl<'a> SelectModel<'a> {
         let empty_tree = IncludeTree::default();
         let include_tree = include_tree.unwrap_or(&empty_tree);
 
-        sm.dfs(model, &include_tree, model.name.to_string(), None);
+        sm.dfs(model, include_tree, model.name.to_string(), None);
         let res = sm.query.to_string(SqliteQueryBuilder);
 
         // Dumb hack to support custom FROM clauses

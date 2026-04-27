@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
-
 use askama::Template;
 use ast::{
-    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, MediaType, Model, NavigationField,
+    ApiMethod, CidlType, CloesceAst, HttpVerb, MediaType, Model, NavigationField,
     NavigationFieldKind, ValidatedField,
 };
 
@@ -40,23 +38,6 @@ struct ClientTemplate<'src> {
 }
 
 impl ClientTemplate<'_> {
-    fn fmt_verb(&self, verb: &HttpVerb) -> &'static str {
-        match verb {
-            HttpVerb::Get => "GET",
-            HttpVerb::Post => "POST",
-            HttpVerb::Put => "PUT",
-            HttpVerb::Patch => "PATCH",
-            HttpVerb::Delete => "DELETE",
-        }
-    }
-
-    fn fmt_content_type(&self, media: &MediaType) -> &'static str {
-        match media {
-            MediaType::Json => "application/json",
-            MediaType::Octet => "application/octet-stream",
-        }
-    }
-
     fn map_type(&self, ty: &CidlType<'_>) -> String {
         self.mapper.cidl_type(ty, self.ast)
     }
@@ -98,7 +79,7 @@ impl ClientTemplate<'_> {
         match ty.root_type() {
             CidlType::Inject { name } | CidlType::Object { name } => name,
             CidlType::Partial { object_name } => object_name,
-            _ => "",
+            _ => panic!("Expected object type, got {:?}", ty),
         }
     }
 
@@ -124,15 +105,6 @@ impl ClientTemplate<'_> {
         )
     }
 
-    fn is_object_array(&self, ty: &CidlType<'_>) -> bool {
-        matches!(ty.root_type(), CidlType::Object { .. })
-            && cidl_type_contains!(ty, CidlType::Array(_))
-    }
-
-    fn is_blob_array(&self, ty: &CidlType<'_>) -> bool {
-        matches!(ty.root_type(), CidlType::Blob) && cidl_type_contains!(ty, CidlType::Array(_))
-    }
-
     fn is_serializable(&self, ty: &CidlType<'_>) -> bool {
         !matches!(ty.root_type(), CidlType::Inject { .. } | CidlType::Env)
     }
@@ -143,10 +115,6 @@ impl ClientTemplate<'_> {
 
     fn is_url_param(&self, ty: &CidlType<'_>, verb: &HttpVerb) -> bool {
         matches!(verb, HttpVerb::Get) || matches!(ty, CidlType::DataSource { .. })
-    }
-
-    fn is_datasource(&self, ty: &CidlType<'_>) -> bool {
-        matches!(ty, CidlType::DataSource { .. })
     }
 
     fn is_stream(&self, ty: &CidlType<'_>) -> bool {
@@ -169,8 +137,6 @@ impl ClientTemplate<'_> {
         name == "$get" || name == "$save" || name == "$list"
     }
 
-    /// Returns the un-prefixed parameter name given a data source name and a prefixed param name.
-    /// e.g. ds_name="Default", param_name="Default_id" => "id"
     fn strip_ds_prefix<'a>(&self, ds_name: &str, param_name: &'a str) -> &'a str {
         let prefix = format!("{}_", ds_name);
         param_name
@@ -178,8 +144,7 @@ impl ClientTemplate<'_> {
             .unwrap_or(param_name)
     }
 
-    /// Returns the CRUD method parameters (from the ApiMethod) that belong to `ds_name`.
-    /// These are params whose name starts with `"{ds_name}_"`.
+    /// CRUD method parameters that belong to `ds_name` (prefixed `DsName_`).
     fn crud_ds_params<'t>(
         &self,
         api: &'t ApiMethod<'t>,
@@ -192,60 +157,27 @@ impl ClientTemplate<'_> {
             .collect()
     }
 
-    fn crud_args_type(
-        &self,
-        method_name: &str,
-        model_name: &str,
-        data_sources: &BTreeMap<&str, DataSource<'_>>,
-    ) -> String {
-        if method_name == "$save" {
-            format!("DataSources.{}.{}", model_name, method_name)
-        } else {
-            let parts: Vec<String> = data_sources
-                .values()
-                .filter(|ds| !ds.is_internal)
-                .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
-                .collect();
-            parts.join(" | ")
-        }
-    }
-
-    fn ds_kind_union(&self, data_sources: &BTreeMap<&str, DataSource<'_>>) -> String {
-        data_sources
-            .values()
-            .filter(|d| !d.is_internal)
-            .map(|d| format!("\"{}\"", d.name))
-            .collect::<Vec<_>>()
-            .join(" | ")
-    }
-
-    fn ds_get_params<'t>(
-        &self,
-        model: &'t Model<'t>,
-        api: &ApiMethod<'_>,
-    ) -> Vec<&'t ValidatedField<'t>> {
-        let ds_name = match api.data_source {
-            Some(name) => name,
-            None => return vec![],
-        };
-        let ds = match model.data_sources.get(ds_name) {
-            Some(ds) => ds,
-            None => return vec![],
-        };
-        match &ds.get {
-            Some(get) => get.parameters.iter().collect(),
-            None => vec![],
-        }
-    }
-
-    /// Returns DS get params that are NOT fields (primary columns, columns, or key_fields) of the model.
-    /// These must be passed explicitly as method parameters.
+    /// Parameters that are not part of the models fields or keys
+    /// but are part of the data source's GET method are considered "extra",
+    /// and must be explicitly passed when calling the CRUD method
+    /// (as opposed to getting from `this`)
     fn ds_extra_params<'t>(
         &self,
         model: &'t Model<'t>,
         api: &ApiMethod<'_>,
     ) -> Vec<&'t ValidatedField<'t>> {
-        let all_field_names: std::collections::HashSet<&str> = model
+        let Some(ds_name) = api.data_source else {
+            return vec![];
+        };
+        let Some(get) = model
+            .data_sources
+            .get(ds_name)
+            .and_then(|ds| ds.get.as_ref())
+        else {
+            return vec![];
+        };
+
+        let fields: Vec<&str> = model
             .primary_columns
             .iter()
             .map(|c| c.field.name.as_ref())
@@ -253,13 +185,28 @@ impl ClientTemplate<'_> {
             .chain(model.key_fields.iter().map(|k| k.name.as_ref()))
             .collect();
 
-        self.ds_get_params(model, api)
-            .into_iter()
-            .filter(|p| !all_field_names.contains(p.name.as_ref()))
+        get.parameters
+            .iter()
+            .filter(|p| !fields.contains(&p.name.as_ref()))
             .collect()
     }
 
-    /// Returns true if a DS get parameter name is an "extra" param (not a field of the model).
+    fn ds_get_params<'t>(
+        &self,
+        model: &'t Model<'t>,
+        api: &ApiMethod<'_>,
+    ) -> Vec<&'t ValidatedField<'t>> {
+        let Some(ds_name) = api.data_source else {
+            return vec![];
+        };
+        model
+            .data_sources
+            .get(ds_name)
+            .and_then(|ds| ds.get.as_ref())
+            .map(|get| get.parameters.iter().collect())
+            .unwrap_or_default()
+    }
+
     fn is_ds_extra_param(&self, model: &Model<'_>, api: &ApiMethod<'_>, param_name: &str) -> bool {
         self.ds_extra_params(model, api)
             .iter()

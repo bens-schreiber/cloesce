@@ -145,7 +145,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "D1BackedModel"
@@ -180,7 +180,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "D1BackedModel"
@@ -222,7 +222,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "D1BackedModel"
@@ -397,7 +397,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "PureR2Model"

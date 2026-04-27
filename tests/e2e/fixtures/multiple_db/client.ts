@@ -7,20 +7,20 @@ export class DB1Model {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB1Model/$get`
     );
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB1Model,
       false
@@ -30,22 +30,22 @@ export class DB1Model {
     args: { Default: DeepPartial<DB1Model> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB1Model/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB1Model,
       false
@@ -55,20 +55,20 @@ export class DB1Model {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model[]>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB1Model/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB1Model,
       true
@@ -76,8 +76,8 @@ export class DB1Model {
   }
 
   static fromJson(data: any): DB1Model {
-    const __res = Object.assign(new DB1Model(), data);
-    return __res;
+    const __$res = Object.assign(new DB1Model(), data);
+    return __$res;
   }
 }
 export class DB2Model {
@@ -87,20 +87,20 @@ export class DB2Model {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB2Model/$get`
     );
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB2Model,
       false
@@ -110,22 +110,22 @@ export class DB2Model {
     args: { Default: DeepPartial<DB2Model> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB2Model/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB2Model,
       false
@@ -135,20 +135,20 @@ export class DB2Model {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model[]>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5291/api/DB2Model/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       DB2Model,
       true
@@ -156,11 +156,10 @@ export class DB2Model {
   }
 
   static fromJson(data: any): DB2Model {
-    const __res = Object.assign(new DB2Model(), data);
-    return __res;
+    const __$res = Object.assign(new DB2Model(), data);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -170,7 +169,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

@@ -5,18 +5,18 @@ export class BlobService {
     b: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const __baseUrl = new URL("http://localhost:5270/api/BlobService/incrementBlob");
-    const __payload: any = {};
-    __payload["b"] = b;
+    const __$baseUrl = new URL("http://localhost:5270/api/BlobService/incrementBlob");
+    const __$payload: any = {};
+    __$payload["b"] = b;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Uint8Array,
       false
@@ -30,19 +30,19 @@ export class BlobHaver {
   async getBlob1(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5270/api/BlobHaver/${__id}/getBlob1`
+    const __$baseUrl = new URL(
+      `http://localhost:5270/api/BlobHaver/${__$id}/getBlob1`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       Uint8Array,
       false
@@ -52,20 +52,20 @@ export class BlobHaver {
     s: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __baseUrl = new URL(
+    const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/inputStream`
     );
-    const __payload: any = {};
-    __payload["s"] = s;
+    const __$payload: any = {};
+    __$payload["s"] = s;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __payload),
+      body: requestBody(MediaType.Octet, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -74,19 +74,19 @@ export class BlobHaver {
   async yieldStream(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5270/api/BlobHaver/${__id}/yieldStream`
+    const __$baseUrl = new URL(
+      `http://localhost:5270/api/BlobHaver/${__$id}/yieldStream`
     );
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Octet,
       Uint8Array,
       false
@@ -96,22 +96,22 @@ export class BlobHaver {
     args: { Default: DeepPartial<BlobHaver> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       BlobHaver,
       false
@@ -121,20 +121,20 @@ export class BlobHaver {
     args: { Default: { id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$get`
     );
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       BlobHaver,
       false
@@ -144,20 +144,20 @@ export class BlobHaver {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       BlobHaver,
       true
@@ -165,13 +165,12 @@ export class BlobHaver {
   }
 
   static fromJson(data: any): BlobHaver {
-    const __res = Object.assign(new BlobHaver(), data);
-    __res.blob1 = b64ToU8(__res.blob1);
-    __res.blob2 = b64ToU8(__res.blob2);
-    return __res;
+    const __$res = Object.assign(new BlobHaver(), data);
+    __$res.blob1 = b64ToU8(__$res.blob1);
+    __$res.blob2 = b64ToU8(__$res.blob2);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -181,7 +180,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

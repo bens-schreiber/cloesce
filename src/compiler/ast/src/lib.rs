@@ -129,7 +129,7 @@ impl<'src> CidlType<'src> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq)]
 pub enum HttpVerb {
     Get,
     Post,
@@ -348,7 +348,7 @@ pub struct R2Field<'src> {
     pub list_prefix: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, PartialEq)]
 pub enum MediaType {
     Json,
     Octet,

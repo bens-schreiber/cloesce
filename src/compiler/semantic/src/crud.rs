@@ -38,7 +38,7 @@ impl CrudExpansion {
 
                         // Last parameter is always the data source
                         parameters.push(ValidatedField {
-                            name: "__datasource".into(),
+                            name: "$datasource".into(),
                             cidl_type: CidlType::DataSource {
                                 model_name: model.name,
                             },
@@ -77,7 +77,7 @@ impl CrudExpansion {
 
                         // Last parameter is always the data source
                         parameters.push(ValidatedField {
-                            name: "__datasource".into(),
+                            name: "$datasource".into(),
                             cidl_type: CidlType::DataSource {
                                 model_name: model.name,
                             },
@@ -111,7 +111,7 @@ impl CrudExpansion {
                                 validators: vec![],
                             },
                             ValidatedField {
-                                name: "__datasource".into(),
+                                name: "$datasource".into(),
                                 cidl_type: CidlType::DataSource {
                                     model_name: model.name,
                                 },

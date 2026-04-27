@@ -10,24 +10,24 @@ export class D1BackedModel {
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.keyParam)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5538/api/D1BackedModel/${__id}/uploadData`
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/D1BackedModel/${__$id}/uploadData`
     );
-    const __payload: any = {};
-    __payload["data"] = data;
+    const __$payload: any = {};
+    __$payload["data"] = data;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __payload),
+      body: requestBody(MediaType.Octet, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -37,21 +37,21 @@ export class D1BackedModel {
     args: { Default: { keyParam: string; id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$get`
     );
-    __baseUrl.searchParams.append("keyParam", String(__resolvedArgs?.keyParam ?? null));
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("keyParam", String(__$resolvedArgs?.keyParam ?? null));
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       false
@@ -61,22 +61,22 @@ export class D1BackedModel {
     args: { Default: DeepPartial<D1BackedModel> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       false
@@ -86,20 +86,20 @@ export class D1BackedModel {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       true
@@ -107,8 +107,8 @@ export class D1BackedModel {
   }
 
   static fromJson(data: any): D1BackedModel {
-    const __res = Object.assign(new D1BackedModel(), data);
-    return __res;
+    const __$res = Object.assign(new D1BackedModel(), data);
+    return __$res;
   }
 }
 export class PureR2Model {
@@ -120,23 +120,23 @@ export class PureR2Model {
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__id}/uploadData`
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/PureR2Model/${__$id}/uploadData`
     );
-    const __payload: any = {};
-    __payload["data"] = data;
+    const __$payload: any = {};
+    __$payload["data"] = data;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __payload),
+      body: requestBody(MediaType.Octet, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -146,23 +146,23 @@ export class PureR2Model {
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const __id = [
+    const __$id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
-    const __baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__id}/uploadOtherData`
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/PureR2Model/${__$id}/uploadOtherData`
     );
-    const __payload: any = {};
-    __payload["data"] = data;
+    const __$payload: any = {};
+    __$payload["data"] = data;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __payload),
+      body: requestBody(MediaType.Octet, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -172,20 +172,20 @@ export class PureR2Model {
     args: { Default: { id: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureR2Model>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5538/api/PureR2Model/$get`
     );
-    __baseUrl.searchParams.append("id", String(__resolvedArgs?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("id", String(__$resolvedArgs?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       PureR2Model,
       false
@@ -193,16 +193,15 @@ export class PureR2Model {
   }
 
   static fromJson(data: any): PureR2Model {
-    const __res = Object.assign(new PureR2Model(), data);
-    if (__res.allData?.results) {
-      for (let i = 0; i < __res.allData.results.length; i++) {
-        __res.allData.results[i] = Object.assign(new R2Object(), __res.allData.results[i]);
+    const __$res = Object.assign(new PureR2Model(), data);
+    if (__$res.allData?.results) {
+      for (let i = 0; i < __$res.allData.results.length; i++) {
+        __$res.allData.results[i] = Object.assign(new R2Object(), __$res.allData.results[i]);
       }
     }
-    return __res;
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -212,7 +211,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

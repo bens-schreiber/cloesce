@@ -40,7 +40,7 @@ fn adds_crud_methods_to_models() {
             .parameters
             .iter()
             .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "GET method should have __datasource parameter"
+        "GET method should have $datasource parameter"
     );
 
     assert_eq!(
@@ -49,7 +49,7 @@ fn adds_crud_methods_to_models() {
             .iter()
             .map(|p| p.name.to_string())
             .collect::<Vec<_>>(),
-        vec!["Default_orderId", "Default_productId", "__datasource"]
+        vec!["Default_orderId", "Default_productId", "$datasource"]
     );
 
     assert!(matches!(get_method.http_verb, HttpVerb::Get));
@@ -93,7 +93,7 @@ fn crud_key_params() {
             .parameters
             .iter()
             .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "GET method should have __datasource parameter"
+        "GET method should have $datasource parameter"
     );
 
     let category_param = get_method.parameters.iter().find(|p| p.name == "category");

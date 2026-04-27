@@ -10,21 +10,21 @@ export class D1BackedModel {
     args: { Default: { keyParam: string; id: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/D1BackedModel/$get`
     );
-    __baseUrl.searchParams.append("keyParam", String(__resolvedArgs?.keyParam ?? null));
-    __baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("keyParam", String(__$resolvedArgs?.keyParam ?? null));
+    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       false
@@ -34,22 +34,22 @@ export class D1BackedModel {
     args: { Default: DeepPartial<D1BackedModel> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/D1BackedModel/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       false
@@ -59,20 +59,20 @@ export class D1BackedModel {
     args: { Default: { lastSeen_id: number; limit: number; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/D1BackedModel/$list`
     );
-    __baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
+    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       D1BackedModel,
       true
@@ -80,9 +80,9 @@ export class D1BackedModel {
   }
 
   static fromJson(data: any): D1BackedModel {
-    const __res = Object.assign(new D1BackedModel(), data);
-    if (__res.kvData) __res.kvData = Object.assign(new KValue(), __res.kvData);
-    return __res;
+    const __$res = Object.assign(new D1BackedModel(), data);
+    if (__$res.kvData) __$res.kvData = Object.assign(new KValue(), __$res.kvData);
+    return __$res;
   }
 }
 export class PaginatedKVModel {
@@ -92,20 +92,20 @@ export class PaginatedKVModel {
     ps: Paginated<KValue<unknown>>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
-    const __baseUrl = new URL(
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/PaginatedKVModel/acceptPaginated`
     );
-    const __payload: any = {};
-    __payload["ps"] = ps;
+    const __$payload: any = {};
+    __$payload["ps"] = ps;
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       undefined,
       false
@@ -115,20 +115,20 @@ export class PaginatedKVModel {
     args: { Default: { id: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PaginatedKVModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/PaginatedKVModel/$get`
     );
-    __baseUrl.searchParams.append("id", String(__resolvedArgs?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("id", String(__$resolvedArgs?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       PaginatedKVModel,
       false
@@ -136,13 +136,13 @@ export class PaginatedKVModel {
   }
 
   static fromJson(data: any): PaginatedKVModel {
-    const __res = Object.assign(new PaginatedKVModel(), data);
-    if (__res.items?.results) {
-      for (let i = 0; i < __res.items.results.length; i++) {
-        __res.items.results[i] = Object.assign(new KValue(), __res.items.results[i]);
+    const __$res = Object.assign(new PaginatedKVModel(), data);
+    if (__$res.items?.results) {
+      for (let i = 0; i < __$res.items.results.length; i++) {
+        __$res.items.results[i] = Object.assign(new KValue(), __$res.items.results[i]);
       }
     }
-    return __res;
+    return __$res;
   }
 }
 export class PureKVModel {
@@ -153,20 +153,20 @@ export class PureKVModel {
     args: { Default: { id: string; }},
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __resolvedArgs: any = args[__resolvedKind];
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$resolvedArgs: any = args[__$resolvedKind];
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/PureKVModel/$get`
     );
-    __baseUrl.searchParams.append("id", String(__resolvedArgs?.id ?? null));
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    __$baseUrl.searchParams.append("id", String(__$resolvedArgs?.id ?? null));
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       PureKVModel,
       false
@@ -176,22 +176,22 @@ export class PureKVModel {
     args: { Default: DeepPartial<PureKVModel> },
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
-    const __resolvedKind: "Default" = dsKey(args) as any;
-    const __baseUrl = new URL(
+    const __$resolvedKind: "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
       `http://localhost:5416/api/PureKVModel/$save`
     );
-    const __payload: any = {};
-    __payload["model"] = args[__resolvedKind];
-    __baseUrl.searchParams.append("__datasource", __resolvedKind);
+    const __$payload: any = {};
+    __$payload["model"] = args[__$resolvedKind];
+    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
 
-    const __res = await fetchImpl(__baseUrl, {
+    const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __payload),
+      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
-      __res,
+      __$res,
       MediaType.Json,
       PureKVModel,
       false
@@ -199,13 +199,12 @@ export class PureKVModel {
   }
 
   static fromJson(data: any): PureKVModel {
-    const __res = Object.assign(new PureKVModel(), data);
-    if (__res.data) __res.data = Object.assign(new KValue(), __res.data);
-    if (__res.otherData) __res.otherData = Object.assign(new KValue(), __res.otherData);
-    return __res;
+    const __$res = Object.assign(new PureKVModel(), data);
+    if (__$res.data) __$res.data = Object.assign(new KValue(), __$res.data);
+    if (__$res.otherData) __$res.otherData = Object.assign(new KValue(), __$res.otherData);
+    return __$res;
   }
 }
-
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }
@@ -215,7 +214,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
   : T extends object
   ? { [K in keyof T]?: DeepPartialInner<T[K]> }
   : T | (null extends T ? null : never);
-export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
   key!: string;

@@ -127,7 +127,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Dog"

@@ -89,7 +89,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Course"
@@ -131,7 +131,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Course"
@@ -166,7 +166,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Course"
@@ -325,7 +325,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Student"
@@ -395,7 +395,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Student"
@@ -430,7 +430,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Student"
@@ -675,7 +675,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "StudentCourse"
@@ -759,7 +759,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "StudentCourse"
@@ -794,7 +794,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "StudentCourse"

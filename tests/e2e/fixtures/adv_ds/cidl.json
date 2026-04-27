@@ -121,7 +121,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Hamburger"
@@ -177,7 +177,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Hamburger"
@@ -379,7 +379,7 @@
               "validators": []
             },
             {
-              "name": "__datasource",
+              "name": "$datasource",
               "cidl_type": {
                 "DataSource": {
                   "model_name": "Topping"
