@@ -22,11 +22,10 @@ An example use case is found in an [early demo of Cloesce](https://github.com/be
 The situation is modeled as follows:
 
 ```ts
-
 @Model()
 export class Course {
   id: Integer;
-  // ... 
+  // ...
 }
 
 @Model()
@@ -39,19 +38,20 @@ export class Professor {
 
 @Model()
 export class ProfessorCourseRating {
-    id: Integer;
+  id: Integer;
 
-    @ForeignKey(Professor)
-    professorId: Integer;
+  @ForeignKey(Professor)
+  professorId: Integer;
 
-    @ForeignKey(Course)
-    courseId: Integer;
+  @ForeignKey(Course)
+  courseId: Integer;
 }
 ```
 
 In this example, a Professor can have multiple ratings for different courses, but the combination of `professorId` and `courseId` should be unique to prevent duplicate ratings for the same course by the same professor. The course rating in this case is not an individual rating from students, but rather an overall rating for the course by the professor, which is why it makes sense to enforce uniqueness on the combination of `professorId` and `courseId`.
 
 Two approaches to modeling this are:
+
 1. **Using a surrogate primary key**: This is the current approach, where `id` is the primary key, and we would need to add a unique constraint on the combination of `professorId` and `courseId`.
 2. **Using a composite primary key**: This would allow us to define `professorId` and `courseId` together as the primary key, eliminating the need for a surrogate key and ensuring uniqueness by design.
 
@@ -69,7 +69,6 @@ The second approach is completely unsupported in Cloesce and requires a signific
 - Allow developers to define unique constraints on any combination of columns in the D1 schema.
 - Querying of composite primary key columns in the ORM.
 - Composite foreign keys that reference composite primary keys.
-
 
 ### Non-Goals
 
@@ -90,29 +89,31 @@ Instead of creating an overbearing verbose syntax on top of a Model class, we wi
 import { defineConfig } from "cloesce";
 
 const config = defineConfig({
-    srcPaths: [
-        "./src/data"
-    ],
-    workersUrl: "http://localhost:5000/api",
-    migrationsPath: "./migrations"
+  srcPaths: ["./src/data"],
+  workersUrl: "http://localhost:5000/api",
+  migrationsPath: "./migrations",
 });
 
 config
-    .model(Foo, (builder) => {
-        builder
-            .primaryKey("id")
-            .foreignKey("barId").references(Bar, "id")
-            .oneToOne("bar").references(Bar, "id")
-            .oneToMany("bars").references(Bar, "fooId")
-            .manyToMany("bars").references(Bar, "id");
-        // NOTE: KV and R2 to come in the future? May not be necessary.
-    })
-    .rawAst((ast) => {
-        // This function will be given the raw AST extracted from the source code and can modify it 
-        // arbitrarily before it is passed to the generator.
-        //
-        // May void your warranty.
-    });
+  .model(Foo, (builder) => {
+    builder
+      .primaryKey("id")
+      .foreignKey("barId")
+      .references(Bar, "id")
+      .oneToOne("bar")
+      .references(Bar, "id")
+      .oneToMany("bars")
+      .references(Bar, "fooId")
+      .manyToMany("bars")
+      .references(Bar, "id");
+    // NOTE: KV and R2 to come in the future? May not be necessary.
+  })
+  .rawAst((ast) => {
+    // This function will be given the raw AST extracted from the source code and can modify it
+    // arbitrarily before it is passed to the generator.
+    //
+    // May void your warranty.
+  });
 
 export default config;
 ```
@@ -125,9 +126,7 @@ To define a unique constraint on some combination of columns, the `model` functi
 
 ```ts
 config.model(ProfessorCourseRating, (builder) => {
-    builder
-        .unique("professorId", "courseId")
-        .unique("name");
+  builder.unique("professorId", "courseId").unique("name");
 });
 ```
 
@@ -152,15 +151,15 @@ A primary key may be made up of multiple columns. Those columns together may be 
 ```ts
 @Model()
 export class ProfessorCourseRating {
-    @PrimaryKey()
-    @ForeignKey<Professor>(p => p.id)
-    professorId: Integer;
+  @PrimaryKey()
+  @ForeignKey<Professor>((p) => p.id)
+  professorId: Integer;
 
-    @PrimaryKey()
-    @ForeignKey<Course>(c => c.id)
-    courseId: Integer;
+  @PrimaryKey()
+  @ForeignKey<Course>((c) => c.id)
+  courseId: Integer;
 
-    name: String;
+  name: String;
 }
 ```
 
@@ -181,12 +180,12 @@ Optionally, this could be expressed through the `model` function in `cloesce.con
 
 ```ts
 config.model(ProfessorCourseRating, (builder) => {
-    builder
-        .primaryKey("professorId", "courseId")
-        .foreignKey("professorId")
-            .references(Professor, "id")
-        .foreignKey("courseId")
-            .references(Course, "id");
+  builder
+    .primaryKey("professorId", "courseId")
+    .foreignKey("professorId")
+    .references(Professor, "id")
+    .foreignKey("courseId")
+    .references(Course, "id");
 });
 ```
 
@@ -197,21 +196,21 @@ If a Model can have a composite primary key, it stands to reason that we should 
 ```ts
 @Model()
 class SomeModel {
-    id: Integer;
+  id: Integer;
 
-    pcrProfessorId: Integer;
-    pcrCourseId: Integer;
-    pcr: ProfessorCourseRating;
+  pcrProfessorId: Integer;
+  pcrCourseId: Integer;
+  pcr: ProfessorCourseRating;
 }
 ```
 
 ```ts
 config.model(SomeModel, (builder) => {
-    builder
-        .foreignKey("pcrProfessorId", "pcrCourseId")
-            .references(ProfessorCourseRating, "professorId", "courseId")
-        .oneToOne("pcr")
-            .references(ProfessorCourseRating, "professorId", "courseId");
+  builder
+    .foreignKey("pcrProfessorId", "pcrCourseId")
+    .references(ProfessorCourseRating, "professorId", "courseId")
+    .oneToOne("pcr")
+    .references(ProfessorCourseRating, "professorId", "courseId");
 });
 ```
 
@@ -229,21 +228,22 @@ CREATE TABLE SomeModel (
 ### Many to Many with Composite Keys
 
 Cloesce supports many-to-many relationships through the use of join tables, such as:
+
 ```ts
 @Model()
 class Student {
-    id: Integer;
-    name: String;
+  id: Integer;
+  name: String;
 
-    courses: Course[];
+  courses: Course[];
 }
 
 @Model()
 class Course {
-    id: Integer;
-    name: String;
+  id: Integer;
+  name: String;
 
-    students: Student[];
+  students: Student[];
 }
 
 // => Implicit join table with composite primary key (courseId, studentId)
@@ -255,29 +255,27 @@ The `model` function in `cloesce.config.ts` can be used to define the many-to-ma
 ```ts
 @Model()
 class Course {
-    @PrimaryKey()
-    id: Integer;
+  @PrimaryKey()
+  id: Integer;
 
-    @PrimaryKey()
-    name: String;
+  @PrimaryKey()
+  name: String;
 
-    students: Student[];
+  students: Student[];
 }
 
 @Model()
 class Student {
-    id: Integer;
-    name: String;
+  id: Integer;
+  name: String;
 
-    courses: Course[];
+  courses: Course[];
 }
 ```
 
 ```ts
 config.model(Student, (builder) => {
-    builder
-        .manyToMany("courses")
-        .references(Course, "id", "name");
+  builder.manyToMany("courses").references(Course, "id", "name");
 });
 ```
 
@@ -348,7 +346,7 @@ pub struct D1Column {
     /// Otherwise, None.
     pub foreign_key_reference: Option<ForeignKeyReference>,
 
-    /// The ID of the composite key this column belongs to, if any. 
+    /// The ID of the composite key this column belongs to, if any.
     /// Columns with the same composite_id belong to the same composite key.
     pub composite_id: Option<u32>,
 
@@ -366,29 +364,27 @@ pub struct Model {
 
 This change will have significant repercussions throughout the entire codebase, as the concept of a primary key is currently deeply ingrained in the way Models are defined and handled.
 
-
 ## Example
 
 A manual implementation of a Many to Many relationship, where `Student` has a composite primary key of `(id, name)`, and `Course` has a primary key of `id`. The join table `StudentCourse` has a composite primary key of `(studentId, studentName, courseId)`, which also serves as a composite foreign key to both `Student` and `Course`.
 
 ```ts
-
 @Model(["GET", "LIST", "SAVE"])
 export class Student {
-    @PrimaryKey
-    id: number;
+  @PrimaryKey
+  id: number;
 
-    @PrimaryKey
-    name: string;
+  @PrimaryKey
+  name: string;
 
-    favoriteColor: string;
-    courses: StudentCourse[];
+  favoriteColor: string;
+  courses: StudentCourse[];
 
-    static readonly coursesOrderedDesc: DataSource<Student> = {
-        includeTree: {
-            courses: {}
-        },
-        list: (joined) => `
+  static readonly coursesOrderedDesc: DataSource<Student> = {
+    includeTree: {
+      courses: {},
+    },
+    list: (joined) => `
             WITH students AS (${joined()})
             SELECT * FROM students
             WHERE id > ?1
@@ -396,32 +392,32 @@ export class Student {
             ORDER BY id DESC, name DESC
             LIMIT ?3
         `,
-        listParams: ["LastSeen", "Limit"]
-    }
+    listParams: ["LastSeen", "Limit"],
+  };
 }
 
 @Model(["GET", "LIST", "SAVE"])
 export class Course {
-    id: number;
-    title: string;
+  id: number;
+  title: string;
 
-    students: StudentCourse[];
+  students: StudentCourse[];
 }
 
 @Model(["GET", "LIST", "SAVE"])
 export class StudentCourse {
-    @PrimaryKey
-    @ForeignKey<Student>(s => s.id)
-    studentId: number;
+  @PrimaryKey
+  @ForeignKey<Student>((s) => s.id)
+  studentId: number;
 
-    @PrimaryKey
-    @ForeignKey<Student>(s => s.name)
-    studentName: string;
-    student: Student;
+  @PrimaryKey
+  @ForeignKey<Student>((s) => s.name)
+  studentName: string;
+  student: Student;
 
-    @PrimaryKey
-    @ForeignKey<Course>(c => c.id)
-    courseId: number;
-    course: Course;
+  @PrimaryKey
+  @ForeignKey<Course>((c) => c.id)
+  courseId: number;
+  course: Course;
 }
 ```

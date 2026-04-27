@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {},
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [
+    "**/dist/",
+    "**/build/",
+    // generated
+    "tests/e2e/fixtures/*/backend.ts",
+    "tests/e2e/fixtures/*/client.ts",
+    "tests/e2e/fixtures/**/*.json",
+    "tests/e2e/fixtures/**/*.jsonc",
+    // examples
+    "examples/**/*"
+  ]
+}

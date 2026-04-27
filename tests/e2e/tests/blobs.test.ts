@@ -70,8 +70,6 @@ describe("BlobHaver", () => {
 
     const got = new Uint8Array(await res.data!.arrayBuffer());
     const expected = [1, 2, 3, 4];
-    expect(
-      expected.length === got.length && expected.every((v, i) => v === got[i]),
-    );
+    expect(expected.length === got.length && expected.every((v, i) => v === got[i]));
   });
 });

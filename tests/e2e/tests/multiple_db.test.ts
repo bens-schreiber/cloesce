@@ -6,10 +6,7 @@ import config from "../fixtures/multiple_db/cloesce.jsonc" with { type: "jsonc" 
 let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  stopWrangler = await startWrangler(
-    "./fixtures/multiple_db",
-    config.workers_url!,
-  );
+  stopWrangler = await startWrangler("./fixtures/multiple_db", config.workers_url!);
 }, 30_000);
 
 afterAll(async () => {

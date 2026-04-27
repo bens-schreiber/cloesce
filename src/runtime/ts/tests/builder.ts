@@ -18,16 +18,9 @@ import {
   R2Field,
 } from "../src/cidl";
 
-export function createAst(args?: {
-  models?: Model[];
-  services?: Service[];
-}): Cidl {
-  const modelsMap = Object.fromEntries(
-    args?.models?.map((m) => [m.name, m]) ?? [],
-  );
-  const serviceMap = Object.fromEntries(
-    args?.services?.map((s) => [s.name, s]) ?? [],
-  );
+export function createAst(args?: { models?: Model[]; services?: Service[] }): Cidl {
+  const modelsMap = Object.fromEntries(args?.models?.map((m) => [m.name, m]) ?? []);
+  const serviceMap = Object.fromEntries(args?.services?.map((s) => [s.name, s]) ?? []);
 
   // NOTE: these won't always be empty in real usage
   for (const model of Object.values(modelsMap)) {
@@ -91,10 +84,7 @@ export class IncludeTreeBuilder {
     return this;
   }
 
-  addWithChildren(
-    name: string,
-    build: (b: IncludeTreeBuilder) => IncludeTreeBuilder,
-  ): this {
+  addWithChildren(name: string, build: (b: IncludeTreeBuilder) => IncludeTreeBuilder): this {
     const subtree = build(new IncludeTreeBuilder()).build();
     this.nodes[name] = subtree;
     return this;
@@ -233,19 +223,12 @@ export class ModelBuilder {
     return this;
   }
 
-  dataSource(
-    name: string,
-    tree: IncludeTree,
-    get?: Field[],
-    is_internal: boolean = false,
-  ): this {
+  dataSource(name: string, tree: IncludeTree, get?: Field[], is_internal: boolean = false): this {
     this.data_sources[name] = {
       name,
       is_internal,
       gen: { include: tree } as any,
-      get: get
-        ? { parameters: get.map((f) => ({ ...f, validators: [] })) }
-        : undefined,
+      get: get ? { parameters: get.map((f) => ({ ...f, validators: [] })) } : undefined,
     };
     return this;
   }

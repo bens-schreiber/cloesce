@@ -2,12 +2,13 @@
 
 In the previous section, we built a basic D1 backed Model with scalar fields. However, when utilizing relational databases like Cloudflare D1, you often need more complex relationships between tables.
 
-*Navigation Fields* allow us to define relationships between different Models.
+_Navigation Fields_ allow us to define relationships between different Models.
 
 ## Foreign Keys
 
 > [!NOTE]
 > A Model can only have a foreign key to another Model if it is:
+>
 > 1. D1 backed
 > 2. Part of the same database as the Model it references (lifted in future releases!)
 
@@ -161,6 +162,7 @@ model Student {
 ```
 
 An underlying junction table will be automatically created by Cloesce during migration:
+
 ```sql
 CREATE TABLE IF NOT EXISTS "CourseStudent" (
   "left" integer NOT NULL,

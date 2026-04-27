@@ -6,7 +6,7 @@ on:
 permissions:
   id-token: write
   contents: write
-  
+
 jobs:
   publish-npm:
     name: Publish to npm
@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: "24"
           registry-url: https://registry.npmjs.org/
 
       - name: Set version from latest release tag

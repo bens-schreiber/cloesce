@@ -55,14 +55,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         method: &'p ApiBlockMethod<'src>,
         table: &SymbolTable<'src, 'p>,
     ) -> Option<ApiMethod<'src>> {
-        // Generated API methods start with a '$'
-        if method.symbol.name.starts_with('$') {
-            self.sink.push(SemanticError::ApiReservedMethod {
-                method: &method.symbol,
-            });
-            return None;
-        }
-
         // Validate return type
         let (return_type, return_media) = self.return_type(method, table);
 

@@ -58,7 +58,7 @@ jobs:
       # --- Build ---
       - name: Build source code
         run: make build-src
-      
+
       # --- Format and Lint ---
       - name: Check code formatting
         run: make format-check

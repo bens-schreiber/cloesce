@@ -8,7 +8,7 @@ export { CloesceApp, DependencyContainer } from "../router/router.js";
 export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../cidl.js";
 export { Orm } from "../router/orm.js";
-export { R2ObjectBody } from "@cloudflare/workers-types";
+export type { R2ObjectBody } from "@cloudflare/workers-types";
 
 /**
  * Base class for a Cloudflare KV model or navigation property.
@@ -40,14 +40,7 @@ export class KValue<V> {
   }
 }
 
-export type Primitive =
-  | string
-  | number
-  | boolean
-  | bigint
-  | symbol
-  | null
-  | undefined;
+export type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = T extends Primitive
   ? never
   : {

@@ -183,11 +183,6 @@ pub enum SemanticError<'src, 'p> {
         param: &'p Symbol<'src>,
     },
 
-    /// An API method uses a reserved name (e.g. $get, $list, $save)
-    ApiReservedMethod {
-        method: &'p Symbol<'src>,
-    },
-
     ValidatorInvalidForType {
         validator: &'p Spd<ValidatorTag<'src>>,
         symbol: &'p Symbol<'src>,
@@ -750,18 +745,6 @@ fn display(
                     Label::new((method_path, method_range))
                         .with_message(format!("method '{}' declared here", method.name))
                         .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::ApiReservedMethod { method } => {
-            let (path, range) = span_parts(&method.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!("API method '{}' uses a reserved name", method.name))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "names like `$get`, `$list`, and `$save` are reserved by the compiler",
-                        )
-                        .with_color(Color::Red),
                 )
         }
         SemanticError::ValidatorUnknown { validator, symbol } => {

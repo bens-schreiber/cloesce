@@ -2,13 +2,13 @@
 
 > [!TIP]
 > A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
-> thin wrappers around data storage and retrieval. 
+> thin wrappers around data storage and retrieval.
 >
 > This separation of concerns can lead to more maintainable and testable code.
 
-Models are not the only way to write API logic in Cloesce. 
+Models are not the only way to write API logic in Cloesce.
 
-Services are another core concept that allows you to encapsulate business logic and share it across your application. Services are similar to Models in that they can define methods that can be called from your API routes, but they do not have any associated data storage or schema. 
+Services are another core concept that allows you to encapsulate business logic and share it across your application. Services are similar to Models in that they can define methods that can be called from your API routes, but they do not have any associated data storage or schema.
 
 Instead, Services are used to group related, complex functionality together and can be injected into other parts of your application using Cloesce's dependency injection system.
 
@@ -24,20 +24,19 @@ api HelloWorldService {
 }
 ```
 
-
-
 After running `cloesce compile`, a backend method can be implemented for the `hello` API:
+
 ```typescript
 import * as Cloesce from "@cloesce/backend";
 
 class HelloWorldService extends Cloesce.HelloWorldService.Api {
-    init(self: Cloesce.HelloWorldService.Self): void {
-        self.helloString = "Hello, World!";
-    }
+  init(self: Cloesce.HelloWorldService.Self): void {
+    self.helloString = "Hello, World!";
+  }
 
-    hello(self): string {
-        return self.helloString;
-    }
+  hello(self): string {
+    return self.helloString;
+  }
 }
 ```
 
@@ -46,6 +45,7 @@ class HelloWorldService extends Cloesce.HelloWorldService.Api {
 To share dependencies across your Cloesce application methods, Cloesce utilizes a dependency injection container. By default, Cloesce provides only the Wrangler environment as a dependency.
 
 To define a custom dependency, simply add an `inject` block to your schema:
+
 ```cloesce
 inject {
     MyDependency
@@ -75,7 +75,6 @@ api VideoService {
     getVideoStatic(wrangler: env, ytClient: YouTubeApiClient, videoId: string) -> stream
 }
 ```
-
 
 ## Services as Dependencies
 

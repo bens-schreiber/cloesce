@@ -1,18 +1,19 @@
 # cloesce (alpha, v0.3.0)
+
 > [!WARNING]
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
 > support across any language. The syntax and features described here are subject to change as the project evolves.
 
 **Cloesce** is a schema language (or IDL) that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). It provides a single source of truth for your application, with a single language to define:
 
-| Feature              | Status |
-|----------------------|--------|
-| D1,KV,R2 ORM         | ✅     |
-| RPC stubs            | ✅     |
-| Middleware           | ✅     |
-| IaC                  | ✅     |
-| SQL Migrations       | ✅     |
-| Runtime Validation   | ✅     |
+| Feature            | Status |
+| ------------------ | ------ |
+| D1,KV,R2 ORM       | ✅     |
+| RPC stubs          | ✅     |
+| Middleware         | ✅     |
+| IaC                | ✅     |
+| SQL Migrations     | ✅     |
+| Runtime Validation | ✅     |
 
 ## How Easy can Full Stack Development Be?
 
@@ -26,8 +27,8 @@ env {
 [use db]
 [use get, save, list]
 model User {
-    primary { 
-        id: int 
+    primary {
+        id: int
     }
 
     nav(Posts::id) {
@@ -55,6 +56,7 @@ api User {
 See the [Cloesce Docs](https://cloesce.pages.dev) for more information on getting started, language features, architecture, and roadmap.
 
 Utilize an LLM to interact with the docs in a conversational way:
+
 ```
 curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
 ```
@@ -66,7 +68,6 @@ See the [Typescript API Reference](https://cloesce-ts.pages.dev) for the generat
 A basic language highlighting extension for Cloesce is available in the [VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=BenSchreiber.cloesce-lang). In the future, this extension will also include a full LSP server.
 
 More editor integrations are planned for the future (and you can always contribute your own!). If you're interested in contributing an editor extension, reach out in the [Discord](https://discord.gg/saVTbcGHwF) server.
-
 
 ## Contributing
 
@@ -83,10 +84,12 @@ Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app f
 Before building, ensure you have the required dependencies installed:
 
 **Required:**
+
 - [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` target)
 - [Node.js](https://nodejs.org/) and npm
 
 **Optional:**
+
 - [pandoc](https://pandoc.org/) (for documentation) - `brew install pandoc`
 - [mdbook](https://rust-lang.github.io/mdBook/) (for documentation) - `cargo install mdbook`
 

@@ -24,6 +24,7 @@ Explain what is being proposed and why it matters.
 Describe the problem this proposal addresses.
 
 Include:
+
 - Current limitations or pain points
 - Real-world use cases
 - Why existing solutions are insufficient
@@ -33,6 +34,7 @@ Include:
 ## 3. Goals and Non-Goals
 
 ### Goals
+
 List what this proposal aims to achieve.
 
 - Goal 1
@@ -40,6 +42,7 @@ List what this proposal aims to achieve.
 - Goal 3
 
 ### Non-Goals
+
 List what is explicitly out of scope.
 
 - Non-goal 1
@@ -52,6 +55,7 @@ List what is explicitly out of scope.
 Provide any relevant background needed to understand the proposal.
 
 Include:
+
 - Related features
 - Prior discussions
 - Links to issues or earlier proposals
@@ -63,6 +67,7 @@ Include:
 Describe the proposed solution in detail.
 
 Include:
+
 - Syntax changes (if any)
 - Semantics
 - APIs
@@ -78,8 +83,8 @@ Use code blocks where appropriate.
 
 Describe other approaches that were considered and why they were rejected.
 
-* Alternative A: <reason rejected>
-* Alternative B: <reason rejected>
+- Alternative A: <reason rejected>
+- Alternative B: <reason rejected>
 
 ---
 
@@ -87,9 +92,9 @@ Describe other approaches that were considered and why they were rejected.
 
 Explain how this change affects existing code.
 
-* Breaking changes (expected during alpha)
-* Migration strategy
-* Compatibility guarantees
+- Breaking changes (expected during alpha)
+- Migration strategy
+- Compatibility guarantees
 
 If none, state explicitly.
 
@@ -101,9 +106,9 @@ Analyze expected performance effects.
 
 Include:
 
-* Compile-time impact
-* Runtime impact
-* Memory usage
+- Compile-time impact
+- Runtime impact
+- Memory usage
 
 Provide benchmarks if available.
 
@@ -115,9 +120,9 @@ Describe any potential security implications.
 
 Include:
 
-* New attack surfaces
-* Unsafe behaviors
-* Mitigations
+- New attack surfaces
+- Unsafe behaviors
+- Mitigations
 
 If none, state explicitly.
 
@@ -129,10 +134,10 @@ Describe how this proposal will be tested.
 
 Include:
 
-* Unit tests
-* Integration tests
-* Fuzzing
-* Regression tests
+- Unit tests
+- Integration tests
+- Fuzzing
+- Regression tests
 
 ---
 
@@ -142,10 +147,10 @@ Outline how the proposal will be implemented.
 
 Include:
 
-* Major steps
-* Estimated effort
-* Dependencies
-* Rollout plan
+- Major steps
+- Estimated effort
+- Dependencies
+- Rollout plan
 
 ---
 
@@ -153,8 +158,8 @@ Include:
 
 List unresolved questions or areas needing further discussion.
 
-* Question 1
-* Question 2
+- Question 1
+- Question 2
 
 ---
 
@@ -162,5 +167,5 @@ List unresolved questions or areas needing further discussion.
 
 List relevant links, papers, issues, or documentation.
 
-* Link 1
-* Link 2
+- Link 1
+- Link 2

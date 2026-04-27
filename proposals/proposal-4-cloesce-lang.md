@@ -42,6 +42,7 @@ The Cloesce Language was created to address the need for a more intuitive and ef
 - Allow for extensibility in the language to accommodate future features and concepts that may arise in the Cloesce framework.
 
 ### Non-Goals
+
 - The Cloesce Language is not intended to be a general-purpose programming language and should not include features unrelated to defining data models.
 - The language is not designed to replace TypeScript for application logic, but rather to complement it by providing a dedicated syntax for data model definitions.
 - The initial implementation of the Cloesce Language will focus on core features necessary for defining data models and their relationships, with more advanced features (LSP, formatter, SQL semantic analysis, etc.) to be considered for future iterations.
@@ -57,11 +58,13 @@ The Cloesce Language syntax is inspired largely by Rust, but is unique in it's o
 Cloesce currently uses Rust for it's compiler, and we will continue to use Rust for the Cloesce Language. The frontend (lexing, parsing, semantic analysis) is implemented using the `logos` lexing crate and the `chumsky` parsing crate.
 
 The frontend takes in a `.clo` or `.cloesce` file containing the Cloesce Language definitions and follows a three step process:
+
 1. **Lexing**: The input file(s) are tokenized into a stream of tokens using the `logos` crate. This involves defining a set of token types (e.g. identifiers, keywords, symbols) and the rules for how to recognize them in the input text.
 2. **Parsing**: The stream of tokens is then parsed an IR called the Parse AST using the `chumsky` crate. This involves defining a grammar for the Cloesce Language and how the tokens can be combined to form valid constructs (e.g. models, fields, relationships).
 3. **Semantic Analysis**: The Parse AST is then transformed into the Cloesce AST (CIDL) which is the internal representation used by the Cloesce compiler. This step involves performing various checks and transformations to ensure the validity of the defined models and their relationships, as well as expanding the constructs in the Cloesce Language to the corresponding constructs in CIDL.
 
 Unlike many other compilers, Cloesce will have no dedicated client-binary to call for the frontend (at least for the sake of this proposal), instead relying on a `NodeJS` package that will call WASI functions exported by the Rust compiler. The rationale behind this decision is twofold:
+
 1. **Simplicity**: Developers do not have to worry about installing and managing a binary for the Cloesce compiler that is compatible with their system.
 2. **Integration**: Since the config for Cloesce is implemented in TypeScript, it is easier to draw in environment variables and do custom dynamic configuration during compilation if the frontend is exposed as a package that can be imported and called directly from the config file.
 
@@ -82,6 +85,7 @@ Cloesce was decided to be a global language spanning multiple files, meaning tha
 #### Defining a Wrangler Environment
 
 Cloesce uses a reserved keyword `env` to define the Cloudflare Wrangler environment, containing all D1, KV, R2, and variable bindings.
+
 ```rs
 env {
     d1 {
@@ -168,6 +172,7 @@ model User {
 The above snippet defines a `User` model with a foreign key `postId`. The type will automatically resolve to the type of the `id` field in the `Post` model.
 
 Foreign keys can be composite, and also marked with an `optional` key to indicate that the relationship is nullable:
+
 ```rs
 model User {
     primary {
@@ -304,7 +309,7 @@ source WithPosts for User {
 
     sql list(lastId: int, limit: int) {
         "
-        SELECT * FROM ($include) 
+        SELECT * FROM ($include)
         WHERE id > $lastId
         ORDER BY id ASC
         LIMIT $limit
@@ -360,6 +365,7 @@ poo UserWithPosts {
 ### Primitives and Generics
 
 The Cloesce Language supports the following type primitives:
+
 - `int`
 - `string`
 - `bool`
@@ -377,4 +383,3 @@ The Cloesce Language supports the following type primitives:
 - `DataSource<T>`
 
 Where `T` can be any type, including user defined models and poos.
-

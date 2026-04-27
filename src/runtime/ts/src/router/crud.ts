@@ -3,11 +3,7 @@ import { ApiMethod, Model } from "../cidl.js";
 import { ApiImplementation } from "./router.js";
 import { CloesceError, CloesceResult, InternalError } from "../common.js";
 
-export function crudRoute(
-  meta: Model,
-  method: ApiMethod,
-  env: any,
-): ApiImplementation | null {
+export function crudRoute(meta: Model, method: ApiMethod, env: any): ApiImplementation | null {
   switch (method.name) {
     case "$get":
       return (...args) => get(meta, method, args, env);
@@ -37,10 +33,7 @@ async function upsert(
   }
 
   if (result.errors.length > 0) {
-    return HttpResult.fail(
-      400,
-      CloesceError.displayErrors(result as CloesceResult<never>),
-    );
+    return HttpResult.fail(400, CloesceError.displayErrors(result as CloesceResult<never>));
   }
 
   if (result.value === null) {
@@ -82,17 +75,10 @@ async function get(
     meta.key_fields.map((f) => [f.name, paramValues.get(f.name)]),
   );
 
-  const res = await dataSource.gen.get(
-    env,
-    ...dataSourceArgs,
-    ...Object.values(keyFieldArgs),
-  );
+  const res = await dataSource.gen.get(env, ...dataSourceArgs, ...Object.values(keyFieldArgs));
 
   if (res.errors.length > 0) {
-    return HttpResult.fail(
-      400,
-      CloesceError.displayErrors(res as CloesceResult<never>),
-    );
+    return HttpResult.fail(400, CloesceError.displayErrors(res as CloesceResult<never>));
   }
 
   if (res.value === null) {
@@ -131,10 +117,7 @@ async function list(
 
   const res = await dataSource.gen.list!(env, ...dataSourceArgs);
   if (res.errors.length > 0) {
-    return HttpResult.fail(
-      400,
-      CloesceError.displayErrors(res as CloesceResult<never>),
-    );
+    return HttpResult.fail(400, CloesceError.displayErrors(res as CloesceResult<never>));
   }
 
   return HttpResult.ok(200, res.value);

@@ -25,15 +25,14 @@ cloesce version
 
 ## Starting a New Project
 
-The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
+The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template.
 
 This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
 
 ### Prerequisites
 
-1. Sign up for a [Cloudflare account](https://dash.cloudflare.com/sign-up/workers-and-pages) (*not necessary for local development*)
+1. Sign up for a [Cloudflare account](https://dash.cloudflare.com/sign-up/workers-and-pages) (_not necessary for local development_)
 2. Install [Node.js](https://nodejs.org/) (version `16.17.0` or later)
-
 
 ### create-cloesce
 
@@ -50,6 +49,7 @@ cd my-cloesce-app
 ```
 
 A simple project structure is created for you.
+
 ```
 
 ├── src/

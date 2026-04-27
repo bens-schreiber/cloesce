@@ -62,22 +62,14 @@ describe("hydrateType Tests", () => {
   describe("Array type hydration", () => {
     test("hydrates each element of an array", () => {
       const isos = ["2024-01-01T00:00:00.000Z", "2024-06-15T12:00:00.000Z"];
-      const result = hydrateType(
-        isos,
-        { Array: "DateIso" },
-        createHydrateArgs(),
-      );
+      const result = hydrateType(isos, { Array: "DateIso" }, createHydrateArgs());
       expect(result).toBeUndefined();
       expect(isos[0]).toBeInstanceOf(Date);
       expect(isos[1]).toBeInstanceOf(Date);
     });
 
     test("returns empty array when value is not an array", () => {
-      const result = hydrateType(
-        "not-an-array",
-        { Array: "String" },
-        createHydrateArgs(),
-      );
+      const result = hydrateType("not-an-array", { Array: "String" }, createHydrateArgs());
       expect(result).toEqual([]);
     });
   });
@@ -140,10 +132,7 @@ describe("hydrateType Tests", () => {
       // Arrange
       const iso = "2024-03-10T08:00:00.000Z";
 
-      const childMeta = ModelBuilder.model("ChildModel")
-        .idPk()
-        .col("createdAt", "DateIso")
-        .build();
+      const childMeta = ModelBuilder.model("ChildModel").idPk().col("createdAt", "DateIso").build();
 
       const parentMeta = ModelBuilder.model("ParentModel")
         .idPk()
@@ -235,13 +224,7 @@ describe("ORM Hydrate Tests", () => {
       .idPk()
       .keyField("configId")
       .kvField("config/{configId}", "namespace1", "config", false, "Json")
-      .kvField(
-        "config/{configId}",
-        "namespace1",
-        "configStream",
-        false,
-        "Stream",
-      )
+      .kvField("config/{configId}", "namespace1", "configStream", false, "Stream")
       .kvField("config", "namespace1", "configList", true, "Json")
       .kvField("emptyConfig", "namespace1", "emptyConfig", false, "Json")
       .keyField("imageId")
@@ -284,10 +267,7 @@ describe("ORM Hydrate Tests", () => {
     await namespace1.put(baseConfigKV.key, JSON.stringify(baseConfigKV.value), {
       metadata: JSON.stringify(baseConfigKV.metadata),
     });
-    await namespace1.put(
-      otherConfigItem.key,
-      JSON.stringify(otherConfigItem.value),
-    );
+    await namespace1.put(otherConfigItem.key, JSON.stringify(otherConfigItem.value));
 
     const bucket1 = await mf.getR2Bucket("bucket1");
     const baseImageObject = {
@@ -433,10 +413,7 @@ describe("ORM Hydrate Tests", () => {
     const namespace1 = await mf.getKVNamespace("namespace1");
     const total = 1005;
     for (let i = 0; i < total; i++) {
-      await namespace1.put(
-        `cursor-test/${String(i).padStart(4, "0")}`,
-        JSON.stringify({ i }),
-      );
+      await namespace1.put(`cursor-test/${String(i).padStart(4, "0")}`, JSON.stringify({ i }));
     }
 
     const ast = createAst({ models: [modelMeta] });

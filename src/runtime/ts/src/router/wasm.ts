@@ -94,9 +94,7 @@ export async function loadOrmWasm(ast: Cidl): Promise<OrmWasmExports> {
     exports = mod;
   } else {
     exports = (
-      (await WebAssembly.instantiate(
-        mod.default,
-      )) as unknown as WebAssembly.Instance & {
+      (await WebAssembly.instantiate(mod.default)) as unknown as WebAssembly.Instance & {
         exports: OrmWasmExports;
       }
     ).exports;
@@ -112,9 +110,7 @@ export async function loadOrmWasm(ast: Cidl): Promise<OrmWasmExports> {
       new Uint8Array(exports.memory.buffer, resPtr, resLen),
     );
 
-    throw Error(
-      `"The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`,
-    );
+    throw Error(`"The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`);
   }
 
   // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
@@ -141,9 +137,7 @@ export function invokeOrmWasm(
     resPtr = wasm.get_return_ptr();
     resLen = wasm.get_return_len();
 
-    const result = new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
-    );
+    const result = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, resPtr, resLen));
 
     return failed ? Either.left(result) : Either.right(result);
   } finally {

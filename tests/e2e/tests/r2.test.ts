@@ -29,9 +29,7 @@ describe("Pure R2 Model", () => {
       id: "test-id-1",
     });
 
-    const res = await model.uploadOtherData(
-      new TextEncoder().encode("Hello, R2!"),
-    );
+    const res = await model.uploadOtherData(new TextEncoder().encode("Hello, R2!"));
 
     expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
   });
@@ -73,9 +71,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("uploads r2 data", async () => {
-    const res = await model.uploadData(
-      new TextEncoder().encode("D1 Backed R2 Data"),
-    );
+    const res = await model.uploadData(new TextEncoder().encode("D1 Backed R2 Data"));
     expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
   });
 

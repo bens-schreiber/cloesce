@@ -144,7 +144,7 @@ impl ClientTemplate<'_> {
             .unwrap_or(param_name)
     }
 
-    /// CRUD method parameters that belong to `ds_name` (prefixed `DsName_`).
+    /// CRUD method parameters that belong to `ds_name` (prefixed `Name_`).
     fn crud_ds_params<'t>(
         &self,
         api: &'t ApiMethod<'t>,
@@ -160,7 +160,7 @@ impl ClientTemplate<'_> {
     /// Parameters that are not part of the models fields or keys
     /// but are part of the data source's GET method are considered "extra",
     /// and must be explicitly passed when calling the CRUD method
-    /// (as opposed to getting from `this`)
+    /// (as opposed to resolving from `this`)
     fn ds_extra_params<'t>(
         &self,
         model: &'t Model<'t>,
