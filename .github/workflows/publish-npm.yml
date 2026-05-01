@@ -24,7 +24,7 @@ jobs:
           node-version: "24"
           registry-url: https://registry.npmjs.org/
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - name: Set version from latest release tag
         run: |
