@@ -23,7 +23,7 @@ impl<'src, 'p> DataSourceAnalysis {
     ) -> Vec<(&'src str, DataSource<'src>)> {
         let mut res = Vec::new();
 
-        for ds in table.data_sources.values() {
+        for ds in &table.data_sources {
             // Validate the model reference
             let Some(model_sym) = table.models.get(ds.model.name).map(|m| &m.symbol) else {
                 sink.push(SemanticError::DataSourceUnknownModelReference { source: &ds.symbol });

@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use crate::{
-    SymbolKind, SymbolTable, ensure,
+    LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validators,
 };
@@ -148,12 +148,10 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     };
 
                     // Check that the data source exists on this namespace
-                    let ds_exists = table
-                        .data_sources
-                        .contains_key(&SymbolKind::DataSourceDecl {
-                            model: namespace,
-                            name: ds.name,
-                        });
+                    let ds_exists = table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
+                        model: namespace,
+                        name: ds.name,
+                    });
 
                     ensure!(
                         ds_exists,

@@ -1,6 +1,6 @@
 use crate::EnvBindingKind;
 use crate::{
-    SymbolKind, SymbolTable, ensure,
+    LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     is_valid_sql_type, kahns, resolve_cidl_type, resolve_validators,
 };
@@ -148,7 +148,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
 
             let binding_symbol = env_bindings[0];
-            if !table.env_bindings.contains_key(&SymbolKind::EnvBinding {
+            if !table.local.contains_key(&LocalSymbolKind::EnvBinding {
                 kind: EnvBindingKind::D1,
                 name: binding_symbol.name,
             }) {
@@ -448,7 +448,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
 
             // Validate the field from the adjacent model
-            let Some(adj_field_sym) = table.model_fields.get(&SymbolKind::ModelField {
+            let Some(adj_field_sym) = table.local.get(&LocalSymbolKind::ModelField {
                 model: adj_model_sym.name,
                 name: adj_field_sym.name,
             }) else {
@@ -540,7 +540,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     continue;
                 }
 
-                if table.model_fields.contains_key(&SymbolKind::ModelField {
+                if table.local.contains_key(&LocalSymbolKind::ModelField {
                     model: adj_model_sym.name,
                     name: ref_field_sym.name,
                 }) {
@@ -755,7 +755,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         env_binding: &'p Symbol<'src>,
         expected: EnvBindingKind,
     ) -> Option<&'src str> {
-        if let Some(binding_sym) = table.env_bindings.get(&SymbolKind::EnvBinding {
+        if let Some(binding_sym) = table.local.get(&LocalSymbolKind::EnvBinding {
             kind: expected.clone(),
             name: env_binding.name,
         }) {
