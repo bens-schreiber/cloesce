@@ -7,7 +7,7 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
-  - package-ecosystem: "npm"
+  - package-ecosystem: "pnpm"
     directory: "/src/runtime/ts"
     schedule:
       interval: "weekly"
@@ -21,7 +21,7 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-patch"]
-  - package-ecosystem: "npm"
+  - package-ecosystem: "pnpm"
     directory: "/tests/e2e"
     schedule:
       interval: "weekly"
