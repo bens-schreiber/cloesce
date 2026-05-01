@@ -9,32 +9,33 @@
 
 ## Summary
 
-[Durable Objects](https://developers.cloudflare.com/durable-objects/) are a Cloudflare Workers primitive that provide a way to model "stateful objects" in a distributed environment. Importantly, they enable a database-per-object model, and are capable of maintaining web socket connections. This proposal details a first class integration of Durable Objects into Cloesce.
+[Durable Objects](https://developers.cloudflare.com/durable-objects/) are a Cloudflare Workers primitive that provide a way to model stateful objects in a distributed environment. Importantly, they enable a database-per-object model and are capable of maintaining WebSocket connections. This proposal details a first-class integration of Durable Objects into Cloesce.
 
 ---
 
 ## Motivation
 
-Durable Objects are easily the most powerful and unique product on the Cloudflare Workers platform. Because Cloudflare has no true "monolithic" relational database (each D1 database is capped at 10GB), Durable Objects are the best solution for stateful applications that rely on relational data. With a solution to model a system of Durable Objects, Cloesce can be used in a wide variety of applications, including those that require real-time communication via web sockets.
+Durable Objects are easily the most powerful and unique product on the Cloudflare Workers platform. Because Cloudflare has no true monolithic relational database (each D1 database is capped at 10 GB), Durable Objects are the best solution for stateful applications that rely on relational data. With a way to model a system of Durable Objects, Cloesce can be used in a wide variety of applications, including those that require real-time communication via WebSockets.
 
 ---
 
 ## Goals and Non-Goals
 
 ### Goals
+
 - Define Durable Objects in the `env` schema declaration.
-- Enable a Model to be backed by a Durable Object 
-- Enable a Model to use a DO based KV store for KV fields (instead of a KV bucket).
-- Enable a Service to be backed by a Durable Object
-- Generate migrations for any SQL schema changes in a DO Model.
-- Wrangler configuration for migrating and deploying DOs.
+- Enable a Model to be backed by a Durable Object.
+- Enable a Model to use a DO-based KV store for KV fields (instead of a KV bucket).
+- Enable a Service to be backed by a Durable Object.
+- Generate migrations for any SQL schema changes in a DO-backed Model.
+- Generate Wrangler configuration for migrating and deploying DOs.
 
 ### Non-Goals
-- Support for D1 backed models having relationships with DO backed models (and vice versa)
-- Support for DOs having relationships with different DOs
-- Web socket RPC support (later!)
-- Optimizing the `save` method for DO backed models (the `_cloesce_tmp` table is used to store primary keys mid transaction, but since a DO has strong consistency, we can likely optimize this in some way).
 
+- Support for D1-backed models having relationships with DO-backed models (and vice versa).
+- Support for DOs having relationships with different DOs.
+- WebSocket RPC support (later!).
+- Optimizing the `save` method for DO-backed models (the `_cloesce_tmp` table is used to store primary keys mid-transaction, but since a DO has strong consistency, this can likely be optimized).
 
 ---
 
@@ -42,16 +43,18 @@ Durable Objects are easily the most powerful and unique product on the Cloudflar
 
 ### What is a Durable Object?
 
-For the sake of Cloesce, a Durable Object can be defined as:
+For the purposes of Cloesce, a Durable Object can be defined as:
+
 - A class that extends the `DurableObject` class provided by Cloudflare.
-- Maintains it's own D1 database and KV store (state)
-- Strongly consistent (i.e. requests to the same DO instance are guaranteed to be processed sequentially, and never concurrently).
+- Maintains its own SQLite database and KV store (state).
+- Strongly consistent; requests to the same DO instance are guaranteed to be processed sequentially, never concurrently.
 
-Unlike a D1 database or KV/R2 bucket, DO's aren't some single global resource (though, you can design a system that way if you want!). Any number of DO instances can be created, each with it's own state and ID.
+Unlike a D1 database or KV/R2 bucket, DOs are not a single global resource (though you can design a system that way). Any number of DO instances can be created, each with its own state and ID.
 
-Each DO class has a `fetch` method (much like the one a Worker has) that is used to handle incoming requests. It is also common to use the Cloudflare built-in RPC system to call methods on a DO instance, but it will not be utilized in this proposal.
+Each DO class has a `fetch` method (much like a Worker's) that handles incoming requests. It is also common to use Cloudflare's built-in RPC system to call methods on a DO instance, but that will not be covered in this proposal.
 
 ### Defining a Durable Object Binding
+
 A Durable Object is defined in the `env` schema declaration, much like a D1 database or KV bucket:
 
 ```cloesce
@@ -63,24 +66,25 @@ env {
 }
 ```
 
-Notice the casing convention here. Unlike other bindings, a DO binding must compile to both an `env` binding and a class name, typically PascalCase:
+Note the casing convention. Unlike other bindings, a DO binding must compile to both an `env` binding and a class name, typically PascalCase:
+
 ```toml
 [[durable_objects.bindings]]
 name = "MyDurableObject"        # binding
 class_name = "MyDurableObject"  # class name
 ```
 
-For the sake of this proposal, we will keep the binding name and class name the same.
+For the purposes of this proposal, the binding name and class name will be kept the same.
 
-### Durable Object Backed Model
+### Durable Object-Backed Model
 
-A Model can be "backed by" a Durable Object, in the exact same way it can be backed by a D1 database. The DO is the source of truth: for a Model to exist, it must exist on that Durable Object instance.
+A Model can be "backed by" a Durable Object in the same way it can be backed by a D1 database. The DO is the source of truth: for a Model instance to exist, it must exist on a Durable Object instance.
 
 ```cloesce
 [use MyDurableObject]
 model User {
     primary {
-        id: uint 
+        id: uint
     }
 
     kv (MyDurableObject, "user/{id}") {
@@ -104,11 +108,11 @@ model Post {
 }
 ```
 
-In the above code, the `User` model exists as a table in SQLite on a `MyDurableObject` instance. Additionally, the `data` field is stored in the KV store of that same DO instance, with a key of `user/{id}`. Just like in a D1 backed model, relatonships can be defined between DO backed models, granted they share the same backing DO.
+In the above code, the `User` model exists as a table in SQLite on a `MyDurableObject` instance. The `data` field is stored in the KV store of that same DO instance, with a key of `user/{id}`. Just like a D1-backed model, relationships can be defined between DO-backed models, provided they share the same backing DO.
 
 ### REST API Methods
 
-Any Model backed by a DO can have REST methods defined within it's `api` block.
+Any Model backed by a DO can have REST methods defined within its `api` block:
 
 ```cloesce
 [use MyDurableObject]
@@ -121,13 +125,14 @@ api Weather {
 }
 ```
 
-However, the execution of a method must change. For a typical Model, the router follows the path within a Worker:
+However, method execution must change. For a typical Model, the router follows this path within a Worker:
+
 ```
-Request 
+Request
     -> Worker -> Route -> Validation -> Hydrate -> Dispatch
 ```
 
-To register some Worker route, it looks like:
+A Worker route is registered like this:
 
 ```ts
 export default {
@@ -139,15 +144,15 @@ export default {
 };
 ```
 
-A Durable Object however does not exist within a Worker, it can only be *invoked* by a Worker.
+A Durable Object, however, does not exist within a Worker, it can only be *invoked* by one:
 
 ```
-Request 
-    -> Worker -> Route -> Redirect 
+Request
+    -> Worker -> Route -> Redirect
         -> DO -> Route -> Validate -> Hydrate -> Dispatch
 ```
 
-Since a DO operates independently of a Worker, it needs to have its own `fetch` method, and its own app registration:
+Since a DO operates independently of a Worker, it needs its own `fetch` method and its own app registration:
 
 ```ts
 export class MyDurableObject implements clo.MyDurableObject {
@@ -169,17 +174,18 @@ export default {
 
 ### ORM
 
-Every Durable Object instance is identified by a unique ID. It can be generated randomly (a 64 character hex string), or be deterministically generated from a seed string (using `env.MyDurableObject.idFromName("some-string")`).
+Every Durable Object instance is identified by a unique ID. It can be generated randomly (a 64-character hex string) or deterministically from a seed string (using `env.MyDurableObject.idFromName("some-string")`).
 
 There are two ways to access a DO instance:
-1. From outside of the DO, using `env.MyDurableObject.get(id)`, which returns a stub that can be used to send requests to that instance.
-2. From inside the DO, using `this`, which allows you to directly access the instance
+
+1. From outside the DO, using `env.MyDurableObject.get(id)`, which returns a stub for sending requests to that instance.
+2. From inside the DO, using `this`, which provides direct access to the instance.
 
 #### Backend API
 
-A Model may exist on a DO, but it _is not_ the DO. The DO is just a database and compute environment that the Model uses. In this design, we will completely separate the DO instance from the Model instance (no shared `this` context, no shared fields).
+A Model may exist on a DO, but it _is not_ the DO. The DO is just a database and compute environment that the Model uses. In this design, the DO instance and the Model instance are completely separate (no shared `this` context, no shared fields).
 
-For example, you can define a DO backed Model with an API like this:
+For example, a DO-backed Model with an API can be defined like this:
 
 ```cloesce
 env {
@@ -199,6 +205,7 @@ api Foo {
 ```
 
 Which will translate to:
+
 ```ts
 export interface Env {
     MyDurableObject: DurableObjectNamespace;
@@ -212,7 +219,6 @@ export namespace Foo {
     // ...
     type InstanceEnv = Env & { $do: MyDurableObject };
 
-
     export interface Api {
         id(e: InstanceEnv, ...): ApiResult<string>;
     }
@@ -224,12 +230,11 @@ export namespace Foo {
 }
 ```
 
-The columns of `Foo` will never include `$do`, as that is a property of the backing DO instance, not the Model itself. Instead, to access that instance, you must pass `env` to the method, which includes a `$do` property that is the DO instance on which that Model instance exists. Intentionally: `env` is not `self`.
-
+The columns of `Foo` will never include `$do`, as that is a property of the backing DO instance, not the Model itself. Instead, to access that instance, you must pass `env` to the method — `env` includes a `$do` property identifying the DO instance on which the Model instance exists. Intentionally: `env` is not `self`.
 
 #### Client API
 
-Similiar to the backend, any client method will need to specify how to locate the DO instance.
+Similar to the backend, any client method will need to specify how to locate the DO instance:
 
 ```ts
 // given some Foo model with PK `id` that is backed by MyDurableObject...
@@ -247,7 +252,7 @@ class Foo {
 }
 ```
 
-A DO backed Service will act in a similar way, with an additional DO ID parameter for each method.
+A DO-backed Service will behave similarly, with an additional DO ID parameter for each method:
 
 ```ts
 // given some FooService that is backed by MyDurableObject...
@@ -257,16 +262,17 @@ class FooService {
 }
 ```
 
-Before, Services had entirely static methods. Now, if backed by a DO, they will need to be instantiated with a DO ID.
+Previously, Services had entirely static methods. If backed by a DO, they must now be instantiated with a DO ID.
 
 ### Migrations
 
-#### SQL 
-Since a DO backed Model uses SQLite for its relational storage, we can use the same migration algorithm as a D1 backed Model. However, instead of running the migrations via the Wrangler CLI, a Durable Object must run the migrations itself on startup, per instance.
+#### SQL
 
-This means that migrations for a DO will not be purely SQL, but will include some TypeScript (or whatever future languages we also support) to handle the migration logic. 
+Since a DO-backed Model uses SQLite for relational storage, the same migration algorithm as a D1-backed Model applies. However, instead of running migrations via the Wrangler CLI, a Durable Object must run its own migrations on startup, per instance.
 
-An example migration might look like this:
+This means migrations for a DO will not be purely SQL: they will include HLL code to handle the migration logic.
+
+An example migration:
 
 ```ts
 // <binding>/<timestamp>_<migration name>.ts
@@ -284,6 +290,7 @@ export default {
 ```
 
 Cloesce will provide a migration runner on each DO along the lines of:
+
 ```ts
 type Migration = {
     name: string;
@@ -292,15 +299,15 @@ type Migration = {
 }
 
 export abstract class MyDurableObject implements DurableObject<Env> {
-    protected async migrate(ctx: DurableObjectState, migrations: Migration[]) {        
+    protected async migrate(ctx: DurableObjectState, migrations: Migration[]) {
         ctx.blockConcurrencyWhile(async () => {
-            // Check this DO's KV storage for each migration to see if it has been run before
-            // If it hasn't been run, add it to the list of migrations to run
+            // Check this DO's KV storage for each migration to see if it has been run before.
+            // If not, add it to the list of pending migrations.
             const toMigrate = await Promise.all(
                 migrations.map(async (m) => await ctx.storage.get(m.id) ? null : m)
             );
 
-            // Run each migration in order of timestamp
+            // Run each pending migration in order of timestamp.
             const sorted = toMigrate.filter(m => m !== null).sort((a, b) => a.timestamp - b.timestamp);
 
             for (const m of sorted) {
@@ -314,7 +321,8 @@ export abstract class MyDurableObject implements DurableObject<Env> {
 }
 ```
 
-This will allow a developer to manually run migrations on a DO instance like:
+This allows a developer to run migrations on a DO instance like so:
+
 ```ts
 class MyDurableObject implements clo.MyDurableObject {
     constructor(state: DurableObjectState, env: Env) {
@@ -331,13 +339,15 @@ class MyDurableObject implements clo.MyDurableObject {
 
 #### Durable Objects
 
-A Durable Object can evolve in four ways:
+A Durable Object class can evolve in four ways:
+
 1. Creating
 2. Renaming
 3. Modifying SQL support
 4. Deleting
 
 For example:
+
 ```toml
 [[migrations]]
 tag = "v1"
@@ -358,4 +368,4 @@ tag = "v4"
 deleted_classes = ["OrgDO"]
 ```
 
-Since Cloesce can track changes between migrations, whenever a DO is migrated (`cloesce migrate --binding MyDurableObject Name`), Cloesce can determine which of the above four operations is being performed, and generate the appropriate Wrangler configuration for that operation. Additionally, this command will invoke SQL migrations, should there be any.
+Since Cloesce can track changes between migrations, whenever a DO is migrated (`cloesce migrate --binding MyDurableObject Name`), Cloesce can determine which of the above four operations is being performed and generate the appropriate Wrangler configuration. This command will also invoke any pending SQL migrations.
