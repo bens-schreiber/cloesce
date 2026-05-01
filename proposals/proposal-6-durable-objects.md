@@ -9,13 +9,27 @@
 
 ## Summary
 
-[Durable Objects](https://developers.cloudflare.com/durable-objects/) are a Cloudflare Workers primitive that provide a way to model stateful objects in a distributed environment. Importantly, they enable a database-per-object model and are capable of maintaining WebSocket connections. This proposal details a first-class integration of Durable Objects into Cloesce.
+This proposal adds first-class support for [Durable Objects](https://developers.cloudflare.com/durable-objects/) in Cloesce. Durable Objects unlock use cases that D1 alone cannot address: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections. The proposal covers how to declare DO bindings in the `env` schema, back Models and Services against a DO, define REST API methods that route through a DO, and generate both SQL and Wrangler migrations as DO classes evolve.
 
 ---
 
 ## Motivation
 
-Durable Objects are easily the most powerful and unique product on the Cloudflare Workers platform. Because Cloudflare has no true monolithic relational database (each D1 database is capped at 10 GB), Durable Objects are the best solution for stateful applications that rely on relational data. With a way to model a system of Durable Objects, Cloesce can be used in a wide variety of applications, including those that require real-time communication via WebSockets.
+Durable Objects are easily the most powerful and unique product on the Cloudflare Workers platform, but they are also the hardest to use correctly. Without framework support, a developer must manually wire up routing, state initialization, migrations, and the Worker-to-DO request handoff all before writing any application logic. This proposal aims to eliminate that boilerplate by integrating Durable Objects as first class citizens in Cloesce's schema and code generation.
+
+### The limits of D1
+
+Cloesce currently supports D1 as its relational backend. D1 works well for many applications, but it has a fundamental architectural constraint: it is a single, globally shared database capped at 10 GB. This makes it a poor fit for applications where data is naturally partitioned by tenant, user, session, or resource (really, cases where you want the database to scale horizontally rather than vertically).
+
+Durable Objects offer a different model entirely. Instead of one large database, you get arbitrarily many small ones. Each DO instance has its own isolated SQLite database, its own KV store, and its own compute context. A multi-tenant SaaS application, for example, can give each organization its own DO instance, with full data isolation and no shared contention.
+
+### Strong consistency
+
+D1 (and most distributed databases) provide eventual consistency. Durable Objects are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, counters, collaborative editing state, rate limiters, and similar workloads.
+
+### Real-time communication
+
+Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients. This is the foundation for features like live cursors, presence indicators, chat, and multiplayer state. Although web sockets will not be addressed in this proposal, it is the foundation for the next proposal that does.
 
 ---
 
@@ -40,18 +54,6 @@ Durable Objects are easily the most powerful and unique product on the Cloudflar
 ---
 
 ## Detailed Design
-
-### What is a Durable Object?
-
-For the purposes of Cloesce, a Durable Object can be defined as:
-
-- A class that extends the `DurableObject` class provided by Cloudflare.
-- Maintains its own SQLite database and KV store (state).
-- Strongly consistent; requests to the same DO instance are guaranteed to be processed sequentially, never concurrently.
-
-Unlike a D1 database or KV/R2 bucket, DOs are not a single global resource (though you can design a system that way). Any number of DO instances can be created, each with its own state and ID.
-
-Each DO class has a `fetch` method (much like a Worker's) that handles incoming requests. It is also common to use Cloudflare's built-in RPC system to call methods on a DO instance, but that will not be covered in this proposal.
 
 ### Defining a Durable Object Binding
 
@@ -148,7 +150,7 @@ A Durable Object, however, does not exist within a Worker, it can only be *invok
 
 ```
 Request
-    -> Worker -> Route -> Redirect
+    -> Worker -> Route -> Forward
         -> DO -> Route -> Validate -> Hydrate -> Dispatch
 ```
 
@@ -369,3 +371,23 @@ deleted_classes = ["OrgDO"]
 ```
 
 Since Cloesce can track changes between migrations, whenever a DO is migrated (`cloesce migrate --binding MyDurableObject Name`), Cloesce can determine which of the above four operations is being performed and generate the appropriate Wrangler configuration. This command will also invoke any pending SQL migrations.
+
+---
+
+## Implementation
+
+The implementation of this proposal will require changes across the full stack of Cloesce, but will not introduce any breaking changes to the public API. The main areas of work include:
+1. Schema parsing and semantic analysis of Durable Object bindings
+2. Backend code generation for new Durable Object backed Models and Services, including their API methods
+3. Client code generation for DO-backed Models and Services
+4. A new template for DO migrations (in TS)
+5. A new Wrangler migrations component that can check for DO changes
+6. Updating the Cloesce Router to forward requests to DOs when necessary, as well as hydrating DO-backed Models with the correct instance ID from `env`
+
+### Passing Durable Object IDs between Worker, DO and Client
+
+DO instances are identified by their IDs, however we do not integrate them directly into the schema of a Model or Service as a field (though it may appear that way on the client).
+
+To pass the DO ID between HTTP requests, from the client to the server the convention will follow: `/api/foo/:doId/method`. This is true for both DO-backed Models and Services.
+
+When a Durable Object is used in the mix of any Cloesce response, the Router will attach a `X-Cloesce-DO-ID` header to the response, which the client can read and use for subsequent requests. Durable Object IDs are not something that have any particular security implications, so there is no harm in exposing them to the client.
