@@ -1,8 +1,9 @@
 use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
-    AstBlockKind, EnvBindingBlockKind, ForeignBlock, ModelBlock, ModelBlockKind,
-    PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, UseTagParamKind, ValidatorLiteral,
+    ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, EnvBindingBlockKind, ForeignBlock,
+    Keyword, ModelBlock, ModelBlockKind, PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol,
+    Tag,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -40,7 +41,7 @@ fn env_block() {
     let env_blocks = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             AstBlockKind::Env(blocks) => Some(blocks),
             _ => None,
         })
@@ -49,9 +50,9 @@ fn env_block() {
     let d1_bindings = env_blocks
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block.kind {
+        .find_map(|spd| match &spd.inner.kind {
             EnvBindingBlockKind::D1 => {
-                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
             }
             _ => None,
         })
@@ -61,9 +62,9 @@ fn env_block() {
     let r2_bindings = env_blocks
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block.kind {
+        .find_map(|spd| match &spd.inner.kind {
             EnvBindingBlockKind::R2 => {
-                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
             }
             _ => None,
         })
@@ -73,9 +74,9 @@ fn env_block() {
     let kv_bindings = env_blocks
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block.kind {
+        .find_map(|spd| match &spd.inner.kind {
             EnvBindingBlockKind::Kv => {
-                Some(spd.block.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
+                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
             }
             _ => None,
         })
@@ -85,9 +86,9 @@ fn env_block() {
     let vars = env_blocks
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block.kind {
+        .find_map(|spd| match &spd.inner.kind {
             EnvBindingBlockKind::Var => Some(
-                spd.block
+                spd.inner
                     .symbols
                     .iter()
                     .map(|s| (s.name, &s.cidl_type))
@@ -147,7 +148,7 @@ fn poo_block() {
     let address = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             AstBlockKind::PlainOldObject(p) if p.symbol.name == "Address" => Some(p),
             _ => None,
         })
@@ -164,7 +165,7 @@ fn poo_block() {
     let user = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             AstBlockKind::PlainOldObject(p) if p.symbol.name == "User" => Some(p),
             _ => None,
         })
@@ -203,7 +204,7 @@ fn poo_block() {
     let container = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             AstBlockKind::PlainOldObject(p) if p.symbol.name == "Container" => Some(p),
             _ => None,
         })
@@ -240,7 +241,7 @@ fn inject_block() {
     let all_injected: Vec<&str> = ast
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.block {
+        .filter_map(|spd| match &spd.inner {
             AstBlockKind::Inject(i) => Some(i),
             _ => None,
         })
@@ -283,7 +284,7 @@ fn service_block() {
     let services: Vec<_> = ast
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.block {
+        .filter_map(|spd| match &spd.inner {
             AstBlockKind::Service(s) => Some(s),
             _ => None,
         })
@@ -332,7 +333,7 @@ fn service_block() {
     let api_blocks: Vec<_> = ast
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.block {
+        .filter_map(|spd| match &spd.inner {
             AstBlockKind::Api(a) => Some(a),
             _ => None,
         })
@@ -349,50 +350,53 @@ fn service_block() {
         .find(|a| {
             a.methods
                 .iter()
-                .any(|m| m.block.symbol.name == "createItem")
+                .any(|m| m.inner.symbol.name == "createItem")
         })
         .expect("block with createItem");
     let create = create_block
         .methods
         .iter()
-        .find(|m| m.block.symbol.name == "createItem")
+        .find(|m| m.inner.symbol.name == "createItem")
         .unwrap();
-    assert!(matches!(create.block.http_verb, HttpVerb::Post));
+    assert!(matches!(create.inner.http_verb, HttpVerb::Post));
     // no SelfParam means it's static
     assert!(
         create
-            .block
+            .inner
             .parameters
             .iter()
-            .all(|p| matches!(&p.block, frontend::ApiBlockMethodParamKind::Field(_)))
+            .all(|p| matches!(&p.inner, ApiBlockMethodParamKind::Param(_)))
     );
-    assert_eq!(create.block.parameters.len(), 2);
-    assert_eq!(create.block.return_type, CidlType::String);
+    assert_eq!(create.inner.parameters.len(), 2);
+    assert_eq!(create.inner.return_type, CidlType::String);
 
     let list_block = api_blocks
         .iter()
-        .find(|a| a.methods.iter().any(|m| m.block.symbol.name == "listItems"))
+        .find(|a| a.methods.iter().any(|m| m.inner.symbol.name == "listItems"))
         .expect("block with listItems");
     let list = list_block
         .methods
         .iter()
-        .find(|m| m.block.symbol.name == "listItems")
+        .find(|m| m.inner.symbol.name == "listItems")
         .unwrap();
-    assert!(matches!(list.block.http_verb, HttpVerb::Get));
+    assert!(matches!(list.inner.http_verb, HttpVerb::Get));
     // has a SelfParam means it's an instance method
-    assert!(list.block.parameters.iter().any(|p| matches!(
-        &p.block,
-        frontend::ApiBlockMethodParamKind::SelfParam { .. }
-    )));
-    assert_eq!(list.block.return_type, CidlType::array(CidlType::String));
+    assert!(
+        list.inner
+            .parameters
+            .iter()
+            .any(|p| matches!(&p.inner, ApiBlockMethodParamKind::SelfParam(_)))
+    );
+    assert_eq!(list.inner.return_type, CidlType::array(CidlType::String));
 }
 
 #[test]
 fn model_primary_unique_optional_foreign() {
     let ast = lex_and_parse(
         r#"
-        [use d1_db, list]
-        [use get, save, d2_db]
+        [use d1_db]
+        [use d2_db]
+        [crud get, save, list]
         model M {
             score: real
 
@@ -427,23 +431,23 @@ fn model_primary_unique_optional_foreign() {
     let m = find_model(&ast, "M");
 
     let env_bindings = m
-        .use_tags
+        .symbol
+        .tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
-        .filter_map(|p| match p {
-            UseTagParamKind::EnvBinding(n) => Some(n.name),
+        .filter_map(|t| match &t.inner {
+            Tag::Use { binding } => Some(binding.inner),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert_eq!(env_bindings, vec!["d1_db", "d2_db"]);
 
     let cruds: Vec<CrudKind> = m
-        .use_tags
+        .symbol
+        .tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
-        .filter_map(|p| match p {
-            UseTagParamKind::Crud(c) => Some(c.block.clone()),
-            _ => None,
+        .flat_map(|t| match &t.inner {
+            Tag::Crud { kinds } => kinds.iter().map(|k| k.inner.clone()).collect::<Vec<_>>(),
+            _ => Vec::new(),
         })
         .collect();
     assert!(
@@ -455,7 +459,7 @@ fn model_primary_unique_optional_foreign() {
     let col = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Column(s) => Some(s),
             _ => None,
         })
@@ -465,7 +469,7 @@ fn model_primary_unique_optional_foreign() {
     let primary = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Primary(blocks) => Some(blocks),
             _ => None,
         })
@@ -495,7 +499,7 @@ fn model_primary_unique_optional_foreign() {
     let tag_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
             _ => None,
         })
@@ -506,7 +510,7 @@ fn model_primary_unique_optional_foreign() {
     let person_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Person", "id")]) => Some(fb),
             _ => None,
         })
@@ -519,7 +523,7 @@ fn model_primary_unique_optional_foreign() {
     let org_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Org", "id")]) => Some(fb),
             _ => None,
         })
@@ -532,7 +536,7 @@ fn model_primary_unique_optional_foreign() {
     let author_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Author", "id")]) => Some(fb),
             _ => None,
         })
@@ -542,7 +546,7 @@ fn model_primary_unique_optional_foreign() {
     let opt = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Optional(blocks) => Some(blocks),
             _ => None,
         })
@@ -552,7 +556,7 @@ fn model_primary_unique_optional_foreign() {
     let uniques: Vec<&Vec<Spd<SqlBlockKind>>> = m
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.block {
+        .filter_map(|spd| match &spd.inner {
             ModelBlockKind::Unique(blocks) => Some(blocks),
             _ => None,
         })
@@ -563,7 +567,7 @@ fn model_primary_unique_optional_foreign() {
         .iter()
         .find(|u| {
             u.iter()
-                .any(|b| matches!(&b.block, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
+                .any(|b| matches!(&b.inner, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
         })
         .unwrap();
     assert_eq!(sql_columns(dept_unique), vec!["role"]);
@@ -594,18 +598,18 @@ fn model_navigation() {
     let loc_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Location", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
     assert_eq!(loc_fb.fields[0].name, "locationId");
-    assert_eq!(loc_fb.nav.as_ref().unwrap().block.symbol.name, "location");
+    assert_eq!(loc_fb.nav.as_ref().unwrap().inner.symbol.name, "location");
 
     let tag_fb = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
             _ => None,
         })
@@ -615,8 +619,8 @@ fn model_navigation() {
     let weathers_nav = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
-            ModelBlockKind::Navigation(n) if n.nav.block.name == "weathers" => Some(n),
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "weathers" => Some(n),
             _ => None,
         })
         .unwrap();
@@ -625,8 +629,8 @@ fn model_navigation() {
     let alerts_nav = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
-            ModelBlockKind::Navigation(n) if n.nav.block.name == "alerts" => Some(n),
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "alerts" => Some(n),
             _ => None,
         })
         .unwrap();
@@ -640,7 +644,7 @@ fn model_navigation() {
 fn model_kv_r2_paginated() {
     let ast = lex_and_parse(
         r#"
-        [use get, save, list]
+        [crud get, save, list]
         model Cache {
             kv(ns_a, "data/{id}") { value: json }
             kv(ns_b, "list/{cursor}") paginated { page: json }
@@ -654,7 +658,7 @@ fn model_kv_r2_paginated() {
             }
         }
 
-        [use get, save, list]
+        [crud get, save, list]
         model PureKv {
             keyfield { 
                 key: string
@@ -672,7 +676,7 @@ fn model_kv_r2_paginated() {
     let kv_a = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_a" => Some(kv),
             _ => None,
         })
@@ -685,7 +689,7 @@ fn model_kv_r2_paginated() {
     let kv_b = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_b" => Some(kv),
             _ => None,
         })
@@ -698,7 +702,7 @@ fn model_kv_r2_paginated() {
     let r2_a = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_a" => Some(r2),
             _ => None,
         })
@@ -711,7 +715,7 @@ fn model_kv_r2_paginated() {
     let r2_b = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_b" => Some(r2),
             _ => None,
         })
@@ -724,7 +728,7 @@ fn model_kv_r2_paginated() {
     let pblocks: Vec<_> = m
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.block {
+        .filter_map(|spd| match &spd.inner {
             ModelBlockKind::Paginated(blocks) => Some(blocks),
             _ => None,
         })
@@ -733,7 +737,7 @@ fn model_kv_r2_paginated() {
 
     let kv_c = pblocks
         .iter()
-        .find_map(|b| match &b.block {
+        .find_map(|b| match &b.inner {
             PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_c" => Some(kv),
             _ => None,
         })
@@ -750,7 +754,7 @@ fn model_kv_r2_paginated() {
 
     let r2_c = pblocks
         .iter()
-        .find_map(|b| match &b.block {
+        .find_map(|b| match &b.inner {
             PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_c" => Some(r2),
             _ => None,
         })
@@ -762,7 +766,7 @@ fn model_kv_r2_paginated() {
 
     let kv_d = pblocks
         .iter()
-        .find_map(|b| match &b.block {
+        .find_map(|b| match &b.inner {
             PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_d" => Some(kv),
             _ => None,
         })
@@ -774,7 +778,7 @@ fn model_kv_r2_paginated() {
 
     let r2_d = pblocks
         .iter()
-        .find_map(|b| match &b.block {
+        .find_map(|b| match &b.inner {
             PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_d" => Some(r2),
             _ => None,
         })
@@ -787,23 +791,23 @@ fn model_kv_r2_paginated() {
     let kv_model = find_model(&ast, "PureKv");
 
     let kv_env_bindings = kv_model
-        .use_tags
+        .symbol
+        .tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
-        .filter_map(|p| match p {
-            UseTagParamKind::EnvBinding(n) => Some(n),
+        .filter_map(|t| match &t.inner {
+            Tag::Use { binding } => Some(binding),
             _ => None,
         })
         .collect::<Vec<_>>();
     assert!(kv_env_bindings.is_empty());
 
     let kv_cruds: Vec<CrudKind> = kv_model
-        .use_tags
+        .symbol
+        .tags
         .iter()
-        .flat_map(|t| t.block.params.iter())
-        .filter_map(|p| match p {
-            UseTagParamKind::Crud(c) => Some(c.block.clone()),
-            _ => None,
+        .flat_map(|t| match &t.inner {
+            Tag::Crud { kinds } => kinds.iter().map(|k| k.inner.clone()).collect::<Vec<_>>(),
+            _ => Vec::new(),
         })
         .collect();
     assert!(
@@ -815,7 +819,7 @@ fn model_kv_r2_paginated() {
     let keyfields: Vec<&str> = kv_model
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::KeyField(fields) => Some(fields.iter().map(|s| s.name).collect()),
             _ => None,
         })
@@ -825,8 +829,8 @@ fn model_kv_r2_paginated() {
     let kv_entry = kv_model
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
-            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match &b.block {
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match &b.inner {
                 PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
                 _ => None,
             }),
@@ -848,10 +852,10 @@ fn validator_tags() {
     let ast = lex_and_parse(
         r#"
         model M {
-            [valid1 "arg1"]
-            [valid2 42]
-            [valid3 42.0]
-            [valid4 /[a-z]+/]
+            [regex /[a-z]+/]
+            [minlen 1]
+            [gt 42]
+            [lte 100.5]
             email: string
         }
         "#,
@@ -861,7 +865,7 @@ fn validator_tags() {
     let col = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             ModelBlockKind::Column(s) => Some(s),
             _ => None,
         })
@@ -871,23 +875,33 @@ fn validator_tags() {
     assert_eq!(col.cidl_type, CidlType::String);
     assert_eq!(col.tags.len(), 4);
 
-    assert_eq!(col.tags[0].block.name, "valid1");
-    assert_eq!(col.tags[0].block.arg, ValidatorLiteral::Str("arg1"));
+    let validators: Vec<(&Keyword, &ArgumentLiteral)> = col
+        .tags
+        .iter()
+        .filter_map(|t| match &t.inner {
+            Tag::Validator { name, argument } => Some((name, argument)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(validators.len(), 4);
 
-    assert_eq!(col.tags[1].block.name, "valid2");
-    assert_eq!(col.tags[1].block.arg, ValidatorLiteral::Int("42"));
+    assert!(matches!(validators[0].0, Keyword::Regex));
+    assert_eq!(validators[0].1, &ArgumentLiteral::Regex("[a-z]+"));
 
-    assert_eq!(col.tags[2].block.name, "valid3");
-    assert_eq!(col.tags[2].block.arg, ValidatorLiteral::Real("42.0"));
+    assert!(matches!(validators[1].0, Keyword::MinLen));
+    assert_eq!(validators[1].1, &ArgumentLiteral::Int("1"));
 
-    assert_eq!(col.tags[3].block.name, "valid4");
-    assert_eq!(col.tags[3].block.arg, ValidatorLiteral::Regex("[a-z]+"));
+    assert!(matches!(validators[2].0, Keyword::GreaterThan));
+    assert_eq!(validators[2].1, &ArgumentLiteral::Int("42"));
+
+    assert!(matches!(validators[3].0, Keyword::LessThanOrEqual));
+    assert_eq!(validators[3].1, &ArgumentLiteral::Real("100.5"));
 }
 
 fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {
     blocks
         .iter()
-        .filter_map(|b| match &b.block {
+        .filter_map(|b| match &b.inner {
             SqlBlockKind::Column(s) => Some(s.name),
             _ => None,
         })
@@ -897,7 +911,7 @@ fn sql_columns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a str> {
 fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock<'a>> {
     blocks
         .iter()
-        .filter_map(|b| match &b.block {
+        .filter_map(|b| match &b.inner {
             SqlBlockKind::Foreign(fb) => Some(fb),
             _ => None,
         })
@@ -907,7 +921,7 @@ fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock
 fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
     ast.blocks
         .iter()
-        .find_map(|spd| match &spd.block {
+        .find_map(|spd| match &spd.inner {
             AstBlockKind::Model(m) if m.symbol.name == name => Some(m),
             _ => None,
         })

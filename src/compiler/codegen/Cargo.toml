@@ -9,7 +9,6 @@ indexmap = { workspace = true }
 json_comments = { workspace = true }
 migrations = { path = "../migrations" }
 orm = { path = "../orm" }
-pathdiff = "0.2.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlformat = { workspace = true }

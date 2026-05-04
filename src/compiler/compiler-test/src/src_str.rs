@@ -184,7 +184,8 @@ source WithR2 for ToyotaPrius {
     }
 }
 
-[use db, get, save, list]
+[use db]
+[crud get, save, list]
 model ModelWithCruds {
     primary {
         id: int

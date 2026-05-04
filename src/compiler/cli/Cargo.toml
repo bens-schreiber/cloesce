@@ -4,7 +4,6 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-ariadne = { workspace = true }
 ast = { path = "../ast" }
 clap = { workspace = true }
 codegen = { path = "../codegen" }

@@ -281,7 +281,7 @@ pub struct Column<'src> {
     pub composite_id: Option<usize>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum CrudKind {
     Get,
     List,

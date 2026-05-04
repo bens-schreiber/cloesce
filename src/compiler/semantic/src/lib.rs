@@ -3,9 +3,9 @@ use ast::{
     WranglerEnv,
 };
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
-    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice,
-    Symbol, ValidatorLiteral, ValidatorTag,
+    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, DataSourceBlock,
+    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
+    ServiceBlock, Spd, SpdSlice, Symbol, Tag,
 };
 use indexmap::IndexMap;
 
@@ -331,7 +331,9 @@ struct SymbolTable<'src, 'p> {
 }
 
 impl<'src, 'p> SymbolTable<'src, 'p> {
-    /// Creates a [SymbolTable] by walking the [ParseAst], catching any [SemanticError::DuplicateSymbol]
+    /// Creates a [SymbolTable] by walking the [ParseAst].
+    ///
+    /// Catches [SemanticError::DuplicateSymbol] and [SemanticError::TagInvalidInContext] errors
     fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
         let mut st = SymbolTable::default();
         let mut global_names = HashMap::new();
@@ -356,15 +358,38 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             }
         };
 
-        for block in parse.blocks.blocks() {
+        macro_rules! tag_whitelist {
+            ($($allowed_tag:ident),* ; $symbol:expr) => {
+                for tag in &$symbol.tags {
+                    #[allow(unused_mut)]
+                    let mut allowed = false;
+                    $(
+                        if let Tag::$allowed_tag { .. } = &tag.inner {
+                            allowed = true;
+                        }
+                    )*
+
+                    if !allowed {
+                        sink.push(SemanticError::TagInvalidInContext {
+                            tag,
+                            symbol: $symbol,
+                        });
+                    }
+                }
+            };
+        }
+
+        for block in parse.blocks.inners() {
             match block {
                 AstBlockKind::Model(model_block) => {
+                    tag_whitelist!(Crud, Use; &model_block.symbol);
                     insert_global(sink, &model_block.symbol);
                     st.models.insert(model_block.symbol.name, model_block);
 
-                    for sub_block in model_block.blocks.blocks() {
+                    for sub_block in model_block.blocks.inners() {
                         let symbols = sub_block.symbols();
                         for symbol in symbols {
+                            tag_whitelist!(Validator; symbol);
                             insert_local(
                                 sink,
                                 symbol,
@@ -377,11 +402,13 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::PlainOldObject(plain_old_object_block) => {
+                    tag_whitelist!(; &plain_old_object_block.symbol);
                     insert_global(sink, &plain_old_object_block.symbol);
                     st.poos
                         .insert(plain_old_object_block.symbol.name, plain_old_object_block);
 
                     for field in &plain_old_object_block.fields {
+                        tag_whitelist!(Validator; field);
                         insert_local(
                             sink,
                             field,
@@ -393,10 +420,12 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::Service(service_block) => {
+                    tag_whitelist!(; &service_block.symbol);
                     insert_global(sink, &service_block.symbol);
                     st.services.insert(service_block.symbol.name, service_block);
 
                     for field in &service_block.fields {
+                        tag_whitelist!(; field);
                         insert_local(
                             sink,
                             field,
@@ -408,8 +437,10 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::Api(api_block) => {
+                    tag_whitelist!(; &api_block.symbol);
                     st.apis.push(api_block);
-                    for method in api_block.methods.blocks() {
+                    for method in api_block.methods.inners() {
+                        tag_whitelist!(; &method.symbol);
                         insert_local(
                             sink,
                             &method.symbol,
@@ -419,12 +450,16 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             },
                         );
 
-                        for param in method.parameters.blocks() {
+                        for param in method.parameters.inners() {
                             let (symbol, name) = match param {
-                                ApiBlockMethodParamKind::SelfParam { symbol, .. } => {
+                                ApiBlockMethodParamKind::SelfParam(symbol) => {
+                                    tag_whitelist!(Source; symbol);
                                     (symbol, "self")
                                 }
-                                ApiBlockMethodParamKind::Field(symbol) => (symbol, symbol.name),
+                                ApiBlockMethodParamKind::Param(symbol) => {
+                                    tag_whitelist!(Validator; symbol);
+                                    (symbol, symbol.name)
+                                }
                             };
 
                             insert_local(
@@ -440,6 +475,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::DataSource(data_source_block) => {
+                    tag_whitelist!(Internal; &data_source_block.symbol);
                     insert_local(
                         sink,
                         &data_source_block.symbol,
@@ -454,9 +490,10 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         ("get", &data_source_block.get),
                     ]
                     .into_iter()
-                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.block)))
+                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.inner)))
                     {
                         for param in &method.parameters {
+                            tag_whitelist!(Validator; param);
                             insert_local(
                                 sink,
                                 param,
@@ -472,9 +509,9 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::Env(env_blocks) => {
                     st.envs.push(env_blocks);
                     for env_block in &env_blocks.blocks {
-                        match &env_block.block.kind {
+                        match &env_block.inner.kind {
                             EnvBindingBlockKind::D1 => {
-                                for symbol in &env_block.block.symbols {
+                                for symbol in &env_block.inner.symbols {
                                     insert_global(sink, symbol);
                                     insert_local(
                                         sink,
@@ -487,7 +524,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                 }
                             }
                             EnvBindingBlockKind::R2 => {
-                                for symbol in &env_block.block.symbols {
+                                for symbol in &env_block.inner.symbols {
+                                    tag_whitelist!(; symbol);
                                     insert_global(sink, symbol);
                                     insert_local(
                                         sink,
@@ -500,7 +538,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                 }
                             }
                             EnvBindingBlockKind::Kv => {
-                                for symbol in &env_block.block.symbols {
+                                for symbol in &env_block.inner.symbols {
+                                    tag_whitelist!(; symbol);
                                     insert_global(sink, symbol);
                                     insert_local(
                                         sink,
@@ -513,7 +552,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                 }
                             }
                             EnvBindingBlockKind::Var => {
-                                for symbol in &env_block.block.symbols {
+                                for symbol in &env_block.inner.symbols {
+                                    tag_whitelist!(; symbol);
                                     insert_local(
                                         sink,
                                         symbol,
@@ -527,6 +567,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::Inject(inject_block) => {
                     st.injects.push(inject_block);
                     for symbol in &inject_block.symbols {
+                        tag_whitelist!(; symbol);
                         insert_global(sink, symbol);
                     }
                 }
@@ -618,9 +659,10 @@ fn resolve_cidl_type<'src, 'p>(
 fn resolve_validators<'src, 'p>(
     symbol: &'p Symbol<'src>,
 ) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
+    use frontend::Keyword::*;
     fn invalid_arg<'src, 'p>(
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         reason: impl Into<std::string::String>,
     ) -> SemanticError<'src, 'p> {
         SemanticError::ValidatorInvalidArgument {
@@ -631,13 +673,13 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_number<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<Number> {
         match lit {
-            ValidatorLiteral::Int(s) => match s.parse() {
+            ArgumentLiteral::Int(s) => match s.parse() {
                 Ok(n) => return Some(Number::Int(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
@@ -645,7 +687,7 @@ fn resolve_validators<'src, 'p>(
                     format!("'{s}' is not a valid integer"),
                 )),
             },
-            ValidatorLiteral::Real(s) => match s.parse() {
+            ArgumentLiteral::Real(s) => match s.parse() {
                 Ok(n) => return Some(Number::Float(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
@@ -659,12 +701,12 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_usize<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<usize> {
-        let ValidatorLiteral::Int(s) = lit else {
+        let ArgumentLiteral::Int(s) = lit else {
             sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
@@ -682,12 +724,12 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_i64<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<i64> {
-        let ValidatorLiteral::Int(s) = lit else {
+        let ArgumentLiteral::Int(s) = lit else {
             sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
@@ -708,22 +750,25 @@ fn resolve_validators<'src, 'p>(
     let mut sink = ErrorSink::new();
 
     for spd in &symbol.tags {
-        let tag = &spd.block;
-        let ValidatorTag { name, arg } = tag;
+        let Tag::Validator {
+            name: kw,
+            argument: arg,
+        } = &spd.inner
+        else {
+            // Non-validator tags are skipped here; the tag whitelist is responsible for
+            // catching tags that are not valid in this context.
+            continue;
+        };
 
         let root = symbol.cidl_type.root_type();
-        let type_ok = match *name {
-            "gt" | "gte" | "lt" | "lte" | "step" => {
+        let type_ok = match kw {
+            GreaterThan | GreaterThanOrEqual | LessThan | LessThanOrEqual | Step => {
                 matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
             }
-            "len" | "minlen" | "maxlen" | "regex" => matches!(root, CidlType::String),
-            _ => {
-                sink.push(SemanticError::ValidatorUnknown {
-                    symbol,
-                    validator: spd,
-                });
-                continue;
-            }
+            Len | MinLen | MaxLen | Regex => matches!(root, CidlType::String),
+            _ => unreachable!(
+                "Tag::Validator only carries validator keywords as parsed in the frontend"
+            ),
         };
         if !type_ok {
             sink.push(SemanticError::ValidatorInvalidForType {
@@ -733,17 +778,21 @@ fn resolve_validators<'src, 'p>(
             continue;
         }
 
-        let validator = match *name {
-            "gt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
-            "gte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual),
-            "lt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
-            "lte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual),
-            "step" => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
-            "len" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
-            "minlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
-            "maxlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
-            "regex" => match arg {
-                ValidatorLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
+        let validator = match kw {
+            GreaterThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
+            GreaterThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual)
+            }
+            LessThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
+            LessThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual)
+            }
+            Step => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
+            Len => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            MinLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
+            MaxLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
+            Regex => match arg {
+                ArgumentLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
                 _ => {
                     sink.push(invalid_arg(
                         symbol,
@@ -753,7 +802,7 @@ fn resolve_validators<'src, 'p>(
                     None
                 }
             },
-            _ => unreachable!("filtered above"),
+            _ => unreachable!("non-validator keywords are filtered out above"),
         };
 
         if let Some(v) = validator {

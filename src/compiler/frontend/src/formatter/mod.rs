@@ -5,12 +5,11 @@ use std::cell::{Cell, RefCell};
 use ast::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock,
-    DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock, ForeignBlock,
-    ForeignBlockNav, ForeignQualifier, InjectBlock, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree, PlainOldObjectBlock, R2Block,
-    ServiceBlock, Spd, SqlBlockKind, Symbol, UseTag, UseTagParamKind, ValidatorLiteral,
-    ValidatorTag, lexer::CommentMap,
+    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind,
+    DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
+    ForeignBlock, ForeignBlockNav, ForeignQualifier, InjectBlock, Keyword, KvBlock, ModelBlock,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree,
+    PlainOldObjectBlock, R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -202,7 +201,7 @@ impl<'src> FmtCtx<'src> {
         let (leading, has_leading_comments) = self.leading_comments(spd.span.start, indent);
 
         self.node_ends.borrow_mut().push(spd.span.end);
-        let content = spd.block.to_doc(self);
+        let content = spd.inner.to_doc(self);
         self.node_ends.borrow_mut().pop();
 
         let trailing = self.trailing_comment(spd.span.end);
@@ -243,13 +242,37 @@ impl<'src> FmtCtx<'src> {
             .then(trailing)
     }
 
+    /// Renders a top-level block declaration of the form `[tag]\nkeyword Name`.
+    ///
+    /// Tags on the symbol (e.g. `[use db]` on a model) are emitted first, each on its own line,
+    /// followed by leading comments and finally `keyword name`.
+    fn top_level_decl(&self, sym: &'src Symbol<'src>, keyword: Keyword) -> Doc<'src> {
+        let mut doc = Doc::nil();
+        for tag in &sym.tags {
+            doc = doc.then(self.spd_doc(tag, 0, true)).then(Doc::hardline(0));
+        }
+
+        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, 0);
+        if has_leading_comments {
+            doc = doc.then(leading).then(Doc::hardline(0));
+        }
+
+        let trailing = self.trailing_comment(sym.span.end);
+        self.advance(sym.span.end);
+
+        doc.then(Doc::text(keyword.as_str()))
+            .then(Doc::text(" "))
+            .then(Doc::text(sym.name))
+            .then(trailing)
+    }
+
     fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
         // Validator tags (if any)
         let mut tags_doc = Doc::nil();
         for tag in &sym.tags {
             let (tag_leading, tag_has_leading) = self.leading_comments(tag.span.start, indent);
             self.node_ends.borrow_mut().push(tag.span.end);
-            let tag_content = tag.block.to_doc(self);
+            let tag_content = tag.inner.to_doc(self);
             self.node_ends.borrow_mut().pop();
             let tag_trailing = self.trailing_comment(tag.span.end);
             self.advance(tag.span.end);
@@ -364,19 +387,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::nil();
-        for tag in &self.use_tags {
-            doc = doc.then(ctx.spd_doc(tag, 0, true)).then(Doc::hardline(0));
-        }
-
-        let (leading, has_leading_comments) = ctx.leading_comments(self.symbol.span.start, 0);
-        if has_leading_comments {
-            doc = doc.then(leading).then(Doc::hardline(0));
-        }
-
-        doc = doc
-            .then(Doc::text("model "))
-            .then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = ctx.top_level_decl(&self.symbol, Keyword::Model);
 
         if self.blocks.is_empty() {
             // No content, return empty model
@@ -391,32 +402,53 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for ValidatorTag<'src> {
-    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let mut doc = Doc::text("[").then(Doc::text(self.name));
-        doc = doc.then(Doc::text(" ")).then(match self.arg {
-            ValidatorLiteral::Int(s) | ValidatorLiteral::Real(s) => Doc::text(s),
-            ValidatorLiteral::Str(s) => Doc::text("\"").then(Doc::text(s)).then(Doc::text("\"")),
-            ValidatorLiteral::Regex(s) => Doc::text("/").then(Doc::text(s)).then(Doc::text("/")),
-        });
-        doc.then(Doc::text("]"))
-    }
-}
-
-impl<'src> ToDoc<'src> for UseTag<'src> {
+impl<'src> ToDoc<'src> for Tag<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.params, |param| match param {
-            UseTagParamKind::Crud(spd) => ctx.spd_doc(spd, 0, true),
-            UseTagParamKind::EnvBinding(b) => ctx.sym_doc(b, 0, true),
-        });
+        let inner = match self {
+            Tag::Validator { name, argument } => {
+                let arg = match argument {
+                    ArgumentLiteral::Int(s) | ArgumentLiteral::Real(s) => Doc::text(s),
+                    ArgumentLiteral::Str(s) => {
+                        Doc::text("\"").then(Doc::text(s)).then(Doc::text("\""))
+                    }
+                    ArgumentLiteral::Regex(s) => {
+                        Doc::text("/").then(Doc::text(s)).then(Doc::text("/"))
+                    }
+                };
 
-        Doc::text("[use ").then(params).then(Doc::text("]"))
+                Doc::text(name.as_str()).then(Doc::text(" ")).then(arg)
+            }
+            Tag::Use { binding } => Doc::kw(Keyword::Use)
+                .then(Doc::text(" "))
+                .then(Doc::text(binding.inner)),
+            Tag::Crud { kinds } => {
+                let mut doc = Doc::kw(Keyword::Crud).then(Doc::text(" "));
+                for (idx, kind) in kinds.iter().enumerate() {
+                    doc = doc.then(ctx.spd_doc(kind, 0, true));
+                    if idx + 1 < kinds.len() {
+                        doc = doc.then(Doc::text(", "));
+                    }
+                }
+                doc
+            }
+            Tag::Source { name } => Doc::kw(Keyword::Source)
+                .then(Doc::text(" "))
+                .then(Doc::text(name.inner)),
+            Tag::Internal => Doc::kw(Keyword::Internal),
+        };
+
+        Doc::text("[").then(inner).then(Doc::text("]"))
     }
 }
 
 impl<'src> ToDoc<'src> for CrudKind {
     fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::text(fmt_crud(self))
+        let kw = match self {
+            CrudKind::Get => Keyword::Get,
+            CrudKind::List => Keyword::List,
+            CrudKind::Save => Keyword::Save,
+        };
+        Doc::text(kw.as_str())
     }
 }
 
@@ -440,16 +472,20 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
-            ModelBlockKind::Primary(blocks) => model_block("primary", blocks, ctx),
-            ModelBlockKind::Unique(blocks) => model_block("unique", blocks, ctx),
-            ModelBlockKind::Optional(blocks) => model_block("optional", blocks, ctx),
-            ModelBlockKind::Paginated(blocks) => model_block("paginated", blocks, ctx),
+            ModelBlockKind::Primary(blocks) => model_block(Keyword::Primary.as_str(), blocks, ctx),
+            ModelBlockKind::Unique(blocks) => model_block(Keyword::Unique.as_str(), blocks, ctx),
+            ModelBlockKind::Optional(blocks) => {
+                model_block(Keyword::Optional.as_str(), blocks, ctx)
+            }
+            ModelBlockKind::Paginated(blocks) => {
+                model_block(Keyword::Paginated.as_str(), blocks, ctx)
+            }
             ModelBlockKind::KeyField(syms) => {
                 let mut inner = Doc::nil();
                 for sym in syms {
                     inner = inner.then(ctx.sym_doc(sym, 2, false));
                 }
-                Doc::text("keyfield").then(ctx.block(inner, 2))
+                Doc::kw(Keyword::KeyField).then(ctx.block(inner, 2))
             }
         }
     }
@@ -481,11 +517,14 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             left.then(Doc::text("::")).then(right)
         });
 
-        let doc = Doc::text("foreign (").then(adjs).then(Doc::text(")"));
+        let doc = Doc::kw(Keyword::Foreign)
+            .then(Doc::text(" ("))
+            .then(adjs)
+            .then(Doc::text(")"));
         let qualifier = match &self.qualifier {
-            Some(ForeignQualifier::Primary) => Doc::text(" primary"),
-            Some(ForeignQualifier::Optional) => Doc::text(" optional"),
-            Some(ForeignQualifier::Unique) => Doc::text(" unique"),
+            Some(ForeignQualifier::Primary) => Doc::text(" ").then(Doc::kw(Keyword::Primary)),
+            Some(ForeignQualifier::Optional) => Doc::text(" ").then(Doc::kw(Keyword::Optional)),
+            Some(ForeignQualifier::Unique) => Doc::text(" ").then(Doc::kw(Keyword::Unique)),
             None => Doc::nil(),
         };
 
@@ -510,21 +549,23 @@ impl<'src> ToDoc<'src> for NavigationBlock<'src> {
             left.then(Doc::text("::")).then(right)
         });
 
-        Doc::text("nav (")
+        Doc::kw(Keyword::Nav)
+            .then(Doc::text(" ("))
             .then(adjs)
             .then(Doc::text(")"))
-            .then(ctx.block(ctx.sym_doc(&self.nav.block, 2, false), 2))
+            .then(ctx.block(ctx.sym_doc(&self.nav.inner, 2, false), 2))
     }
 }
 
 impl<'src> ToDoc<'src> for KvBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let paginated = if self.is_paginated {
-            Doc::text(" paginated")
+            Doc::text(" ").then(Doc::kw(Keyword::Paginated))
         } else {
             Doc::nil()
         };
-        Doc::text("kv (")
+        Doc::kw(Keyword::Kv)
+            .then(Doc::text(" ("))
             .then(ctx.sym_doc(&self.env_binding, 0, true))
             .then(Doc::text(", \""))
             .then(Doc::text(self.key_format))
@@ -537,11 +578,12 @@ impl<'src> ToDoc<'src> for KvBlock<'src> {
 impl<'src> ToDoc<'src> for R2Block<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let paginated = if self.is_paginated {
-            Doc::text(" paginated")
+            Doc::text(" ").then(Doc::kw(Keyword::Paginated))
         } else {
             Doc::nil()
         };
-        Doc::text("r2 (")
+        Doc::kw(Keyword::R2)
+            .then(Doc::text(" ("))
             .then(ctx.sym_doc(&self.env_binding, 0, true))
             .then(Doc::text(", \""))
             .then(Doc::text(self.key_format))
@@ -553,7 +595,7 @@ impl<'src> ToDoc<'src> for R2Block<'src> {
 
 impl<'src> ToDoc<'src> for ApiBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = Doc::text("api ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = ctx.top_level_decl(&self.symbol, Keyword::Api);
 
         if self.methods.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -567,38 +609,32 @@ impl<'src> ToDoc<'src> for ApiBlock<'src> {
     }
 }
 
+impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        match self {
+            ApiBlockMethodParamKind::SelfParam(sym) => ctx.sym_doc(sym, 0, true),
+            ApiBlockMethodParamKind::Param(sym) => ctx.sym_doc(sym, 0, true),
+        }
+    }
+}
+
 impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.parameters, |param| ctx.spd_doc(param, 0, true));
 
-        Doc::text(fmt_http_verb(&self.http_verb))
-            .then(Doc::text(" "))
-            .then(ctx.sym_doc(&self.symbol, 0, true))
-            .then(Doc::text("("))
-            .then(params)
-            .then(Doc::text(") -> "))
-            .then(Doc::owned(fmt_cidl_type(&self.return_type)))
-    }
-}
-
-impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        match self {
-            ApiBlockMethodParamKind::SelfParam {
-                symbol,
-                data_source,
-            } => {
-                let ds_doc = if let Some(ds) = data_source {
-                    Doc::text("[source ")
-                        .then(ctx.sym_doc(ds, 0, true))
-                        .then(Doc::text("] "))
-                } else {
-                    Doc::nil()
-                };
-                ds_doc.then(ctx.sym_doc(symbol, 0, true))
-            }
-            ApiBlockMethodParamKind::Field(sym) => ctx.sym_doc(sym, 0, true),
-        }
+        Doc::text(match &self.http_verb {
+            HttpVerb::Get => Keyword::Get.as_str(),
+            HttpVerb::Post => Keyword::Post.as_str(),
+            HttpVerb::Put => Keyword::Put.as_str(),
+            HttpVerb::Delete => Keyword::Delete.as_str(),
+            HttpVerb::Patch => Keyword::Patch.as_str(),
+        })
+        .then(Doc::text(" "))
+        .then(ctx.sym_doc(&self.symbol, 0, true))
+        .then(Doc::text("("))
+        .then(params)
+        .then(Doc::text(") -> "))
+        .then(Doc::owned(fmt_cidl_type(&self.return_type)))
     }
 }
 
@@ -629,16 +665,21 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
         };
 
         let source_doc = internal
-            .then(Doc::text("source "))
+            .then(Doc::kw(Keyword::Source))
+            .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.symbol, 0, true))
-            .then(Doc::text(" for "))
+            .then(Doc::text(" "))
+            .then(Doc::kw(Keyword::For))
+            .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.model, 0, true));
 
         let mut include = if self.tree.0.is_empty() {
-            Doc::hardline(1).then(Doc::text("include {}"))
+            Doc::hardline(1)
+                .then(Doc::kw(Keyword::Include))
+                .then(Doc::text(" {}"))
         } else {
             Doc::hardline(1)
-                .then(Doc::text("include"))
+                .then(Doc::kw(Keyword::Include))
                 .then(ctx.block(self.tree.to_doc_at(ctx, 2), 2))
         };
 
@@ -646,14 +687,18 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
             include = include
                 .then(Doc::hardline(1))
                 .then(Doc::hardline(1))
-                .then(Doc::text("sql get"))
+                .then(Doc::kw(Keyword::Sql))
+                .then(Doc::text(" "))
+                .then(Doc::kw(Keyword::Get))
                 .then(ctx.spd_doc(get, 1, true));
         }
         if let Some(list) = &self.list {
             include = include
                 .then(Doc::hardline(1))
                 .then(Doc::hardline(1))
-                .then(Doc::text("sql list"))
+                .then(Doc::kw(Keyword::Sql))
+                .then(Doc::text(" "))
+                .then(Doc::kw(Keyword::List))
                 .then(ctx.spd_doc(list, 1, true));
         }
 
@@ -681,7 +726,7 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = Doc::text("service ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = ctx.top_level_decl(&self.symbol, Keyword::Service);
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -697,7 +742,7 @@ impl<'src> ToDoc<'src> for ServiceBlock<'src> {
 
 impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = Doc::text("poo ").then(ctx.sym_doc(&self.symbol, 0, true));
+        let doc = ctx.top_level_decl(&self.symbol, Keyword::Poo);
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -714,10 +759,10 @@ impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
 impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let keyword = match self.kind {
-            EnvBindingBlockKind::D1 => "d1",
-            EnvBindingBlockKind::R2 => "r2",
-            EnvBindingBlockKind::Kv => "kv",
-            EnvBindingBlockKind::Var => "vars",
+            EnvBindingBlockKind::D1 => Keyword::D1.as_str(),
+            EnvBindingBlockKind::R2 => Keyword::R2.as_str(),
+            EnvBindingBlockKind::Kv => Keyword::Kv.as_str(),
+            EnvBindingBlockKind::Var => Keyword::Vars.as_str(),
         };
 
         let mut inner = Doc::nil();
@@ -735,26 +780,26 @@ impl<'src> ToDoc<'src> for EnvBlock<'src> {
         for spd in &self.blocks {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
-        Doc::text("env").then(ctx.block(inner, 1))
+        Doc::kw(Keyword::Env).then(ctx.block(inner, 1))
     }
 }
 
 impl<'src> ToDoc<'src> for InjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         if self.symbols.is_empty() {
-            return Doc::text("inject {}");
+            return Doc::kw(Keyword::Inject).then(Doc::text(" {}"));
         }
         let mut inner = Doc::nil();
         for sym in &self.symbols {
             inner = inner.then(ctx.sym_doc(sym, 1, false));
         }
-        Doc::text("inject").then(ctx.block(inner, 1))
+        Doc::kw(Keyword::Inject).then(ctx.block(inner, 1))
     }
 }
 
 impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::text("nav").then(ctx.block(ctx.sym_doc(&self.symbol, 3, false), 3))
+        Doc::kw(Keyword::Nav).then(ctx.block(ctx.sym_doc(&self.symbol, 3, false), 3))
     }
 }
 
@@ -782,24 +827,6 @@ fn fmt_cidl_type(ty: &CidlType<'_>) -> String {
         CidlType::Nullable(inner) => format!("Option<{}>", fmt_cidl_type(inner)),
         CidlType::Paginated(inner) => format!("Paginated<{}>", fmt_cidl_type(inner)),
         CidlType::KvObject(inner) => format!("KvObject<{}>", fmt_cidl_type(inner)),
-    }
-}
-
-fn fmt_http_verb(verb: &HttpVerb) -> &'static str {
-    match verb {
-        HttpVerb::Get => "get",
-        HttpVerb::Post => "post",
-        HttpVerb::Put => "put",
-        HttpVerb::Delete => "delete",
-        HttpVerb::Patch => "patch",
-    }
-}
-
-fn fmt_crud(kind: &CrudKind) -> &'static str {
-    match kind {
-        CrudKind::Get => "get",
-        CrudKind::List => "list",
-        CrudKind::Save => "save",
     }
 }
 

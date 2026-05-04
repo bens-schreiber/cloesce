@@ -6,7 +6,7 @@ use crate::{
     resolve_cidl_type, resolve_validators,
 };
 use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
-use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice};
+use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
 
 #[derive(Default)]
 pub struct ApiAnalysis<'src, 'p> {
@@ -37,7 +37,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             };
 
             let mut methods = Vec::new();
-            for method in api_block.methods.blocks() {
+            for method in api_block.methods.inners() {
                 if let Some(api_method) = self.method(namespace, method, table) {
                     methods.push(api_method);
                 }
@@ -136,21 +136,28 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut params = Vec::new();
 
         let mut has_stream = false;
-        let mut data_source_symbol = None;
+        let mut data_source: Option<&'src str> = None;
         let mut is_static = true;
-        for param in method.parameters.blocks() {
+        for param in method.parameters.inners() {
             let param = match param {
-                ApiBlockMethodParamKind::SelfParam { data_source, .. } => {
+                ApiBlockMethodParamKind::SelfParam(self_sym) => {
                     is_static = false;
-                    data_source_symbol = data_source.clone();
-                    let Some(ds) = data_source else {
+
+                    // Extract `[source SourceName]` from the self symbol's tags.
+                    let source_tag = self_sym.tags.iter().find_map(|t| match &t.inner {
+                        Tag::Source { name } => Some(name),
+                        _ => None,
+                    });
+
+                    let Some(ds) = source_tag else {
                         continue;
                     };
+                    data_source = Some(ds.inner);
 
                     // Check that the data source exists on this namespace
                     let ds_exists = table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
                         model: namespace,
-                        name: ds.name,
+                        name: ds.inner,
                     });
 
                     ensure!(
@@ -164,7 +171,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
 
                     continue;
                 }
-                ApiBlockMethodParamKind::Field(symbol) => symbol,
+                ApiBlockMethodParamKind::Param(symbol) => symbol,
             };
 
             let err = SemanticError::ApiInvalidParam {
@@ -211,9 +218,9 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     has_stream = true;
                     let required_params = method
                         .parameters
-                        .blocks()
+                        .inners()
                         .filter(|p| {
-                            let ApiBlockMethodParamKind::Field(symbol) = p else {
+                            let ApiBlockMethodParamKind::Param(symbol) = p else {
                                 return false;
                             };
 
@@ -259,7 +266,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 MediaType::Json
             },
             is_static,
-            data_source_symbol.map(|s| s.name),
+            data_source,
         )
     }
 }

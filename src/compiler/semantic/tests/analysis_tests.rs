@@ -1125,20 +1125,14 @@ fn validator_errors() {
             primary { id: int }
 
             keyfield {
-                [bogusvalidator 42]       // ValidatorUnknown
+                [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
                 name: string
             }
 
-            [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
             [step 2.5]                // ValidatorInvalidArgument (float to step)
             [len 3.14]                // ValidatorInvalidForType (length on non-string)
             [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
             age: int
-        }
-
-        poo MyPoo {
-            [unknown_poo 1]           // ValidatorUnknown on a poo field
-            field: string
         }
         "#,
     );
@@ -1146,17 +1140,12 @@ fn validator_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    expect_err!(errors, SemanticError::ValidatorUnknown { .. });
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
         2
     );
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidForType { .. }),
-        2
-    );
-    assert_eq!(
-        count_errs!(errors, SemanticError::ValidatorUnknown { .. }),
         2
     );
 }

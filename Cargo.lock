@@ -314,7 +314,6 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 name = "cli"
 version = "0.0.0"
 dependencies = [
- "ariadne",
  "ast",
  "clap",
  "codegen",
@@ -342,7 +341,6 @@ dependencies = [
  "json_comments",
  "migrations",
  "orm",
- "pathdiff",
  "serde",
  "serde_json",
  "sqlformat",
@@ -1477,12 +1475,6 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
-
-[[package]]
-name = "pathdiff"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "pem-rfc7468"

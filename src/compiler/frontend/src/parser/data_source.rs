@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use crate::{
     AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -41,7 +41,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     });
 
     // include { ... }
-    let include_tree = just(Token::Ident("include")).ignore_then(
+    let include_tree = kw!(Include).ignore_then(
         include_entry
             .repeated()
             .collect::<Vec<_>>()
@@ -63,7 +63,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql get(...) { ... }
     let get_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("get")))
+        .then_ignore(kw!(Get))
         .ignore_then(method_params())
         .then(sql_block.clone())
         .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
@@ -73,7 +73,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("list")))
+        .then_ignore(kw!(List))
         .ignore_then(method_params())
         .then(sql_block)
         .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
@@ -83,7 +83,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // [internal]
     let internal_decorator = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("internal")))
+        .ignore_then(kw!(Internal))
         .then_ignore(just(Token::RBracket))
         .map_spanned(|_| ())
         .map(|spd: Spd<()>| Symbol {
@@ -95,7 +95,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     // source SourceName for ModelName { ... }
     let source_block = just(Token::Source)
         .ignore_then(symbol())
-        .then_ignore(just(Token::Ident("for")))
+        .then_ignore(kw!(For))
         .then(symbol())
         .then(
             include_tree
@@ -117,9 +117,9 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     internal_decorator.or_not().then(source_block).map(
         |(internal, mut spd): (Option<Symbol>, Spd<DataSourceBlock>)| {
-            spd.block.internal = internal;
+            spd.inner.internal = internal;
             Spd {
-                block: AstBlockKind::DataSource(spd.block),
+                inner: AstBlockKind::DataSource(spd.inner),
                 span: spd.span,
             }
         },

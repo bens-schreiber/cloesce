@@ -1,20 +1,17 @@
 use chumsky::prelude::*;
 
-use ast::CrudKind;
-
 use crate::{
     AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, UseTag,
-    UseTagParamKind,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, typed_symbol},
 };
 
 /// `nav { navName }`
 fn foreign_nav_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<ForeignBlockNav<'src>>, Extra<'tokens, 'src>>
 {
-    just(Token::Ident("nav"))
+    kw!(Nav)
         .ignore_then(
             symbol()
                 .map(|nav| ForeignBlockNav { symbol: nav })
@@ -31,15 +28,15 @@ fn foreign_block<'tokens, 'src: 'tokens>()
         .then(symbol());
 
     let qualifier = choice((
-        just(Token::Ident("primary")).to(ForeignQualifier::Primary),
-        just(Token::Ident("optional")).to(ForeignQualifier::Optional),
-        just(Token::Ident("unique")).to(ForeignQualifier::Unique),
+        kw!(Primary).to(ForeignQualifier::Primary),
+        kw!(Optional).to(ForeignQualifier::Optional),
+        kw!(Unique).to(ForeignQualifier::Unique),
     ))
     .or_not();
 
-    let field = just(Token::Ident("nav")).not().ignore_then(symbol());
+    let field = kw!(Nav).not().ignore_then(symbol());
 
-    just(Token::Ident("foreign"))
+    kw!(Foreign)
         .ignore_then(
             adj_ref
                 .separated_by(just(Token::Comma))
@@ -66,14 +63,14 @@ fn foreign_block<'tokens, 'src: 'tokens>()
 /// `kv (binding, "key/format/{id}") paginated { ident: cidl_type }`
 fn kv_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvBlock<'src>, Extra<'tokens, 'src>> {
-    just(Token::Ident("kv"))
+    kw!(Kv)
         .ignore_then(
             symbol()
                 .then_ignore(just(Token::Comma))
                 .then(select! { Token::StringLit(value) => value })
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(just(Token::Ident("paginated")).or_not())
+        .then(kw!(Paginated).or_not())
         .then(typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((env_binding, key_format), paginated), field)| KvBlock {
             env_binding,
@@ -86,14 +83,14 @@ fn kv_block<'tokens, 'src: 'tokens>()
 /// `r2(binding, "key/format/{id}") paginated { ident }`
 fn r2_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2Block<'src>, Extra<'tokens, 'src>> {
-    just(Token::Ident("r2"))
+    kw!(R2)
         .ignore_then(
             symbol()
                 .then_ignore(just(Token::Comma))
                 .then(select! { Token::StringLit(value) => value })
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(just(Token::Ident("paginated")).or_not())
+        .then(kw!(Paginated).or_not())
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((env_binding, key_format), paginated), field)| R2Block {
             env_binding,
@@ -103,33 +100,8 @@ fn r2_block<'tokens, 'src: 'tokens>()
         })
 }
 
-fn use_item<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, UseTagParamKind<'src>, Extra<'tokens, 'src>> {
-    let crud = select! {
-        Token::Ident("get") => CrudKind::Get,
-        Token::Ident("save") => CrudKind::Save,
-        Token::Ident("list") => CrudKind::List,
-    }
-    .map_spanned(|k| k)
-    .map(UseTagParamKind::Crud);
-
-    crud.or(symbol().map(UseTagParamKind::EnvBinding))
-}
-
 pub fn model_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
-    // [use d1, get, save, list]
-    let use_tag = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("use")))
-        .ignore_then(
-            use_item()
-                .separated_by(just(Token::Comma))
-                .at_least(1)
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBracket))
-        .map_spanned(|params| UseTag { params });
-
     let choice_sql = || {
         choice((
             foreign_block().map(SqlBlockKind::Foreign),
@@ -139,7 +111,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     };
 
     // `primary { typed_symbols... foreign(...) { ... } }`
-    let primary_block = just(Token::Ident("primary")).ignore_then(
+    let primary_block = kw!(Primary).ignore_then(
         choice_sql()
             .repeated()
             .collect::<Vec<_>>()
@@ -148,7 +120,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     );
 
     // `optional { foreign(...) { ... } ... }` — all contained foreigners are nullable
-    let optional_block = just(Token::Ident("optional")).ignore_then(
+    let optional_block = kw!(Optional).ignore_then(
         choice_sql()
             .repeated()
             .collect::<Vec<_>>()
@@ -157,7 +129,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     );
 
     // `unique { foreign(...) { ... } | typed_symbol ... }`
-    let unique_block = just(Token::Ident("unique")).ignore_then(
+    let unique_block = kw!(Unique).ignore_then(
         choice_sql()
             .repeated()
             .collect::<Vec<_>>()
@@ -171,7 +143,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .then_ignore(just(Token::DoubleColon))
             .then(symbol());
 
-        just(Token::Ident("nav"))
+        kw!(Nav)
             .ignore_then(
                 adj_ref
                     .separated_by(just(Token::Comma))
@@ -189,7 +161,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
 
     // `keyfield { ([tag]* ident: cidl_type)* }`
     let keyfield_block = {
-        just(Token::Ident("keyfield"))
+        kw!(KeyField)
             .ignore_then(
                 typed_symbol()
                     .repeated()
@@ -200,7 +172,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     };
 
     // `paginated { r2(...) { ... } kv(...) { ... } }`
-    let paginated_block = just(Token::Ident("paginated")).ignore_then(
+    let paginated_block = kw!(Paginated).ignore_then(
         choice((
             kv_block().map(PaginatedBlockKind::Kv),
             r2_block().map(PaginatedBlockKind::R2),
@@ -230,8 +202,6 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         unique_block,
     ));
 
-    let use_tags = use_tag.repeated().collect::<Vec<_>>();
-
     let model_body = just(Token::Model)
         .ignore_then(symbol())
         .then(
@@ -241,21 +211,10 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|(symbol, blocks)| ModelBlock {
-            symbol,
-            use_tags: Vec::new(),
-            blocks,
-        });
+        .map(|(symbol, blocks)| ModelBlock { symbol, blocks });
 
-    use_tags
-        .then(model_body)
-        .map(|(use_tags, mut spd): (Vec<Spd<UseTag>>, Spd<ModelBlock>)| {
-            spd.block.use_tags = use_tags;
-            Spd {
-                block: AstBlockKind::Model(spd.block),
-                span: spd.span,
-            }
-        })
+    model_body
+        .map_spanned(|b| AstBlockKind::Model(b))
         // Without this box, Apple `ld` linker breaks
         // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
         .boxed()

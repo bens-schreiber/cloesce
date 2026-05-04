@@ -3,7 +3,7 @@ use chumsky::prelude::*;
 use crate::{
     AstBlockKind, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, typed_symbol},
 };
 
 /// Parses a block of the form:
@@ -27,7 +27,7 @@ use crate::{
 pub fn env_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // d1 { ident* }
-    let d1 = just(Token::Ident("d1"))
+    let d1 = kw!(D1)
         .ignore_then(
             symbol()
                 .repeated()
@@ -40,7 +40,7 @@ pub fn env_block<'tokens, 'src: 'tokens>()
         });
 
     // r2 { ident* }
-    let r2 = just(Token::Ident("r2"))
+    let r2 = kw!(R2)
         .ignore_then(
             symbol()
                 .repeated()
@@ -53,7 +53,7 @@ pub fn env_block<'tokens, 'src: 'tokens>()
         });
 
     // kv { ident* }
-    let kv = just(Token::Ident("kv"))
+    let kv = kw!(Kv)
         .ignore_then(
             symbol()
                 .repeated()
@@ -65,7 +65,7 @@ pub fn env_block<'tokens, 'src: 'tokens>()
             kind: EnvBindingBlockKind::Kv,
         });
 
-    let vars = just(Token::Ident("vars"))
+    let vars = kw!(Vars)
         .ignore_then(
             typed_symbol()
                 .repeated()

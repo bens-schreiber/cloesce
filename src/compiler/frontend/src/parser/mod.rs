@@ -3,21 +3,24 @@ mod data_source;
 mod env;
 mod model;
 
-use ast::CidlType;
+use ast::{CidlType, CrudKind};
 use chumsky::extra;
 use chumsky::input::MappedInput;
 use chumsky::prelude::*;
 
-use crate::AstBlockKind;
-use crate::FileTable;
-use crate::Span;
-use crate::Symbol;
-use crate::ValidatorLiteral;
-use crate::ValidatorTag;
-use crate::lexer::LexedFile;
-use crate::lexer::SpannedToken;
-use crate::lexer::Token;
-use crate::{InjectBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd};
+use crate::lexer::{LexedFile, SpannedToken, Token};
+use crate::{
+    ArgumentLiteral, AstBlockKind, FileTable, InjectBlock, Keyword, ParseAst, PlainOldObjectBlock,
+    ServiceBlock, Span, Spd, Symbol, Tag,
+};
+
+/// Converts a [Keyword] to a `just` [Token] parser
+macro_rules! kw {
+    ($kw:ident) => {
+        just(Token::from(crate::Keyword::$kw))
+    };
+}
+pub(crate) use kw;
 
 type TokenInput<'tokens, 'src> =
     MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
@@ -36,7 +39,7 @@ trait MapSpanned<'tokens, 'src: 'tokens, O>:
     {
         self.try_map(move |out, span: Span| {
             Ok(Spd {
-                block: f(out),
+                inner: f(out),
                 span,
             })
         })
@@ -160,22 +163,11 @@ fn inject_block<'tokens, 'src: 'tokens>()
 /// ```
 fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // ident: cidl_type
-    // NOTE: Does not capture validator tags.
-    let attribute = symbol()
-        .then_ignore(just(Token::Colon))
-        .then(cidl_type())
-        .map_with(|(sym, cidl_type), e| Symbol {
-            span: Span::new(sym.span.context(), sym.span.start..e.span().end),
-            cidl_type,
-            ..sym
-        });
-
     // service ServiceName { ... }
     just(Token::Service)
         .ignore_then(symbol())
         .then(
-            attribute
+            typed_symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -183,46 +175,104 @@ fn service_block<'tokens, 'src: 'tokens>()
         .map(|(symbol, fields)| AstBlockKind::Service(ServiceBlock { symbol, fields }))
 }
 
-/// Parses an identifier and captures its name + span info into a `Symbol`.
-///
-/// Does not capture cidl type / validator (sets to [CidlType::default()])
+/// Parses any number of `[ ... ]` tags, returning them as a vector of spanned [Tag]s.
+fn tags<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Vec<Spd<Tag<'src>>>, Extra<'tokens, 'src>> {
+    // [validator arg]
+    let validators = just(Token::LBracket)
+        .ignore_then(choice((
+            kw!(GreaterThan).to(Keyword::GreaterThan),
+            kw!(GreaterThanOrEqual).to(Keyword::GreaterThanOrEqual),
+            kw!(LessThanOrEqual).to(Keyword::LessThanOrEqual),
+            kw!(LessThan).to(Keyword::LessThan),
+            kw!(Step).to(Keyword::Step),
+            kw!(Len).to(Keyword::Len),
+            kw!(MinLen).to(Keyword::MinLen),
+            kw!(MaxLen).to(Keyword::MaxLen),
+            kw!(Regex).to(Keyword::Regex),
+        )))
+        .then(choice((
+            select! { Token::RealLit(s) => ArgumentLiteral::Real(s) },
+            select! { Token::IntLit(s) => ArgumentLiteral::Int(s) },
+            select! { Token::StringLit(s) => ArgumentLiteral::Str(s) },
+            select! { Token::RegexLit(s) => ArgumentLiteral::Regex(s) },
+        )))
+        .then_ignore(just(Token::RBracket))
+        .map(|(name, argument)| Tag::Validator { name, argument });
+
+    // [use binding]
+    let use_tags = just(Token::LBracket)
+        .then(kw!(Use))
+        .ignore_then(select! { Token::Ident(name) => name }.map_spanned(|name| name))
+        .then_ignore(just(Token::RBracket))
+        .map(|binding| Tag::Use { binding });
+
+    // [crud get|list|save, get|list|save, ...]
+    let crud_tags = just(Token::LBracket)
+        .then(kw!(Crud))
+        .ignore_then(
+            choice((
+                kw!(Get).to(CrudKind::Get),
+                kw!(List).to(CrudKind::List),
+                kw!(Save).to(CrudKind::Save),
+            ))
+            .map_spanned(|b| b)
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|kinds| Tag::Crud { kinds });
+
+    // [internal]
+    let internal_tag = just(Token::LBracket)
+        .then(kw!(Internal))
+        .then_ignore(just(Token::RBracket))
+        .map(|_| Tag::Internal);
+
+    // [source SourceName]
+    let source_tag = just(Token::LBracket)
+        .then(kw!(Source))
+        .ignore_then(select! { Token::Ident(name) => name }.map_spanned(|name| name))
+        .then_ignore(just(Token::RBracket))
+        .map(|name| Tag::Source { name });
+
+    choice((validators, use_tags, crud_tags, internal_tag, source_tag))
+        .map_spanned(|tag| tag)
+        .repeated()
+        .collect::<Vec<_>>()
+}
+
+/// Parses a block of the form:
+///```cloesce
+/// [tag arg]
+/// ident
+/// ```
 fn symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
-        span: e.span(),
-        name,
-        ..Default::default()
-    })
+    tags()
+        .then(select! { Token::Ident(name) => name })
+        .map_with(|(tags, name), e| Symbol {
+            span: e.span(),
+            name,
+            tags,
+            ..Default::default()
+        })
 }
 
 /// Parses a block of the form:
 /// ```cloesce
-/// [tag args...]
+/// [tag arg]
 /// ident: cidl_type
 /// ```
 fn typed_symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    let validator_tag = just(Token::LBracket)
-        .ignore_then(select! { Token::Ident(name) => name })
-        .then(choice((
-            select! { Token::RealLit(s) => ValidatorLiteral::Real(s) },
-            select! { Token::IntLit(s) => ValidatorLiteral::Int(s) },
-            select! { Token::StringLit(s) => ValidatorLiteral::Str(s) },
-            select! { Token::RegexLit(s) => ValidatorLiteral::Regex(s) },
-        )))
-        .then_ignore(just(Token::RBracket))
-        .map_spanned(|(name, arg)| ValidatorTag { name, arg });
-
-    validator_tag
-        .repeated()
-        .collect::<Vec<_>>()
-        .then(symbol())
+    symbol()
         .then_ignore(just(Token::Colon))
         .then(cidl_type())
-        .map_with(|((validator_tags, sym), cidl_type), e| Symbol {
+        .map_with(|(sym, cidl_type), e| Symbol {
             span: Span::new(sym.span.context(), sym.span.start..e.span().end),
             cidl_type,
-            tags: validator_tags,
             ..sym
         })
         // Without this box, Apple `ld` linker breaks
@@ -232,49 +282,60 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
 
 fn cidl_type<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, CidlType<'src>, Extra<'tokens, 'src>> {
-    recursive(|cidl_type| {
-        let wrapper = select! { Token::Ident(name) => name }
-            .then_ignore(just(Token::LAngle))
-            .then(cidl_type.clone())
-            .then_ignore(just(Token::RAngle))
-            .try_map(|(wrapper, inner), span| match wrapper {
-                "Option" => Ok(CidlType::nullable(inner)),
-                "Array" => Ok(CidlType::array(inner)),
-                "Paginated" => Ok(CidlType::paginated(inner)),
-                "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
-                "Partial" => match inner {
-                    CidlType::UnresolvedReference { name } => {
-                        Ok(CidlType::Partial { object_name: name })
-                    }
-                    _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
-                },
-                "DataSource" => match inner {
-                    CidlType::UnresolvedReference { name: model_name } => {
-                        Ok(CidlType::DataSource { model_name })
-                    }
-                    _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
-                },
-                _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
-            });
+    let primitive_keyword = choice((
+        kw!(TString).to(CidlType::String),
+        kw!(TInt).to(CidlType::Int),
+        kw!(TUint).to(CidlType::Uint),
+        kw!(TReal).to(CidlType::Real),
+        kw!(TDate).to(CidlType::DateIso),
+        kw!(TBool).to(CidlType::Boolean),
+        kw!(TJson).to(CidlType::Json),
+        kw!(TVoid).to(CidlType::Void),
+        kw!(TBlob).to(CidlType::Blob),
+        kw!(TStream).to(CidlType::Stream),
+        kw!(TR2Object).to(CidlType::R2Object),
+        kw!(Env).to(CidlType::Env),
+    ));
 
-        let primitive_keyword = choice((
-            just(Token::Ident("string")).to(CidlType::String),
-            just(Token::Ident("int")).to(CidlType::Int),
-            just(Token::Ident("uint")).to(CidlType::Uint),
-            just(Token::Ident("real")).to(CidlType::Real),
-            just(Token::Ident("date")).to(CidlType::DateIso),
-            just(Token::Ident("bool")).to(CidlType::Boolean),
-            just(Token::Ident("json")).to(CidlType::Json),
-            just(Token::Ident("void")).to(CidlType::Void),
-            just(Token::Ident("blob")).to(CidlType::Blob),
-            just(Token::Ident("stream")).to(CidlType::Stream),
-            just(Token::Ident("R2Object")).to(CidlType::R2Object),
-            just(Token::Env).to(CidlType::Env),
-        ));
+    recursive(|cidl_type| {
+        let generic = choice((
+            kw!(GOption).to(Keyword::GOption),
+            kw!(GArray).to(Keyword::GArray),
+            kw!(GPaginated).to(Keyword::GPaginated),
+            kw!(GKvObject).to(Keyword::GKvObject),
+            kw!(GPartial).to(Keyword::GPartial),
+            kw!(GDataSource).to(Keyword::GDataSource),
+        ))
+        .then(
+            cidl_type
+                .clone()
+                .delimited_by(just(Token::LAngle), just(Token::RAngle)),
+        )
+        .try_map(|(wrapper, inner), span| match wrapper {
+            Keyword::GOption => Ok(CidlType::nullable(inner)),
+            Keyword::GArray => Ok(CidlType::array(inner)),
+            Keyword::GPaginated => Ok(CidlType::paginated(inner)),
+            Keyword::GKvObject => Ok(CidlType::KvObject(Box::new(inner))),
+            Keyword::GPartial => match inner {
+                CidlType::UnresolvedReference { name } => {
+                    Ok(CidlType::Partial { object_name: name })
+                }
+                _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
+            },
+            Keyword::GDataSource => match inner {
+                CidlType::UnresolvedReference { name: model_name } => {
+                    Ok(CidlType::DataSource { model_name })
+                }
+                _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
+            },
+            _ => unreachable!(
+                "All generic wrapper keywords should be covered in the match arms above"
+            ),
+        });
 
         let unresolved_type = select! { Token::Ident(name) => name }
             .map(|name: &str| CidlType::UnresolvedReference { name });
 
-        choice((wrapper, primitive_keyword, unresolved_type)).boxed()
+        choice((generic, primitive_keyword, unresolved_type)).boxed()
     })
 }

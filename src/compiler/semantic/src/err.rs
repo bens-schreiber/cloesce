@@ -1,5 +1,6 @@
 use ariadne::{Color, Label, Report, ReportKind};
-use frontend::{FileTable, Span, Spd, ValidatorTag, err::DisplayError};
+use ast::CrudKind;
+use frontend::{FileTable, Span, Spd, Tag, err::DisplayError};
 
 use crate::Symbol;
 
@@ -29,12 +30,12 @@ pub enum SemanticError<'src, 'p> {
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
         model: &'p Symbol<'src>,
-        binding: &'p Symbol<'src>,
+        binding: &'p Spd<&'src str>,
     },
 
     D1ModelMultipleD1Bindings {
         model: &'p Symbol<'src>,
-        bindings: Vec<&'p Symbol<'src>>,
+        bindings: Vec<&'p Spd<&'src str>>,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
@@ -62,7 +63,7 @@ pub enum SemanticError<'src, 'p> {
     ForeignKeyReferencesDifferentDatabase {
         model: &'p Symbol<'src>,
         fk_model: &'p Symbol<'src>,
-        fk_binding: Option<&'p Symbol<'src>>,
+        fk_binding: Option<&'p Spd<&'src str>>,
     },
 
     // A foreign key references a field that is not a valid SQLite type
@@ -159,6 +160,7 @@ pub enum SemanticError<'src, 'p> {
     /// A model has a CRUD operation that is not supported for its backing store.
     UnsupportedCrudOperation {
         model: &'p Symbol<'src>,
+        crud: &'p Spd<CrudKind>,
     },
 
     /// An API block references a model that does not exist.
@@ -169,7 +171,7 @@ pub enum SemanticError<'src, 'p> {
     /// An API method references a data source that does not exist on the model.
     ApiUnknownDataSourceReference {
         method: &'p Symbol<'src>,
-        data_source: &'p Symbol<'src>,
+        data_source: &'p Spd<&'src str>,
     },
 
     /// An API method has an invalid return type.
@@ -184,18 +186,18 @@ pub enum SemanticError<'src, 'p> {
     },
 
     ValidatorInvalidForType {
-        validator: &'p Spd<ValidatorTag<'src>>,
+        validator: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
     },
 
     ValidatorInvalidArgument {
-        validator: &'p Spd<ValidatorTag<'src>>,
+        validator: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
         reason: String,
     },
 
-    ValidatorUnknown {
-        validator: &'p Spd<ValidatorTag<'src>>,
+    TagInvalidInContext {
+        tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
     },
 }
@@ -252,6 +254,14 @@ impl DisplayError for SemanticError<'_, '_> {
 fn span_parts(span: &Span, file_table: &FileTable) -> (String, std::ops::Range<usize>) {
     let (_, path) = file_table.resolve(span.context);
     (path.display().to_string(), span.start..span.end)
+}
+
+/// Returns the textual name of a validator tag, e.g. "gt" / "len" / "regex".
+fn validator_name(tag: &Tag<'_>) -> &'static str {
+    match tag {
+        Tag::Validator { name, .. } => name.as_str(),
+        _ => "<non-validator>",
+    }
 }
 
 fn display(
@@ -315,7 +325,7 @@ fn display(
             report!(binding_path.clone(), binding_range.clone())
                 .with_message(format!(
                     "'{}' is not a valid D1 binding in the env block",
-                    binding.name
+                    binding.inner
                 ))
                 .with_label(
                     Label::new((binding_path, binding_range))
@@ -344,7 +354,7 @@ fn display(
                 let (b_path, b_range) = span_parts(&binding.span, file_table);
                 report = report.with_label(
                     Label::new((b_path, b_range))
-                        .with_message(format!("binding '{}' specified here", binding.name))
+                        .with_message(format!("binding '{}' specified here", binding.inner))
                         .with_color(Color::Red),
                 );
             }
@@ -425,8 +435,11 @@ fn display(
                 .with_label(
                     Label::new((fk_path, fk_range))
                         .with_message(match fk_binding {
-                            Some(b) => {
-                                format!("model '{}' belongs to binding '{}'", fk_model.name, b.name)
+                            Some(spd) => {
+                                format!(
+                                    "model '{}' belongs to binding '{}'",
+                                    fk_model.name, spd.inner
+                                )
                             }
                             None => format!("model '{}' has no D1 binding", fk_model.name),
                         })
@@ -670,16 +683,19 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::UnsupportedCrudOperation { model } => {
+        SemanticError::UnsupportedCrudOperation { model, crud } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "model '{}' has a CRUD operation that is not supported for its backing store",
-                    model.name
+                    "model '{}' has unsupported CRUD operation '{:?}'",
+                    model.name, crud.inner
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("this CRUD operation is not available for this model type")
+                        .with_message(format!(
+                            "the backing store for this model does not support '{:?}'",
+                            crud.inner
+                        ))
                         .with_color(Color::Red),
                 )
         }
@@ -704,13 +720,13 @@ fn display(
             report!(path.clone(), range.clone())
                 .with_message(format!(
                     "API method '{}' references unknown data source '{}'",
-                    method.name, data_source.name
+                    method.name, data_source.inner
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(format!(
                             "'{}' is not defined on the model",
-                            data_source.name
+                            data_source.inner
                         ))
                         .with_color(Color::Red),
                 )
@@ -747,22 +763,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-        SemanticError::ValidatorUnknown { validator, symbol } => {
-            let (path, range) = span_parts(&symbol.span, file_table);
-            let (v_path, v_range) = span_parts(&validator.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!("unknown validator `{}`", validator.block.name))
-                .with_label(
-                    Label::new((v_path, v_range))
-                        .with_message("this validator is not recognized")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("applied to this field")
-                        .with_color(Color::Yellow),
-                )
-        }
         SemanticError::ValidatorInvalidArgument {
             validator,
             symbol,
@@ -773,7 +773,7 @@ fn display(
             report!(path.clone(), range.clone())
                 .with_message(format!(
                     "invalid argument for validator `{}`",
-                    validator.block.name
+                    validator_name(&validator.inner)
                 ))
                 .with_label(
                     Label::new((v_path, v_range))
@@ -792,7 +792,7 @@ fn display(
             report!(path.clone(), range.clone())
                 .with_message(format!(
                     "validator `{}` is not valid for this type",
-                    validator.block.name
+                    validator_name(&validator.inner)
                 ))
                 .with_label(
                     Label::new((v_path, v_range))
@@ -802,6 +802,22 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message("applied to this field")
+                        .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::TagInvalidInContext { tag, symbol } => {
+            let (path, range) = span_parts(&symbol.span, file_table);
+            let (t_path, t_range) = span_parts(&tag.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message("tag is not valid in this context")
+                .with_label(
+                    Label::new((t_path, t_range))
+                        .with_message("this tag cannot be applied here")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("applied to this symbol")
                         .with_color(Color::Yellow),
                 )
         }

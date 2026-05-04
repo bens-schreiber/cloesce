@@ -193,7 +193,7 @@ impl<'src> CloesceLexer {
 
         // todo: could be parallelized
         for (id_seed, source) in targets.into_iter().enumerate() {
-            let file_id = id_seed.try_into().expect("too many files to lex");
+            let file_id = FileId(id_seed.try_into().expect("too many files to lex"));
 
             file_table.table.insert(file_id, (source.src, source.path));
 
