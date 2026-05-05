@@ -4,7 +4,7 @@ use ast::{
     CidlType, CloesceAst, DataSource, DataSourceMethod, IncludeTree, Model, NavigationFieldKind,
     ValidatedField,
 };
-use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol};
+use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol, Tag};
 use indexmap::IndexMap;
 use orm::select::SelectModel;
 
@@ -90,6 +90,12 @@ impl<'src, 'p> DataSourceAnalysis {
                 .as_ref()
                 .and_then(|spd| Self::method(&ds.symbol, &spd.inner, sink));
 
+            let is_internal = ds
+                .symbol
+                .tags
+                .iter()
+                .any(|t| matches!(t.inner, Tag::Internal));
+
             res.push((
                 model_sym.name,
                 DataSource {
@@ -97,7 +103,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     tree: parsed_include_tree_to_ast(&ds.tree),
                     list,
                     get,
-                    is_internal: ds.internal.is_some(),
+                    is_internal,
                 },
             ));
         }

@@ -7,16 +7,14 @@ ast = { path = "../ast" }
 base64 = "0.22"
 chrono = { version = "0.4.44", features = ["serde"], default-features = false }
 indexmap = { workspace = true }
-regex = "1.12.3"
+regex = { workspace = true }
 sea-query = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-base64 = "0.22"
 compiler-test = { path = "../compiler-test" }
 migrations = { path = "../migrations" }
-serde_json = { workspace = true }
 sqlx = { workspace = true }
 
 [[bin]]

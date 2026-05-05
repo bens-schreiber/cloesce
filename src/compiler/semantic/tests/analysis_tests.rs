@@ -146,7 +146,7 @@ fn d1_model_column_fk_errors() {
         [use my_d1]
         model User {
             primary {
-                id: Option<int> // primary key cannot be nullable
+                id: option<int> // primary key cannot be nullable
             }
 
             id: int // duplicate symbol

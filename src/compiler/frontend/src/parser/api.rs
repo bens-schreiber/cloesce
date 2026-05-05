@@ -5,7 +5,7 @@ use ast::HttpVerb;
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tags, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol, tags},
 };
 
 /// Parses a block of the form:
@@ -23,7 +23,7 @@ use crate::{
 /// ```
 pub fn api_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    just(Token::Api)
+    kw!(Api)
         .ignore_then(symbol())
         .then(
             method()
@@ -50,11 +50,11 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
 
     // [tag]* self
     let self_param = tags()
-        .then_ignore(just(Token::SelfToken))
-        .map_with(|tag_list, e| {
+        .then(just(Token::SelfToken).map_with(|_, e| e.span()))
+        .map(|(tag_list, span)| {
             ApiBlockMethodParamKind::SelfParam(Symbol {
                 name: "self",
-                span: e.span(),
+                span,
                 tags: tag_list,
                 ..Default::default()
             })
@@ -63,7 +63,7 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
     // self | tagged_symbol: cidl_type
     let parameter = choice((
         self_param,
-        typed_symbol().map(ApiBlockMethodParamKind::Param),
+        tagged_typed_symbol().map(ApiBlockMethodParamKind::Param),
     ))
     .map_spanned(|p| p);
 

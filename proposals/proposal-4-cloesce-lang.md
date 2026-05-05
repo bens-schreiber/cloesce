@@ -358,7 +358,7 @@ The `poo` keyword defines a plain old object, which is simply a namespace for so
 poo UserWithPosts {
     id: int
     name: string
-    posts: Array<Post>
+    posts: array<Post>
 }
 ```
 
@@ -375,7 +375,7 @@ The Cloesce Language supports the following type primitives:
 - `json`
 - `stream`
 - `R2Object`
-- `Array<T>`
+- `array<T>`
 - `Option<T>`
 - `Paginated<T>`
 - `Partial<T>`

@@ -14,9 +14,8 @@ env {
 }
 
 // 4
-// 5
+[use db] // 5
 // 6
-[use db]
 model BasicModel {
     // C
     // 7
@@ -45,9 +44,8 @@ model BasicModel {
 } // 20
 
 // 21
-// 22
+[internal] // 22
 // 23
-[internal]
 source InternalSource for Model {
     include {
         // I

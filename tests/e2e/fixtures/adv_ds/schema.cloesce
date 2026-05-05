@@ -82,6 +82,6 @@ source OnlyBacon for Hamburger {
 }
 
 api Hamburger {
-    get noLettuceToppings([source NoLettuce] self) -> Array<Topping>
-    get onlyBaconToppings([source OnlyBacon] self) -> Array<Topping>
+    get noLettuceToppings([source NoLettuce] self) -> array<Topping>
+    get onlyBaconToppings([source OnlyBacon] self) -> array<Topping>
 }

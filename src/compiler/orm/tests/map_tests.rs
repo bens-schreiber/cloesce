@@ -55,7 +55,7 @@ fn no_records_returns_empty() {
                 id: int
             }
 
-            name: Option<string>
+            name: option<string>
 
             nav(Rider::horseId) {
                 riders
@@ -68,7 +68,7 @@ fn no_records_returns_empty() {
                 id: int
             }
 
-            nickname: Option<string>
+            nickname: option<string>
 
             foreign(Horse::id) {
                 horseId
@@ -95,7 +95,7 @@ fn flat() {
                 id: int
             }
 
-            name: Option<string>
+            name: option<string>
         }
     "#,
     );
@@ -127,7 +127,7 @@ async fn one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
 
                 foreign(Rider::id) {
                     bestRiderId
@@ -143,7 +143,7 @@ async fn one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: Option<string>
+                nickname: option<string>
             }
         "#,
         )
@@ -204,7 +204,7 @@ async fn one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
 
                 nav(Rider::horseId) {
                     riders
@@ -217,7 +217,7 @@ async fn one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: Option<string>
+                nickname: option<string>
 
                 foreign(Horse::id) {
                     horseId
@@ -281,7 +281,7 @@ async fn many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
 
                 nav(Course::id) {
                     courses
@@ -294,7 +294,7 @@ async fn many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                title: Option<string>
+                title: option<string>
 
                 nav(Student::id) {
                     students

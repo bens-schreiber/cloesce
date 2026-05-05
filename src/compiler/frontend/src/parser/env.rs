@@ -80,7 +80,7 @@ pub fn env_block<'tokens, 'src: 'tokens>()
     let sub_block = choice((d1, r2, kv, vars));
 
     // env { sub_block* }
-    just(Token::Env)
+    kw!(Env)
         .ignore_then(
             sub_block
                 .repeated()

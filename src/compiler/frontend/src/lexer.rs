@@ -9,23 +9,7 @@ use crate::{FileId, FileTable, Span};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token<'src> {
-    // Keywords
-    #[token("env")]
-    Env,
-    #[token("model")]
-    Model,
-    #[token("source")]
-    Source,
-    #[token("service")]
-    Service,
-    #[token("inject")]
-    Inject,
-    #[token("api")]
-    Api,
-    #[token("poo")]
-    Poo,
-    #[token("sql")]
-    Sql,
+    // Reserved
     #[token("self")]
     SelfToken,
 

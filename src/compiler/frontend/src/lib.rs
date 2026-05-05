@@ -80,9 +80,6 @@ contextual_keywords! {
     Patch => "patch",
     Delete => "delete",
 
-    // Self parameter in API methods
-    SelfParam => "self",
-
     // Validator tag (numerical)
     LessThan => "lt",
     LessThanOrEqual => "lte",
@@ -266,7 +263,6 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
-    pub internal: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {

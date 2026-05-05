@@ -2,9 +2,9 @@ use chumsky::prelude::*;
 
 use crate::{
     AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, kw, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
 
 /// `nav { navName }`
@@ -71,7 +71,7 @@ fn kv_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(kw!(Paginated).or_not())
-        .then(typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .then(tagged_typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((env_binding, key_format), paginated), field)| KvBlock {
             env_binding,
             key_format,
@@ -105,7 +105,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     let choice_sql = || {
         choice((
             foreign_block().map(SqlBlockKind::Foreign),
-            typed_symbol().map(SqlBlockKind::Column),
+            tagged_typed_symbol().map(SqlBlockKind::Column),
         ))
         .map_spanned(|k| k)
     };
@@ -163,7 +163,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     let keyfield_block = {
         kw!(KeyField)
             .ignore_then(
-                typed_symbol()
+                tagged_typed_symbol()
                     .repeated()
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -187,7 +187,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     let kv = kv_block().map(ModelBlockKind::Kv);
     let r2 = r2_block().map(ModelBlockKind::R2);
     let foreign = foreign_block().map(ModelBlockKind::Foreign);
-    let column = typed_symbol().map(ModelBlockKind::Column);
+    let column = tagged_typed_symbol().map(ModelBlockKind::Column);
 
     let sub_blocks = choice((
         foreign,
@@ -200,10 +200,12 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         primary_block,
         optional_block,
         unique_block,
-    ));
+    ))
+    .boxed();
 
-    let model_body = just(Token::Model)
-        .ignore_then(symbol())
+    let model_body = tags()
+        .then_ignore(kw!(Model))
+        .then(symbol())
         .then(
             sub_blocks
                 .map_spanned(|k| k)
@@ -211,11 +213,10 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(symbol, blocks)| ModelBlock { symbol, blocks });
+        .map(|((tags, symbol), blocks)| ModelBlock {
+            symbol: Symbol { tags, ..symbol },
+            blocks,
+        });
 
-    model_body
-        .map_spanned(|b| AstBlockKind::Model(b))
-        // Without this box, Apple `ld` linker breaks
-        // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
-        .boxed()
+    model_body.map_spanned(|b| AstBlockKind::Model(b)).boxed()
 }

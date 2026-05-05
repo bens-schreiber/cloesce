@@ -119,10 +119,10 @@ fn parser<'tokens, 'src: 'tokens>()
 /// ```
 fn poo_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    just(Token::Poo)
+    kw!(Poo)
         .ignore_then(symbol())
         .then(
-            typed_symbol()
+            tagged_typed_symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -143,7 +143,7 @@ fn poo_block<'tokens, 'src: 'tokens>()
 /// ```
 fn inject_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    just(Token::Inject)
+    kw!(Inject)
         .ignore_then(
             symbol()
                 .repeated()
@@ -164,7 +164,7 @@ fn inject_block<'tokens, 'src: 'tokens>()
 fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // service ServiceName { ... }
-    just(Token::Service)
+    kw!(Service)
         .ignore_then(symbol())
         .then(
             typed_symbol()
@@ -241,28 +241,26 @@ fn tags<'tokens, 'src: 'tokens>()
         .map_spanned(|tag| tag)
         .repeated()
         .collect::<Vec<_>>()
+        .boxed()
 }
 
 /// Parses a block of the form:
 ///```cloesce
-/// [tag arg]
 /// ident
 /// ```
+///
+/// NOTE: Does not include tags.
 fn symbol<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
-    tags()
-        .then(select! { Token::Ident(name) => name })
-        .map_with(|(tags, name), e| Symbol {
-            span: e.span(),
-            name,
-            tags,
-            ..Default::default()
-        })
+    select! { Token::Ident(name) => name }.map_with(|name, e| Symbol {
+        span: e.span(),
+        name,
+        ..Default::default()
+    })
 }
 
 /// Parses a block of the form:
 /// ```cloesce
-/// [tag arg]
 /// ident: cidl_type
 /// ```
 fn typed_symbol<'tokens, 'src: 'tokens>()
@@ -275,9 +273,18 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
             cidl_type,
             ..sym
         })
-        // Without this box, Apple `ld` linker breaks
-        // (a symbol name over 1.2 million characters is generated, exceeding the name limit)
-        .boxed()
+}
+
+/// Parses a block of the form:
+/// ```cloesce
+/// [tags]
+/// ident: cidl_type
+/// ```
+fn tagged_typed_symbol<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Symbol<'src>, Extra<'tokens, 'src>> {
+    tags()
+        .then(typed_symbol())
+        .map(|(tags, sym)| Symbol { tags, ..sym })
 }
 
 fn cidl_type<'tokens, 'src: 'tokens>()

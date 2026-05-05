@@ -242,34 +242,16 @@ impl<'src> FmtCtx<'src> {
             .then(trailing)
     }
 
-    /// Renders a top-level block declaration of the form `[tag]\nkeyword Name`.
-    ///
-    /// Tags on the symbol (e.g. `[use db]` on a model) are emitted first, each on its own line,
-    /// followed by leading comments and finally `keyword name`.
-    fn top_level_decl(&self, sym: &'src Symbol<'src>, keyword: Keyword) -> Doc<'src> {
-        let mut doc = Doc::nil();
-        for tag in &sym.tags {
-            doc = doc.then(self.spd_doc(tag, 0, true)).then(Doc::hardline(0));
-        }
-
-        let (leading, has_leading_comments) = self.leading_comments(sym.span.start, 0);
-        if has_leading_comments {
-            doc = doc.then(leading).then(Doc::hardline(0));
-        }
-
-        let trailing = self.trailing_comment(sym.span.end);
-        self.advance(sym.span.end);
-
-        doc.then(Doc::text(keyword.as_str()))
-            .then(Doc::text(" "))
-            .then(Doc::text(sym.name))
-            .then(trailing)
-    }
-
-    fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
-        // Validator tags (if any)
+    fn _sym_doc(
+        &self,
+        sym: &'src Symbol<'src>,
+        keyword: Option<Keyword>,
+        indent: usize,
+        inline: bool,
+    ) -> Doc<'src> {
+        // Tags
         let mut tags_doc = Doc::nil();
-        for tag in &sym.tags {
+        for (idx, tag) in sym.tags.iter().enumerate() {
             let (tag_leading, tag_has_leading) = self.leading_comments(tag.span.start, indent);
             self.node_ends.borrow_mut().push(tag.span.end);
             let tag_content = tag.inner.to_doc(self);
@@ -281,17 +263,33 @@ impl<'src> FmtCtx<'src> {
             } else {
                 Doc::nil()
             };
+
+            let next_start = sym
+                .tags
+                .get(idx + 1)
+                .map(|t| t.span.start)
+                .unwrap_or(sym.span.start);
+            let post_sep = if self.gap(tag.span.end, next_start) > 0 {
+                Doc::hardline(indent)
+            } else {
+                Doc::text(" ")
+            };
+
             tags_doc = tags_doc
                 .then(tag_leading)
                 .then(tag_sep)
                 .then(tag_content)
                 .then(tag_trailing)
-                .then(Doc::hardline(indent));
+                .then(post_sep);
         }
 
+        let is_top_decl = keyword.is_some();
         let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = if matches!(sym.cidl_type, CidlType::Void) {
-            Doc::text(sym.name)
+            keyword.map_or_else(
+                || Doc::text(sym.name),
+                |kw| Doc::kw(kw).then(Doc::text(" ")).then(Doc::text(sym.name)),
+            )
         } else {
             Doc::text(sym.name)
                 .then(Doc::text(": "))
@@ -307,7 +305,7 @@ impl<'src> FmtCtx<'src> {
             Doc::nil()
         };
 
-        let pre_leading = if sym.tags.is_empty() {
+        let pre_leading = if sym.tags.is_empty() && !is_top_decl {
             Doc::hardline(indent)
         } else {
             Doc::nil()
@@ -334,6 +332,16 @@ impl<'src> FmtCtx<'src> {
             .then(content_sep)
             .then(content)
             .then(trailing)
+    }
+
+    /// Emits a top level declaration as a [Doc], including any leading tags or comments.
+    fn top_decl_doc(&self, sym: &'src Symbol<'src>, keyword: Keyword) -> Doc<'src> {
+        self._sym_doc(sym, Some(keyword), 0, false)
+    }
+
+    /// Emits a symbol as a [Doc], including any leading tags or comments.
+    fn sym_doc(&self, sym: &'src Symbol<'src>, indent: usize, inline: bool) -> Doc<'src> {
+        self._sym_doc(sym, None, indent, inline)
     }
 }
 
@@ -387,7 +395,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_level_decl(&self.symbol, Keyword::Model);
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Model);
 
         if self.blocks.is_empty() {
             // No content, return empty model
@@ -595,7 +603,7 @@ impl<'src> ToDoc<'src> for R2Block<'src> {
 
 impl<'src> ToDoc<'src> for ApiBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_level_decl(&self.symbol, Keyword::Api);
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Api);
 
         if self.methods.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -655,19 +663,8 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
 
 impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let internal = if let Some(sym) = &self.internal {
-            Doc::text("[")
-                .then(ctx.sym_doc(sym, 0, true))
-                .then(Doc::text("]"))
-                .then(Doc::hardline(0))
-        } else {
-            Doc::nil()
-        };
-
-        let source_doc = internal
-            .then(Doc::kw(Keyword::Source))
-            .then(Doc::text(" "))
-            .then(ctx.sym_doc(&self.symbol, 0, true))
+        let source_doc = ctx
+            .top_decl_doc(&self.symbol, Keyword::Source)
             .then(Doc::text(" "))
             .then(Doc::kw(Keyword::For))
             .then(Doc::text(" "))
@@ -726,7 +723,7 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_level_decl(&self.symbol, Keyword::Service);
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Service);
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -742,7 +739,7 @@ impl<'src> ToDoc<'src> for ServiceBlock<'src> {
 
 impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_level_decl(&self.symbol, Keyword::Poo);
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Poo);
 
         if self.fields.is_empty() {
             return doc.then(Doc::text(" {}"));
@@ -820,13 +817,23 @@ fn fmt_cidl_type(ty: &CidlType<'_>) -> String {
         CidlType::Inject { name }
         | CidlType::Object { name }
         | CidlType::UnresolvedReference { name } => name.to_string(),
-        CidlType::Partial { object_name } => format!("Partial<{}>", object_name),
-        CidlType::DataSource { model_name } => format!("DataSource<{}>", model_name),
-        CidlType::Array(inner) => format!("Array<{}>", fmt_cidl_type(inner)),
-        CidlType::HttpResult(inner) => format!("HttpResult<{}>", fmt_cidl_type(inner)),
-        CidlType::Nullable(inner) => format!("Option<{}>", fmt_cidl_type(inner)),
-        CidlType::Paginated(inner) => format!("Paginated<{}>", fmt_cidl_type(inner)),
-        CidlType::KvObject(inner) => format!("KvObject<{}>", fmt_cidl_type(inner)),
+        CidlType::Partial { object_name } => {
+            format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
+        }
+        CidlType::DataSource { model_name } => {
+            format!("{}<{}>", Keyword::GDataSource.as_str(), model_name)
+        }
+        CidlType::Array(inner) => format!("{}<{}>", Keyword::GArray.as_str(), fmt_cidl_type(inner)),
+        CidlType::Nullable(inner) => {
+            format!("{}<{}>", Keyword::GOption.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::Paginated(inner) => {
+            format!("{}<{}>", Keyword::GPaginated.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::KvObject(inner) => {
+            format!("{}<{}>", Keyword::GKvObject.as_str(), fmt_cidl_type(inner))
+        }
+        _ => unreachable!("unsupported CIDL type in fmt_cidl_type"),
     }
 }
 

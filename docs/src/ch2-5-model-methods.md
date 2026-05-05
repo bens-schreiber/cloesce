@@ -35,7 +35,7 @@ model User {
 
 api User {
     get echo() -> string
-    get myDogs(self) -> Array<Dog>
+    get myDogs(self) -> array<Dog>
     get selfWithoutDogs([source NoDogs] self) -> User
 
     post updateName(self, newName: string) -> void
@@ -139,7 +139,7 @@ There are many valid types for method parameters in Cloesce, such as:
 | `Partial<T>`      | Partial version of Model type `T` where anything can be missing     |
 | Plain Old Objects | Objects with properties of supported types                          |
 | Model types       | Custom Models (e.g., `User`, `Post`)                                |
-| `Array<T>`        | Arrays of any supported type (e.g., `Array<string>`, `Array<User>`) |
+| `array<T>`        | Arrays of any supported type (e.g., `array<string>`, `array<User>`) |
 | `Option<T>`       | Nullable versions of any type                                       |
 | `stream`          | Stream of data                                                      |
 
@@ -154,7 +154,7 @@ Cloesce supports the use of Plain Old Objects (POOs) as method parameters and re
 poo Profile {
     bio: string
     age: int
-    interests: Array<string>
+    interests: array<string>
 }
 
 model User {

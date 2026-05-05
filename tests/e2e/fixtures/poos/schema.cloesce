@@ -15,7 +15,7 @@ poo PooB {
 
 poo PooC {
     a: PooA
-    b: Array<PooB>
+    b: array<PooB>
 }
 
 [use db]

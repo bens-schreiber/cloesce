@@ -119,27 +119,27 @@ fn poo_block() {
         poo Address {
             street: string
             city: string
-            zipcode: Option<string>
+            zipcode: option<string>
         }
 
         poo User {
             id: int
             name: string
             email: string
-            age: Option<int>
+            age: option<int>
             active: bool
             balance: real
             created: date
             address: Address
-            tags: Array<string>
-            metadata: Option<json>
-            optional_items: Option<Array<Item>>
-            nullable_arrays: Array<Option<string>>
+            tags: array<string>
+            metadata: option<json>
+            optional_items: option<array<Item>>
+            nullable_arrays: array<option<string>>
         }
 
         poo Container {
-            items: Array<Item>
-            nested: Array<Array<int>>
+            items: array<Item>
+            nested: array<array<int>>
         }
         "#,
     );
@@ -275,7 +275,7 @@ fn service_block() {
         }
 
         api MyAppService {
-            get listItems(self) -> Array<string>
+            get listItems(self) -> array<string>
         }
         "#,
     );

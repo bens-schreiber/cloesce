@@ -193,7 +193,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 - **Option<T>**: Validate the inner type `T` if the value is not null. If the value is null, skip validation.
 
-- **Array<T>** | **Paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
+- **array<T>** | **Paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
 
 - **Partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 

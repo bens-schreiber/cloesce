@@ -37,11 +37,11 @@ model HasSqlColumnTypes {
     dub: real
     boo: bool
     dat: date
-    strNull: Option<string>
-    integerNull: Option<int>
-    dubNull: Option<real>
-    booNull: Option<bool>
-    dateNull: Option<date>
+    strNull: option<string>
+    integerNull: option<int>
+    dubNull: option<real>
+    booNull: option<bool>
+    dateNull: option<date>
 }
 
 [use db]
@@ -125,7 +125,7 @@ model ModelWithKv {
 api ModelWithKv {
     post instanceMethod(self, e: env, input: string) -> string
     get staticMethod(input: int) -> int
-    post hasKvParamAndRes(self, input: KvObject<string>) -> KvObject<string>
+    post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
 }
 
 model ModelWithR2 {
