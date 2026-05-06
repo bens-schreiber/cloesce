@@ -196,6 +196,12 @@ pub enum SemanticError<'src, 'p> {
         reason: String,
     },
 
+    InstanceTagOnNonField {
+        tag: &'p Spd<Tag<'src>>,
+        source: &'p Symbol<'src>,
+        param: &'p Symbol<'src>,
+    },
+
     TagInvalidInContext {
         tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
@@ -834,6 +840,31 @@ fn display(
                             "key fields must be a valid SQLite type (string, int, real, date, json, bool, or blob)"
                         )
                         .with_color(Color::Red),
+                )
+        }
+        SemanticError::InstanceTagOnNonField { source, param, tag } => {
+            let (s_path, s_range) = span_parts(&source.span, file_table);
+            let (p_path, p_range) = span_parts(&param.span, file_table);
+            let (t_path, t_range) = span_parts(&tag.span, file_table);
+            report!(s_path.clone(), s_range.clone())
+                .with_message(format!(
+                    "instance tag applied to non-field symbol '{}'",
+                    source.name
+                ))
+                .with_label(
+                    Label::new((s_path, s_range))
+                        .with_message("instance tags can only be applied to fields")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((p_path, p_range))
+                        .with_message(format!("this parameter '{}' is not a field", param.name))
+                        .with_color(Color::Yellow),
+                )
+                .with_label(
+                    Label::new((t_path, t_range))
+                        .with_message("this tag is an instance tag")
+                        .with_color(Color::Blue),
                 )
         }
     };

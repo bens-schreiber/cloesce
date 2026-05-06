@@ -156,7 +156,7 @@ source Default for Foo {
 
 **String Validators**
 
-- `[length n]`: Validates that a string has a length of n, where n is an integer literal.
+- `[len n]`: Validates that a string has a length of n, where n is an integer literal.
 - `[min n]`: Validates that a string has a minimum length of n, where n is an integer literal.
 - `[max n]`: Validates that a string has a maximum length of n, where n is an integer literal.
 - `[regex r]`: Validates that a string matches the regular expression r, where r is a regex literal.
@@ -193,7 +193,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 - **option<T>**: Validate the inner type `T` if the value is not null. If the value is null, skip validation.
 
-- **array<T>** | **Paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
+- **array<T>** | **paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
 
 - **partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 ---
@@ -228,31 +228,7 @@ source B for Foo {
 }
 ```
 
-**Option 1: flat prefix.** Prefix each parameter with its source name in the generated signature:
-
-```
-get params:
-    - A_id: string [length 5]
-    - B_id: string [length 100]
-```
-
-This is unambiguous, but the flat names leak into the client callsite and become unwieldy with longer source names:
-
-```ts
-const result = await Foo.$get({ A_id: "hello" });
-```
-
-**Option 2: Plain old Object per source method.** Group parameters under a per-source key in the generated client type:
-
-```ts
-const result = await Foo.$get({
-  A: { id: "hello" },
-});
-```
-
-This is clean at the callsite, but requires generating a distinct input type per source method, adding schema noise with no meaning outside this narrow context.
-
-**Chosen approach: prefix internally, present as nested object.** Use the prefixed representation in the compiled AST and generated schema (keeping codegen simple and unambiguous), but emit client-side TypeScript that surfaces the parameters as a nested object keyed by source name. This isolates the structural complexity to the codegen layer and keeps both the schema and client code clean.
+Instead of hacking around this problem with hardcoded generation, it makes the most sense to solve it using the primitives available in Cloesce: generating per-source `get`, `list` and `save` methods. For example, the above would generate `$get_A`, `$get_B`, `$list_A`, `$list_B`, etc. These exist as their own endpoint entirely, meaning the Cloesce Router will route to the correct implementation based off the incoming route name (e.g. `GET /foo/$get_A` dispatches to get of source A).
 
 ---
 

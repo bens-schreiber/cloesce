@@ -218,5 +218,5 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             blocks,
         });
 
-    model_body.map_spanned(|b| AstBlockKind::Model(b)).boxed()
+    model_body.map_spanned(AstBlockKind::Model).boxed()
 }

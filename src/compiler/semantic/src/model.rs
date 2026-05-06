@@ -152,7 +152,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             )
         });
 
-        let binding = if has_sql_blocks || env_bindings.len() > 0 {
+        let binding = if has_sql_blocks || !env_bindings.is_empty() {
             if env_bindings.is_empty() {
                 ma.sink
                     .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });

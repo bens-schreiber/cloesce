@@ -6,11 +6,13 @@ edition = "2024"
 ast = { path = "../ast" }
 base64 = "0.22"
 chrono = { version = "0.4.44", features = ["serde"], default-features = false }
+frontend = { path = "../frontend" }
 indexmap = { workspace = true }
 regex = { workspace = true }
 sea-query = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }

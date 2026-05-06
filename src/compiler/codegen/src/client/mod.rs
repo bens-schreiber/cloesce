@@ -1,7 +1,7 @@
 use askama::Template;
 use ast::{
-    ApiMethod, CidlType, CloesceAst, HttpVerb, MediaType, Model, NavigationField,
-    NavigationFieldKind, ValidatedField,
+    ApiMethod, CidlType, CloesceAst, DataSourceGetMethodParam, HttpVerb, MediaType, Model,
+    NavigationField, NavigationFieldKind,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -113,10 +113,6 @@ impl ClientTemplate<'_> {
         matches!(verb, HttpVerb::Get)
     }
 
-    fn is_url_param(&self, ty: &CidlType<'_>, verb: &HttpVerb) -> bool {
-        matches!(verb, HttpVerb::Get) || matches!(ty, CidlType::DataSource { .. })
-    }
-
     fn is_stream(&self, ty: &CidlType<'_>) -> bool {
         matches!(ty.root_type(), CidlType::Stream)
     }
@@ -133,84 +129,16 @@ impl ClientTemplate<'_> {
         matches!(nav.kind, NavigationFieldKind::OneToOne { .. })
     }
 
-    fn is_crud_method(&self, name: &str) -> bool {
-        name == "$get" || name == "$save" || name == "$list"
-    }
-
-    fn strip_ds_prefix<'a>(&self, ds_name: &str, param_name: &'a str) -> &'a str {
-        let prefix = format!("{}_", ds_name);
-        param_name
-            .strip_prefix(prefix.as_str())
-            .unwrap_or(param_name)
-    }
-
-    /// CRUD method parameters that belong to `ds_name` (prefixed `Name_`).
-    fn crud_ds_params<'t>(
-        &self,
-        api: &'t ApiMethod<'t>,
-        ds_name: &str,
-    ) -> Vec<&'t ValidatedField<'t>> {
-        let prefix = format!("{}_", ds_name);
-        api.parameters
-            .iter()
-            .filter(|p| p.name.starts_with(prefix.as_str()))
-            .collect()
-    }
-
-    /// Parameters that are not part of the models fields or keys
-    /// but are part of the data source's GET method are considered "extra",
-    /// and must be explicitly passed when calling the CRUD method
-    /// (as opposed to resolving from `this`)
-    fn ds_extra_params<'t>(
+    fn ds_get<'t>(
         &self,
         model: &'t Model<'t>,
         api: &ApiMethod<'_>,
-    ) -> Vec<&'t ValidatedField<'t>> {
-        let Some(ds_name) = api.data_source else {
-            return vec![];
-        };
-        let Some(get) = model
-            .data_sources
-            .get(ds_name)
+    ) -> &'t [DataSourceGetMethodParam<'t>] {
+        api.data_source
+            .and_then(|n| model.data_sources.get(n))
             .and_then(|ds| ds.get.as_ref())
-        else {
-            return vec![];
-        };
-
-        let fields: Vec<&str> = model
-            .primary_columns
-            .iter()
-            .map(|c| c.field.name.as_ref())
-            .chain(model.columns.iter().map(|c| c.field.name.as_ref()))
-            .chain(model.key_fields.iter().map(|k| k.name.as_ref()))
-            .collect();
-
-        get.parameters
-            .iter()
-            .filter(|p| !fields.contains(&p.name.as_ref()))
-            .collect()
-    }
-
-    fn ds_get_params<'t>(
-        &self,
-        model: &'t Model<'t>,
-        api: &ApiMethod<'_>,
-    ) -> Vec<&'t ValidatedField<'t>> {
-        let Some(ds_name) = api.data_source else {
-            return vec![];
-        };
-        model
-            .data_sources
-            .get(ds_name)
-            .and_then(|ds| ds.get.as_ref())
-            .map(|get| get.parameters.iter().collect())
-            .unwrap_or_default()
-    }
-
-    fn is_ds_extra_param(&self, model: &Model<'_>, api: &ApiMethod<'_>, param_name: &str) -> bool {
-        self.ds_extra_params(model, api)
-            .iter()
-            .any(|p| p.name == param_name)
+            .map(|g| g.parameters.as_slice())
+            .unwrap_or(&[])
     }
 }
 

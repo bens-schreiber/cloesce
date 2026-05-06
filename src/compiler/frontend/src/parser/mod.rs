@@ -230,6 +230,12 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|_| Tag::Internal);
 
+    // [instance]
+    let instance_tag = just(Token::LBracket)
+        .then(kw!(Instance))
+        .then_ignore(just(Token::RBracket))
+        .map(|_| Tag::Instance);
+
     // [source SourceName]
     let source_tag = just(Token::LBracket)
         .then(kw!(Source))
@@ -237,11 +243,18 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|name| Tag::Source { name });
 
-    choice((validators, use_tags, crud_tags, internal_tag, source_tag))
-        .map_spanned(|tag| tag)
-        .repeated()
-        .collect::<Vec<_>>()
-        .boxed()
+    choice((
+        validators,
+        use_tags,
+        crud_tags,
+        internal_tag,
+        instance_tag,
+        source_tag,
+    ))
+    .map_spanned(|tag| tag)
+    .repeated()
+    .collect::<Vec<_>>()
+    .boxed()
 }
 
 /// Parses a block of the form:
@@ -309,7 +322,6 @@ fn cidl_type<'tokens, 'src: 'tokens>()
             kw!(GPaginated).to(Keyword::GPaginated),
             kw!(GKvObject).to(Keyword::GKvObject),
             kw!(GPartial).to(Keyword::GPartial),
-            kw!(GDataSource).to(Keyword::GDataSource),
         ))
         .then(
             cidl_type
@@ -326,12 +338,6 @@ fn cidl_type<'tokens, 'src: 'tokens>()
                     Ok(CidlType::Partial { object_name: name })
                 }
                 _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
-            },
-            Keyword::GDataSource => match inner {
-                CidlType::UnresolvedReference { name: model_name } => {
-                    Ok(CidlType::DataSource { model_name })
-                }
-                _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
             },
             _ => unreachable!(
                 "All generic wrapper keywords should be covered in the match arms above"

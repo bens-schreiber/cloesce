@@ -201,7 +201,7 @@ model ModelWithCruds {
 source ByName for ModelWithCruds {
     include {}
 
-    sql get(name: string) {
+    sql get([instance] name: string) {
         "SELECT * FROM ModelWithCruds WHERE name = $name"
     }
 
@@ -236,7 +236,7 @@ source Custom for ModelWithCustomDs {
         data
     }
 
-    sql get(id: int, externalParam: string) {
+    sql get([instance] id: int, externalParam: string) {
         "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
     }
 }

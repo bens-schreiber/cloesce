@@ -4,8 +4,8 @@ use std::{
 };
 
 use ast::{
-    CidlType, CloesceAst, DataSource, DataSourceMethod, IncludeTree, Model, NavigationFieldKind,
-    ValidatedField,
+    CidlType, CloesceAst, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
+    DataSourceListMethod, IncludeTree, Model, NavigationFieldKind, ValidatedField, Validator,
 };
 use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol, Tag};
 use indexmap::IndexMap;
@@ -54,7 +54,6 @@ impl<'src, 'p> DataSourceAnalysis {
             // Validate include tree via BFS
             let mut q = VecDeque::new();
             q.push_back((&ds.tree, model));
-
             while let Some((node, parent_model)) = q.pop_front() {
                 for (field, child) in &node.0 {
                     // Check navigation properties
@@ -97,14 +96,78 @@ impl<'src, 'p> DataSourceAnalysis {
                 }
             }
 
-            let list = ds
-                .list
-                .as_ref()
-                .and_then(|spd| Self::method(&ds.symbol, &spd.inner, sink));
-            let get = ds
-                .get
-                .as_ref()
-                .and_then(|spd| Self::method(&ds.symbol, &spd.inner, sink));
+            let list = ds.list.as_ref().map(|method| {
+                validate_raw_sql(&ds.symbol, &method.inner, sink);
+
+                let params = method
+                    .inner
+                    .parameters
+                    .iter()
+                    .map(|p| {
+                        let (validators, instance_tag) = validate_ds_param(p, &ds.symbol, sink);
+
+                        if let Some(tag) = instance_tag {
+                            // Not allowed on list methods
+                            sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
+                        }
+
+                        ValidatedField {
+                            name: p.name.into(),
+                            cidl_type: p.cidl_type.clone(),
+                            validators,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                DataSourceListMethod {
+                    parameters: params,
+                    raw_sql: method.inner.raw_sql.to_string(),
+                }
+            });
+
+            let get = ds.get.as_ref().map(|method| {
+                validate_raw_sql(&ds.symbol, &method.inner, sink);
+
+                let params = method
+                    .inner
+                    .parameters
+                    .iter()
+                    .map(|p| {
+                        let (validators, instance_tag) = validate_ds_param(p, &ds.symbol, sink);
+
+                        if let Some(tag) = instance_tag {
+                            // Parameter must exist as a field on the model
+                            if !model.columns.iter().any(|c| c.field.name == p.name)
+                                && !model
+                                    .primary_columns
+                                    .iter()
+                                    .any(|pk| pk.field.name == p.name)
+                                && !model.key_fields.iter().any(|k| k.name == p.name)
+                            {
+                                sink.push(SemanticError::InstanceTagOnNonField {
+                                    tag,
+                                    source: &ds.symbol,
+                                    param: p,
+                                });
+                            }
+                        }
+
+                        DataSourceGetMethodParam {
+                            parameter: ValidatedField {
+                                name: p.name.into(),
+                                cidl_type: p.cidl_type.clone(),
+                                validators,
+                            },
+                            instance_field: instance_tag.is_some(),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                DataSourceGetMethod {
+                    parameters: params,
+                    raw_sql: method.inner.raw_sql.to_string(),
+                }
+            });
 
             res.push((
                 model_sym.name,
@@ -118,17 +181,58 @@ impl<'src, 'p> DataSourceAnalysis {
             ));
         }
 
-        res
-    }
+        return res;
 
-    // Validate list and get method parameters
-    fn method(
-        source_sym: &'p Symbol<'src>,
-        method: &'p DataSourceBlockMethod<'src>,
-        sink: &mut ErrorSink<'src, 'p>,
-    ) -> Option<DataSourceMethod<'src>> {
-        let mut parameters = Vec::new();
-        for param in &method.parameters {
+        /// Validates that the raw SQL only references parameters that are defined
+        /// on the method.
+        fn validate_raw_sql<'src, 'p>(
+            source_sym: &'p Symbol<'src>,
+            method: &DataSourceBlockMethod,
+            sink: &mut ErrorSink<'src, 'p>,
+        ) {
+            let mut chars = method.raw_sql.chars().peekable();
+            while let Some(ch) = chars.next() {
+                if ch == '$' {
+                    let name: String =
+                        std::iter::from_fn(|| chars.next_if(|c| c.is_alphanumeric() || *c == '_'))
+                            .collect();
+
+                    if !name.is_empty()
+                        && name != "include"
+                        && !method.parameters.iter().any(|p| p.name == name)
+                    {
+                        sink.push(SemanticError::DataSourceUnknownSqlParam {
+                            source: source_sym,
+                            name,
+                        });
+                    }
+                }
+            }
+        }
+
+        /// Validates that a parameter is a valid SQL type and has valid tags for
+        /// a data source method parameter.
+        ///
+        /// Returns a list of resolved validators and whether the parameter is an instance field.
+        fn validate_ds_param<'src, 'p>(
+            param: &'p Symbol<'src>,
+            source_sym: &'p Symbol<'src>,
+            sink: &mut ErrorSink<'src, 'p>,
+        ) -> (Vec<Validator<'src>>, Option<&'p frontend::Spd<Tag<'src>>>) {
+            let mut instance_tag = None;
+
+            // Validate tags
+            for tag in param.tags.iter() {
+                match &tag.inner {
+                    Tag::Instance => instance_tag = Some(tag),
+                    Tag::Validator { .. } => {
+                        // Allowed
+                    }
+                    _ => sink.push(SemanticError::TagInvalidInContext { tag, symbol: param }),
+                }
+            }
+
+            // Validate type
             if !is_valid_sql_type(&param.cidl_type) {
                 sink.push(SemanticError::DataSourceInvalidMethodParam {
                     source: source_sym,
@@ -136,43 +240,15 @@ impl<'src, 'p> DataSourceAnalysis {
                 });
             }
 
-            let validators = match resolve_validator_tags(param) {
-                Ok(v) => v,
+            // Resolve all validator tags
+            match resolve_validator_tags(param) {
+                Ok(v) => (v, instance_tag),
                 Err(errs) => {
                     sink.extend(errs);
-                    Vec::new()
-                }
-            };
-
-            parameters.push(ValidatedField {
-                name: param.name.into(),
-                cidl_type: param.cidl_type.clone(),
-                validators,
-            });
-        }
-
-        // Verify every $name placeholder in the SQL is either $include or matches a parameter.
-        let param_names: std::collections::HashSet<String> =
-            parameters.iter().map(|p| p.name.to_string()).collect();
-        let mut chars = method.raw_sql.chars().peekable();
-        while let Some(ch) = chars.next() {
-            if ch == '$' {
-                let name: String =
-                    std::iter::from_fn(|| chars.next_if(|c| c.is_alphanumeric() || *c == '_'))
-                        .collect();
-                if !name.is_empty() && name != "include" && !param_names.contains(&name) {
-                    sink.push(SemanticError::DataSourceUnknownSqlParam {
-                        source: source_sym,
-                        name,
-                    });
+                    (vec![], None)
                 }
             }
         }
-
-        Some(DataSourceMethod {
-            parameters,
-            raw_sql: method.raw_sql.to_string(),
-        })
     }
 }
 
@@ -204,11 +280,14 @@ impl<'src> DataSourceExpansion {
     }
 
     // Simple get by primary key
-    fn build_default_get(model: &Model<'src>, include_sql: &String) -> DataSourceMethod<'src> {
+    fn build_default_get(model: &Model<'src>, include_sql: &String) -> DataSourceGetMethod<'src> {
         let parameters = model
             .primary_columns
             .iter()
-            .map(|pk| pk.field.clone())
+            .map(|pk| DataSourceGetMethodParam {
+                parameter: pk.field.clone(),
+                instance_field: true,
+            })
             .collect();
 
         let where_clause = if model.primary_columns.len() == 1 {
@@ -235,14 +314,14 @@ impl<'src> DataSourceExpansion {
             format!("{include_sql} WHERE ({where_clause}) = ({params})")
         };
 
-        DataSourceMethod {
+        DataSourceGetMethod {
             parameters,
             raw_sql,
         }
     }
 
     // Seek pagination based on primary keys with a limit, ordered by primary key ascending.
-    fn build_default_list(model: &Model<'src>, include_sql: &String) -> DataSourceMethod<'src> {
+    fn build_default_list(model: &Model<'src>, include_sql: &String) -> DataSourceListMethod<'src> {
         let parameters = model
             .primary_columns
             .iter()
@@ -293,7 +372,7 @@ impl<'src> DataSourceExpansion {
         let raw_sql =
             format!("{include_sql} WHERE {where_expr} ORDER BY {order} LIMIT ?{limit_param}");
 
-        DataSourceMethod {
+        DataSourceListMethod {
             parameters,
             raw_sql,
         }
@@ -301,16 +380,16 @@ impl<'src> DataSourceExpansion {
 
     /// Normalizes input and resolves `$parameterName` placeholders
     /// to positional `?N` syntax for prepared statements.
-    pub fn resolve_sql_params(method: &mut DataSourceMethod) {
+    pub fn resolve_sql_params(
+        raw_sql: &str,
+        params: &[&ValidatedField<'_>],
+        include_sql: &str,
+    ) -> String {
         // Normalize whitespace to keep generated SQL stable.
-        method.raw_sql = method
-            .raw_sql
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ");
+        let normalized = raw_sql.split_whitespace().collect::<Vec<_>>().join(" ");
 
-        let mut result = String::with_capacity(method.raw_sql.len());
-        let mut chars = method.raw_sql.chars().peekable();
+        let mut result = String::with_capacity(normalized.len());
+        let mut chars = normalized.chars().peekable();
 
         while let Some(ch) = chars.next() {
             if ch == '$' {
@@ -331,9 +410,14 @@ impl<'src> DataSourceExpansion {
                     continue;
                 }
 
+                if name == "include" {
+                    // Expand $include to the full include SQL.
+                    result.push_str(include_sql);
+                    continue;
+                }
+
                 // Look up the parameter index by exact name match.
-                if let Some((idx, _param)) = method
-                    .parameters
+                if let Some((idx, _param)) = params
                     .iter()
                     .enumerate()
                     .find(|(_, p)| p.name.as_ref() == name.as_str())
@@ -351,7 +435,7 @@ impl<'src> DataSourceExpansion {
             }
         }
 
-        method.raw_sql = result;
+        result
     }
 
     /// Creates a default [DataSource] for any model that doesn't have one,
@@ -410,15 +494,7 @@ impl<'src> DataSourceExpansion {
                     .collect();
                 (model.name, defaults)
             })
-            .collect::<Vec<(
-                &str,
-                Vec<(
-                    &str,
-                    Option<DataSourceMethod>,
-                    Option<DataSourceMethod>,
-                    String,
-                )>,
-            )>>();
+            .collect::<Vec<(&str, Vec<_>)>>();
 
         for (name, defaults) in pending {
             let model = ast.models.get_mut(name).unwrap();
@@ -432,14 +508,18 @@ impl<'src> DataSourceExpansion {
                     ds.list = Some(l);
                 }
 
-                // Expand $include then resolve $paramName -> ?N
+                // Resolve $paramName -> ?N
                 if let Some(m) = &mut ds.get {
-                    m.raw_sql = m.raw_sql.replace("$include", &include_sql);
-                    Self::resolve_sql_params(m);
+                    let params = m
+                        .parameters
+                        .iter()
+                        .map(|p| &p.parameter)
+                        .collect::<Vec<_>>();
+                    m.raw_sql = Self::resolve_sql_params(&m.raw_sql, &params, &include_sql);
                 }
                 if let Some(m) = &mut ds.list {
-                    m.raw_sql = m.raw_sql.replace("$include", &include_sql);
-                    Self::resolve_sql_params(m);
+                    let params = m.parameters.iter().collect::<Vec<_>>();
+                    m.raw_sql = Self::resolve_sql_params(&m.raw_sql, &params, &include_sql);
                 }
             }
         }

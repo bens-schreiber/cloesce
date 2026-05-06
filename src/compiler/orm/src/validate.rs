@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use ast::{CidlType, CloesceAst, Number, ValidatedField, Validator};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
+use frontend::fmt_cidl_type;
 use serde_json::Value;
 
-use crate::{OrmErrorKind, fail, fmt_cidl_type};
+use crate::{OrmErrorKind, fail};
 
 /// Runtime type validation, asserting that the structure of a JSON value
 /// matches the structure of the provided CIDL type.
@@ -150,19 +151,6 @@ pub fn validate_cidl_type(
             } else {
                 fail!(type_mismatch_err(value))
             }
-        }
-
-        CidlType::DataSource { model_name } => {
-            let model = ast.models.get(model_name).unwrap();
-            let Some(value_str) = value.as_str() else {
-                fail!(type_mismatch_err(value));
-            };
-
-            if !model.data_sources.contains_key(value_str) {
-                fail!(type_mismatch_err(value));
-            }
-
-            Some(value)
         }
 
         CidlType::KvObject(inner) => {

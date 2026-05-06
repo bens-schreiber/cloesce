@@ -1,4 +1,4 @@
-use ast::{CidlType, Number};
+use ast::Number;
 use serde_json::Value;
 
 pub mod map;
@@ -99,32 +99,6 @@ impl std::fmt::Display for OrmErrorKind {
                 "Validation error: expected value to match regex pattern '{pattern}', got '{got}'"
             ),
         }
-    }
-}
-
-fn fmt_cidl_type(t: &CidlType) -> String {
-    match t {
-        CidlType::Void => "void".to_string(),
-        CidlType::Int => "int".to_string(),
-        CidlType::Real => "real".to_string(),
-        CidlType::String => "string".to_string(),
-        CidlType::Blob => "blob".to_string(),
-        CidlType::Boolean => "boolean".to_string(),
-        CidlType::DateIso => "date_iso".to_string(),
-        CidlType::Stream => "stream".to_string(),
-        CidlType::Json => "json".to_string(),
-        CidlType::R2Object => "r2_object".to_string(),
-        CidlType::Env => "env".to_string(),
-        CidlType::Inject { name } => format!("inject '{}'", name),
-        CidlType::Object { name } => format!("object '{}'", name),
-        CidlType::Partial { object_name } => format!("partial '{}'", object_name),
-        CidlType::DataSource { model_name } => format!("data_source '{}'", model_name),
-        CidlType::Array(cidl_type) => format!("array<{}>", fmt_cidl_type(cidl_type)),
-        CidlType::HttpResult(cidl_type) => format!("http_result<{}>", fmt_cidl_type(cidl_type)),
-        CidlType::Nullable(cidl_type) => format!("nullable<{}>", fmt_cidl_type(cidl_type)),
-        CidlType::Paginated(cidl_type) => format!("paginated<{}>", fmt_cidl_type(cidl_type)),
-        CidlType::KvObject(cidl_type) => format!("kv_object<{}>", fmt_cidl_type(cidl_type)),
-        CidlType::UnresolvedReference { name } => format!("unresolved_reference '{}'", name),
     }
 }
 

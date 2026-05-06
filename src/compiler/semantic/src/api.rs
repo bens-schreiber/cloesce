@@ -69,7 +69,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         };
 
         Some(ApiMethod {
-            name: method.symbol.name,
+            name: method.symbol.name.into(),
             is_static,
             data_source,
             http_verb: method.http_verb,
@@ -148,7 +148,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                         let Tag::Source { name } = &tag.inner else {
                             self.sink.push(SemanticError::TagInvalidInContext {
                                 tag,
-                                symbol: &self_sym,
+                                symbol: self_sym,
                             });
                             continue;
                         };
@@ -235,12 +235,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                                 return false;
                             };
 
-                            !matches!(
-                                symbol.cidl_type,
-                                CidlType::Inject { .. }
-                                    | CidlType::DataSource { .. }
-                                    | CidlType::Env
-                            )
+                            !matches!(symbol.cidl_type, CidlType::Inject { .. } | CidlType::Env)
                         })
                         .count();
 

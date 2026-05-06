@@ -1,4 +1,7 @@
-use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, Model, ValidatedField};
+use ast::{
+    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, Model,
+    ValidatedField,
+};
 
 pub struct CrudExpansion;
 impl CrudExpansion {
@@ -7,129 +10,103 @@ impl CrudExpansion {
         for model in ast.models.values_mut() {
             let mut crud_methods = vec![];
             for crud in &model.cruds {
-                crud_methods.push(Self::method(crud, model));
+                crud_methods.extend(Self::methods(crud, model));
             }
 
             model.apis.extend(crud_methods);
         }
     }
 
-    fn method<'src>(crud: &CrudKind, model: &Model<'src>) -> ApiMethod<'src> {
+    /// Returns a list of API methods for the given [CrudKind]
+    ///
+    /// - [CrudKind::Get] generates a method for each public data source with a `get` block
+    ///   with the name `$get_{data_source_name}`.
+    ///
+    /// - [CrudKind::List] generates a method for each public data source with a `list` block
+    ///   with the name `$list_{data_source_name}`.
+    ///
+    /// - [CrudKind::Save] generates a method for each public data source with the name `$save_{data_source_name}`.
+    ///
+    /// The `Default` data source is treated as a special case and does not have the data source name appended to the method.
+    fn methods<'src>(crud: &CrudKind, model: &Model<'src>) -> Vec<ApiMethod<'src>> {
+        let sources = model.data_sources.values().filter(|ds| !ds.is_internal);
+        let format_name = |ds: &DataSource<'src>| {
+            let verb = match crud {
+                CrudKind::Get => "get",
+                CrudKind::List => "list",
+                CrudKind::Save => "save",
+            };
+            if ds.name == "Default" {
+                format!("${verb}").into()
+            } else {
+                format!("${verb}_{}", ds.name).into()
+            }
+        };
+
         match crud {
-            CrudKind::Get => {
-                let mut parameters = vec![];
+            CrudKind::Get => sources
+                .filter(|ds| ds.get.is_some())
+                .map(|ds| {
+                    let parameters = ds
+                        .get
+                        .as_ref()
+                        .unwrap()
+                        .parameters
+                        .iter()
+                        .map(|get| &get.parameter)
+                        .chain(model.key_fields.iter())
+                        .cloned()
+                        .collect();
 
-                // Include all key fields
-                for field in &model.key_fields {
-                    parameters.push(ValidatedField {
-                        name: field.name.clone(),
-                        cidl_type: CidlType::nullable(field.cidl_type.clone()),
-                        validators: field.validators.clone(),
-                    });
-                }
-
-                // Include parameters from each data source, prefixed by source name
-                for (&ds_name, ds) in &model.data_sources {
-                    if ds.is_internal {
-                        continue;
+                    ApiMethod {
+                        name: format_name(ds),
+                        is_static: true,
+                        data_source: None,
+                        http_verb: HttpVerb::Get,
+                        return_type: CidlType::http(CidlType::Object { name: model.name }),
+                        return_media: MediaType::Json,
+                        parameters_media: MediaType::Json,
+                        parameters,
                     }
-                    if let Some(get) = &ds.get {
-                        for param in &get.parameters {
-                            parameters.push(ValidatedField {
-                                name: format!("{}_{}", ds_name, param.name).into(),
-                                cidl_type: CidlType::nullable(param.cidl_type.clone()),
-                                validators: param.validators.clone(),
-                            });
-                        }
+                })
+                .collect(),
+            CrudKind::List => sources
+                .filter(|ds| ds.list.is_some())
+                .map(|ds| {
+                    let parameters = ds.list.as_ref().unwrap().parameters.clone();
+
+                    ApiMethod {
+                        name: format_name(ds),
+                        is_static: true,
+                        data_source: None,
+                        http_verb: HttpVerb::Get,
+                        return_type: CidlType::http(CidlType::array(CidlType::Object {
+                            name: model.name,
+                        })),
+                        return_media: MediaType::Json,
+                        parameters_media: MediaType::Json,
+                        parameters,
                     }
-                }
-
-                // Last parameter is always the data source
-                parameters.push(ValidatedField {
-                    name: "$datasource".into(),
-                    cidl_type: CidlType::DataSource {
-                        model_name: model.name,
-                    },
-                    validators: vec![],
-                });
-
-                ApiMethod {
-                    name: "$get",
+                })
+                .collect(),
+            CrudKind::Save => sources
+                .map(|ds| ApiMethod {
+                    name: format_name(ds),
                     is_static: true,
-                    http_verb: HttpVerb::Get,
+                    data_source: None,
+                    http_verb: HttpVerb::Post,
                     return_type: CidlType::http(CidlType::Object { name: model.name }),
-                    parameters,
-                    parameters_media: MediaType::Json,
                     return_media: MediaType::Json,
-                    data_source: None,
-                }
-            }
-            CrudKind::List => {
-                let mut parameters = vec![];
-
-                // Include parameters from each data source, prefixed by source name
-                for (&ds_name, ds) in &model.data_sources {
-                    if ds.is_internal {
-                        continue;
-                    }
-                    if let Some(list) = &ds.list {
-                        for param in &list.parameters {
-                            parameters.push(ValidatedField {
-                                name: format!("{}_{}", ds_name, param.name).into(),
-                                cidl_type: CidlType::nullable(param.cidl_type.clone()),
-                                validators: param.validators.clone(),
-                            });
-                        }
-                    }
-                }
-
-                // Last parameter is always the data source
-                parameters.push(ValidatedField {
-                    name: "$datasource".into(),
-                    cidl_type: CidlType::DataSource {
-                        model_name: model.name,
-                    },
-                    validators: vec![],
-                });
-
-                ApiMethod {
-                    name: "$list",
-                    is_static: true,
-                    http_verb: HttpVerb::Get,
-                    return_type: CidlType::http(CidlType::array(CidlType::Object {
-                        name: model.name,
-                    })),
-                    parameters,
                     parameters_media: MediaType::Json,
-                    return_media: MediaType::Json,
-                    data_source: None,
-                }
-            }
-            CrudKind::Save => ApiMethod {
-                name: "$save",
-                is_static: true,
-                http_verb: HttpVerb::Post,
-                return_type: CidlType::http(CidlType::Object { name: model.name }),
-                parameters: vec![
-                    ValidatedField {
+                    parameters: vec![ValidatedField {
                         name: "model".into(),
                         cidl_type: CidlType::Partial {
                             object_name: model.name,
                         },
                         validators: vec![],
-                    },
-                    ValidatedField {
-                        name: "$datasource".into(),
-                        cidl_type: CidlType::DataSource {
-                            model_name: model.name,
-                        },
-                        validators: vec![],
-                    },
-                ],
-                parameters_media: MediaType::Json,
-                return_media: MediaType::Json,
-                data_source: None,
-            },
+                    }],
+                })
+                .collect(),
         }
     }
 }

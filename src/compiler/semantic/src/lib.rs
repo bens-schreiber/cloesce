@@ -540,7 +540,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
 }
 
 /// Converts a [CidlType::UnresolvedReference] to a resolved type of [CidlType::Object] or [CidlType::Inject]
-/// if possible, recursively. Also validates [CidlType::DataSource] and [CidlType::Partial] references.
+/// if possible, recursively. Also validates references inside of generic types.
 ///
 /// Returns an error if the type cannot be resolved or is invalid.
 fn resolve_cidl_type<'src, 'p>(
@@ -578,14 +578,6 @@ fn resolve_cidl_type<'src, 'p>(
             }
 
             Err(SemanticError::UnresolvedSymbol { symbol })
-        }
-        CidlType::DataSource { model_name } => {
-            let valid = table.models.contains_key(model_name);
-
-            if !valid {
-                return Err(SemanticError::UnresolvedSymbol { symbol });
-            }
-            Ok(cidl_type.clone())
         }
         CidlType::Partial { object_name } => {
             let valid =

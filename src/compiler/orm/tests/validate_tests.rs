@@ -343,35 +343,6 @@ fn r2() {
 }
 
 #[test]
-fn data_source() {
-    // Unknown data source
-    {
-        let ast = src_to_ast(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Horse {
-                primary {
-                    id: int
-                }
-            }
-        "#,
-        );
-        let result = validate(
-            CidlType::DataSource {
-                model_name: "Horse",
-            },
-            Some(json!("nonexistent_source")),
-            &ast,
-        );
-        assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
-    }
-}
-
-#[test]
 fn objects_partials() {
     // Invalid column propagates
     {

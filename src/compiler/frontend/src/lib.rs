@@ -67,6 +67,7 @@ contextual_keywords! {
     Use => "use",
     Crud => "crud",
     Internal => "internal",
+    Instance => "instance",
 
     // CRUD / SQL method
     Get => "get",
@@ -99,7 +100,6 @@ contextual_keywords! {
     GPaginated => "paginated",
     GKvObject => "kvobject",
     GPartial => "partial",
-    GDataSource => "datasource",
 
     // Primitive type
     TString => "string",
@@ -111,6 +111,40 @@ contextual_keywords! {
     TBlob => "blob",
     TStream => "stream",
     TR2Object => "R2Object",
+}
+
+pub fn fmt_cidl_type(ty: &CidlType) -> String {
+    match ty {
+        CidlType::Int => Keyword::TInt.as_str().into(),
+        CidlType::Real => Keyword::TReal.as_str().into(),
+        CidlType::String => Keyword::TString.as_str().into(),
+        CidlType::Blob => Keyword::TBlob.as_str().into(),
+        CidlType::Boolean => Keyword::TBool.as_str().into(),
+        CidlType::DateIso => Keyword::TDate.as_str().into(),
+        CidlType::Stream => Keyword::TStream.as_str().into(),
+        CidlType::Json => Keyword::TJson.as_str().into(),
+        CidlType::R2Object => Keyword::TR2Object.as_str().into(),
+        CidlType::Env => "env".into(), // TODO: remove env
+        CidlType::Inject { name }
+        | CidlType::Object { name }
+        | CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Partial { object_name } => {
+            format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
+        }
+        CidlType::Array(inner) => {
+            format!("{}<{}>", Keyword::GArray.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::Nullable(inner) => {
+            format!("{}<{}>", Keyword::GOption.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::Paginated(inner) => {
+            format!("{}<{}>", Keyword::GPaginated.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::KvObject(inner) => {
+            format!("{}<{}>", Keyword::GKvObject.as_str(), fmt_cidl_type(inner))
+        }
+        _ => unreachable!("unsupported CIDL type in fmt_cidl_type"),
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
@@ -189,6 +223,7 @@ pub enum Tag<'src> {
         name: Spd<&'src str>,
     },
     Internal,
+    Instance,
     Validator {
         name: Keyword,
         argument: ArgumentLiteral<'src>,

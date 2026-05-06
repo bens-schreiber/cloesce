@@ -5,15 +5,16 @@ use ast::{
     ValidatedField,
 };
 
+use frontend::fmt_cidl_type;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
 use sea_query::{Expr, Query};
 use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
+use crate::fail;
 use crate::select::SelectModel;
 use crate::{OrmErrorKind, alias};
-use crate::{fail, fmt_cidl_type};
 
 use super::Result;
 use super::validate::validate_cidl_type;

@@ -65,25 +65,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::Partial { object_name, .. } => {
                 format!("DeepPartial<{}>", self.namespace(ast, object_name))
             }
-            CidlType::DataSource { model_name, .. } => {
-                let ds = &ast
-                    .models
-                    .get(model_name)
-                    .expect("Model to exist")
-                    .data_sources;
-
-                let joined = ds
-                    .values()
-                    .filter_map(|d| (!d.is_internal).then_some(format!("\"{}\"", d.name)))
-                    .collect::<Vec<_>>()
-                    .join(" | ");
-
-                if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
-                    format!("{joined} = \"Default\"")
-                } else {
-                    joined
-                }
-            }
             CidlType::Stream => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),

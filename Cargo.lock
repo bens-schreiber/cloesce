@@ -1438,6 +1438,7 @@ dependencies = [
  "base64",
  "chrono",
  "compiler-test",
+ "frontend",
  "indexmap",
  "migrations",
  "regex",
