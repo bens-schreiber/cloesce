@@ -539,7 +539,8 @@ fn one_to_many_nav_person_dogs() {
             d1 { db }
         }
 
-        [use db, save, get]
+        [use db]
+        [crud save, get]
         model Person {
             primary { id: int }
 
@@ -548,7 +549,8 @@ fn one_to_many_nav_person_dogs() {
             }
         }
 
-        [use db, save]
+        [use db]
+        [crud save]
         model Dog {
             primary { id: int }
 

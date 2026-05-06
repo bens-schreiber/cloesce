@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, save, get, list]
+[use db]
+[crud save, get, list]
 model CrudHaver {
     primary {
         id: int
@@ -17,7 +18,8 @@ api CrudHaver {
     post notCrud(self) -> void
 }
 
-[use db, save, get, list]
+[use db]
+[crud save, get, list]
 model Parent {
     primary {
         id: int

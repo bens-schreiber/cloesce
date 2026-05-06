@@ -1,4 +1,7 @@
-use std::collections::{HashSet, VecDeque};
+use std::{
+    collections::{HashSet, VecDeque},
+    ops::Not,
+};
 
 use ast::{
     CidlType, CloesceAst, DataSource, DataSourceMethod, IncludeTree, Model, NavigationFieldKind,
@@ -11,7 +14,7 @@ use orm::select::SelectModel;
 use crate::{
     SymbolTable,
     err::{ErrorSink, SemanticError},
-    is_valid_sql_type, resolve_validators,
+    is_valid_sql_type, resolve_validator_tags,
 };
 
 pub struct DataSourceAnalysis;
@@ -24,6 +27,19 @@ impl<'src, 'p> DataSourceAnalysis {
         let mut res = Vec::new();
 
         for ds in &table.data_sources {
+            // Validate tags
+            let mut is_internal = false;
+            for tag in &ds.symbol.tags {
+                if matches!(&tag.inner, Tag::Internal).not() {
+                    sink.push(SemanticError::TagInvalidInContext {
+                        tag,
+                        symbol: &ds.symbol,
+                    });
+                    continue;
+                }
+                is_internal = true;
+            }
+
             // Validate the model reference
             let Some(model_sym) = table.models.get(ds.model.name).map(|m| &m.symbol) else {
                 sink.push(SemanticError::DataSourceUnknownModelReference { source: &ds.symbol });
@@ -90,12 +106,6 @@ impl<'src, 'p> DataSourceAnalysis {
                 .as_ref()
                 .and_then(|spd| Self::method(&ds.symbol, &spd.inner, sink));
 
-            let is_internal = ds
-                .symbol
-                .tags
-                .iter()
-                .any(|t| matches!(t.inner, Tag::Internal));
-
             res.push((
                 model_sym.name,
                 DataSource {
@@ -126,7 +136,7 @@ impl<'src, 'p> DataSourceAnalysis {
                 });
             }
 
-            let validators = match resolve_validators(param) {
+            let validators = match resolve_validator_tags(param) {
                 Ok(v) => v,
                 Err(errs) => {
                     sink.extend(errs);

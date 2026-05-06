@@ -32,7 +32,8 @@ api PureR2Model {
     put uploadOtherData(self, e: env, data: stream) -> void
 }
 
-[use db, get, save, list]
+[use db]
+[crud get, save, list]
 model D1BackedModel {
     primary {
         id: int

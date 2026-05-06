@@ -3,7 +3,7 @@ use std::ops::Not;
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    resolve_cidl_type, resolve_validators,
+    resolve_cidl_type, resolve_validator_tags,
 };
 use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
 use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
@@ -143,41 +143,48 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 ApiBlockMethodParamKind::SelfParam(self_sym) => {
                     is_static = false;
 
-                    // Extract `[source SourceName]` from the self symbol's tags.
-                    let source_tag = self_sym.tags.iter().find_map(|t| match &t.inner {
-                        Tag::Source { name } => Some(name),
-                        _ => None,
-                    });
+                    // Validate tags
+                    for tag in &self_sym.tags {
+                        let Tag::Source { name } = &tag.inner else {
+                            self.sink.push(SemanticError::TagInvalidInContext {
+                                tag,
+                                symbol: &self_sym,
+                            });
+                            continue;
+                        };
 
-                    let Some(ds) = source_tag else {
-                        continue;
-                    };
-                    data_source = Some(ds.inner);
+                        data_source = Some(name.inner);
 
-                    // Check that the data source exists on this namespace
-                    let ds_exists = table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
-                        model: namespace,
-                        name: ds.inner,
-                    });
+                        // Check that the data source exists on this namespace
+                        let ds_exists =
+                            table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
+                                model: namespace,
+                                name: name.inner,
+                            });
 
-                    ensure!(
-                        ds_exists,
-                        self.sink,
-                        SemanticError::ApiUnknownDataSourceReference {
-                            method: &method.symbol,
-                            data_source: ds
-                        }
-                    );
+                        ensure!(
+                            ds_exists,
+                            self.sink,
+                            SemanticError::ApiUnknownDataSourceReference {
+                                method: &method.symbol,
+                                data_source: name,
+                            }
+                        );
+                    }
 
+                    // No further validation is needed for `self`.
                     continue;
                 }
                 ApiBlockMethodParamKind::Param(symbol) => symbol,
             };
 
-            let err = SemanticError::ApiInvalidParam {
-                method: &method.symbol,
-                param,
-            };
+            // Validate tags
+            for tag in &param.tags {
+                if !matches!(tag.inner, Tag::Validator { .. }) {
+                    self.sink
+                        .push(SemanticError::TagInvalidInContext { tag, symbol: param });
+                }
+            }
 
             let resolved_type = match resolve_cidl_type(param, &param.cidl_type, table) {
                 Ok(t) => t,
@@ -186,14 +193,22 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     continue;
                 }
             };
+            let invalid_type_err = SemanticError::ApiInvalidParam {
+                method: &method.symbol,
+                param,
+            };
             match resolved_type.root_type() {
                 CidlType::Inject { .. } => {
                     // Option, Array or any other wrapper types are not allowed to wrap Inject
-                    ensure!(*resolved_type.root_type() == resolved_type, self.sink, err);
+                    ensure!(
+                        *resolved_type.root_type() == resolved_type,
+                        self.sink,
+                        invalid_type_err
+                    );
                 }
 
                 CidlType::Void => {
-                    self.sink.push(err);
+                    self.sink.push(invalid_type_err);
                 }
 
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
@@ -201,7 +216,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
@@ -210,7 +225,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
@@ -236,14 +251,14 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     ensure!(
                         required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
                 _ => {}
             }
 
-            let validators = match resolve_validators(param) {
+            let validators = match resolve_validator_tags(param) {
                 Ok(v) => v,
                 Err(errs) => {
                     self.sink.extend(errs);

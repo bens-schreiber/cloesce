@@ -100,7 +100,24 @@ impl<'src, 'p> SemanticAnalysis {
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<WranglerEnv<'src>> {
-        if table.env_bindings.is_empty() {
+        let mut d1_bindings = Vec::new();
+        let mut r2_bindings = Vec::new();
+        let mut kv_bindings = Vec::new();
+        let mut vars = Vec::new();
+
+        for block in table.envs.iter().flat_map(|e| e.blocks.inners()) {
+            match block.kind {
+                EnvBindingBlockKind::D1 => d1_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::R2 => r2_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::Kv => kv_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::Var => vars.extend(block.symbols.iter().map(|s| Field {
+                    name: s.name.into(),
+                    cidl_type: s.cidl_type.clone(),
+                })),
+            }
+        }
+
+        if d1_bindings.is_empty() && r2_bindings.is_empty() && kv_bindings.is_empty() {
             ensure!(
                 table.models.is_empty(),
                 sink,
@@ -108,27 +125,6 @@ impl<'src, 'p> SemanticAnalysis {
             );
             return None;
         };
-
-        let mut d1_bindings = Vec::new();
-        let mut r2_bindings = Vec::new();
-        let mut kv_bindings = Vec::new();
-        let mut vars = Vec::new();
-        for (symbol_kind, symbol) in &table.env_bindings {
-            match symbol_kind {
-                LocalSymbolKind::EnvBinding { kind, .. } => match kind {
-                    EnvBindingKind::D1 => d1_bindings.push(symbol.name),
-                    EnvBindingKind::R2 => r2_bindings.push(symbol.name),
-                    EnvBindingKind::Kv => kv_bindings.push(symbol.name),
-                },
-                LocalSymbolKind::EnvVar(_) => {
-                    vars.push(Field {
-                        name: symbol.name.into(),
-                        cidl_type: symbol.cidl_type.clone(),
-                    });
-                }
-                _ => unreachable!("only EnvBinding kinds should be in env_bindings"),
-            }
-        }
 
         Some(WranglerEnv {
             d1_bindings,
@@ -176,7 +172,7 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 }
 
-                let validators = match resolve_validators(field) {
+                let validators = match resolve_validator_tags(field) {
                     Ok(v) => v,
                     Err(errs) => {
                         sink.extend(errs);
@@ -318,6 +314,7 @@ enum LocalSymbolKind<'src> {
 
 #[derive(Default)]
 struct SymbolTable<'src, 'p> {
+    // Globals
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
     services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
@@ -325,15 +322,15 @@ struct SymbolTable<'src, 'p> {
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
     data_sources: Vec<&'p DataSourceBlock<'src>>,
-    env_bindings: Vec<(LocalSymbolKind<'src>, &'p Symbol<'src>)>,
 
+    // Locals
     local: BTreeMap<LocalSymbolKind<'src>, &'p Symbol<'src>>,
 }
 
 impl<'src, 'p> SymbolTable<'src, 'p> {
     /// Creates a [SymbolTable] by walking the [ParseAst].
     ///
-    /// Catches [SemanticError::DuplicateSymbol] and [SemanticError::TagInvalidInContext] errors
+    /// Catches [SemanticError::DuplicateSymbol] errors.
     fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
         let mut st = SymbolTable::default();
         let mut global_names = HashMap::new();
@@ -344,7 +341,9 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     first,
                     second: symbol,
                 });
+                return false;
             }
+            true
         };
 
         let mut insert_local = |sink: &mut ErrorSink<'src, 'p>,
@@ -355,60 +354,34 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     first,
                     second: symbol,
                 });
+                return false;
             }
+            true
         };
-
-        macro_rules! tag_whitelist {
-            ($($allowed_tag:ident),* ; $symbol:expr) => {
-                for tag in &$symbol.tags {
-                    #[allow(unused_mut)]
-                    let mut allowed = false;
-                    $(
-                        if let Tag::$allowed_tag { .. } = &tag.inner {
-                            allowed = true;
-                        }
-                    )*
-
-                    if !allowed {
-                        sink.push(SemanticError::TagInvalidInContext {
-                            tag,
-                            symbol: $symbol,
-                        });
-                    }
-                }
-            };
-        }
 
         for block in parse.blocks.inners() {
             match block {
                 AstBlockKind::Model(model_block) => {
-                    tag_whitelist!(Crud, Use; &model_block.symbol);
                     insert_global(sink, &model_block.symbol);
                     st.models.insert(model_block.symbol.name, model_block);
 
-                    for sub_block in model_block.blocks.inners() {
-                        let symbols = sub_block.symbols();
-                        for symbol in symbols {
-                            tag_whitelist!(Validator; symbol);
-                            insert_local(
-                                sink,
-                                symbol,
-                                LocalSymbolKind::ModelField {
-                                    model: model_block.symbol.name,
-                                    name: symbol.name,
-                                },
-                            );
-                        }
+                    for symbol in model_block.blocks.iter().flat_map(|b| b.inner.symbols()) {
+                        insert_local(
+                            sink,
+                            symbol,
+                            LocalSymbolKind::ModelField {
+                                model: model_block.symbol.name,
+                                name: symbol.name,
+                            },
+                        );
                     }
                 }
                 AstBlockKind::PlainOldObject(plain_old_object_block) => {
-                    tag_whitelist!(; &plain_old_object_block.symbol);
                     insert_global(sink, &plain_old_object_block.symbol);
                     st.poos
                         .insert(plain_old_object_block.symbol.name, plain_old_object_block);
 
                     for field in &plain_old_object_block.fields {
-                        tag_whitelist!(Validator; field);
                         insert_local(
                             sink,
                             field,
@@ -420,12 +393,10 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::Service(service_block) => {
-                    tag_whitelist!(; &service_block.symbol);
                     insert_global(sink, &service_block.symbol);
                     st.services.insert(service_block.symbol.name, service_block);
 
                     for field in &service_block.fields {
-                        tag_whitelist!(; field);
                         insert_local(
                             sink,
                             field,
@@ -437,10 +408,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::Api(api_block) => {
-                    tag_whitelist!(; &api_block.symbol);
                     st.apis.push(api_block);
                     for method in api_block.methods.inners() {
-                        tag_whitelist!(; &method.symbol);
                         insert_local(
                             sink,
                             &method.symbol,
@@ -452,14 +421,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
 
                         for param in method.parameters.inners() {
                             let (symbol, name) = match param {
-                                ApiBlockMethodParamKind::SelfParam(symbol) => {
-                                    tag_whitelist!(Source; symbol);
-                                    (symbol, "self")
-                                }
-                                ApiBlockMethodParamKind::Param(symbol) => {
-                                    tag_whitelist!(Validator; symbol);
-                                    (symbol, symbol.name)
-                                }
+                                ApiBlockMethodParamKind::SelfParam(symbol) => (symbol, "self"),
+                                ApiBlockMethodParamKind::Param(symbol) => (symbol, symbol.name),
                             };
 
                             insert_local(
@@ -475,7 +438,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::DataSource(data_source_block) => {
-                    tag_whitelist!(Internal; &data_source_block.symbol);
+                    st.data_sources.push(data_source_block);
                     insert_local(
                         sink,
                         &data_source_block.symbol,
@@ -493,7 +456,6 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.inner)))
                     {
                         for param in &method.parameters {
-                            tag_whitelist!(Validator; param);
                             insert_local(
                                 sink,
                                 param,
@@ -512,48 +474,48 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         match &env_block.inner.kind {
                             EnvBindingBlockKind::D1 => {
                                 for symbol in &env_block.inner.symbols {
-                                    insert_global(sink, symbol);
-                                    insert_local(
+                                    if insert_local(
                                         sink,
                                         symbol,
                                         LocalSymbolKind::EnvBinding {
                                             kind: EnvBindingKind::D1,
                                             name: symbol.name,
                                         },
-                                    );
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
                                 }
                             }
                             EnvBindingBlockKind::R2 => {
                                 for symbol in &env_block.inner.symbols {
-                                    tag_whitelist!(; symbol);
-                                    insert_global(sink, symbol);
-                                    insert_local(
+                                    if insert_local(
                                         sink,
                                         symbol,
                                         LocalSymbolKind::EnvBinding {
                                             kind: EnvBindingKind::R2,
                                             name: symbol.name,
                                         },
-                                    );
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
                                 }
                             }
                             EnvBindingBlockKind::Kv => {
                                 for symbol in &env_block.inner.symbols {
-                                    tag_whitelist!(; symbol);
-                                    insert_global(sink, symbol);
-                                    insert_local(
+                                    if insert_local(
                                         sink,
                                         symbol,
                                         LocalSymbolKind::EnvBinding {
                                             kind: EnvBindingKind::Kv,
                                             name: symbol.name,
                                         },
-                                    );
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
                                 }
                             }
                             EnvBindingBlockKind::Var => {
                                 for symbol in &env_block.inner.symbols {
-                                    tag_whitelist!(; symbol);
                                     insert_local(
                                         sink,
                                         symbol,
@@ -567,7 +529,6 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::Inject(inject_block) => {
                     st.injects.push(inject_block);
                     for symbol in &inject_block.symbols {
-                        tag_whitelist!(; symbol);
                         insert_global(sink, symbol);
                     }
                 }
@@ -655,11 +616,88 @@ fn resolve_cidl_type<'src, 'p>(
     }
 }
 
-/// Resolves validators for a given symbol, returning an error if any validator is invalid for the symbol's type.
-fn resolve_validators<'src, 'p>(
+/// Resolves validators for a given symbol, returning an error if
+/// any validator is invalid.
+fn resolve_validator_tags<'src, 'p>(
     symbol: &'p Symbol<'src>,
 ) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
     use frontend::Keyword::*;
+
+    let mut resolved = Vec::new();
+    let mut sink = ErrorSink::new();
+
+    for spd in &symbol.tags {
+        let Tag::Validator {
+            name: kw,
+            argument: arg,
+        } = &spd.inner
+        else {
+            continue;
+        };
+
+        let root = symbol.cidl_type.root_type();
+        let type_ok = match kw {
+            GreaterThan | GreaterThanOrEqual | LessThan | LessThanOrEqual | Step => {
+                matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
+            }
+            Len | MinLen | MaxLen | Regex => matches!(root, CidlType::String),
+            _ => unreachable!(
+                "Tag::Validator only carries validator keywords as parsed in the frontend"
+            ),
+        };
+        if !type_ok {
+            sink.push(SemanticError::ValidatorInvalidForType {
+                symbol,
+                validator: spd,
+            });
+            continue;
+        }
+
+        let validator = match kw {
+            GreaterThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
+            GreaterThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual)
+            }
+            LessThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
+            LessThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual)
+            }
+            Step => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
+            Len => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            MinLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
+            MaxLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
+            Regex => match arg {
+                ArgumentLiteral::Regex(s) => match regex::Regex::new(s) {
+                    Ok(_) => Some(Validator::Regex(std::borrow::Cow::Borrowed(s))),
+                    Err(e) => {
+                        sink.push(SemanticError::ValidatorInvalidArgument {
+                            symbol,
+                            validator: spd,
+                            reason: format!("invalid regex pattern: {e}"),
+                        });
+                        None
+                    }
+                },
+                _ => {
+                    sink.push(invalid_arg(
+                        symbol,
+                        spd,
+                        "expected a regex argument (e.g. /pattern/)",
+                    ));
+                    None
+                }
+            },
+            _ => unreachable!("non-validator keywords are filtered out above"),
+        };
+
+        if let Some(v) = validator {
+            resolved.push(v);
+        }
+    }
+
+    sink.finish()?;
+    return Ok(resolved);
+
     fn invalid_arg<'src, 'p>(
         symbol: &'p Symbol<'src>,
         spd: &'p Spd<Tag<'src>>,
@@ -745,73 +783,6 @@ fn resolve_validators<'src, 'p>(
             }
         }
     }
-
-    let mut resolved = Vec::new();
-    let mut sink = ErrorSink::new();
-
-    for spd in &symbol.tags {
-        let Tag::Validator {
-            name: kw,
-            argument: arg,
-        } = &spd.inner
-        else {
-            // Non-validator tags are skipped here; the tag whitelist is responsible for
-            // catching tags that are not valid in this context.
-            continue;
-        };
-
-        let root = symbol.cidl_type.root_type();
-        let type_ok = match kw {
-            GreaterThan | GreaterThanOrEqual | LessThan | LessThanOrEqual | Step => {
-                matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
-            }
-            Len | MinLen | MaxLen | Regex => matches!(root, CidlType::String),
-            _ => unreachable!(
-                "Tag::Validator only carries validator keywords as parsed in the frontend"
-            ),
-        };
-        if !type_ok {
-            sink.push(SemanticError::ValidatorInvalidForType {
-                symbol,
-                validator: spd,
-            });
-            continue;
-        }
-
-        let validator = match kw {
-            GreaterThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
-            GreaterThanOrEqual => {
-                parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual)
-            }
-            LessThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
-            LessThanOrEqual => {
-                parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual)
-            }
-            Step => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
-            Len => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
-            MinLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
-            MaxLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
-            Regex => match arg {
-                ArgumentLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
-                _ => {
-                    sink.push(invalid_arg(
-                        symbol,
-                        spd,
-                        "expected a regex argument (e.g. /pattern/)",
-                    ));
-                    None
-                }
-            },
-            _ => unreachable!("non-validator keywords are filtered out above"),
-        };
-
-        if let Some(v) = validator {
-            resolved.push(v);
-        }
-    }
-
-    sink.finish()?;
-    Ok(resolved)
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type

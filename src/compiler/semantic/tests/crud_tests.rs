@@ -17,7 +17,8 @@ fn adds_crud_methods_to_models() {
             d1 { db }
         }
 
-        [use db, get, save, list]
+        [use db]
+        [crud get, save, list]
         model OrderItem {
             primary {
                 orderId: int
@@ -66,7 +67,8 @@ fn crud_key_params() {
             kv { my_kv }
         }
 
-        [use db, get]
+        [use db]
+        [crud get]
         model Product {
             primary {
                 id: int
@@ -118,7 +120,8 @@ fn crud_methods_namespace_sources_inherit_validators() {
             d1 { db }
         }
 
-        [use db, get, list]
+        [use db]
+        [crud get, list]
         model Product {
             primary {
                 [gt 0]

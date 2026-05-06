@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, save]
+[use db] 
+[crud save]
 model Dog {
     primary {
         id: int

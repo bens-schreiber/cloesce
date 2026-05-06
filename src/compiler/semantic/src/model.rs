@@ -2,7 +2,7 @@ use crate::EnvBindingKind;
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validators,
+    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
 };
 use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
@@ -13,6 +13,7 @@ use frontend::{
     R2Block, Spd, SpdSlice, SqlBlockKind, Symbol, Tag,
 };
 use indexmap::IndexMap;
+use std::collections::HashSet;
 use std::{collections::BTreeMap, vec};
 
 #[derive(Default)]
@@ -30,15 +31,35 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
 
         for &model_block in table.models.values() {
-            let (cruds, env_bindings) = model_tags(model_block);
+            // Validate tags
+            let mut dedup_cruds = HashSet::new();
+            let mut cruds = Vec::new();
+            let mut env_bindings = Vec::new();
+            for tag in &model_block.symbol.tags {
+                match &tag.inner {
+                    Tag::Crud { kinds } => {
+                        for kind in kinds {
+                            if dedup_cruds.insert(kind.inner.clone()) {
+                                cruds.push(kind);
+                            }
+                        }
+                    }
+                    Tag::Use { binding } => env_bindings.push(binding),
+                    _ => self.sink.push(SemanticError::TagInvalidInContext {
+                        tag,
+                        symbol: &model_block.symbol,
+                    }),
+                }
+            }
 
             let builder = ModelBuilder::new(model_block);
             let Some(mut model) = builder.build(&mut self, env_bindings, table) else {
                 continue;
             };
 
-            // Validate CRUD operations — List requires a D1 binding
+            // Validate CRUD operations
             for crud in &cruds {
+                // List requires a D1 binding
                 ensure!(
                     !matches!(crud.inner, CrudKind::List) || model.d1_binding.is_some(),
                     self.sink,
@@ -131,14 +152,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             )
         });
 
-        let binding = {
-            if !has_sql_blocks && env_bindings.is_empty() {
-                return Some(Model {
-                    name: self.name,
-                    ..Default::default()
-                });
-            }
-
+        let binding = if has_sql_blocks || env_bindings.len() > 0 {
             if env_bindings.is_empty() {
                 ma.sink
                     .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });
@@ -165,7 +179,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 return None;
             };
 
-            binding
+            Some(binding)
+        } else {
+            None
         };
 
         for block in self.model.blocks.inners() {
@@ -174,9 +190,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     self.column(ma, symbol, FieldQualifiers::default());
                 }
                 ModelBlockKind::Foreign(fk) => {
-                    self.foreign(ma, table, binding.inner, fk, FieldQualifiers::default());
+                    let binding = binding.unwrap().inner;
+                    self.foreign(ma, table, binding, fk, FieldQualifiers::default());
                 }
                 ModelBlockKind::Primary(blocks) => {
+                    let binding = binding.unwrap().inner;
                     let qual = FieldQualifiers {
                         is_primary: true,
                         ..Default::default()
@@ -188,12 +206,13 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                                 self.column(ma, symbol, qual.clone());
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding.inner, foreign_block, qual.clone())
+                                self.foreign(ma, table, binding, foreign_block, qual.clone())
                             }
                         }
                     }
                 }
                 ModelBlockKind::Unique(blocks) => {
+                    let binding = binding.unwrap().inner;
                     let qual = FieldQualifiers {
                         unique_ids: vec![self.unique_seed],
                         ..Default::default()
@@ -206,12 +225,13 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                                 self.column(ma, symbol, qual.clone());
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding.inner, foreign_block, qual.clone())
+                                self.foreign(ma, table, binding, foreign_block, qual.clone())
                             }
                         }
                     }
                 }
                 ModelBlockKind::Optional(blocks) => {
+                    let binding = binding.unwrap().inner;
                     let qual = FieldQualifiers {
                         is_optional: true,
                         ..Default::default()
@@ -223,14 +243,14 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                                 self.column(ma, symbol, qual.clone());
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding.inner, foreign_block, qual.clone())
+                                self.foreign(ma, table, binding, foreign_block, qual.clone())
                             }
                         }
                     }
                 }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
-                    binding.inner,
+                    binding.unwrap().inner,
                     &navigation_block.adj,
                     &navigation_block.nav.inner,
                     false,
@@ -249,7 +269,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                             continue;
                         }
 
-                        let validators = match resolve_validators(field) {
+                        let validators = match resolve_validator_tags(field) {
                             Ok(v) => v,
                             Err(errs) => {
                                 ma.sink.extend(errs);
@@ -279,7 +299,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         }
 
-        if !self.has_defined_pk {
+        if binding.is_some() && !self.has_defined_pk {
             ma.sink
                 .push(SemanticError::D1ModelMissingPrimaryKey { model: self.symbol });
             return None;
@@ -287,7 +307,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
         Some(Model {
             name: self.name,
-            d1_binding: Some(binding.inner),
+            d1_binding: binding.map(|b| b.inner),
             primary_columns: self.primary_columns,
             columns: self.columns,
             kv_fields: self.kv_fields,
@@ -323,7 +343,14 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return;
         }
 
-        let validators = match resolve_validators(symbol) {
+        // Validate tags
+        for tag in &symbol.tags {
+            if !matches!(tag.inner, Tag::Validator { .. }) {
+                ma.sink
+                    .push(SemanticError::TagInvalidInContext { tag, symbol });
+            }
+        }
+        let validators = match resolve_validator_tags(symbol) {
             Ok(v) => v,
             Err(errs) => {
                 ma.sink.extend(errs);
@@ -385,7 +412,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         // Must belong to the same database
-        let adj_binding = model_tags(adj_model_block).1.first().copied();
+        let adj_binding = model_use_binding(adj_model_block);
         if adj_binding.map(|s| s.inner) != Some(binding) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
@@ -461,7 +488,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
             // No reason to push these errors, it will be caught during
             // the validation of the adjacent model's own columns.
-            let adj_validators = resolve_validators(adj_field_sym).unwrap_or_default();
+            let adj_validators = resolve_validator_tags(adj_field_sym).unwrap_or_default();
 
             let col = Column {
                 hash: 0,
@@ -539,7 +566,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
 
         // Must belong to the same database
-        let adj_binding = model_tags(adj_model_block).1.first().copied();
+        let adj_binding = model_use_binding(adj_model_block);
         if adj_binding.map(|s| s.inner) != Some(binding) {
             ma.sink
                 .push(SemanticError::NavigationReferencesDifferentDatabase { field });
@@ -668,7 +695,16 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         };
 
-        let validators = match resolve_validators(&kv.field) {
+        // Validate tags
+        for tag in &kv.field.tags {
+            if !matches!(tag.inner, Tag::Validator { .. }) {
+                ma.sink.push(SemanticError::TagInvalidInContext {
+                    tag,
+                    symbol: &kv.field,
+                });
+            }
+        }
+        let validators = match resolve_validator_tags(&kv.field) {
             Ok(v) => v,
             Err(errs) => {
                 ma.sink.extend(errs);
@@ -726,7 +762,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         });
     }
 
-    // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
+    /// Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
+    ///
+    /// Returns the binding name if valid, otherwise pushes an error and returns None.
     fn validate_binding(
         sink: &mut ErrorSink<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
@@ -755,9 +793,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         None
     }
 
-    // Extracts variables from a formatted string, then validates that they
-    // correspond to fields on the model that are of valid SQLite types or are key_fields.
-    // Returns the parameters to create a key format.
+    /// Extracts variables from a formatted string, then validates that they
+    /// correspond to fields on the model that are of valid SQLite types or are key_fields.
+    ///
+    /// Returns the parameters to create a key format.
     fn validate_key_format(
         sink: &mut ErrorSink<'src, 'p>,
         model_block: &'p ModelBlock<'src>,
@@ -813,23 +852,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     }
 }
 
-/// Returns a tuple of (CRUD tags, Use tags) for a given model block.
-fn model_tags<'p, 'src>(
-    model_block: &'p ModelBlock<'src>,
-) -> (Vec<&'p Spd<CrudKind>>, Vec<&'p Spd<&'src str>>) {
-    model_block.symbol.tags.iter().fold(
-        (Vec::new(), Vec::new()),
-        |(mut acc_cruds, mut acc_bindings), tag| {
-            match &tag.inner {
-                Tag::Crud { kinds } => acc_cruds.extend(kinds.iter()),
-                Tag::Use { binding } => acc_bindings.push(binding),
-                _ => {}
-            }
-            (acc_cruds, acc_bindings)
-        },
-    )
-}
-
 #[derive(Default, Clone)]
 struct FieldQualifiers {
     is_optional: bool,
@@ -865,4 +887,15 @@ fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
         return Err("unclosed brace in key".to_string());
     }
     Ok(out)
+}
+
+/// Returns the first `use` tag binding on a model block, if it exists.
+fn model_use_binding<'p, 'src>(model_block: &'p ModelBlock<'src>) -> Option<&'p Spd<&'src str>> {
+    model_block.symbol.tags.iter().find_map(|tag| {
+        if let Tag::Use { binding } = &tag.inner {
+            Some(binding)
+        } else {
+            None
+        }
+    })
 }

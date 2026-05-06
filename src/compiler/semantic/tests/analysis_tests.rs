@@ -116,16 +116,13 @@ fn d1_model_basic_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    // User has d1 but no primary key
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
 
-    // Post references other_d1 which is not in the env block
     expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
 
-    // Comment has fields but no binding
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingD1Binding { model } => model
     );
@@ -688,7 +685,7 @@ fn api_errors() {
 
         // Invalid return type
         api User {
-            get badReturn() -> Option<stream>
+            get badReturn() -> option<stream>
         }
 
         // Void parameter
@@ -1030,7 +1027,7 @@ fn cidl_types_resolve() {
         service MyService {}
 
         api User {
-            post resolveAll(e: env, p: Array<MyPoo>, u: User, s: MyService) -> string
+            post resolveAll(e: env, p: array<MyPoo>, u: User, s: MyService) -> string
         }
     "#;
 
@@ -1125,12 +1122,12 @@ fn validator_errors() {
             primary { id: int }
 
             keyfield {
-                [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
+                [len 3.14]            // ValidatorInvalidArgument (wrong literal kind)
                 name: string
             }
 
             [step 2.5]                // ValidatorInvalidArgument (float to step)
-            [len 3.14]                // ValidatorInvalidForType (length on non-string)
+            [len 3]                   // ValidatorInvalidForType (length on non-string)
             [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
             age: int
         }

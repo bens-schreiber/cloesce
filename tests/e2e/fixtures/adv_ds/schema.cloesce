@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, save]
+[use db]
+[crud save]
 model Topping {
     primary {
         id: int
@@ -17,7 +18,8 @@ model Topping {
     }
 }
 
-[use db, save, list]
+[use db]
+[crud save, list]
 model Hamburger {
     primary {
         id: int

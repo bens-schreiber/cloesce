@@ -8,7 +8,8 @@ env {
     }
 }
 
-[use db, save, get, list]
+[use db]
+[crud save, get, list]
 model Validator {
     primary {
         [lt 100]

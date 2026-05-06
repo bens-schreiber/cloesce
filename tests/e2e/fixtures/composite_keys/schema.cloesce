@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, get, list, save]
+[use db]
+[crud get, list, save]
 model Student {
     primary {
         id: int
@@ -35,7 +36,8 @@ source CoursesOrderedDescending for Student {
     }
 }
 
-[use db, get, list, save]
+[use db]
+[crud get, list, save]
 model Course {
     primary {
         id: int
@@ -48,7 +50,8 @@ model Course {
     }
 }
 
-[use db, get, list, save]
+[use db]
+[crud get, list, save]
 model StudentCourse {
     primary {
         foreign (Student::id, Student::name) {
