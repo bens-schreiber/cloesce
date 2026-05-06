@@ -81,7 +81,7 @@ model WeatherReport {
 
 ```cloesce
 [use db]
-[use get, list, save]
+[crud get, list, save]
 model Weather {
     primary {
         id: int
