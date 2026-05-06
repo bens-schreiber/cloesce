@@ -3,13 +3,13 @@
 - **Author(s):** Ben Schreiber
 - **Status:** Draft | Review | Accepted | Rejected | **Implemented**
 - **Created:** 2026-04-21
-- **Last Updated:** 2026-04-26
+- **Last Updated:** 2026-05-06
 
 ---
 
 ## Summary
 
-This proposal introduces a set of [Zod](https://zod.dev) inspired "validator tags", allowing fine grained validation of input data in a declarative manner. Validators can be applied to model fields, API parameters, and Data Source parameters, and are inherited by all CRUD methods of a model as well as any API that references that field. The initial set of validators includes numerical validators (e.g. greater than, less than), string validators (e.g. length, regex), and composition of validators through AND chaining.
+This proposal introduces a set of [Zod](https://zod.dev)-inspired "validator tags", allowing fine-grained validation of input data in a declarative manner. Validators can be applied to model fields, API parameters, and Data Source parameters, and are inherited by all CRUD methods of a model as well as any API that references that field. The initial set of validators includes numerical validators (e.g. greater than, less than), string validators (e.g. length, regex), and composition of validators through AND chaining.
 
 ---
 
@@ -31,7 +31,7 @@ While Cloesce is capable of expressing the structure and types of data, it lacks
 
 A workaround to this problem is writing validation logic within API implementations, but this approach has two big drawbacks:
 
-1. We lose the ability to implicitly inherit validation logic across Cloesce constructs
+1. We lose the ability to implicitly inherit validation logic across Cloesce constructs.
 2. Method dispatch occurs after hydration, so we lose the ability to fail fast on invalid input before performing any unnecessary work.
 
 Thus, taking inspiration from Zod, we can introduce a set of validator tags that can be applied directly to model fields and API parameters. This allows us to express common validation logic in a declarative manner, and have it implicitly inherited across all relevant constructs. For example:
@@ -39,8 +39,8 @@ Thus, taking inspiration from Zod, we can introduce a set of validator tags that
 ```cloesce
 model Foo {
     primary {
-        [length 5]
-        [max 100]
+        [len 5]
+        [maxlen 100]
         id: string
     }
 }
@@ -49,8 +49,8 @@ api Foo {
     get foo(
         self,
 
-        [length 5]
-        [max 100]
+        [len 5]
+        [maxlen 100]
         id: string
     ) -> Foo
 }
@@ -157,8 +157,8 @@ source Default for Foo {
 **String Validators**
 
 - `[len n]`: Validates that a string has a length of n, where n is an integer literal.
-- `[min n]`: Validates that a string has a minimum length of n, where n is an integer literal.
-- `[max n]`: Validates that a string has a maximum length of n, where n is an integer literal.
+- `[minlen n]`: Validates that a string has a minimum length of n, where n is an integer literal.
+- `[maxlen n]`: Validates that a string has a maximum length of n, where n is an integer literal.
 - `[regex r]`: Validates that a string matches the regular expression r, where r is a regex literal.
 
 ### Inheriting Validators and Generics
@@ -169,7 +169,7 @@ Validators applied to a field will be inherited by all CRUD methods of a model, 
 [use save]
 model Foo {
     primary {
-        [length 5]
+        [len 5]
         id: string
     }
 }
@@ -193,7 +193,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 - **option<T>**: Validate the inner type `T` if the value is not null. If the value is null, skip validation.
 
-- **array<T>** | **paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
+- **array<T>** and **paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
 
 - **partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 
@@ -203,13 +203,13 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 The implementation of this proposal will involve:
 
-1. Extending the lexer to recognize literals
-2. Adding a new `ValidatorTag` node to the AST, composed within a field or parameter definition
-3. Semantic analysis to ensure that validators are applied to compatible types (e.g. you can't apply `[length 5]` to an `int` field), and test regex literals for validity,
-4. Extend the Cloesce AST to include validator information on fields and parameters
-5. Modify the ORM `validate` function to run the appropriate validation logic based on the validators specified in the AST
+1. Extending the lexer to recognize literals.
+2. Adding a new `ValidatorTag` node to the AST, composed within a field or parameter definition.
+3. Performing semantic analysis to ensure that validators are applied to compatible types (e.g. you can't apply `[len 5]` to an `int` field), and testing regex literals for validity.
+4. Extending the Cloesce AST to include validator information on fields and parameters.
+5. Modifying the ORM `validate` function to run the appropriate validation logic based on the validators specified in the AST.
 
-No validation code will be generated, the `validate` function reads validator constraints directly from the compiled AST at runtime.
+No validation code will be generated; the `validate` function reads validator constraints directly from the compiled AST at runtime.
 
 ## Data Source Methods
 
@@ -220,16 +220,16 @@ Currently, `list` and `get` are generated to accept the union of all parameters 
 ```cloesce
 source A for Foo {
     // ...
-    sql get([length 5] id: string) {...}
+    sql get([len 5] id: string) {...}
 }
 
 source B for Foo {
     // ...
-    sql get([length 100] id: string) {...}
+    sql get([len 100] id: string) {...}
 }
 ```
 
-Instead of hacking around this problem with hardcoded generation, it makes the most sense to solve it using the primitives available in Cloesce: generating per-source `get`, `list` and `save` methods. For example, the above would generate `$get_A`, `$get_B`, `$list_A`, `$list_B`, etc. These exist as their own endpoint entirely, meaning the Cloesce Router will route to the correct implementation based off the incoming route name (e.g. `GET /foo/$get_A` dispatches to get of source A).
+Instead of hacking around this problem with hardcoded generation, it makes the most sense to solve it using the primitives available in Cloesce: generating per-source `get`, `list`, and `save` methods. For example, the above would generate `$get_A`, `$get_B`, `$list_A`, `$list_B`, etc. Each exists as its own endpoint, meaning the Cloesce Router will route to the correct implementation based on the incoming route name (e.g. `GET /foo/$get_A` dispatches to the `get` of source A).
 
 ---
 
@@ -247,7 +247,7 @@ validator name {
 }
 ```
 
-However, I hesitate to add this because it stands to reason that this boilerplate reduction is a general feature that could be useful beyond just validators. A better fix might be a macro-language embedded in Cloesce.
+However, I hesitate to add this because boilerplate reduction is a general problem that extends beyond just validators. A better fix might be a macro language embedded in Cloesce.
 
 ### Custom Validators
 
