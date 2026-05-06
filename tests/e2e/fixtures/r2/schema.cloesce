@@ -8,7 +8,7 @@ env {
     }
 }
 
-[use get]
+[crud get]
 model PureR2Model {
     keyfield {
         id: string

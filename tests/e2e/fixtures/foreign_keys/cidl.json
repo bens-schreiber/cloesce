@@ -1,5 +1,5 @@
 {
-  "hash": 13563103492600318157,
+  "hash": 642337985712049489,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "A": {
-      "hash": 7524899204816327788,
+      "hash": 4714858754684814240,
       "name": "A",
       "d1_binding": "db",
       "primary_columns": [
@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "hash": 14795965140419699510,
+          "hash": 5030660962754790246,
           "field": {
             "name": "bId",
             "cidl_type": {
@@ -48,7 +48,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 15496760873931370897,
+          "hash": 12787859864084899288,
           "field": {
             "name": "b",
             "cidl_type": {
@@ -139,12 +139,55 @@
                 }
               },
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$save_WithB",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "$datasource",
+              "name": "model",
               "cidl_type": {
-                "DataSource": {
-                  "model_name": "A"
+                "Partial": {
+                  "object_name": "A"
+                }
+              },
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$save_WithoutB",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "A"
                 }
               },
               "validators": []
@@ -167,33 +210,52 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_WithB",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "WithB_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_WithoutB",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "WithoutB_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "A"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -211,17 +273,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -238,17 +309,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -265,17 +345,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -288,7 +377,7 @@
       ]
     },
     "B": {
-      "hash": 15334710138958857664,
+      "hash": 2244928777608358445,
       "name": "B",
       "d1_binding": "db",
       "primary_columns": [
@@ -309,7 +398,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 2142773207963205782,
+          "hash": 11375391601863706804,
           "field": {
             "name": "a",
             "cidl_type": {
@@ -367,15 +456,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "B"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -395,19 +475,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "B"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -425,17 +494,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -448,7 +526,7 @@
       ]
     },
     "Course": {
-      "hash": 16699223254241264860,
+      "hash": 1933848128018438236,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -469,7 +547,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 4351158626271558737,
+          "hash": 8100108184152476018,
           "field": {
             "name": "students",
             "cidl_type": {
@@ -509,15 +587,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Course"
-                }
-              },
-              "validators": []
             }
           ]
         }
@@ -534,17 +603,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -556,7 +634,7 @@
       ]
     },
     "Person": {
-      "hash": 16470081740962856391,
+      "hash": 3380300379545248308,
       "name": "Person",
       "d1_binding": "db",
       "primary_columns": [
@@ -577,7 +655,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 6065373329749440851,
+          "hash": 15297991723649941873,
           "field": {
             "name": "dogs",
             "cidl_type": {
@@ -670,12 +748,55 @@
                 }
               },
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$save_WithDogs",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "$datasource",
+              "name": "model",
               "cidl_type": {
-                "DataSource": {
-                  "model_name": "Person"
+                "Partial": {
+                  "object_name": "Person"
+                }
+              },
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$save_WithoutDogs",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Person"
                 }
               },
               "validators": []
@@ -698,33 +819,52 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_WithDogs",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "WithDogs_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_WithoutDogs",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "WithoutDogs_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Person"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -742,17 +882,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -769,17 +918,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -796,17 +954,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -819,7 +986,7 @@
       ]
     },
     "Student": {
-      "hash": 399521836238653955,
+      "hash": 11264132189404198743,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -840,7 +1007,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 3566465184463996039,
+          "hash": 7315414742277804456,
           "field": {
             "name": "courses",
             "cidl_type": {
@@ -927,12 +1094,55 @@
                 }
               },
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$save_None",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "$datasource",
+              "name": "model",
               "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
+                "Partial": {
+                  "object_name": "Student"
+                }
+              },
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$save_WithCoursesStudentsCourses",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Student"
                 }
               },
               "validators": []
@@ -955,33 +1165,52 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_None",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "None_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_WithCoursesStudentsCourses",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "WithCoursesStudentsCourses_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -999,17 +1228,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -1026,17 +1264,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -1053,17 +1300,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -1076,7 +1332,7 @@
       ]
     },
     "Dog": {
-      "hash": 13552818947087553442,
+      "hash": 11927641146139395250,
       "name": "Dog",
       "d1_binding": "db",
       "primary_columns": [
@@ -1112,7 +1368,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 8191773270369632834,
+          "hash": 5482872260590270089,
           "field": {
             "name": "person",
             "cidl_type": {
@@ -1168,15 +1424,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Dog"
-                }
-              },
-              "validators": []
             }
           ]
         }
@@ -1193,17 +1440,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

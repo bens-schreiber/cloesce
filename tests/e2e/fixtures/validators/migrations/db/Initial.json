@@ -1,16 +1,16 @@
 {
-  "hash": 12943445999625665821,
+  "hash": 1454352641393335132,
   "models": {
     "Validator": {
-      "hash": 11924306774175608156,
+      "hash": 1908438877902929966,
       "name": "Validator",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 5506969935928112087,
+          "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Uint",
+            "cidl_type": "Int",
             "validators": [
               {
                 "LessThan": {
@@ -26,7 +26,7 @@
       ],
       "columns": [
         {
-          "hash": 15344942205672937722,
+          "hash": 16235850408217800395,
           "field": {
             "name": "email",
             "cidl_type": "String",

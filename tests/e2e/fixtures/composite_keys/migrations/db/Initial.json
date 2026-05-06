@@ -1,8 +1,8 @@
 {
-  "hash": 119602433404634890,
+  "hash": 9563088113416759681,
   "models": {
     "Course": {
-      "hash": 14748881912780342862,
+      "hash": 154833210238316151,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 15780404444437376256,
+          "hash": 16671312646982238929,
           "field": {
             "name": "title",
             "cidl_type": "String",
@@ -33,7 +33,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 11846137710452078753,
+          "hash": 2632012030643028160,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -56,7 +56,7 @@
       ]
     },
     "Student": {
-      "hash": 16595591254135553968,
+      "hash": 3307802068798637679,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -72,7 +72,7 @@
           "composite_id": null
         },
         {
-          "hash": 229685833227152214,
+          "hash": 1120594035772014887,
           "field": {
             "name": "name",
             "cidl_type": "String",
@@ -85,7 +85,7 @@
       ],
       "columns": [
         {
-          "hash": 1970635201383300956,
+          "hash": 2861543403928163629,
           "field": {
             "name": "favoriteColor",
             "cidl_type": "String",
@@ -98,7 +98,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 7061627726012070416,
+          "hash": 754518381149749717,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -122,7 +122,7 @@
       ]
     },
     "StudentCourse": {
-      "hash": 866749334295693945,
+      "hash": 10966023593578992102,
       "name": "StudentCourse",
       "d1_binding": "db",
       "primary_columns": [
@@ -141,7 +141,7 @@
           "composite_id": 0
         },
         {
-          "hash": 11710951977069246871,
+          "hash": 8458339642054402947,
           "field": {
             "name": "studentName",
             "cidl_type": "String",
@@ -172,7 +172,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 1145499244062893133,
+          "hash": 14709591228973544548,
           "field": {
             "name": "student",
             "cidl_type": {
@@ -192,7 +192,7 @@
           }
         },
         {
-          "hash": 8059058540154773008,
+          "hash": 5350157530375410263,
           "field": {
             "name": "course",
             "cidl_type": {

@@ -34,17 +34,15 @@ export class D1BackedModel {
     );
   }
   static async $get(
-    args: { Default: { keyParam: string; id: number; }},
+    id: number,
+    keyParam: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$get`
     );
-    __$baseUrl.searchParams.append("keyParam", String(__$resolvedArgs?.keyParam ?? null));
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
+    __$baseUrl.searchParams.append("keyParam", String(keyParam));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -58,16 +56,14 @@ export class D1BackedModel {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<D1BackedModel> },
+    model: DeepPartial<D1BackedModel>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -83,16 +79,15 @@ export class D1BackedModel {
     );
   }
   static async $list(
-    args: { Default: { lastSeen_id: number; limit: number; }},
+    lastSeen_id: number,
+    limit: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$list`
     );
-    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -169,16 +164,13 @@ export class PureR2Model {
     );
   }
   static async $get(
-    args: { Default: { id: string; }},
+    id: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureR2Model>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5538/api/PureR2Model/$get`
     );
-    __$baseUrl.searchParams.append("id", String(__$resolvedArgs?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",

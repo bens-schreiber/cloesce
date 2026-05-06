@@ -5,7 +5,8 @@ env {
     }
 }
 
-[use db1, get, save, list]
+[use db1]
+[crud get, save, list]
 model DB1Model {
     primary {
         id: int
@@ -14,7 +15,8 @@ model DB1Model {
     someColumn: string
 }
 
-[use db2, get, save, list]
+[use db2]
+[crud get, save, list]
 model DB2Model {
     primary {
         id: int

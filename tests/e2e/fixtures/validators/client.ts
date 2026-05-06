@@ -35,16 +35,37 @@ export class Validator {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<Validator> } | { None: DeepPartial<Validator> },
+    model: DeepPartial<Validator>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
-    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Validator,
+      false
+    );
+  }
+  static async $save_None(
+    model: DeepPartial<Validator>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Validator>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5038/api/Validator/$save_None`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -60,18 +81,37 @@ export class Validator {
     );
   }
   static async $get(
-    args: { Default: { name: string; id: number; }} | { None: { name: string; id: number; }},
+    id: number,
+    name: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
-    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$get`
     );
-    __$baseUrl.searchParams.append("name", String(__$resolvedArgs?.name ?? null));
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
+    __$baseUrl.searchParams.append("name", String(name));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Validator,
+      false
+    );
+  }
+  static async $get_None(
+    id: number,
+    name: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Validator>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5038/api/Validator/$get_None`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+    __$baseUrl.searchParams.append("name", String(name));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -85,18 +125,37 @@ export class Validator {
     );
   }
   static async $list(
-    args: { Default: { lastSeen_id: number; limit: number; }} | { None: { lastSeen_id: number; limit: number; }},
+    lastSeen_id: number,
+    limit: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator[]>> {
-    const __$resolvedKind: "Default" | "None" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$list`
     );
-    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __$baseUrl.searchParams.append("None_lastSeen_id", String(args?.None?.lastSeen_id ?? null));
-    __$baseUrl.searchParams.append("None_limit", String(args?.None?.limit ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Validator,
+      true
+    );
+  }
+  static async $list_None(
+    lastSeen_id: number,
+    limit: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Validator[]>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5038/api/Validator/$list_None`
+    );
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",

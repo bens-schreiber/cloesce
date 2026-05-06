@@ -17,10 +17,8 @@ describe("Bools, Dates, Ints", () => {
   it("POST", async () => {
     const date = new Date("2020-01-01").toISOString();
     const res = await Weather.$save({
-      Default: {
-        isRaining: true,
-        date: date,
-      },
+      isRaining: true,
+      date: date,
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({

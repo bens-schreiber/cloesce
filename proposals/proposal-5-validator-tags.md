@@ -196,6 +196,7 @@ will also require that `fooId` is exactly 5 characters long, since it references
 - **array<T>** | **paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
 
 - **partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
+
 ---
 
 ## Implementation

@@ -1,8 +1,8 @@
 {
-  "hash": 15822732363646458116,
+  "hash": 5565231451096687504,
   "models": {
     "Dog": {
-      "hash": 11841117067238888161,
+      "hash": 16625692680497709233,
       "name": "Dog",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 5897771438217574949,
+          "hash": 6788679640762437622,
           "field": {
             "name": "name",
             "cidl_type": "String",

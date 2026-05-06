@@ -45,17 +45,15 @@ impl CrudExpansion {
 
         match crud {
             CrudKind::Get => sources
-                .filter(|ds| ds.get.is_some())
+                .filter(|ds| ds.get.is_some() || ds.name == "Default")
                 .map(|ds| {
                     let parameters = ds
                         .get
                         .as_ref()
-                        .unwrap()
-                        .parameters
-                        .iter()
-                        .map(|get| &get.parameter)
-                        .chain(model.key_fields.iter())
-                        .cloned()
+                        .map(|g| g.parameters.iter().map(|p| &p.parameter).cloned().collect())
+                        .unwrap_or_else(Vec::new)
+                        .into_iter()
+                        .chain(model.key_fields.iter().cloned())
                         .collect();
 
                     ApiMethod {

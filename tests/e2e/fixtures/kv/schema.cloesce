@@ -8,7 +8,7 @@ env {
     }
 }
 
-[use get, save]
+[crud get, save]
 model PureKVModel {
     keyfield {
         id: string
@@ -42,7 +42,7 @@ model D1BackedModel {
     }
 }
 
-[use get]
+[crud get]
 model PaginatedKVModel {
     keyfield {
         id: string
@@ -54,5 +54,5 @@ model PaginatedKVModel {
 }
 
 api PaginatedKVModel {
-    post acceptPaginated(ps: Paginated<KvObject<json>>) -> Paginated<KvObject<json>>
+    post acceptPaginated(ps: paginated<kvobject<json>>) -> paginated<kvobject<json>>
 }

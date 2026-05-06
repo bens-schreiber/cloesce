@@ -228,7 +228,14 @@ export class ModelBuilder {
       name,
       is_internal,
       gen: { include: tree } as any,
-      get: get ? { parameters: get.map((f) => ({ ...f, validators: [] })) } : undefined,
+      get: get
+        ? {
+            parameters: get.map((f) => ({
+              parameter: { ...f, validators: [] },
+              instance_field: false,
+            })),
+          }
+        : undefined,
     };
     return this;
   }

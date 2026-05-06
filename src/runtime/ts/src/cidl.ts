@@ -15,7 +15,6 @@ export type CidlType =
   | "Json"
   | "R2Object"
   | "Env"
-  | { DataSource: { model_name: string } }
   | { Inject: { name: string } }
   | { Object: { name: string } }
   | { Partial: { object_name: string } }
@@ -124,8 +123,17 @@ export interface IncludeTree {
   [key: string]: IncludeTree;
 }
 
-export interface DataSourceMethod {
+export interface DataSourceListMethod {
   parameters: ValidatedField[];
+}
+
+export interface DataSourceGetMethodParam {
+  parameter: ValidatedField;
+  instance_field: boolean;
+}
+
+export interface DataSourceGetMethod {
+  parameters: DataSourceGetMethodParam[];
 }
 
 export interface DataSourceImpl {
@@ -136,8 +144,8 @@ export interface DataSourceImpl {
 
 export interface DataSource {
   name: string;
-  list?: DataSourceMethod;
-  get?: DataSourceMethod;
+  list?: DataSourceListMethod;
+  get?: DataSourceGetMethod;
   is_internal: boolean;
 
   // Generated at runtime, not serialized.

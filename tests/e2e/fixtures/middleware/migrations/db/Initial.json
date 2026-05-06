@@ -1,13 +1,13 @@
 {
-  "hash": 304070468593168154,
+  "hash": 10335980690941339895,
   "models": {
     "Foo": {
-      "hash": 16858419069770744178,
+      "hash": 2057975560306353780,
       "name": "Foo",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 3725153530838386741,
+          "hash": 4616061733383249414,
           "field": {
             "name": "id",
             "cidl_type": "String",

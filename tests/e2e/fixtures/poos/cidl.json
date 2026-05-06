@@ -101,17 +101,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

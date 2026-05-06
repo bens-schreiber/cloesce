@@ -1,5 +1,5 @@
 {
-  "hash": 3199909977581287234,
+  "hash": 12541860684839478437,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -13,7 +13,7 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 16719842609251620435,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
       "d1_binding": "db",
       "primary_columns": [
@@ -31,7 +31,7 @@
       ],
       "columns": [
         {
-          "hash": 3747858334280870224,
+          "hash": 4638766536825732897,
           "field": {
             "name": "someColumn",
             "cidl_type": "Real",
@@ -42,7 +42,7 @@
           "composite_id": null
         },
         {
-          "hash": 15903318361342044116,
+          "hash": 16794226563886906789,
           "field": {
             "name": "someOtherColumn",
             "cidl_type": "String",
@@ -111,26 +111,13 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
               "name": "keyParam",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "D1BackedModel"
-                }
-              },
+              "cidl_type": "String",
               "validators": []
             }
           ]
@@ -158,15 +145,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "D1BackedModel"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -188,27 +166,20 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "D1BackedModel"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         }
@@ -225,17 +196,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -324,18 +304,7 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "PaginatedKVModel"
-                }
-              },
+              "cidl_type": "String",
               "validators": []
             }
           ]
@@ -424,18 +393,7 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "PureKVModel"
-                }
-              },
+              "cidl_type": "String",
               "validators": []
             }
           ]
@@ -460,15 +418,6 @@
               "cidl_type": {
                 "Partial": {
                   "object_name": "PureKVModel"
-                }
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "PureKVModel"
                 }
               },
               "validators": []

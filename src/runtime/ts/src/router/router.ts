@@ -440,7 +440,7 @@ function matchRoute(
 
   const getParamValues: Record<string, string> = {};
   for (let i = 0; i < numGetParams; i++) {
-    const param = dataSource.get!.parameters[i];
+    const param = dataSource.get!.parameters[i].parameter;
     getParamValues[param.name] = parts[1 + i];
   }
 
@@ -483,7 +483,8 @@ async function validateRequest(
     const model = route.model!;
 
     // Validate all data source get parameters are present
-    for (const field of route.dataSource?.get?.parameters ?? []) {
+    for (const p of route.dataSource?.get?.parameters ?? []) {
+      const field = p.parameter;
       if (!(field.name in route.getParamValues)) {
         return invalidRequest(
           RouterError.InstantiatedMethodMissingGetParam,

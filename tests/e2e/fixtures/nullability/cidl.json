@@ -1,5 +1,5 @@
 {
-  "hash": 16767580073494028876,
+  "hash": 17765369616828601231,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 5642072893624890189,
+      "hash": 7819174499920087688,
       "name": "NullabilityChecks",
       "d1_binding": "db",
       "primary_columns": [
@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "hash": 16560120440891336829,
+          "hash": 17451028643436199502,
           "field": {
             "name": "notNullableString",
             "cidl_type": "String",
@@ -39,7 +39,7 @@
           "composite_id": null
         },
         {
-          "hash": 17407232496985557666,
+          "hash": 2709437981156923332,
           "field": {
             "name": "nullableString",
             "cidl_type": {
@@ -200,17 +200,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

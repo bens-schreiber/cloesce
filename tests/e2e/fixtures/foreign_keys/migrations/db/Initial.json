@@ -1,8 +1,8 @@
 {
-  "hash": 13563103492600318157,
+  "hash": 642337985712049489,
   "models": {
     "A": {
-      "hash": 7524899204816327788,
+      "hash": 4714858754684814240,
       "name": "A",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 14795965140419699510,
+          "hash": 5030660962754790246,
           "field": {
             "name": "bId",
             "cidl_type": {
@@ -38,7 +38,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 15496760873931370897,
+          "hash": 12787859864084899288,
           "field": {
             "name": "b",
             "cidl_type": {
@@ -59,7 +59,7 @@
       ]
     },
     "B": {
-      "hash": 15334710138958857664,
+      "hash": 2244928777608358445,
       "name": "B",
       "d1_binding": "db",
       "primary_columns": [
@@ -78,7 +78,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 2142773207963205782,
+          "hash": 11375391601863706804,
           "field": {
             "name": "a",
             "cidl_type": {
@@ -101,7 +101,7 @@
       ]
     },
     "Course": {
-      "hash": 16699223254241264860,
+      "hash": 1933848128018438236,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -120,7 +120,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 4351158626271558737,
+          "hash": 8100108184152476018,
           "field": {
             "name": "students",
             "cidl_type": {
@@ -137,7 +137,7 @@
       ]
     },
     "Person": {
-      "hash": 16470081740962856391,
+      "hash": 3380300379545248308,
       "name": "Person",
       "d1_binding": "db",
       "primary_columns": [
@@ -156,7 +156,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 6065373329749440851,
+          "hash": 15297991723649941873,
           "field": {
             "name": "dogs",
             "cidl_type": {
@@ -179,7 +179,7 @@
       ]
     },
     "Student": {
-      "hash": 399521836238653955,
+      "hash": 11264132189404198743,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -198,7 +198,7 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 3566465184463996039,
+          "hash": 7315414742277804456,
           "field": {
             "name": "courses",
             "cidl_type": {
@@ -215,7 +215,7 @@
       ]
     },
     "Dog": {
-      "hash": 13552818947087553442,
+      "hash": 11927641146139395250,
       "name": "Dog",
       "d1_binding": "db",
       "primary_columns": [
@@ -249,7 +249,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 8191773270369632834,
+          "hash": 5482872260590270089,
           "field": {
             "name": "person",
             "cidl_type": {

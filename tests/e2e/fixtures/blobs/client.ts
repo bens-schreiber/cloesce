@@ -93,16 +93,14 @@ export class BlobHaver {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<BlobHaver> },
+    model: DeepPartial<BlobHaver>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -118,16 +116,13 @@ export class BlobHaver {
     );
   }
   static async $get(
-    args: { Default: { id: number; }},
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$get`
     );
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -141,16 +136,15 @@ export class BlobHaver {
     );
   }
   static async $list(
-    args: { Default: { lastSeen_id: number; limit: number; }},
+    lastSeen_id: number,
+    limit: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5270/api/BlobHaver/$list`
     );
-    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",

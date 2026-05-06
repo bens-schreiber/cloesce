@@ -55,7 +55,7 @@ source NoLettuce for Hamburger {
         toppings
     }
     
-    sql get(id: int) {
+    sql get([instance] id: int) {
         "
         WITH included as ($include)
         SELECT * FROM included
@@ -72,7 +72,7 @@ source OnlyBacon for Hamburger {
         toppings
     }
     
-    sql get(id: int) {
+    sql get([instance] id: int) {
         "
         WITH included as ($include)
         SELECT * FROM included

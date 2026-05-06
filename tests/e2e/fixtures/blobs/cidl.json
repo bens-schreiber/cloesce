@@ -1,5 +1,5 @@
 {
-  "hash": 5838618954633320915,
+  "hash": 4055048839320829329,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "BlobHaver": {
-      "hash": 3392668001046713360,
+      "hash": 560041510452854967,
       "name": "BlobHaver",
       "d1_binding": "db",
       "primary_columns": [
@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "hash": 16513902811358920341,
+          "hash": 17404811013903783014,
           "field": {
             "name": "blob1",
             "cidl_type": "Blob",
@@ -39,7 +39,7 @@
           "composite_id": null
         },
         {
-          "hash": 13499521664997034261,
+          "hash": 14390429867474788070,
           "field": {
             "name": "blob2",
             "cidl_type": "Blob",
@@ -120,15 +120,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "BlobHaver"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -148,19 +139,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "BlobHaver"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -183,27 +163,20 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "BlobHaver"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         }
@@ -220,17 +193,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
