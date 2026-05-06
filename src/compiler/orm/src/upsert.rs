@@ -205,7 +205,7 @@ impl<'a> UpsertModel<'a> {
                     pk_vals.push((pk_col.field.name.to_string(), Some(val)));
                     pk_missing = false;
                 }
-                None if matches!(pk_col.field.cidl_type, CidlType::Int | CidlType::Uint) => {
+                None if matches!(pk_col.field.cidl_type, CidlType::Int) => {
                     if model.has_composite_pk() {
                         fail!(OrmErrorKind::ModelKeyCannotAutoIncrement {
                             model: model_name.to_string(),
@@ -754,12 +754,7 @@ fn key_format_interpolation(
             {
                 s.clone()
             }
-            Value::Number(n)
-                if matches!(
-                    field_meta.cidl_type,
-                    CidlType::Real | CidlType::Uint | CidlType::Int
-                ) =>
-            {
+            Value::Number(n) if matches!(field_meta.cidl_type, CidlType::Real | CidlType::Int) => {
                 n.to_string()
             }
             Value::Bool(b) if matches!(field_meta.cidl_type, CidlType::Boolean) => b.to_string(),
@@ -824,7 +819,6 @@ fn validate_and_transform(
     Ok(match value {
         Value::Null => match field.cidl_type.root_type() {
             CidlType::Int => return Ok(Expr::val(None::<i32>).into()),
-            CidlType::Uint => return Ok(Expr::val(None::<u32>).into()),
             CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),
             CidlType::Real => return Ok(Expr::val(None::<f64>).into()),
             CidlType::String | CidlType::DateIso => {

@@ -76,13 +76,12 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then_ignore(just(Token::Arrow))
-        .then(cidl_type())
+        .then(just(Token::Arrow).ignore_then(cidl_type()).or_not())
         .map_spanned(
             |(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
                 symbol,
                 http_verb,
-                return_type,
+                return_type: return_type.unwrap_or_default(),
                 parameters,
             },
         )

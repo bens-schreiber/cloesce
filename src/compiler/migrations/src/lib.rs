@@ -480,9 +480,7 @@ impl MigrateTables {
                                                 // Column type changed, cast
                                                 let sql_type = match &model_c.cidl_type.root_type()
                                                 {
-                                                    CidlType::Int
-                                                    | CidlType::Uint
-                                                    | CidlType::Boolean => "integer",
+                                                    CidlType::Int | CidlType::Boolean => "integer",
                                                     CidlType::Real => "real",
                                                     CidlType::String | CidlType::DateIso => "text",
                                                     _ => unreachable!(),
@@ -888,7 +886,6 @@ fn sql_default(ty: &CidlType) -> sea_query::Value {
     }
     match ty {
         CidlType::Int => sea_query::Value::Int(Some(0i32)),
-        CidlType::Uint => sea_query::Value::Unsigned(Some(0u32)),
         CidlType::Real => sea_query::Value::Float(Some(0.0)),
         CidlType::String => sea_query::Value::String(Some(Box::new("".into()))),
         _ => unreachable!(),
@@ -907,7 +904,7 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     }
 
     match inner {
-        CidlType::Int | CidlType::Uint | CidlType::Boolean => col.integer(),
+        CidlType::Int | CidlType::Boolean => col.integer(),
         CidlType::Real => col.decimal(),
         CidlType::String | CidlType::DateIso => col.text(),
         CidlType::Blob => col.blob(),

@@ -216,12 +216,11 @@ fn crud_methods_namespace_sources_inherit_validators() {
                 .unwrap_or(false),
         );
 
-        let default_limit_param = method
+        method
             .parameters
             .iter()
             .find(|p| p.name == "Default_limit")
             .unwrap();
-        assert!(default_limit_param.validators.is_empty());
 
         let custom_limit_param = method
             .parameters

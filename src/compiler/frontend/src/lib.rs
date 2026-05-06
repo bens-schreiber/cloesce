@@ -104,12 +104,10 @@ contextual_keywords! {
     // Primitive type
     TString => "string",
     TInt => "int",
-    TUint => "uint",
     TReal => "real",
     TDate => "date",
     TBool => "bool",
     TJson => "json",
-    TVoid => "void",
     TBlob => "blob",
     TStream => "stream",
     TR2Object => "R2Object",

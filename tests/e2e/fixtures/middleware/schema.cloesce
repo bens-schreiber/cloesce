@@ -17,6 +17,6 @@ model Foo {
 }
 
 api Foo {
-    get blockedMethod() -> void
+    get blockedMethod()
     get getInjectedThing(thing: InjectedThing) -> string
 }

@@ -6,7 +6,6 @@ export type CrudKind = "Save" | "Get" | "List";
 export type CidlType =
   | "Void"
   | "Int"
-  | "Uint"
   | "Real"
   | "String"
   | "Blob"

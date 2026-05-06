@@ -103,7 +103,7 @@ model Weather {
 }
 
 api Weather {
-    post uploadPhoto(self, e: env, s: stream) -> void
+    post uploadPhoto(self, e: env, s: stream)
     get downloadPhoto([source R2Only] self) -> stream
 }
 

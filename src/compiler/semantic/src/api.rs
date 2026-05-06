@@ -207,10 +207,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     );
                 }
 
-                CidlType::Void => {
-                    self.sink.push(invalid_type_err);
-                }
-
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
                     // GET requests do not support Object parameters
                     ensure!(

@@ -30,7 +30,7 @@ model Foo {
 }
 
 api Foo {
-    post bar([source Baz] self, customDs: DataSource<Foo>, oneDs: DataSource<OneDs>, noDs: DataSource<NoDs>, poop: Poo) -> void
+    post bar([source Baz] self, customDs: DataSource<Foo>, oneDs: DataSource<OneDs>, noDs: DataSource<NoDs>, poop: Poo)
 }
 
 source Baz for Foo {

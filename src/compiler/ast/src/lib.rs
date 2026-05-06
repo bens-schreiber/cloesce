@@ -16,7 +16,6 @@ pub enum CidlType<'src> {
     Void,
 
     Int,
-    Uint,
     Real,
     String,
     Blob,
@@ -114,10 +113,6 @@ impl<'src> CidlType<'src> {
 
     pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
-    }
-
-    pub fn null() -> CidlType<'src> {
-        CidlType::Nullable(Box::new(CidlType::Void))
     }
 
     pub fn http(cidl_type: CidlType<'src>) -> CidlType<'src> {

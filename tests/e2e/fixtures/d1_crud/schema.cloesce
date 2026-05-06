@@ -15,7 +15,7 @@ model CrudHaver {
 }
 
 api CrudHaver {
-    post notCrud(self) -> void
+    post notCrud(self)
 }
 
 [use db]

@@ -38,7 +38,7 @@ api User {
     get myDogs(self) -> array<Dog>
     get selfWithoutDogs([source NoDogs] self) -> User
 
-    post updateName(self, newName: string) -> void
+    post updateName(self, newName: string)
 }
 
 source NoDogs for User {
@@ -163,7 +163,7 @@ model User {
 
 api User {
     get profile(self) -> Profile
-    post updateProfile(self, profile: Profile) -> void
+    post updateProfile(self, profile: Profile)
 }
 ```
 
@@ -193,7 +193,7 @@ model MediaFile {
 }
 
 api MediaFile {
-    post uploadFile(self, wrangler: env, file: stream) -> void
+    post uploadFile(self, wrangler: env, file: stream)
     get downloadFile(self) -> stream
 }
 ```

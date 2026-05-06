@@ -191,20 +191,11 @@ will also require that `fooId` is exactly 5 characters long, since it references
 
 #### Generics
 
-- **Option<T>**: Validate the inner type `T` if the value is not null. If the value is null, skip validation.
+- **option<T>**: Validate the inner type `T` if the value is not null. If the value is null, skip validation.
 
 - **array<T>** | **Paginated<T>**: Validate each item in the array against the inner type `T`. If any item fails validation, the entire array fails validation.
 
-- **Partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
-
-### Renaming `double` to `real` and Introducing Unsigned Integer Type
-
-First, it's overdue that we rename `double` to `real`. Since Cloesce compiles to multiple languages, we don't really know what the underlying representation of a floating point number will be, and `real` is a more general term that can encompass both single and double precision floats (it is also the SQLite type for floating point numbers).
-
-`real` and `int` will represent a number that can be positive or negative.
-
-`uint` will be introduced to represent an unsigned integer which must be greater than or equal to 0 at runtime.
-
+- **partial<T>**: Validate all fields in `T` that are present in the input. If a field is missing from the input, skip validation for that field.
 ---
 
 ## Implementation
@@ -223,7 +214,7 @@ No validation code will be generated, the `validate` function reads validator co
 
 A validator can be applied to data source method parameters. However, this exposes a pre-existing problem with how multi-source CRUD methods are generated.
 
-Currently, `list` and `get` are generated to accept the union of all parameters across all data sources as a flat set of `Option<T>` fields (e.g. if `DataSourceA` has parameters `a` and `b`, and `DataSourceB` has parameters `c` and `d`, the generated signature is `list(a: Option<Type>, b: Option<Type>, c: Option<Type>, d: Option<Type>)`). This already breaks down when two sources define a parameter with the same name but different types. Validators make it unworkable entirely, since there is no way to associate per-source validation constraints with a single merged parameter:
+Currently, `list` and `get` are generated to accept the union of all parameters across all data sources as a flat set of `option<T>` fields (e.g. if `DataSourceA` has parameters `a` and `b`, and `DataSourceB` has parameters `c` and `d`, the generated signature is `list(a: option<Type>, b: option<Type>, c: option<Type>, d: option<Type>)`). This already breaks down when two sources define a parameter with the same name but different types. Validators make it unworkable entirely, since there is no way to associate per-source validation constraints with a single merged parameter:
 
 ```cloesce
 source A for Foo {

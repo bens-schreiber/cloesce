@@ -292,12 +292,10 @@ fn cidl_type<'tokens, 'src: 'tokens>()
     let primitive_keyword = choice((
         kw!(TString).to(CidlType::String),
         kw!(TInt).to(CidlType::Int),
-        kw!(TUint).to(CidlType::Uint),
         kw!(TReal).to(CidlType::Real),
         kw!(TDate).to(CidlType::DateIso),
         kw!(TBool).to(CidlType::Boolean),
         kw!(TJson).to(CidlType::Json),
-        kw!(TVoid).to(CidlType::Void),
         kw!(TBlob).to(CidlType::Blob),
         kw!(TStream).to(CidlType::Stream),
         kw!(TR2Object).to(CidlType::R2Object),

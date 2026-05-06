@@ -688,11 +688,6 @@ fn api_errors() {
             get badReturn() -> option<stream>
         }
 
-        // Void parameter
-        api User {
-            post badVoidParam(v: void) -> string
-        }
-
         // Object parameter on GET
         api User {
             get badGetObj(u: User) -> string
@@ -715,7 +710,7 @@ fn api_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 6);
+    assert_eq!(errors.len(), 5);
 
     expect_err!(errors, SemanticError::ApiUnknownNamespaceReference { .. });
 
@@ -723,7 +718,7 @@ fn api_errors() {
 
     assert_eq!(
         count_errs!(errors, SemanticError::ApiInvalidParam { .. }),
-        4
+        3
     );
 }
 
@@ -921,7 +916,6 @@ fn poo_errors() {
     let src = r#"
         poo MyPoo {
             streamField: stream
-            voidField: void
             cyclicalField: MyPoo
         }
     "#;
@@ -931,7 +925,7 @@ fn poo_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 3);
+    assert_eq!(errors.len(), 2);
 
     let cycle = expect_err!(errors,
         SemanticError::CyclicalRelationship { cycle } => cycle.clone()
@@ -941,11 +935,6 @@ fn poo_errors() {
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
-    )));
-
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
     )));
 }
 

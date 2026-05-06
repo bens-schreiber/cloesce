@@ -802,18 +802,16 @@ impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
 
 fn fmt_cidl_type(ty: &CidlType<'_>) -> String {
     match ty {
-        CidlType::Void => "void".into(),
-        CidlType::Int => "int".into(),
-        CidlType::Uint => "uint".into(),
-        CidlType::Real => "real".into(),
-        CidlType::String => "string".into(),
-        CidlType::Blob => "blob".into(),
-        CidlType::Boolean => "bool".into(),
-        CidlType::DateIso => "date".into(),
-        CidlType::Stream => "stream".into(),
-        CidlType::Json => "json".into(),
-        CidlType::R2Object => "R2Object".into(),
-        CidlType::Env => "env".into(),
+        CidlType::Int => Keyword::TInt.as_str().into(),
+        CidlType::Real => Keyword::TReal.as_str().into(),
+        CidlType::String => Keyword::TString.as_str().into(),
+        CidlType::Blob => Keyword::TBlob.as_str().into(),
+        CidlType::Boolean => Keyword::TBool.as_str().into(),
+        CidlType::DateIso => Keyword::TDate.as_str().into(),
+        CidlType::Stream => Keyword::TStream.as_str().into(),
+        CidlType::Json => Keyword::TJson.as_str().into(),
+        CidlType::R2Object => Keyword::TR2Object.as_str().into(),
+        CidlType::Env => "env".into(), // TODO: remove env
         CidlType::Inject { name }
         | CidlType::Object { name }
         | CidlType::UnresolvedReference { name } => name.to_string(),

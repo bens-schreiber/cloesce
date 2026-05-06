@@ -5,7 +5,6 @@
 - Basic zod-inspired validators for any field (Model, Poo, API method, Data Source method)
   - string validators: `regex`, `maxlen`, `minlen`, `len`
   - number validators: `gt`, `gte`, `lt`, `lte`, `step`
-- new `uint` type which performs the same as `int` but with an implicit `gt 0` validator
 
 ### Changed
 

@@ -164,7 +164,7 @@ impl<'src, 'p> SemanticAnalysis {
                         graph.entry(name).or_default().push(poo_name);
                         in_degree.entry(poo_name).and_modify(|d| *d += 1);
                     }
-                    CidlType::Stream | CidlType::Void => {
+                    CidlType::Stream => {
                         sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
                     }
                     _ => {
@@ -638,7 +638,7 @@ fn resolve_validator_tags<'src, 'p>(
         let root = symbol.cidl_type.root_type();
         let type_ok = match kw {
             GreaterThan | GreaterThanOrEqual | LessThan | LessThanOrEqual | Step => {
-                matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
+                matches!(root, CidlType::Int | CidlType::Real)
             }
             Len | MinLen | MaxLen | Regex => matches!(root, CidlType::String),
             _ => unreachable!(
@@ -795,7 +795,6 @@ fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     matches!(
         inner,
         CidlType::Int
-            | CidlType::Uint
             | CidlType::Real
             | CidlType::String
             | CidlType::Blob

@@ -252,8 +252,8 @@ impl<'src> DataSourceExpansion {
             })
             .chain(vec![ValidatedField {
                 name: "limit".into(),
-                cidl_type: CidlType::Uint,
-                validators: Vec::new(),
+                cidl_type: CidlType::Int,
+                validators: vec![ast::Validator::GreaterThan(ast::Number::Int(0))],
             }])
             .collect();
 

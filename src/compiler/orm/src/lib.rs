@@ -106,7 +106,6 @@ fn fmt_cidl_type(t: &CidlType) -> String {
     match t {
         CidlType::Void => "void".to_string(),
         CidlType::Int => "int".to_string(),
-        CidlType::Uint => "uint".to_string(),
         CidlType::Real => "real".to_string(),
         CidlType::String => "string".to_string(),
         CidlType::Blob => "blob".to_string(),

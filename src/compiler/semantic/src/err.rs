@@ -383,7 +383,7 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "only string, int, real, uint, date, json, bool, and blob are allowed",
+                            "only string, int, real, date, json, bool, and blob are allowed",
                         )
                         .with_color(Color::Red),
                 )
@@ -661,7 +661,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((param_path, param_range))
-                        .with_message("only string, int, real, uint, date, json, bool, and blob are allowed as method params")
+                        .with_message("only string, int, real, date, json, bool, and blob are allowed as method params")
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -831,7 +831,7 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "key fields must be a valid SQLite type (string, int, real, uint, date, json, bool, or blob)"
+                            "key fields must be a valid SQLite type (string, int, real, date, json, bool, or blob)"
                         )
                         .with_color(Color::Red),
                 )

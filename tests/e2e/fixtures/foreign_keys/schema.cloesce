@@ -17,7 +17,7 @@ model B {
 }
 
 api B {
-    post testMethod(self) -> void
+    post testMethod(self)
 }
 
 [use db]
@@ -96,7 +96,7 @@ model Dog {
 }
 
 api Dog {
-    post testMethod(self) -> void
+    post testMethod(self)
 }
 // #endregion
 // #region ManyToMany
