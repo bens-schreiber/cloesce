@@ -11,7 +11,7 @@ In this section, we will explore how to define methods on Models that are expose
 
 > [!WARNING]
 > GET methods in v0.3.0 do not support complex types as parameters (such as other Models, arrays, etc).
-> Only primitive types like `string`, `int`, `double`, `bool` are supported. This limitation will be lifted in future releases.
+> Only primitive types like `string`, `int`, `real`, `bool` are supported. This limitation will be lifted in future releases.
 
 A Model in Cloesce may have both "static" and "instance" methods.
 
@@ -35,10 +35,10 @@ model User {
 
 api User {
     get echo() -> string
-    get myDogs(self) -> Array<Dog>
+    get myDogs(self) -> array<Dog>
     get selfWithoutDogs([source NoDogs] self) -> User
 
-    post updateName(self, newName: string) -> void
+    post updateName(self, newName: string)
 }
 
 source NoDogs for User {
@@ -97,7 +97,7 @@ When creating Models, you will find yourself writing the same CRUD (Create, Read
 
 ```cloesce
 [use db]
-[use get, save, list]
+[crud get, save, list]
 model User {
     primary {
         id: int
@@ -129,18 +129,17 @@ There are many valid types for method parameters in Cloesce, such as:
 | Type              | Description                                                         |
 | ----------------- | ------------------------------------------------------------------- |
 | `string`          | String values                                                       |
-| `double`          | Floating-point numbers                                              |
+| `real`            | Floating-point numbers                                              |
 | `int`             | Integer values                                                      |
 | `bool`            | Boolean values (true/false)                                         |
 | `date`            | Date and time values                                                |
 | `blob`            | Binary data                                                         |
-| `DataSource<T>`   | Any data source for Model type `T`                                  |
 | `json`            | JSON data of unknown structure                                      |
-| `Partial<T>`      | Partial version of Model type `T` where anything can be missing     |
+| `partial<T>`      | Partial version of Model type `T` where anything can be missing     |
 | Plain Old Objects | Objects with properties of supported types                          |
 | Model types       | Custom Models (e.g., `User`, `Post`)                                |
-| `Array<T>`        | Arrays of any supported type (e.g., `Array<string>`, `Array<User>`) |
-| `Option<T>`       | Nullable versions of any type                                       |
+| `array<T>`        | Arrays of any supported type (e.g., `array<string>`, `array<User>`) |
+| `option<T>`       | Nullable versions of any type                                       |
 | `stream`          | Stream of data                                                      |
 
 ## Plain Old Objects
@@ -154,7 +153,7 @@ Cloesce supports the use of Plain Old Objects (POOs) as method parameters and re
 poo Profile {
     bio: string
     age: int
-    interests: Array<string>
+    interests: array<string>
 }
 
 model User {
@@ -163,7 +162,7 @@ model User {
 
 api User {
     get profile(self) -> Profile
-    post updateProfile(self, profile: Profile) -> void
+    post updateProfile(self, profile: Profile)
 }
 ```
 
@@ -193,7 +192,7 @@ model MediaFile {
 }
 
 api MediaFile {
-    post uploadFile(self, wrangler: env, file: stream) -> void
+    post uploadFile(self, wrangler: env, file: stream)
     get downloadFile(self) -> stream
 }
 ```

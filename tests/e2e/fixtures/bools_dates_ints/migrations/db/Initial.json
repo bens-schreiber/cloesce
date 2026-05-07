@@ -1,8 +1,8 @@
 {
-  "hash": 8050296775765088471,
+  "hash": 14113549040013838164,
   "models": {
     "Weather": {
-      "hash": 1875505954177212837,
+      "hash": 10306382131681195126,
       "name": "Weather",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 6528871581409872296,
+          "hash": 7419779783954734969,
           "field": {
             "name": "date",
             "cidl_type": "DateIso",
@@ -31,7 +31,7 @@
           "composite_id": null
         },
         {
-          "hash": 4243998849744196752,
+          "hash": 5134907052289059425,
           "field": {
             "name": "isRaining",
             "cidl_type": "Boolean",

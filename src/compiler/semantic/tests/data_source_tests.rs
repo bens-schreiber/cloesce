@@ -170,7 +170,8 @@ fn default_data_source_methods() {
             kv { my_kv }
         }
 
-        [use db, get, list]
+        [use db]
+        [crud get, list]
         model Item {
             primary {
                 id: int

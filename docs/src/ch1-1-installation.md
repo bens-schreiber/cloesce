@@ -51,7 +51,6 @@ cd my-cloesce-app
 A simple project structure is created for you.
 
 ```
-
 ├── src/
 │   ├── api/            # API route handlers
 │   ├── web/            # Frontend web assets

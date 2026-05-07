@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, save]
+[use db]
+[crud save]
 model Topping {
     primary {
         id: int
@@ -17,7 +18,8 @@ model Topping {
     }
 }
 
-[use db, save, list]
+[use db]
+[crud save, list]
 model Hamburger {
     primary {
         id: int
@@ -53,7 +55,7 @@ source NoLettuce for Hamburger {
         toppings
     }
     
-    sql get(id: int) {
+    sql get([instance] id: int) {
         "
         WITH included as ($include)
         SELECT * FROM included
@@ -70,7 +72,7 @@ source OnlyBacon for Hamburger {
         toppings
     }
     
-    sql get(id: int) {
+    sql get([instance] id: int) {
         "
         WITH included as ($include)
         SELECT * FROM included
@@ -82,6 +84,6 @@ source OnlyBacon for Hamburger {
 }
 
 api Hamburger {
-    get noLettuceToppings([source NoLettuce] self) -> Array<Topping>
-    get onlyBaconToppings([source OnlyBacon] self) -> Array<Topping>
+    get noLettuceToppings([source NoLettuce] self) -> array<Topping>
+    get onlyBaconToppings([source OnlyBacon] self) -> array<Topping>
 }

@@ -1,12 +1,12 @@
 use std::ops::Not;
 
 use crate::{
-    SymbolKind, SymbolTable, ensure,
+    LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    resolve_cidl_type, resolve_validators,
+    resolve_cidl_type, resolve_validator_tags,
 };
 use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
-use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice};
+use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
 
 #[derive(Default)]
 pub struct ApiAnalysis<'src, 'p> {
@@ -37,7 +37,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             };
 
             let mut methods = Vec::new();
-            for method in api_block.methods.blocks() {
+            for method in api_block.methods.inners() {
                 if let Some(api_method) = self.method(namespace, method, table) {
                     methods.push(api_method);
                 }
@@ -69,7 +69,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         };
 
         Some(ApiMethod {
-            name: method.symbol.name,
+            name: method.symbol.name.into(),
             is_static,
             data_source,
             http_verb: method.http_verb,
@@ -136,43 +136,55 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut params = Vec::new();
 
         let mut has_stream = false;
-        let mut data_source_symbol = None;
+        let mut data_source: Option<&'src str> = None;
         let mut is_static = true;
-        for param in method.parameters.blocks() {
+        for param in method.parameters.inners() {
             let param = match param {
-                ApiBlockMethodParamKind::SelfParam { data_source, .. } => {
+                ApiBlockMethodParamKind::SelfParam(self_sym) => {
                     is_static = false;
-                    data_source_symbol = data_source.clone();
-                    let Some(ds) = data_source else {
-                        continue;
-                    };
 
-                    // Check that the data source exists on this namespace
-                    let ds_exists = table
-                        .data_sources
-                        .contains_key(&SymbolKind::DataSourceDecl {
-                            model: namespace,
-                            name: ds.name,
-                        });
+                    // Validate tags
+                    for tag in &self_sym.tags {
+                        let Tag::Source { name } = &tag.inner else {
+                            self.sink.push(SemanticError::TagInvalidInContext {
+                                tag,
+                                symbol: self_sym,
+                            });
+                            continue;
+                        };
 
-                    ensure!(
-                        ds_exists,
-                        self.sink,
-                        SemanticError::ApiUnknownDataSourceReference {
-                            method: &method.symbol,
-                            data_source: ds
-                        }
-                    );
+                        data_source = Some(name.inner);
 
+                        // Check that the data source exists on this namespace
+                        let ds_exists =
+                            table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
+                                model: namespace,
+                                name: name.inner,
+                            });
+
+                        ensure!(
+                            ds_exists,
+                            self.sink,
+                            SemanticError::ApiUnknownDataSourceReference {
+                                method: &method.symbol,
+                                data_source: name,
+                            }
+                        );
+                    }
+
+                    // No further validation is needed for `self`.
                     continue;
                 }
-                ApiBlockMethodParamKind::Field(symbol) => symbol,
+                ApiBlockMethodParamKind::Param(symbol) => symbol,
             };
 
-            let err = SemanticError::ApiInvalidParam {
-                method: &method.symbol,
-                param,
-            };
+            // Validate tags
+            for tag in &param.tags {
+                if !matches!(tag.inner, Tag::Validator { .. }) {
+                    self.sink
+                        .push(SemanticError::TagInvalidInContext { tag, symbol: param });
+                }
+            }
 
             let resolved_type = match resolve_cidl_type(param, &param.cidl_type, table) {
                 Ok(t) => t,
@@ -181,14 +193,18 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     continue;
                 }
             };
+            let invalid_type_err = SemanticError::ApiInvalidParam {
+                method: &method.symbol,
+                param,
+            };
             match resolved_type.root_type() {
                 CidlType::Inject { .. } => {
                     // Option, Array or any other wrapper types are not allowed to wrap Inject
-                    ensure!(*resolved_type.root_type() == resolved_type, self.sink, err);
-                }
-
-                CidlType::Void => {
-                    self.sink.push(err);
+                    ensure!(
+                        *resolved_type.root_type() == resolved_type,
+                        self.sink,
+                        invalid_type_err
+                    );
                 }
 
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
@@ -196,7 +212,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
@@ -205,40 +221,45 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
                 CidlType::Stream => {
+                    // GET requests do not have any body, so Stream parameters
+                    // cannot be used
+                    ensure!(
+                        matches!(method.http_verb, HttpVerb::Get).not(),
+                        self.sink,
+                        invalid_type_err.clone()
+                    );
+
                     has_stream = true;
                     let required_params = method
                         .parameters
-                        .blocks()
+                        .inners()
                         .filter(|p| {
-                            let ApiBlockMethodParamKind::Field(symbol) = p else {
+                            let ApiBlockMethodParamKind::Param(symbol) = p else {
                                 return false;
                             };
 
-                            !matches!(
-                                symbol.cidl_type,
-                                CidlType::Inject { .. }
-                                    | CidlType::DataSource { .. }
-                                    | CidlType::Env
-                            )
+                            !matches!(symbol.cidl_type, CidlType::Inject { .. } | CidlType::Env)
                         })
                         .count();
 
+                    // Only one Stream parameter is allowed, and it must be the
+                    // only non-injected parameter
                     ensure!(
                         required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                         self.sink,
-                        err
+                        invalid_type_err
                     );
                 }
 
                 _ => {}
             }
 
-            let validators = match resolve_validators(param) {
+            let validators = match resolve_validator_tags(param) {
                 Ok(v) => v,
                 Err(errs) => {
                     self.sink.extend(errs);
@@ -261,7 +282,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 MediaType::Json
             },
             is_static,
-            data_source_symbol.map(|s| s.name),
+            data_source,
         )
     }
 }

@@ -8,11 +8,12 @@ env {
     }
 }
 
-[use db, save, get, list]
+[use db]
+[crud save, get, list]
 model Validator {
     primary {
         [lt 100]
-        id: uint
+        id: int
     }
 
     [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
@@ -36,11 +37,11 @@ api Validator {
         self,
 
         [lt 100] 
-        id: uint,
+        id: int,
 
         [len 10] 
         name: string,
-    ) -> void
+    )
 }
 
 source None for Validator {

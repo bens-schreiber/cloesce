@@ -1,5 +1,5 @@
 {
-  "hash": 12943445999625665821,
+  "hash": 1454352641393335132,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -12,15 +12,15 @@
   },
   "models": {
     "Validator": {
-      "hash": 11924306774175608156,
+      "hash": 1908438877902929966,
       "name": "Validator",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 5506969935928112087,
+          "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Uint",
+            "cidl_type": "Int",
             "validators": [
               {
                 "LessThan": {
@@ -36,7 +36,7 @@
       ],
       "columns": [
         {
-          "hash": 15344942205672937722,
+          "hash": 16235850408217800395,
           "field": {
             "name": "email",
             "cidl_type": "String",
@@ -112,7 +112,7 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Uint",
+              "cidl_type": "Int",
               "validators": [
                 {
                   "LessThan": {
@@ -155,12 +155,29 @@
                 }
               },
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$save_None",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Validator"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "$datasource",
+              "name": "model",
               "cidl_type": {
-                "DataSource": {
-                  "model_name": "Validator"
+                "Partial": {
+                  "object_name": "Validator"
                 }
               },
               "validators": []
@@ -183,21 +200,45 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "LessThan": {
+                    "Int": 100
+                  }
+                }
+              ]
+            },
+            {
               "name": "name",
-              "cidl_type": {
-                "Nullable": "String"
-              },
+              "cidl_type": "String",
               "validators": [
                 {
                   "Length": 10
                 }
               ]
-            },
+            }
+          ]
+        },
+        {
+          "name": "$get_None",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Validator"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": [
                 {
                   "LessThan": {
@@ -207,26 +248,13 @@
               ]
             },
             {
-              "name": "None_id",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
+              "name": "name",
+              "cidl_type": "String",
               "validators": [
                 {
-                  "LessThan": {
-                    "Int": 100
-                  }
+                  "Length": 10
                 }
               ]
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Validator"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -248,10 +276,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": [
                 {
                   "LessThan": {
@@ -261,17 +287,38 @@
               ]
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "$list_None",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "Validator"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "None_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": [
                 {
                   "LessThan": {
@@ -281,20 +328,15 @@
               ]
             },
             {
-              "name": "None_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Validator"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         }
@@ -306,7 +348,7 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Uint",
+                "cidl_type": "Int",
                 "validators": [
                   {
                     "LessThan": {
@@ -317,23 +359,32 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Uint",
-                "validators": [
-                  {
-                    "LessThan": {
-                      "Int": 100
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "LessThan": {
+                        "Int": 100
+                      }
                     }
-                  }
-                ]
+                  ]
+                },
+                "instance_field": true
               }
             ]
           },
@@ -345,7 +396,7 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Uint",
+                "cidl_type": "Int",
                 "validators": [
                   {
                     "LessThan": {
@@ -356,23 +407,32 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Uint",
-                "validators": [
-                  {
-                    "LessThan": {
-                      "Int": 100
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "LessThan": {
+                        "Int": 100
+                      }
                     }
-                  }
-                ]
+                  ]
+                },
+                "instance_field": true
               }
             ]
           },

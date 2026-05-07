@@ -343,35 +343,6 @@ fn r2() {
 }
 
 #[test]
-fn data_source() {
-    // Unknown data source
-    {
-        let ast = src_to_ast(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Horse {
-                primary {
-                    id: int
-                }
-            }
-        "#,
-        );
-        let result = validate(
-            CidlType::DataSource {
-                model_name: "Horse",
-            },
-            Some(json!("nonexistent_source")),
-            &ast,
-        );
-        assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
-    }
-}
-
-#[test]
 fn objects_partials() {
     // Invalid column propagates
     {
@@ -539,7 +510,8 @@ fn one_to_many_nav_person_dogs() {
             d1 { db }
         }
 
-        [use db, save, get]
+        [use db]
+        [crud save, get]
         model Person {
             primary { id: int }
 
@@ -548,7 +520,8 @@ fn one_to_many_nav_person_dogs() {
             }
         }
 
-        [use db, save]
+        [use db]
+        [crud save]
         model Dog {
             primary { id: int }
 

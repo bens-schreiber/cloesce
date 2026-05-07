@@ -280,8 +280,8 @@ model User { }
 
 api User {
     get getUser(id: int) -> User
-    post doNothing(self) -> void
-    delete deleteUser(self) -> void
+    post doNothing(self)
+    delete deleteUser(self)
 }
 
 // valid to keep defining blocks
@@ -346,7 +346,7 @@ service EmailService {
 }
 
 api EmailService {
-    get sendEmail(self, to: string, subject: string, body: string) -> void
+    get sendEmail(self, to: string, subject: string, body: string)
 }
 ```
 
@@ -358,7 +358,7 @@ The `poo` keyword defines a plain old object, which is simply a namespace for so
 poo UserWithPosts {
     id: int
     name: string
-    posts: Array<Post>
+    posts: array<Post>
 }
 ```
 
@@ -375,7 +375,7 @@ The Cloesce Language supports the following type primitives:
 - `json`
 - `stream`
 - `R2Object`
-- `Array<T>`
+- `array<T>`
 - `Option<T>`
 - `Paginated<T>`
 - `Partial<T>`

@@ -4,7 +4,8 @@ env {
     }
 }
 // #region OneToOne
-[use db, save, get]
+[use db]
+[crud save, get]
 model B {
     primary {
         id: int
@@ -16,10 +17,11 @@ model B {
 }
 
 api B {
-    post testMethod(self) -> void
+    post testMethod(self)
 }
 
-[use db, save, get]
+[use db]
+[crud save, get]
 model A {
     primary {
         id: int
@@ -50,7 +52,8 @@ api A {
 }
 // #endregion
 // #region OneToMany
-[use db, save, get]
+[use db]
+[crud save, get]
 model Person {
     primary {
         id: int
@@ -76,7 +79,8 @@ api Person {
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
-[use db, save]
+[use db]
+[crud save]
 model Dog {
     primary {
         id: int
@@ -92,11 +96,12 @@ model Dog {
 }
 
 api Dog {
-    post testMethod(self) -> void
+    post testMethod(self)
 }
 // #endregion
 // #region ManyToMany
-[use db, save, get]
+[use db]
+[crud save, get]
 model Student {
     primary {
         id: int
@@ -126,7 +131,8 @@ api Student {
     get none([source None] self) -> Student
 }
 
-[use db, save]
+[use db]
+[crud save]
 model Course {
     primary {
         id: int

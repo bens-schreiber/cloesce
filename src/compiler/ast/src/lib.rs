@@ -16,7 +16,6 @@ pub enum CidlType<'src> {
     Void,
 
     Int,
-    Uint,
     Real,
     String,
     Blob,
@@ -56,12 +55,6 @@ pub enum CidlType<'src> {
     Partial {
         #[serde(borrow)]
         object_name: &'src str,
-    },
-
-    /// A data source of some model
-    DataSource {
-        #[serde(borrow)]
-        model_name: &'src str,
     },
 
     /// An array of any type
@@ -114,10 +107,6 @@ impl<'src> CidlType<'src> {
 
     pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
-    }
-
-    pub fn null() -> CidlType<'src> {
-        CidlType::Nullable(Box::new(CidlType::Void))
     }
 
     pub fn http(cidl_type: CidlType<'src>) -> CidlType<'src> {
@@ -281,7 +270,7 @@ pub struct Column<'src> {
     pub composite_id: Option<usize>,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum CrudKind {
     Get,
     List,
@@ -289,9 +278,28 @@ pub enum CrudKind {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct DataSourceMethod<'src> {
+pub struct DataSourceListMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
+
+    #[serde(skip)]
+    pub raw_sql: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DataSourceGetMethodParam<'src> {
+    #[serde(borrow)]
+    pub parameter: ValidatedField<'src>,
+
+    /// True if the parameter matches a field on the model,
+    /// meaning the client can automatically populate it when calling the method on an instance of the model.
+    pub instance_field: bool,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DataSourceGetMethod<'src> {
+    #[serde(borrow)]
+    pub parameters: Vec<DataSourceGetMethodParam<'src>>,
 
     #[serde(skip)]
     pub raw_sql: String,
@@ -306,11 +314,13 @@ pub struct DataSource<'src> {
     pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
-    pub list: Option<DataSourceMethod<'src>>,
+    pub list: Option<DataSourceListMethod<'src>>,
 
     #[serde(borrow)]
-    pub get: Option<DataSourceMethod<'src>>,
+    pub get: Option<DataSourceGetMethod<'src>>,
 
+    /// True if the data source is only used for internal method implementations
+    /// and should not be exposed on the client.
     pub is_internal: bool,
 }
 
@@ -357,7 +367,7 @@ pub enum MediaType {
 #[derive(Deserialize, Serialize)]
 pub struct ApiMethod<'src> {
     #[serde(borrow)]
-    pub name: &'src str,
+    pub name: Cow<'src, str>,
 
     /// If true, the method is static (instantiated on a class, not an instance).
     /// Static methods require no hydration or data source.

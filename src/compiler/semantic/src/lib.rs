@@ -3,9 +3,9 @@ use ast::{
     WranglerEnv,
 };
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, AstBlockKind, DataSourceBlock, EnvBindingBlockKind,
-    EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Spd, SpdSlice,
-    Symbol, ValidatorLiteral, ValidatorTag,
+    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, DataSourceBlock,
+    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
+    ServiceBlock, Spd, SpdSlice, Symbol, Tag,
 };
 use indexmap::IndexMap;
 
@@ -24,299 +24,6 @@ mod crud;
 mod data_source;
 pub mod err;
 mod model;
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub enum EnvBindingKind {
-    D1,
-    R2,
-    Kv,
-}
-
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SymbolKind<'src> {
-    // Scoped
-    EnvVar(&'src str),
-    EnvBinding {
-        kind: EnvBindingKind,
-        name: &'src str,
-    },
-    ModelField {
-        model: &'src str,
-        name: &'src str,
-    },
-    PlainOldObjectField {
-        poo: &'src str,
-        name: &'src str,
-    },
-    ServiceField {
-        service: &'src str,
-        name: &'src str,
-    },
-    ApiMethodDecl {
-        namespace: &'src str,
-        name: &'src str,
-    },
-    ApiMethodParam {
-        namespace: &'src str,
-        method: &'src str,
-        name: &'src str,
-    },
-    DataSourceDecl {
-        model: &'src str,
-        name: &'src str,
-    },
-    DataSourceMethodParam {
-        data_source: &'src str,
-        method: &'src str,
-        name: &'src str,
-    },
-}
-
-type SymbolLookup<'src, 'p> = BTreeMap<SymbolKind<'src>, &'p Symbol<'src>>;
-
-#[derive(Default)]
-pub struct SymbolTable<'src, 'p> {
-    models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
-    poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
-    services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
-    envs: Vec<&'p EnvBlock<'src>>,
-    injects: Vec<&'p InjectBlock<'src>>,
-    data_sources: BTreeMap<SymbolKind<'src>, &'p DataSourceBlock<'src>>,
-    apis: Vec<&'p ApiBlock<'src>>,
-
-    env_vars: SymbolLookup<'src, 'p>,
-    env_bindings: SymbolLookup<'src, 'p>,
-    model_fields: SymbolLookup<'src, 'p>,
-    poo_fields: SymbolLookup<'src, 'p>,
-    service_fields: SymbolLookup<'src, 'p>,
-    api_method_decls: SymbolLookup<'src, 'p>,
-    api_method_params: SymbolLookup<'src, 'p>,
-    data_source_method_params: SymbolLookup<'src, 'p>,
-}
-
-impl<'src, 'p> SymbolTable<'src, 'p> {
-    /// Creates a [SymbolTable] from a [ParseAst], catching [SemanticError::DuplicateSymbol]'s
-    fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
-        let mut st = SymbolTable::default();
-        let mut global_names = HashMap::new();
-
-        let mut insert_global = |sink: &mut ErrorSink<'src, 'p>, symbol: &'p Symbol<'src>| {
-            if let Some(first) = global_names.insert(symbol.name, symbol) {
-                sink.push(SemanticError::DuplicateSymbol {
-                    first,
-                    second: symbol,
-                });
-            }
-        };
-
-        for block in parse.blocks.blocks() {
-            match block {
-                AstBlockKind::Model(model_block) => {
-                    insert_global(sink, &model_block.symbol);
-                    st.models.insert(model_block.symbol.name, model_block);
-
-                    for sub_block in model_block.blocks.blocks() {
-                        let symbols = sub_block.symbols();
-                        for symbol in symbols {
-                            if let Some(first) = st.model_fields.insert(
-                                SymbolKind::ModelField {
-                                    model: model_block.symbol.name,
-                                    name: symbol.name,
-                                },
-                                symbol,
-                            ) {
-                                sink.push(SemanticError::DuplicateSymbol {
-                                    first,
-                                    second: symbol,
-                                });
-                            }
-                        }
-                    }
-                }
-                AstBlockKind::PlainOldObject(plain_old_object_block) => {
-                    insert_global(sink, &plain_old_object_block.symbol);
-                    st.poos
-                        .insert(plain_old_object_block.symbol.name, plain_old_object_block);
-
-                    for field in &plain_old_object_block.fields {
-                        if let Some(first) = st.poo_fields.insert(
-                            SymbolKind::PlainOldObjectField {
-                                poo: plain_old_object_block.symbol.name,
-                                name: field.name,
-                            },
-                            field,
-                        ) {
-                            sink.push(SemanticError::DuplicateSymbol {
-                                first,
-                                second: field,
-                            });
-                        }
-                    }
-                }
-                AstBlockKind::Service(service_block) => {
-                    insert_global(sink, &service_block.symbol);
-                    st.services.insert(service_block.symbol.name, service_block);
-
-                    for field in &service_block.fields {
-                        if let Some(first) = st.service_fields.insert(
-                            SymbolKind::ServiceField {
-                                service: service_block.symbol.name,
-                                name: field.name,
-                            },
-                            field,
-                        ) {
-                            sink.push(SemanticError::DuplicateSymbol {
-                                first,
-                                second: field,
-                            });
-                        }
-                    }
-                }
-                AstBlockKind::Api(api_block) => {
-                    st.apis.push(api_block);
-                    for method in api_block.methods.blocks() {
-                        if let Some(first) = st.api_method_decls.insert(
-                            SymbolKind::ApiMethodDecl {
-                                namespace: api_block.symbol.name,
-                                name: method.symbol.name,
-                            },
-                            &method.symbol,
-                        ) {
-                            sink.push(SemanticError::DuplicateSymbol {
-                                first,
-                                second: &method.symbol,
-                            });
-                        }
-
-                        for param in method.parameters.blocks() {
-                            let (symbol, name) = match param {
-                                ApiBlockMethodParamKind::SelfParam { symbol, .. } => {
-                                    (symbol, "self")
-                                }
-                                ApiBlockMethodParamKind::Field(symbol) => (symbol, symbol.name),
-                            };
-
-                            if let Some(first) = st.api_method_params.insert(
-                                SymbolKind::ApiMethodParam {
-                                    namespace: api_block.symbol.name,
-                                    method: method.symbol.name,
-                                    name,
-                                },
-                                symbol,
-                            ) {
-                                sink.push(SemanticError::DuplicateSymbol {
-                                    first,
-                                    second: symbol,
-                                });
-                            }
-                        }
-                    }
-                }
-                AstBlockKind::DataSource(data_source_block) => {
-                    if let Some(first) = st.data_sources.insert(
-                        SymbolKind::DataSourceDecl {
-                            model: data_source_block.model.name,
-                            name: data_source_block.symbol.name,
-                        },
-                        data_source_block,
-                    ) {
-                        sink.push(SemanticError::DuplicateSymbol {
-                            first: &first.symbol,
-                            second: &data_source_block.symbol,
-                        });
-                    }
-
-                    for (method_name, method) in [
-                        ("list", &data_source_block.list),
-                        ("get", &data_source_block.get),
-                    ]
-                    .into_iter()
-                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.block)))
-                    {
-                        for param in &method.parameters {
-                            if let Some(first) = st.data_source_method_params.insert(
-                                SymbolKind::DataSourceMethodParam {
-                                    data_source: data_source_block.symbol.name,
-                                    method: method_name,
-                                    name: param.name,
-                                },
-                                param,
-                            ) {
-                                sink.push(SemanticError::DuplicateSymbol {
-                                    first,
-                                    second: param,
-                                });
-                            }
-                        }
-                    }
-                }
-                AstBlockKind::Env(env_blocks) => {
-                    st.envs.push(env_blocks);
-                    for env_block in &env_blocks.blocks {
-                        match &env_block.block.kind {
-                            EnvBindingBlockKind::D1 => {
-                                for symbol in &env_block.block.symbols {
-                                    insert_global(sink, symbol);
-                                    st.env_bindings.insert(
-                                        SymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::D1,
-                                            name: symbol.name,
-                                        },
-                                        symbol,
-                                    );
-                                }
-                            }
-                            EnvBindingBlockKind::R2 => {
-                                for symbol in &env_block.block.symbols {
-                                    insert_global(sink, symbol);
-                                    st.env_bindings.insert(
-                                        SymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::R2,
-                                            name: symbol.name,
-                                        },
-                                        symbol,
-                                    );
-                                }
-                            }
-                            EnvBindingBlockKind::Kv => {
-                                for symbol in &env_block.block.symbols {
-                                    insert_global(sink, symbol);
-                                    st.env_bindings.insert(
-                                        SymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::Kv,
-                                            name: symbol.name,
-                                        },
-                                        symbol,
-                                    );
-                                }
-                            }
-                            EnvBindingBlockKind::Var => {
-                                for symbol in &env_block.block.symbols {
-                                    if let Some(first) =
-                                        st.env_vars.insert(SymbolKind::EnvVar(symbol.name), symbol)
-                                    {
-                                        sink.push(SemanticError::DuplicateSymbol {
-                                            first,
-                                            second: symbol,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                AstBlockKind::Inject(inject_block) => {
-                    st.injects.push(inject_block);
-                    for symbol in &inject_block.symbols {
-                        insert_global(sink, symbol);
-                    }
-                }
-            }
-        }
-
-        st
-    }
-}
 
 pub struct SemanticAnalysis;
 impl<'src, 'p> SemanticAnalysis {
@@ -393,7 +100,24 @@ impl<'src, 'p> SemanticAnalysis {
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<WranglerEnv<'src>> {
-        if table.env_bindings.is_empty() {
+        let mut d1_bindings = Vec::new();
+        let mut r2_bindings = Vec::new();
+        let mut kv_bindings = Vec::new();
+        let mut vars = Vec::new();
+
+        for block in table.envs.iter().flat_map(|e| e.blocks.inners()) {
+            match block.kind {
+                EnvBindingBlockKind::D1 => d1_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::R2 => r2_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::Kv => kv_bindings.extend(block.symbols.iter().map(|s| s.name)),
+                EnvBindingBlockKind::Var => vars.extend(block.symbols.iter().map(|s| Field {
+                    name: s.name.into(),
+                    cidl_type: s.cidl_type.clone(),
+                })),
+            }
+        }
+
+        if d1_bindings.is_empty() && r2_bindings.is_empty() && kv_bindings.is_empty() {
             ensure!(
                 table.models.is_empty(),
                 sink,
@@ -401,30 +125,6 @@ impl<'src, 'p> SemanticAnalysis {
             );
             return None;
         };
-
-        let mut d1_bindings = Vec::new();
-        let mut r2_bindings = Vec::new();
-        let mut kv_bindings = Vec::new();
-        for symbol_kind in table.env_bindings.keys() {
-            if let SymbolKind::EnvBinding { kind, name } = symbol_kind {
-                match kind {
-                    EnvBindingKind::D1 => d1_bindings.push(*name),
-                    EnvBindingKind::R2 => r2_bindings.push(*name),
-                    EnvBindingKind::Kv => kv_bindings.push(*name),
-                }
-            } else {
-                unreachable!("only EnvBinding kinds should be in env_bindings")
-            }
-        }
-
-        let vars = table
-            .env_vars
-            .values()
-            .map(|symbol| Field {
-                name: symbol.name.into(),
-                cidl_type: symbol.cidl_type.clone(),
-            })
-            .collect();
 
         Some(WranglerEnv {
             d1_bindings,
@@ -464,7 +164,7 @@ impl<'src, 'p> SemanticAnalysis {
                         graph.entry(name).or_default().push(poo_name);
                         in_degree.entry(poo_name).and_modify(|d| *d += 1);
                     }
-                    CidlType::Stream | CidlType::Void => {
+                    CidlType::Stream => {
                         sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
                     }
                     _ => {
@@ -472,7 +172,7 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 }
 
-                let validators = match resolve_validators(field) {
+                let validators = match resolve_validator_tags(field) {
                     Ok(v) => v,
                     Err(errs) => {
                         sink.extend(errs);
@@ -566,8 +266,281 @@ impl<'src, 'p> SemanticAnalysis {
     }
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+enum EnvBindingKind {
+    D1,
+    R2,
+    Kv,
+}
+
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
+enum LocalSymbolKind<'src> {
+    EnvVar(&'src str),
+    EnvBinding {
+        kind: EnvBindingKind,
+        name: &'src str,
+    },
+    ModelField {
+        model: &'src str,
+        name: &'src str,
+    },
+    PlainOldObjectField {
+        poo: &'src str,
+        name: &'src str,
+    },
+    ServiceField {
+        service: &'src str,
+        name: &'src str,
+    },
+    ApiMethodDecl {
+        namespace: &'src str,
+        name: &'src str,
+    },
+    ApiMethodParam {
+        namespace: &'src str,
+        method: &'src str,
+        name: &'src str,
+    },
+    DataSourceDecl {
+        model: &'src str,
+        name: &'src str,
+    },
+    DataSourceMethodParam {
+        data_source: &'src str,
+        method: &'src str,
+        name: &'src str,
+    },
+}
+
+#[derive(Default)]
+struct SymbolTable<'src, 'p> {
+    // Globals
+    models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
+    poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
+    services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
+    envs: Vec<&'p EnvBlock<'src>>,
+    injects: Vec<&'p InjectBlock<'src>>,
+    apis: Vec<&'p ApiBlock<'src>>,
+    data_sources: Vec<&'p DataSourceBlock<'src>>,
+
+    // Locals
+    local: BTreeMap<LocalSymbolKind<'src>, &'p Symbol<'src>>,
+}
+
+impl<'src, 'p> SymbolTable<'src, 'p> {
+    /// Creates a [SymbolTable] by walking the [ParseAst].
+    ///
+    /// Catches [SemanticError::DuplicateSymbol] errors.
+    fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
+        let mut st = SymbolTable::default();
+        let mut global_names = HashMap::new();
+
+        let mut insert_global = |sink: &mut ErrorSink<'src, 'p>, symbol: &'p Symbol<'src>| {
+            if let Some(first) = global_names.insert(symbol.name, symbol) {
+                sink.push(SemanticError::DuplicateSymbol {
+                    first,
+                    second: symbol,
+                });
+                return false;
+            }
+            true
+        };
+
+        let mut insert_local = |sink: &mut ErrorSink<'src, 'p>,
+                                symbol: &'p Symbol<'src>,
+                                kind: LocalSymbolKind<'src>| {
+            if let Some(first) = st.local.insert(kind, symbol) {
+                sink.push(SemanticError::DuplicateSymbol {
+                    first,
+                    second: symbol,
+                });
+                return false;
+            }
+            true
+        };
+
+        for block in parse.blocks.inners() {
+            match block {
+                AstBlockKind::Model(model_block) => {
+                    insert_global(sink, &model_block.symbol);
+                    st.models.insert(model_block.symbol.name, model_block);
+
+                    for symbol in model_block.blocks.iter().flat_map(|b| b.inner.symbols()) {
+                        insert_local(
+                            sink,
+                            symbol,
+                            LocalSymbolKind::ModelField {
+                                model: model_block.symbol.name,
+                                name: symbol.name,
+                            },
+                        );
+                    }
+                }
+                AstBlockKind::PlainOldObject(plain_old_object_block) => {
+                    insert_global(sink, &plain_old_object_block.symbol);
+                    st.poos
+                        .insert(plain_old_object_block.symbol.name, plain_old_object_block);
+
+                    for field in &plain_old_object_block.fields {
+                        insert_local(
+                            sink,
+                            field,
+                            LocalSymbolKind::PlainOldObjectField {
+                                poo: plain_old_object_block.symbol.name,
+                                name: field.name,
+                            },
+                        );
+                    }
+                }
+                AstBlockKind::Service(service_block) => {
+                    insert_global(sink, &service_block.symbol);
+                    st.services.insert(service_block.symbol.name, service_block);
+
+                    for field in &service_block.fields {
+                        insert_local(
+                            sink,
+                            field,
+                            LocalSymbolKind::ServiceField {
+                                service: service_block.symbol.name,
+                                name: field.name,
+                            },
+                        );
+                    }
+                }
+                AstBlockKind::Api(api_block) => {
+                    st.apis.push(api_block);
+                    for method in api_block.methods.inners() {
+                        insert_local(
+                            sink,
+                            &method.symbol,
+                            LocalSymbolKind::ApiMethodDecl {
+                                namespace: api_block.symbol.name,
+                                name: method.symbol.name,
+                            },
+                        );
+
+                        for param in method.parameters.inners() {
+                            let (symbol, name) = match param {
+                                ApiBlockMethodParamKind::SelfParam(symbol) => (symbol, "self"),
+                                ApiBlockMethodParamKind::Param(symbol) => (symbol, symbol.name),
+                            };
+
+                            insert_local(
+                                sink,
+                                symbol,
+                                LocalSymbolKind::ApiMethodParam {
+                                    namespace: api_block.symbol.name,
+                                    method: method.symbol.name,
+                                    name,
+                                },
+                            );
+                        }
+                    }
+                }
+                AstBlockKind::DataSource(data_source_block) => {
+                    st.data_sources.push(data_source_block);
+                    insert_local(
+                        sink,
+                        &data_source_block.symbol,
+                        LocalSymbolKind::DataSourceDecl {
+                            model: data_source_block.model.name,
+                            name: data_source_block.symbol.name,
+                        },
+                    );
+
+                    for (method_name, method) in [
+                        ("list", &data_source_block.list),
+                        ("get", &data_source_block.get),
+                    ]
+                    .into_iter()
+                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.inner)))
+                    {
+                        for param in &method.parameters {
+                            insert_local(
+                                sink,
+                                param,
+                                LocalSymbolKind::DataSourceMethodParam {
+                                    data_source: data_source_block.symbol.name,
+                                    method: method_name,
+                                    name: param.name,
+                                },
+                            );
+                        }
+                    }
+                }
+                AstBlockKind::Env(env_blocks) => {
+                    st.envs.push(env_blocks);
+                    for env_block in &env_blocks.blocks {
+                        match &env_block.inner.kind {
+                            EnvBindingBlockKind::D1 => {
+                                for symbol in &env_block.inner.symbols {
+                                    if insert_local(
+                                        sink,
+                                        symbol,
+                                        LocalSymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::D1,
+                                            name: symbol.name,
+                                        },
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
+                                }
+                            }
+                            EnvBindingBlockKind::R2 => {
+                                for symbol in &env_block.inner.symbols {
+                                    if insert_local(
+                                        sink,
+                                        symbol,
+                                        LocalSymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::R2,
+                                            name: symbol.name,
+                                        },
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
+                                }
+                            }
+                            EnvBindingBlockKind::Kv => {
+                                for symbol in &env_block.inner.symbols {
+                                    if insert_local(
+                                        sink,
+                                        symbol,
+                                        LocalSymbolKind::EnvBinding {
+                                            kind: EnvBindingKind::Kv,
+                                            name: symbol.name,
+                                        },
+                                    ) {
+                                        insert_global(sink, symbol);
+                                    }
+                                }
+                            }
+                            EnvBindingBlockKind::Var => {
+                                for symbol in &env_block.inner.symbols {
+                                    insert_local(
+                                        sink,
+                                        symbol,
+                                        LocalSymbolKind::EnvVar(symbol.name),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                AstBlockKind::Inject(inject_block) => {
+                    st.injects.push(inject_block);
+                    for symbol in &inject_block.symbols {
+                        insert_global(sink, symbol);
+                    }
+                }
+            }
+        }
+
+        st
+    }
+}
+
 /// Converts a [CidlType::UnresolvedReference] to a resolved type of [CidlType::Object] or [CidlType::Inject]
-/// if possible, recursively. Also validates [CidlType::DataSource] and [CidlType::Partial] references.
+/// if possible, recursively. Also validates references inside of generic types.
 ///
 /// Returns an error if the type cannot be resolved or is invalid.
 fn resolve_cidl_type<'src, 'p>(
@@ -606,14 +579,6 @@ fn resolve_cidl_type<'src, 'p>(
 
             Err(SemanticError::UnresolvedSymbol { symbol })
         }
-        CidlType::DataSource { model_name } => {
-            let valid = table.models.contains_key(model_name);
-
-            if !valid {
-                return Err(SemanticError::UnresolvedSymbol { symbol });
-            }
-            Ok(cidl_type.clone())
-        }
         CidlType::Partial { object_name } => {
             let valid =
                 table.models.contains_key(object_name) || table.poos.contains_key(object_name);
@@ -643,13 +608,91 @@ fn resolve_cidl_type<'src, 'p>(
     }
 }
 
-/// Resolves validators for a given symbol, returning an error if any validator is invalid for the symbol's type.
-fn resolve_validators<'src, 'p>(
+/// Resolves validators for a given symbol, returning an error if
+/// any validator is invalid.
+fn resolve_validator_tags<'src, 'p>(
     symbol: &'p Symbol<'src>,
 ) -> BatchResult<'src, 'p, Vec<Validator<'src>>> {
+    use frontend::Keyword::*;
+
+    let mut resolved = Vec::new();
+    let mut sink = ErrorSink::new();
+
+    for spd in &symbol.tags {
+        let Tag::Validator {
+            name: kw,
+            argument: arg,
+        } = &spd.inner
+        else {
+            continue;
+        };
+
+        let root = symbol.cidl_type.root_type();
+        let type_ok = match kw {
+            GreaterThan | GreaterThanOrEqual | LessThan | LessThanOrEqual | Step => {
+                matches!(root, CidlType::Int | CidlType::Real)
+            }
+            Len | MinLen | MaxLen | Regex => matches!(root, CidlType::String),
+            _ => unreachable!(
+                "Tag::Validator only carries validator keywords as parsed in the frontend"
+            ),
+        };
+        if !type_ok {
+            sink.push(SemanticError::ValidatorInvalidForType {
+                symbol,
+                validator: spd,
+            });
+            continue;
+        }
+
+        let validator = match kw {
+            GreaterThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
+            GreaterThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual)
+            }
+            LessThan => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
+            LessThanOrEqual => {
+                parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual)
+            }
+            Step => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
+            Len => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
+            MinLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
+            MaxLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
+            Regex => match arg {
+                ArgumentLiteral::Regex(s) => match regex::Regex::new(s) {
+                    Ok(_) => Some(Validator::Regex(std::borrow::Cow::Borrowed(s))),
+                    Err(e) => {
+                        sink.push(SemanticError::ValidatorInvalidArgument {
+                            symbol,
+                            validator: spd,
+                            reason: format!("invalid regex pattern: {e}"),
+                        });
+                        None
+                    }
+                },
+                _ => {
+                    sink.push(invalid_arg(
+                        symbol,
+                        spd,
+                        "expected a regex argument (e.g. /pattern/)",
+                    ));
+                    None
+                }
+            },
+            _ => unreachable!("non-validator keywords are filtered out above"),
+        };
+
+        if let Some(v) = validator {
+            resolved.push(v);
+        }
+    }
+
+    sink.finish()?;
+    return Ok(resolved);
+
     fn invalid_arg<'src, 'p>(
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         reason: impl Into<std::string::String>,
     ) -> SemanticError<'src, 'p> {
         SemanticError::ValidatorInvalidArgument {
@@ -660,13 +703,13 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_number<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<Number> {
         match lit {
-            ValidatorLiteral::Int(s) => match s.parse() {
+            ArgumentLiteral::Int(s) => match s.parse() {
                 Ok(n) => return Some(Number::Int(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
@@ -674,7 +717,7 @@ fn resolve_validators<'src, 'p>(
                     format!("'{s}' is not a valid integer"),
                 )),
             },
-            ValidatorLiteral::Real(s) => match s.parse() {
+            ArgumentLiteral::Real(s) => match s.parse() {
                 Ok(n) => return Some(Number::Float(n)),
                 Err(_) => sink.push(invalid_arg(
                     symbol,
@@ -688,12 +731,12 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_usize<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<usize> {
-        let ValidatorLiteral::Int(s) = lit else {
+        let ArgumentLiteral::Int(s) = lit else {
             sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
@@ -711,12 +754,12 @@ fn resolve_validators<'src, 'p>(
     }
 
     fn parse_i64<'src, 'p>(
-        lit: &ValidatorLiteral<'src>,
+        lit: &ArgumentLiteral<'src>,
         symbol: &'p Symbol<'src>,
-        spd: &'p Spd<ValidatorTag<'src>>,
+        spd: &'p Spd<Tag<'src>>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<i64> {
-        let ValidatorLiteral::Int(s) = lit else {
+        let ArgumentLiteral::Int(s) = lit else {
             sink.push(invalid_arg(symbol, spd, "expected an integer argument"));
             return None;
         };
@@ -732,66 +775,6 @@ fn resolve_validators<'src, 'p>(
             }
         }
     }
-
-    let mut resolved = Vec::new();
-    let mut sink = ErrorSink::new();
-
-    for spd in &symbol.tags {
-        let tag = &spd.block;
-        let ValidatorTag { name, arg } = tag;
-
-        let root = symbol.cidl_type.root_type();
-        let type_ok = match *name {
-            "gt" | "gte" | "lt" | "lte" | "step" => {
-                matches!(root, CidlType::Int | CidlType::Uint | CidlType::Real)
-            }
-            "len" | "minlen" | "maxlen" | "regex" => matches!(root, CidlType::String),
-            _ => {
-                sink.push(SemanticError::ValidatorUnknown {
-                    symbol,
-                    validator: spd,
-                });
-                continue;
-            }
-        };
-        if !type_ok {
-            sink.push(SemanticError::ValidatorInvalidForType {
-                symbol,
-                validator: spd,
-            });
-            continue;
-        }
-
-        let validator = match *name {
-            "gt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThan),
-            "gte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::GreaterThanOrEqual),
-            "lt" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThan),
-            "lte" => parse_number(arg, symbol, spd, &mut sink).map(Validator::LessThanOrEqual),
-            "step" => parse_i64(arg, symbol, spd, &mut sink).map(Validator::Step),
-            "len" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::Length),
-            "minlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
-            "maxlen" => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
-            "regex" => match arg {
-                ValidatorLiteral::Regex(s) => Some(Validator::Regex((*s).into())),
-                _ => {
-                    sink.push(invalid_arg(
-                        symbol,
-                        spd,
-                        "expected a regex argument (e.g. /pattern/)",
-                    ));
-                    None
-                }
-            },
-            _ => unreachable!("filtered above"),
-        };
-
-        if let Some(v) = validator {
-            resolved.push(v);
-        }
-    }
-
-    sink.finish()?;
-    Ok(resolved)
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type
@@ -804,7 +787,6 @@ fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     matches!(
         inner,
         CidlType::Int
-            | CidlType::Uint
             | CidlType::Real
             | CidlType::String
             | CidlType::Blob

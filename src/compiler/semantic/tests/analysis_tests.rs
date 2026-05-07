@@ -116,16 +116,13 @@ fn d1_model_basic_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    // User has d1 but no primary key
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
 
-    // Post references other_d1 which is not in the env block
     expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
 
-    // Comment has fields but no binding
     let model = expect_err!(errors,
         SemanticError::D1ModelMissingD1Binding { model } => model
     );
@@ -146,7 +143,7 @@ fn d1_model_column_fk_errors() {
         [use my_d1]
         model User {
             primary {
-                id: Option<int> // primary key cannot be nullable
+                id: option<int> // primary key cannot be nullable
             }
 
             id: int // duplicate symbol
@@ -688,12 +685,7 @@ fn api_errors() {
 
         // Invalid return type
         api User {
-            get badReturn() -> Option<stream>
-        }
-
-        // Void parameter
-        api User {
-            post badVoidParam(v: void) -> string
+            get badReturn() -> option<stream>
         }
 
         // Object parameter on GET
@@ -718,7 +710,7 @@ fn api_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 6);
+    assert_eq!(errors.len(), 5);
 
     expect_err!(errors, SemanticError::ApiUnknownNamespaceReference { .. });
 
@@ -726,7 +718,7 @@ fn api_errors() {
 
     assert_eq!(
         count_errs!(errors, SemanticError::ApiInvalidParam { .. }),
-        4
+        3
     );
 }
 
@@ -924,7 +916,6 @@ fn poo_errors() {
     let src = r#"
         poo MyPoo {
             streamField: stream
-            voidField: void
             cyclicalField: MyPoo
         }
     "#;
@@ -934,7 +925,7 @@ fn poo_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 3);
+    assert_eq!(errors.len(), 2);
 
     let cycle = expect_err!(errors,
         SemanticError::CyclicalRelationship { cycle } => cycle.clone()
@@ -944,11 +935,6 @@ fn poo_errors() {
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
-    )));
-
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
     )));
 }
 
@@ -1030,7 +1016,7 @@ fn cidl_types_resolve() {
         service MyService {}
 
         api User {
-            post resolveAll(e: env, p: Array<MyPoo>, u: User, s: MyService) -> string
+            post resolveAll(e: env, p: array<MyPoo>, u: User, s: MyService) -> string
         }
     "#;
 
@@ -1125,20 +1111,14 @@ fn validator_errors() {
             primary { id: int }
 
             keyfield {
-                [bogusvalidator 42]       // ValidatorUnknown
+                [len 3.14]            // ValidatorInvalidArgument (wrong literal kind)
                 name: string
             }
 
-            [gt "not_a_number"]       // ValidatorInvalidArgument (wrong literal kind)
             [step 2.5]                // ValidatorInvalidArgument (float to step)
-            [len 3.14]                // ValidatorInvalidForType (length on non-string)
+            [len 3]                   // ValidatorInvalidForType (length on non-string)
             [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
             age: int
-        }
-
-        poo MyPoo {
-            [unknown_poo 1]           // ValidatorUnknown on a poo field
-            field: string
         }
         "#,
     );
@@ -1146,17 +1126,12 @@ fn validator_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    expect_err!(errors, SemanticError::ValidatorUnknown { .. });
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidArgument { .. }),
         2
     );
     assert_eq!(
         count_errs!(errors, SemanticError::ValidatorInvalidForType { .. }),
-        2
-    );
-    assert_eq!(
-        count_errs!(errors, SemanticError::ValidatorUnknown { .. }),
         2
     );
 }

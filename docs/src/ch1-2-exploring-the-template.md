@@ -81,7 +81,7 @@ model WeatherReport {
 
 ```cloesce
 [use db]
-[use get, list, save]
+[crud get, list, save]
 model Weather {
     primary {
         id: int
@@ -103,7 +103,7 @@ model Weather {
 }
 
 api Weather {
-    post uploadPhoto(self, e: env, s: stream) -> void
+    post uploadPhoto(self, e: env, s: stream)
     get downloadPhoto([source R2Only] self) -> stream
 }
 

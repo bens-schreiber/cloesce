@@ -1,5 +1,5 @@
 {
-  "hash": 119602433404634890,
+  "hash": 9563088113416759681,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "Course": {
-      "hash": 14748881912780342862,
+      "hash": 154833210238316151,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "hash": 15780404444437376256,
+          "hash": 16671312646982238929,
           "field": {
             "name": "title",
             "cidl_type": "String",
@@ -43,7 +43,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 11846137710452078753,
+          "hash": 2632012030643028160,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -82,19 +82,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Course"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -117,27 +106,20 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Course"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         },
@@ -164,15 +146,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Course"
-                }
-              },
-              "validators": []
             }
           ]
         }
@@ -189,17 +162,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -213,7 +195,7 @@
       ]
     },
     "Student": {
-      "hash": 16595591254135553968,
+      "hash": 3307802068798637679,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -229,7 +211,7 @@
           "composite_id": null
         },
         {
-          "hash": 229685833227152214,
+          "hash": 1120594035772014887,
           "field": {
             "name": "name",
             "cidl_type": "String",
@@ -242,7 +224,7 @@
       ],
       "columns": [
         {
-          "hash": 1970635201383300956,
+          "hash": 2861543403928163629,
           "field": {
             "name": "favoriteColor",
             "cidl_type": "String",
@@ -257,7 +239,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 7061627726012070416,
+          "hash": 754518381149749717,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -282,6 +264,33 @@
       "key_fields": [],
       "apis": [
         {
+          "name": "$get_CoursesOrderedDescending",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "name",
+              "cidl_type": "String",
+              "validators": []
+            }
+          ]
+        },
+        {
           "name": "$get",
           "is_static": true,
           "data_source": null,
@@ -297,40 +306,47 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "CoursesOrderedDescending_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "CoursesOrderedDescending_name",
-              "cidl_type": {
-                "Nullable": "String"
-              },
+              "name": "name",
+              "cidl_type": "String",
               "validators": []
-            },
-            {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "Default_name",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
+            }
+          ]
+        },
+        {
+          "name": "$list_CoursesOrderedDescending",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "Student"
                 }
-              },
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastId",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "lastName",
+              "cidl_type": "String",
+              "validators": []
+            },
+            {
+              "name": "limit",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -353,52 +369,48 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "CoursesOrderedDescending_lastId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "CoursesOrderedDescending_lastName",
-              "cidl_type": {
-                "Nullable": "String"
-              },
+              "name": "lastSeen_name",
+              "cidl_type": "String",
               "validators": []
             },
             {
-              "name": "CoursesOrderedDescending_limit",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "$save_CoursesOrderedDescending",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "Default_lastSeen_id",
+              "name": "model",
               "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "Default_lastSeen_name",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
+                "Partial": {
+                  "object_name": "Student"
                 }
               },
               "validators": []
@@ -425,15 +437,6 @@
               "cidl_type": {
                 "Partial": {
                   "object_name": "Student"
-                }
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
                 }
               },
               "validators": []
@@ -466,14 +469,20 @@
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "name",
-                "cidl_type": "String",
-                "validators": []
+                "parameter": {
+                  "name": "name",
+                  "cidl_type": "String",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -495,22 +504,34 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "name",
-                "cidl_type": "String",
-                "validators": []
+                "parameter": {
+                  "name": "name",
+                  "cidl_type": "String",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -524,7 +545,7 @@
       ]
     },
     "StudentCourse": {
-      "hash": 866749334295693945,
+      "hash": 10966023593578992102,
       "name": "StudentCourse",
       "d1_binding": "db",
       "primary_columns": [
@@ -543,7 +564,7 @@
           "composite_id": 0
         },
         {
-          "hash": 11710951977069246871,
+          "hash": 8458339642054402947,
           "field": {
             "name": "studentName",
             "cidl_type": "String",
@@ -576,7 +597,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 1145499244062893133,
+          "hash": 14709591228973544548,
           "field": {
             "name": "student",
             "cidl_type": {
@@ -596,7 +617,7 @@
           }
         },
         {
-          "hash": 8059058540154773008,
+          "hash": 5350157530375410263,
           "field": {
             "name": "course",
             "cidl_type": {
@@ -633,54 +654,50 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_studentId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "studentId",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_studentName",
-              "cidl_type": {
-                "Nullable": "String"
-              },
+              "name": "studentName",
+              "cidl_type": "String",
               "validators": []
             },
             {
-              "name": "Default_courseId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "courseId",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ]
+        },
+        {
+          "name": "$get_WithStudentCourse",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "StudentCourse"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "studentId",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "WithStudentCourse_studentId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "studentName",
+              "cidl_type": "String",
               "validators": []
             },
             {
-              "name": "WithStudentCourse_studentName",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "WithStudentCourse_courseId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "StudentCourse"
-                }
-              },
+              "name": "courseId",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -703,69 +720,75 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_studentId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_studentId",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_lastSeen_studentName",
-              "cidl_type": {
-                "Nullable": "String"
-              },
+              "name": "lastSeen_studentName",
+              "cidl_type": "String",
               "validators": []
             },
             {
-              "name": "Default_lastSeen_courseId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_courseId",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "WithStudentCourse_lastSeen_studentId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "WithStudentCourse_lastSeen_studentName",
-              "cidl_type": {
-                "Nullable": "String"
-              },
-              "validators": []
-            },
-            {
-              "name": "WithStudentCourse_lastSeen_courseId",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "WithStudentCourse_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "StudentCourse"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
+              ]
+            }
+          ]
+        },
+        {
+          "name": "$list_WithStudentCourse",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "StudentCourse"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_studentId",
+              "cidl_type": "Int",
               "validators": []
+            },
+            {
+              "name": "lastSeen_studentName",
+              "cidl_type": "String",
+              "validators": []
+            },
+            {
+              "name": "lastSeen_courseId",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
             }
           ]
         },
@@ -792,12 +815,29 @@
                 }
               },
               "validators": []
-            },
+            }
+          ]
+        },
+        {
+          "name": "$save_WithStudentCourse",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "StudentCourse"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
             {
-              "name": "$datasource",
+              "name": "model",
               "cidl_type": {
-                "DataSource": {
-                  "model_name": "StudentCourse"
+                "Partial": {
+                  "object_name": "StudentCourse"
                 }
               },
               "validators": []
@@ -827,27 +867,42 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "studentId",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "studentId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "studentName",
-                "cidl_type": "String",
-                "validators": []
+                "parameter": {
+                  "name": "studentName",
+                  "cidl_type": "String",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "courseId",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "courseId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -874,27 +929,42 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "studentId",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "studentId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "studentName",
-                "cidl_type": "String",
-                "validators": []
+                "parameter": {
+                  "name": "studentName",
+                  "cidl_type": "String",
+                  "validators": []
+                },
+                "instance_field": true
               },
               {
-                "name": "courseId",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "courseId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

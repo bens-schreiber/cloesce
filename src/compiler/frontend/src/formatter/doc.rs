@@ -1,3 +1,5 @@
+use crate::Keyword;
+
 /// Document IR for canonical formatting
 pub enum Doc<'src> {
     Nil,
@@ -14,18 +16,27 @@ pub enum Doc<'src> {
 }
 
 impl<'src> Doc<'src> {
+    #[inline(always)]
     pub fn text(s: &'src str) -> Self {
         Doc::Text(s)
     }
 
+    #[inline(always)]
+    pub fn kw(kw: Keyword) -> Self {
+        Doc::Text(kw.as_str())
+    }
+
+    #[inline(always)]
     pub fn owned(s: String) -> Self {
         Doc::OwnedText(s)
     }
 
+    #[inline(always)]
     pub fn nil() -> Self {
         Doc::Nil
     }
 
+    #[inline(always)]
     pub fn hardline(depth: usize) -> Self {
         Doc::HardLine { depth }
     }

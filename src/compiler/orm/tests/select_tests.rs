@@ -559,7 +559,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
                 }
 
                 name: string
-                bio: Option<string>
+                bio: option<string>
 
                 nav(Match::horseId1) {
                     matches

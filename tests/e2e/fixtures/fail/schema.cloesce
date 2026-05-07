@@ -1,0 +1,60 @@
+env {
+    d1 {
+        db
+    }
+}
+
+[use db]
+[crud save, get, list]
+model FailModel {
+    primary {
+        id: int
+    }
+
+    name: string
+}
+
+api FailModel {
+    post throwingMethod(self)
+
+    post numericValidators(
+        self,
+
+        [gt 10]
+        gtField: int,
+
+        [gte 10]
+        gteField: int,
+
+        [lt 100]
+        ltField: int,
+
+        [lte 100]
+        lteField: int,
+
+        [step 5]
+        stepField: int,
+    )
+
+    post stringValidators(
+        self,
+
+        [len 4]
+        lenField: string,
+
+        [minlen 3]
+        minLenField: string,
+
+        [maxlen 5]
+        maxLenField: string,
+
+        [regex /^[a-z]+$/]
+        regexField: string,
+    )
+}
+
+service UnregisteredService {}
+
+api UnregisteredService {
+    get unregistered() -> string
+}

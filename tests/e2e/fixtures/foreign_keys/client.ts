@@ -49,16 +49,60 @@ export class A {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<A> } | { WithB: DeepPartial<A> } | { WithoutB: DeepPartial<A> },
+    model: DeepPartial<A>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const __$resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/A/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      A,
+      false
+    );
+  }
+  static async $save_WithB(
+    model: DeepPartial<A>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/A/$save_WithB`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      A,
+      false
+    );
+  }
+  static async $save_WithoutB(
+    model: DeepPartial<A>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/A/$save_WithoutB`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -74,18 +118,53 @@ export class A {
     );
   }
   static async $get(
-    args: { Default: { id: number; }} | { WithB: { id: number; }} | { WithoutB: { id: number; }},
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const __$resolvedKind: "Default" | "WithB" | "WithoutB" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5716/api/A/$get`
     );
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("WithB_id", String(args?.WithB?.id ?? null));
-    __$baseUrl.searchParams.append("WithoutB_id", String(args?.WithoutB?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      A,
+      false
+    );
+  }
+  static async $get_WithB(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/A/$get_WithB`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      A,
+      false
+    );
+  }
+  static async $get_WithoutB(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/A/$get_WithoutB`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -133,16 +212,14 @@ export class B {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<B> },
+    model: DeepPartial<B>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/B/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -158,16 +235,13 @@ export class B {
     );
   }
   static async $get(
-    args: { Default: { id: number; }},
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5716/api/B/$get`
     );
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -193,16 +267,14 @@ export class Course {
   id: number;
   students: Student[];
   static async $save(
-    args: { Default: DeepPartial<Course> },
+    model: DeepPartial<Course>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Course/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -274,16 +346,60 @@ export class Person {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<Person> } | { WithDogs: DeepPartial<Person> } | { WithoutDogs: DeepPartial<Person> },
+    model: DeepPartial<Person>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const __$resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Person/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Person,
+      false
+    );
+  }
+  static async $save_WithDogs(
+    model: DeepPartial<Person>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Person/$save_WithDogs`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Person,
+      false
+    );
+  }
+  static async $save_WithoutDogs(
+    model: DeepPartial<Person>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Person/$save_WithoutDogs`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -299,18 +415,53 @@ export class Person {
     );
   }
   static async $get(
-    args: { Default: { id: number; }} | { WithDogs: { id: number; }} | { WithoutDogs: { id: number; }},
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const __$resolvedKind: "Default" | "WithDogs" | "WithoutDogs" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Person/$get`
     );
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("WithDogs_id", String(args?.WithDogs?.id ?? null));
-    __$baseUrl.searchParams.append("WithoutDogs_id", String(args?.WithoutDogs?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Person,
+      false
+    );
+  }
+  static async $get_WithDogs(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Person/$get_WithDogs`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Person,
+      false
+    );
+  }
+  static async $get_WithoutDogs(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Person/$get_WithoutDogs`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -380,16 +531,60 @@ export class Student {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<Student> } | { None: DeepPartial<Student> } | { WithCoursesStudentsCourses: DeepPartial<Student> },
+    model: DeepPartial<Student>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const __$resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Student/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
+  static async $save_None(
+    model: DeepPartial<Student>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Student/$save_None`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
+  static async $save_WithCoursesStudentsCourses(
+    model: DeepPartial<Student>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Student/$save_WithCoursesStudentsCourses`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -405,18 +600,53 @@ export class Student {
     );
   }
   static async $get(
-    args: { Default: { id: number; }} | { None: { id: number; }} | { WithCoursesStudentsCourses: { id: number; }},
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const __$resolvedKind: "Default" | "None" | "WithCoursesStudentsCourses" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Student/$get`
     );
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("None_id", String(args?.None?.id ?? null));
-    __$baseUrl.searchParams.append("WithCoursesStudentsCourses_id", String(args?.WithCoursesStudentsCourses?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
+  static async $get_None(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Student/$get_None`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
+  static async $get_WithCoursesStudentsCourses(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5716/api/Student/$get_WithCoursesStudentsCourses`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -467,16 +697,14 @@ export class Dog {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<Dog> },
+    model: DeepPartial<Dog>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5716/api/Dog/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",

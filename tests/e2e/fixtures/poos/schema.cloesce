@@ -15,7 +15,7 @@ poo PooB {
 
 poo PooC {
     a: PooA
-    b: Array<PooB>
+    b: array<PooB>
 }
 
 [use db]
@@ -26,6 +26,6 @@ model PooAcceptYield {
 }
 
 api PooAcceptYield {
-    post acceptPoos(a: PooA, b: PooB, c: PooC) -> void
+    post acceptPoos(a: PooA, b: PooB, c: PooC)
     post yieldPoo() -> PooC
 }

@@ -114,7 +114,7 @@ async fn migrate_models_scalars(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
                 age: int
                 address: string
             }
@@ -417,7 +417,7 @@ async fn migrate_with_rebuild(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
                 age: int
                 address: string
             }
@@ -447,7 +447,7 @@ async fn migrate_with_rebuild(db: SqlitePool) {
                     id: int
                 }
 
-                first_name: Option<string>
+                first_name: option<string>
                 age: string
                 favorite_color: string
             }
@@ -500,7 +500,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     id: string
                 }
 
-                first_name: Option<string>
+                first_name: option<string>
                 age: string
                 favorite_color: string
             }
@@ -551,7 +551,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     id: string
                 }
 
-                first_name: Option<string>
+                first_name: option<string>
                 age: string
                 favorite_color: string
 
@@ -735,7 +735,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                     id: int
                 }
 
-                name: Option<string>
+                name: option<string>
                 age: int
                 address: string
             }
@@ -773,7 +773,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                 id: int
             }
 
-            name: Option<string>
+            name: option<string>
             age: int
             address: string
         }

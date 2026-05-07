@@ -2,9 +2,9 @@ use chumsky::prelude::*;
 use indexmap::IndexMap;
 
 use crate::{
-    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd, Symbol,
+    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, symbol, typed_symbol},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
 
 /// Parses a block of the form:
@@ -41,7 +41,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     });
 
     // include { ... }
-    let include_tree = just(Token::Ident("include")).ignore_then(
+    let include_tree = kw!(Include).ignore_then(
         include_entry
             .repeated()
             .collect::<Vec<_>>()
@@ -54,7 +54,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql get(ident: cidl_type, ...) { "..." }
     let method_params = || {
-        typed_symbol()
+        tagged_typed_symbol()
             .separated_by(just(Token::Comma))
             .allow_trailing()
             .collect::<Vec<_>>()
@@ -62,8 +62,8 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
     };
 
     // sql get(...) { ... }
-    let get_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("get")))
+    let get_method = kw!(Sql)
+        .then_ignore(kw!(Get))
         .ignore_then(method_params())
         .then(sql_block.clone())
         .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
@@ -72,8 +72,8 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         });
 
     // sql list(...) { ... }
-    let list_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("list")))
+    let list_method = kw!(Sql)
+        .then_ignore(kw!(List))
         .ignore_then(method_params())
         .then(sql_block)
         .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
@@ -81,21 +81,11 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             raw_sql,
         });
 
-    // [internal]
-    let internal_decorator = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("internal")))
-        .then_ignore(just(Token::RBracket))
-        .map_spanned(|_| ())
-        .map(|spd: Spd<()>| Symbol {
-            name: "internal",
-            span: spd.span,
-            ..Default::default()
-        });
-
-    // source SourceName for ModelName { ... }
-    let source_block = just(Token::Source)
-        .ignore_then(symbol())
-        .then_ignore(just(Token::Ident("for")))
+    // [tag]* source SourceName for ModelName { ... }
+    let source_block = tags()
+        .then_ignore(kw!(Source))
+        .then(symbol())
+        .then_ignore(kw!(For))
         .then(symbol())
         .then(
             include_tree
@@ -103,25 +93,22 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                 .then(list_method.or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|((symbol, model), ((include_entries, get), list))| {
-            let tree = ParsedIncludeTree(include_entries.into_iter().collect::<IndexMap<_, _>>());
-            DataSourceBlock {
-                symbol,
-                model,
-                tree,
-                get,
-                list,
-                internal: None,
-            }
-        });
+        .map(
+            |(((leading_tags, mut symbol), model), ((include_entries, get), list))| {
+                let mut all_tags = leading_tags;
+                all_tags.append(&mut symbol.tags);
+                symbol.tags = all_tags;
+                let tree =
+                    ParsedIncludeTree(include_entries.into_iter().collect::<IndexMap<_, _>>());
+                DataSourceBlock {
+                    symbol,
+                    model,
+                    tree,
+                    get,
+                    list,
+                }
+            },
+        );
 
-    internal_decorator.or_not().then(source_block).map(
-        |(internal, mut spd): (Option<Symbol>, Spd<DataSourceBlock>)| {
-            spd.block.internal = internal;
-            Spd {
-                block: AstBlockKind::DataSource(spd.block),
-                span: spd.span,
-            }
-        },
-    )
+    source_block.map_spanned(AstBlockKind::DataSource)
 }

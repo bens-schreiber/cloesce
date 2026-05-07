@@ -10,7 +10,8 @@ api BlobService {
     post incrementBlob(b: blob) -> blob
 }
 
-[use db, save, get, list]
+[use db]
+[crud save, get, list]
 model BlobHaver {
     primary {
         id: int
@@ -22,6 +23,6 @@ model BlobHaver {
 
 api BlobHaver {
     get getBlob1(self) -> blob
-    post inputStream(s: stream) -> void
+    post inputStream(s: stream)
     get yieldStream(self) -> stream
 }

@@ -1,5 +1,5 @@
 {
-  "hash": 18092913188023989415,
+  "hash": 5303730850516668862,
   "wrangler_env": {
     "d1_bindings": [
       "db1",
@@ -11,7 +11,7 @@
   },
   "models": {
     "DB1Model": {
-      "hash": 3695430497616817140,
+      "hash": 7341731061861978357,
       "name": "DB1Model",
       "d1_binding": "db1",
       "primary_columns": [
@@ -29,7 +29,7 @@
       ],
       "columns": [
         {
-          "hash": 2856950131736007551,
+          "hash": 3747858334280870224,
           "field": {
             "name": "someColumn",
             "cidl_type": "String",
@@ -61,19 +61,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB1Model"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -101,15 +90,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB1Model"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -131,27 +111,20 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB1Model"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         }
@@ -168,17 +141,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },
@@ -192,7 +174,7 @@
       ]
     },
     "DB2Model": {
-      "hash": 14922467547174020977,
+      "hash": 122024037709630579,
       "name": "DB2Model",
       "d1_binding": "db2",
       "primary_columns": [
@@ -210,7 +192,7 @@
       ],
       "columns": [
         {
-          "hash": 2856950131736007551,
+          "hash": 3747858334280870224,
           "field": {
             "name": "someColumn",
             "cidl_type": "String",
@@ -242,19 +224,8 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB2Model"
-                }
-              },
+              "name": "id",
+              "cidl_type": "Int",
               "validators": []
             }
           ]
@@ -282,15 +253,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB2Model"
-                }
-              },
-              "validators": []
             }
           ]
         },
@@ -312,27 +274,20 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "Default_lastSeen_id",
-              "cidl_type": {
-                "Nullable": "Int"
-              },
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
               "validators": []
             },
             {
-              "name": "Default_limit",
-              "cidl_type": {
-                "Nullable": "Uint"
-              },
-              "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB2Model"
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
                 }
-              },
-              "validators": []
+              ]
             }
           ]
         }
@@ -349,17 +304,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "Int",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

@@ -52,40 +52,18 @@ impl LanguageTypeMapper for TypeScriptMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
             CidlType::Json => "unknown".to_string(),
-            CidlType::Int | CidlType::Uint | CidlType::Real => "number".to_string(), // goodbye num types :(
+            CidlType::Int | CidlType::Real => "number".to_string(),
             CidlType::String => "string".to_string(),
             CidlType::Boolean => "boolean".to_string(),
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
             CidlType::Object { name, .. } => self.namespace(ast, name),
-            CidlType::Nullable(inner) => match inner.as_ref() {
-                CidlType::Void => "null".to_string(),
-                _ => format!("{} | null", self.cidl_type(inner, ast)),
-            },
+            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner, ast)),
             CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, ast)),
             CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {
                 format!("DeepPartial<{}>", self.namespace(ast, object_name))
-            }
-            CidlType::DataSource { model_name, .. } => {
-                let ds = &ast
-                    .models
-                    .get(model_name)
-                    .expect("Model to exist")
-                    .data_sources;
-
-                let joined = ds
-                    .values()
-                    .filter_map(|d| (!d.is_internal).then_some(format!("\"{}\"", d.name)))
-                    .collect::<Vec<_>>()
-                    .join(" | ");
-
-                if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
-                    format!("{joined} = \"Default\"")
-                } else {
-                    joined
-                }
             }
             CidlType::Stream => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),

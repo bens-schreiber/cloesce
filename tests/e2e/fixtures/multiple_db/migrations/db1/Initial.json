@@ -1,8 +1,8 @@
 {
-  "hash": 18092913188023989415,
+  "hash": 5303730850516668862,
   "models": {
     "DB1Model": {
-      "hash": 3695430497616817140,
+      "hash": 7341731061861978357,
       "name": "DB1Model",
       "d1_binding": "db1",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 2856950131736007551,
+          "hash": 3747858334280870224,
           "field": {
             "name": "someColumn",
             "cidl_type": "String",

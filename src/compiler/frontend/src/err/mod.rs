@@ -8,14 +8,6 @@ use crate::parser::ParserResult;
 impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Env => write!(f, "env"),
-            Token::Model => write!(f, "model"),
-            Token::Source => write!(f, "source"),
-            Token::Service => write!(f, "service"),
-            Token::Inject => write!(f, "inject"),
-            Token::Api => write!(f, "api"),
-            Token::Poo => write!(f, "poo"),
-            Token::Sql => write!(f, "sql"),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
             Token::LParen => write!(f, "("),

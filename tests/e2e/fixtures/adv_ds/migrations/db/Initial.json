@@ -1,8 +1,8 @@
 {
-  "hash": 13006754155948345517,
+  "hash": 18365234846283661017,
   "models": {
     "Hamburger": {
-      "hash": 9074810877786669492,
+      "hash": 18435153889760686788,
       "name": "Hamburger",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 5897771438217574949,
+          "hash": 6788679640762437622,
           "field": {
             "name": "name",
             "cidl_type": "String",
@@ -33,7 +33,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 15059743203676459063,
+          "hash": 361948687780715865,
           "field": {
             "name": "toppings",
             "cidl_type": {
@@ -50,7 +50,7 @@
       ]
     },
     "Topping": {
-      "hash": 4034831846104480738,
+      "hash": 1237273738752186119,
       "name": "Topping",
       "d1_binding": "db",
       "primary_columns": [
@@ -68,7 +68,7 @@
       ],
       "columns": [
         {
-          "hash": 5897771438217574949,
+          "hash": 6788679640762437622,
           "field": {
             "name": "name",
             "cidl_type": "String",
@@ -81,7 +81,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 5227112688301022683,
+          "hash": 8976062246114831100,
           "field": {
             "name": "hamburger",
             "cidl_type": {

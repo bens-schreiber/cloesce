@@ -11,13 +11,13 @@ model NullabilityChecks {
     }
     
     notNullableString: string
-    nullableString: Option<string>
+    nullableString: option<string>
 }
 
 api NullabilityChecks {
-    post primitiveTypes(self, a: Option<int>, b: Option<string>) -> Option<bool>
-    post modelTypes(self, a: Option<NullabilityChecks>) -> Option<NullabilityChecks>
-    post injectableTypes(self) -> void
-    post arrayTypes(self, a: Option<Array<int>>, b: Option<Array<NullabilityChecks>>) -> Option<Array<string>>
-    post httpResultTypes(self) -> Option<Array<NullabilityChecks>>
+    post primitiveTypes(self, a: option<int>, b: option<string>) -> option<bool>
+    post modelTypes(self, a: option<NullabilityChecks>) -> option<NullabilityChecks>
+    post injectableTypes(self)
+    post arrayTypes(self, a: option<array<int>>, b: option<array<NullabilityChecks>>) -> option<array<string>>
+    post httpResultTypes(self) -> option<array<NullabilityChecks>>
 }

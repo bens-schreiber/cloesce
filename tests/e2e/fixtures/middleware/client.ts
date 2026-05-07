@@ -39,16 +39,14 @@ export class Foo {
     );
   }
   static async $save(
-    args: { Default: DeepPartial<Foo> },
+    model: DeepPartial<Foo>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
-    const __$resolvedKind: "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
       `http://localhost:5560/api/Foo/$save`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",

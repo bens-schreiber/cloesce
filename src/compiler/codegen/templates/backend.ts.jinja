@@ -108,7 +108,7 @@ export namespace {{ model.name }} {
 
     export interface Api {
 {%- for api in &model.apis %}
-{%- if !self.is_crud_method(api.name) %}
+{%- if !self.is_generated_method(api.name) %}
         {{ api.name }}({% if !api.is_static %}self: {{ model.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): ApiResult<{{ self.map_type(&api.return_type) }}>;
 {%- endif %}
 {%- endfor %}
@@ -125,9 +125,9 @@ export namespace {{ model.name }} {
         export const {{ ds.name }} = {
             include: {{ self.mapper.include_tree(&ds.tree) }},
 {%- if let Some(get) = &ds.get %}
-            getQuery: (env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
-            async get(env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}): Promise<CloesceResult<{{ model.name }}.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.Source.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.Source.{{ ds.name }}.include, { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
+            getQuery: (env: Env{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
+            async get(env: Env{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}): Promise<CloesceResult<{{ model.name }}.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.Source.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.parameter.name }}{% endfor %}), {{ model.name }}.Source.{{ ds.name }}.include, { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
             },
 {%- else %}
             async get(env: Env{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}): Promise<{{ model.name }}.Self | null> {

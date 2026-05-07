@@ -38,7 +38,7 @@ Cloesce supports a variety of column types for D1 Models. These are the supporte
 | `string`        | `TEXT`      | Represents a string value          |
 | `bool`          | `INTEGER`   | 0 for false, 1 for true            |
 | `date`          | `TEXT`      | Stored in ISO 8601 format          |
-| `double`        | `REAL`      | Represents a floating-point number |
+| `real`          | `REAL`      | Represents a floating-point number |
 | `blob`          | `BLOB`      | Represents binary data             |
 
 All of these types by themselves are `NOT NULL` by default. To make a property nullable, you may wrap it in an `Option` generic:

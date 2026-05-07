@@ -1,8 +1,8 @@
 {
-  "hash": 14846765435635902856,
+  "hash": 16353891316088601461,
   "models": {
     "CrudHaver": {
-      "hash": 18021533906554076977,
+      "hash": 3221090397089686579,
       "name": "CrudHaver",
       "d1_binding": "db",
       "primary_columns": [
@@ -20,7 +20,7 @@
       ],
       "columns": [
         {
-          "hash": 5897771438217574949,
+          "hash": 6788679640762437622,
           "field": {
             "name": "name",
             "cidl_type": "String",
@@ -34,7 +34,7 @@
       "navigation_fields": []
     },
     "Parent": {
-      "hash": 11381680676619887414,
+      "hash": 6875682808057942832,
       "name": "Parent",
       "d1_binding": "db",
       "primary_columns": [
@@ -52,7 +52,7 @@
       ],
       "columns": [
         {
-          "hash": 4700966054935737206,
+          "hash": 13382405950980379557,
           "field": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -70,7 +70,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 7609943810091403507,
+          "hash": 4901042800312040762,
           "field": {
             "name": "favoriteChild",
             "cidl_type": {
@@ -89,7 +89,7 @@
           }
         },
         {
-          "hash": 16743869929196782581,
+          "hash": 7529744249387731988,
           "field": {
             "name": "children",
             "cidl_type": {
@@ -112,7 +112,7 @@
       ]
     },
     "Child": {
-      "hash": 4102921076935304432,
+      "hash": 2477743275987146240,
       "name": "Child",
       "d1_binding": "db",
       "primary_columns": [
@@ -146,7 +146,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 4252492671256200320,
+          "hash": 1543591661476837575,
           "field": {
             "name": "parent",
             "cidl_type": {

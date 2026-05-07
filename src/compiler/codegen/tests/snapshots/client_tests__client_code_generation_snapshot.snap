@@ -436,18 +436,14 @@ export class ModelWithCruds {
   id: number;
   name: string;
   categoryId: number;
-  static async $get(
-    args: { ByName: { name: string; }} | { Default: { id: number; }},
+  static async $get_ByName(
+    name: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
-    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
-    const __$resolvedArgs: any = args[__$resolvedKind];
     const __$baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$get`
+      `http://example.com/path/to/api/ModelWithCruds/$get_ByName`
     );
-    __$baseUrl.searchParams.append("ByName_name", String(args?.ByName?.name ?? null));
-    __$baseUrl.searchParams.append("Default_id", String(args?.Default?.id ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("name", String(name));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -460,17 +456,35 @@ export class ModelWithCruds {
       false
     );
   }
-  static async $save(
-    args: { ByName: DeepPartial<ModelWithCruds> } | { Default: DeepPartial<ModelWithCruds> },
+  static async $get(
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
-    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
     const __$baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$save`
+      `http://example.com/path/to/api/ModelWithCruds/$get`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
+  static async $save_ByName(
+    model: DeepPartial<ModelWithCruds>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/$save_ByName`
     );
     const __$payload: any = {};
-    __$payload["model"] = args[__$resolvedKind];
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -485,19 +499,61 @@ export class ModelWithCruds {
       false
     );
   }
-  static async $list(
-    args: { ByName: { name: string; limit: number; }} | { Default: { lastSeen_id: number; limit: number; }},
+  static async $save(
+    model: DeepPartial<ModelWithCruds>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/$save`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
+  static async $list_ByName(
+    name: string,
+    limit: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
-    const __$resolvedKind: "ByName" | "Default" = dsKey(args) as any;
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/$list_ByName`
+    );
+    __$baseUrl.searchParams.append("name", String(name));
+    __$baseUrl.searchParams.append("limit", String(limit));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      ModelWithCruds,
+      true
+    );
+  }
+  static async $list(
+    lastSeen_id: number,
+    limit: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds[]>> {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
-    __$baseUrl.searchParams.append("ByName_name", String(args?.ByName?.name ?? null));
-    __$baseUrl.searchParams.append("ByName_limit", String(args?.ByName?.limit ?? null));
-    __$baseUrl.searchParams.append("Default_lastSeen_id", String(args?.Default?.lastSeen_id ?? null));
-    __$baseUrl.searchParams.append("Default_limit", String(args?.Default?.limit ?? null));
-    __$baseUrl.searchParams.append("$datasource", __$resolvedKind);
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",

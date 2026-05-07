@@ -16,9 +16,7 @@ afterAll(async () => {
 describe("Basic", () => {
   let model: CrudHaver;
   it("POST", async () => {
-    const res = await CrudHaver.$save({
-      Default: { name: "tim" },
-    });
+    const res = await CrudHaver.$save({ name: "tim" });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
@@ -29,7 +27,7 @@ describe("Basic", () => {
 
   it("POST Update", async () => {
     model.name = "julio";
-    const res = await CrudHaver.$save({ Default: model });
+    const res = await CrudHaver.$save(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
@@ -39,7 +37,7 @@ describe("Basic", () => {
   });
 
   it("$get a model", async () => {
-    const res = await CrudHaver.$get({ Default: { id: model.id } });
+    const res = await CrudHaver.$get(model.id);
     expect(res.ok, withRes("$get should be OK", res)).toBe(true);
     expect(res.data).toEqual(model);
   });
@@ -48,7 +46,7 @@ describe("Basic", () => {
   it("POST 3 Models", async () => {
     await Promise.all(
       models.map(async (m) => {
-        const res = await CrudHaver.$save({ Default: { name: m } });
+        const res = await CrudHaver.$save({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
         expect(res.data!.name).toEqual(m);
       }),
@@ -56,9 +54,7 @@ describe("Basic", () => {
   });
 
   it("$list 4 models", async () => {
-    const res = await CrudHaver.$list({
-      Default: { lastSeen_id: 0, limit: 4 },
-    });
+    const res = await CrudHaver.$list(0, 4);
     expect(res.ok, withRes("$list should be OK", res)).toBe(true);
     expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) => expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m));
@@ -68,11 +64,9 @@ describe("Basic", () => {
 describe("Parent with children", () => {
   let model: Parent;
   it("POST", async () => {
-    const res = await Parent.$save({
-      WithChildren: {
-        // leaving out favoriteChildId, should infer as null
-        children: [{}, {}, {}], // should be able to leave blank, creating 3 children
-      },
+    const res = await Parent.$save_WithChildren({
+      // leaving out favoriteChildId, should infer as null
+      children: [{}, {}, {}], // should be able to leave blank, creating 3 children
     });
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
@@ -91,7 +85,7 @@ describe("Parent with children", () => {
 
   it("POST Update", async () => {
     model.favoriteChildId = model.children[0].id;
-    const res = await Parent.$save({ WithChildren: model });
+    const res = await Parent.$save_WithChildren(model);
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual({
@@ -112,15 +106,13 @@ describe("Parent with children", () => {
   });
 
   it("$get", async () => {
-    const res = await Parent.$get({ WithChildren: { id: model.id } });
+    const res = await Parent.$get_WithChildren(model.id);
     expect(res.ok, withRes("$get should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual(model);
   });
 
   it("$list", async () => {
-    const res = await Parent.$list({
-      WithChildren: { lastSeen_id: 0, limit: 100 },
-    });
+    const res = await Parent.$list_WithChildren(0, 100);
     expect(res.ok, withRes("$list should be OK", res)).toBe(true);
     expect(res.data!.length).toEqual(1);
     expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);

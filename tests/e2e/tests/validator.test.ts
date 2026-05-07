@@ -16,10 +16,8 @@ afterAll(async () => {
 describe("Validator Tests", () => {
   it("save fails when id is too high", async () => {
     const res = await Validator.$save({
-      Default: {
-        id: 150,
-        email: "test@example.com",
-      },
+      id: 150,
+      email: "test@example.com",
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -27,10 +25,8 @@ describe("Validator Tests", () => {
 
   it("save fails when email is too small", async () => {
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: "a@b.c",
-      },
+      id: 50,
+      email: "a@b.c",
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -39,10 +35,8 @@ describe("Validator Tests", () => {
   it("save fails when email is too large", async () => {
     const longEmail = "a".repeat(300) + "@example.com";
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: longEmail,
-      },
+      id: 50,
+      email: longEmail,
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -50,10 +44,8 @@ describe("Validator Tests", () => {
 
   it("save fails when email is not an email", async () => {
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: "not-an-email",
-      },
+      id: 50,
+      email: "not-an-email",
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -61,11 +53,9 @@ describe("Validator Tests", () => {
 
   it("save fails when name is not length 10", async () => {
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: "test@example.com",
-        name: "short",
-      },
+      id: 50,
+      email: "test@example.com",
+      name: "short",
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -74,13 +64,11 @@ describe("Validator Tests", () => {
   it("save fails when KV value is over length 500", async () => {
     const longValue = "a".repeat(501);
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: "test@example.com",
-        name: "testuser",
-        data: {
-          raw: longValue,
-        },
+      id: 50,
+      email: "test@example.com",
+      name: "testuser",
+      data: {
+        raw: longValue,
       },
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
@@ -90,13 +78,11 @@ describe("Validator Tests", () => {
   let validator: Validator;
   it("save succeeds when all fields are valid", async () => {
     const res = await Validator.$save({
-      Default: {
-        id: 50,
-        email: "test@example.com",
-        name: "testuser12",
-        data: {
-          raw: "valid data",
-        },
+      id: 50,
+      email: "test@example.com",
+      name: "testuser12",
+      data: {
+        raw: "valid data",
       },
     });
     expect(res.ok, withRes("Expected validation to succeed", res)).toBe(true);

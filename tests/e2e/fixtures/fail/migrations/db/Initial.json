@@ -1,0 +1,37 @@
+{
+  "hash": 10734415364405569210,
+  "models": {
+    "FailModel": {
+      "hash": 8168459232680355642,
+      "name": "FailModel",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "field": {
+            "name": "name",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": []
+    }
+  }
+}

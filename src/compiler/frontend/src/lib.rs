@@ -4,41 +4,182 @@ use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
 use indexmap::IndexMap;
 
+use crate::lexer::Token;
+
 pub mod err;
 pub mod formatter;
 pub mod lexer;
 pub mod parser;
 
+macro_rules! contextual_keywords {
+    ($($variant:ident => $str:literal),* $(,)?) => {
+        #[derive(Clone, Debug)]
+        pub enum Keyword {
+            $($variant),*
+        }
+
+        impl Keyword {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(Keyword::$variant => $str),*
+                }
+            }
+        }
+
+        impl From<Keyword> for Token<'static> {
+            fn from(kw: Keyword) -> Self {
+                match kw {
+                    $(Keyword::$variant => Token::Ident($str)),*
+                }
+            }
+        }
+    };
+}
+
+contextual_keywords! {
+    // Block declaration / infix
+    Nav => "nav",
+    Foreign => "foreign",
+    Primary => "primary",
+    Optional => "optional",
+    Unique => "unique",
+    Paginated => "paginated",
+    KeyField => "keyfield",
+    For => "for",
+    Include => "include",
+
+    // Block type
+    Model => "model",
+    Poo => "poo",
+    Service => "service",
+    Source => "source",
+    Env => "env",
+    Inject => "inject",
+    Api => "api",
+
+    // Sub-block / binding
+    D1 => "d1",
+    R2 => "r2",
+    Kv => "kv",
+    Vars => "vars",
+
+    // Tag
+    Use => "use",
+    Crud => "crud",
+    Internal => "internal",
+    Instance => "instance",
+
+    // CRUD / SQL method
+    Get => "get",
+    List => "list",
+    Save => "save",
+    Sql => "sql",
+
+    // HTTP verb
+    Post => "post",
+    Put => "put",
+    Patch => "patch",
+    Delete => "delete",
+
+    // Validator tag (numerical)
+    LessThan => "lt",
+    LessThanOrEqual => "lte",
+    GreaterThan => "gt",
+    GreaterThanOrEqual => "gte",
+    Step => "step",
+
+    // Validator tag (string)
+    Len => "len",
+    MinLen => "minlen",
+    MaxLen => "maxlen",
+    Regex => "regex",
+
+    // Generic type
+    GOption => "option",
+    GArray => "array",
+    GPaginated => "paginated",
+    GKvObject => "kvobject",
+    GPartial => "partial",
+
+    // Primitive type
+    TString => "string",
+    TInt => "int",
+    TReal => "real",
+    TDate => "date",
+    TBool => "bool",
+    TJson => "json",
+    TBlob => "blob",
+    TStream => "stream",
+    TR2Object => "R2Object",
+}
+
+pub fn fmt_cidl_type(ty: &CidlType) -> String {
+    match ty {
+        CidlType::Int => Keyword::TInt.as_str().into(),
+        CidlType::Real => Keyword::TReal.as_str().into(),
+        CidlType::String => Keyword::TString.as_str().into(),
+        CidlType::Blob => Keyword::TBlob.as_str().into(),
+        CidlType::Boolean => Keyword::TBool.as_str().into(),
+        CidlType::DateIso => Keyword::TDate.as_str().into(),
+        CidlType::Stream => Keyword::TStream.as_str().into(),
+        CidlType::Json => Keyword::TJson.as_str().into(),
+        CidlType::R2Object => Keyword::TR2Object.as_str().into(),
+        CidlType::Env => "env".into(), // TODO: remove env
+        CidlType::Inject { name }
+        | CidlType::Object { name }
+        | CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Partial { object_name } => {
+            format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
+        }
+        CidlType::Array(inner) => {
+            format!("{}<{}>", Keyword::GArray.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::Nullable(inner) => {
+            format!("{}<{}>", Keyword::GOption.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::Paginated(inner) => {
+            format!("{}<{}>", Keyword::GPaginated.as_str(), fmt_cidl_type(inner))
+        }
+        CidlType::KvObject(inner) => {
+            format!("{}<{}>", Keyword::GKvObject.as_str(), fmt_cidl_type(inner))
+        }
+        _ => unreachable!("unsupported CIDL type in fmt_cidl_type"),
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
+pub struct FileId(u16);
+
 pub type Span = SimpleSpan<usize, FileId>;
 
-/// A spanned block
+/// A spanned value
 #[derive(Debug, Clone)]
 pub struct Spd<T> {
-    pub block: T,
+    pub inner: T,
     pub span: Span,
 }
 
 pub trait SpdSlice<T> {
-    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    fn inners<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
     where
         T: 'a;
 }
 
 impl<T> SpdSlice<T> for [Spd<T>] {
-    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    fn inners<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
     where
         T: 'a,
     {
-        self.iter().map(|spd| &spd.block)
+        self.iter().map(|spd| &spd.inner)
     }
 }
 
 impl<T> SpdSlice<T> for Vec<Spd<T>> {
-    fn blocks<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
+    fn inners<'a>(&'a self) -> impl Iterator<Item = &'a T> + 'a
     where
         T: 'a,
     {
-        self.iter().map(|spd| &spd.block)
+        self.iter().map(|spd| &spd.inner)
     }
 }
 
@@ -62,24 +203,31 @@ impl<'src> FileTable<'src> {
     }
 }
 
-pub type FileId = u16;
-
-/// A literal argument to a validator tag.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ValidatorLiteral<'src> {
+pub enum ArgumentLiteral<'src> {
     Int(&'src str),
     Real(&'src str),
     Str(&'src str),
     Regex(&'src str),
 }
 
-/// A validator tag applied before a field or parameter, e.g. `[len 5]` or `[regex /^[a-z]+$/]`.
 #[derive(Debug, Clone)]
-pub struct ValidatorTag<'src> {
-    pub name: &'src str,
-
-    // TODO: Every validator tag has exactly one argument
-    pub arg: ValidatorLiteral<'src>,
+pub enum Tag<'src> {
+    Use {
+        binding: Spd<&'src str>,
+    },
+    Crud {
+        kinds: Vec<Spd<CrudKind>>,
+    },
+    Source {
+        name: Spd<&'src str>,
+    },
+    Internal,
+    Instance,
+    Validator {
+        name: Keyword,
+        argument: ArgumentLiteral<'src>,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -92,8 +240,7 @@ pub struct Symbol<'src> {
     /// The span the symbol name (and type) occupies, not including any leading validator tags.
     pub span: Span,
 
-    /// Empty for symbols where validators are not applicable (e.g. R2 fields, structural names).
-    pub tags: Vec<Spd<ValidatorTag<'src>>>,
+    pub tags: Vec<Spd<Tag<'src>>>,
 }
 
 impl PartialEq for Symbol<'_> {
@@ -117,17 +264,6 @@ pub struct ApiBlock<'src> {
     pub methods: Vec<Spd<ApiBlockMethod<'src>>>,
 }
 
-pub enum ApiBlockMethodParamKind<'src> {
-    SelfParam {
-        /// The symbol for the `self` parameter, e.g. `self`
-        symbol: Symbol<'src>,
-
-        /// A data source block if tagged, e.g. `[source MySource] self`
-        data_source: Option<Symbol<'src>>,
-    },
-    Field(Symbol<'src>),
-}
-
 pub struct ApiBlockMethod<'src> {
     /// The symbol for the method name, e.g. `getUser` in `post getUser(...) { ... }`
     pub symbol: Symbol<'src>,
@@ -135,6 +271,11 @@ pub struct ApiBlockMethod<'src> {
     pub http_verb: HttpVerb,
     pub return_type: CidlType<'src>,
     pub parameters: Vec<Spd<ApiBlockMethodParamKind<'src>>>,
+}
+
+pub enum ApiBlockMethodParamKind<'src> {
+    SelfParam(Symbol<'src>),
+    Param(Symbol<'src>),
 }
 
 pub struct DataSourceBlockMethod<'src> {
@@ -155,7 +296,6 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
-    pub internal: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {
@@ -231,15 +371,6 @@ pub struct R2Block<'src> {
     pub is_paginated: bool,
 }
 
-pub enum UseTagParamKind<'src> {
-    Crud(Spd<CrudKind>),
-    EnvBinding(Symbol<'src>),
-}
-
-pub struct UseTag<'src> {
-    pub params: Vec<UseTagParamKind<'src>>,
-}
-
 pub enum SqlBlockKind<'src> {
     Column(Symbol<'src>),
     Foreign(ForeignBlock<'src>),
@@ -268,14 +399,14 @@ impl<'src> ModelBlockKind<'src> {
         match self {
             ModelBlockKind::Column(symbol) => vec![symbol],
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.block],
+            ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.inner],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
             ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
             ModelBlockKind::Primary(blocks)
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .flat_map(|spd| match &spd.block {
+                .flat_map(|spd| match &spd.inner {
                     SqlBlockKind::Column(symbol) => vec![symbol],
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
@@ -283,7 +414,7 @@ impl<'src> ModelBlockKind<'src> {
             ModelBlockKind::KeyField(fields) => fields.iter().collect(),
             ModelBlockKind::Paginated(blocks) => blocks
                 .iter()
-                .flat_map(|spd| match &spd.block {
+                .flat_map(|spd| match &spd.inner {
                     PaginatedBlockKind::Kv(kv_block) => vec![&kv_block.field],
                     PaginatedBlockKind::R2(r2_block) => vec![&r2_block.field],
                 })
@@ -296,36 +427,19 @@ pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
 
-    pub use_tags: Vec<Spd<UseTag<'src>>>,
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }
 
 impl<'src> ModelBlock<'src> {
-    pub fn partition_use_tags(&self) -> (Vec<&CrudKind>, Vec<&Symbol<'src>>) {
-        let mut crud_tags = Vec::new();
-        let mut env_binding_tags = Vec::new();
-
-        for tag in &self.use_tags {
-            for param in &tag.block.params {
-                match param {
-                    UseTagParamKind::Crud(spd) => crud_tags.push(&spd.block),
-                    UseTagParamKind::EnvBinding(binding) => env_binding_tags.push(binding),
-                }
-            }
-        }
-
-        (crud_tags, env_binding_tags)
-    }
-
     /// Iterate over all foreign blocks, be they top level or nested in primary/unique/optional blocks
     pub fn foreign_blocks(&self) -> impl Iterator<Item = &ForeignBlock<'src>> {
-        self.blocks.iter().flat_map(|spd| match &spd.block {
+        self.blocks.iter().flat_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(foreign_block) => vec![foreign_block],
             ModelBlockKind::Primary(blocks)
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .filter_map(|b| match &b.block {
+                .filter_map(|b| match &b.inner {
                     SqlBlockKind::Foreign(fb) => Some(fb),
                     _ => None,
                 })
@@ -336,7 +450,7 @@ impl<'src> ModelBlock<'src> {
 
     /// Iterate over navigation blocks (not including those in foreign blocks)
     pub fn navigation_blocks(&self) -> impl Iterator<Item = &NavigationBlock<'src>> {
-        self.blocks.iter().filter_map(|spd| match &spd.block {
+        self.blocks.iter().filter_map(|spd| match &spd.inner {
             ModelBlockKind::Navigation(navigation_block) => Some(navigation_block),
             _ => None,
         })
@@ -344,14 +458,14 @@ impl<'src> ModelBlock<'src> {
 
     /// Iterate over all SQL column blocks, be they top level or nested in primary/unique/optional blocks
     pub fn sql_symbols(&self) -> impl Iterator<Item = &Symbol<'src>> {
-        self.blocks.iter().flat_map(|spd| match &spd.block {
+        self.blocks.iter().flat_map(|spd| match &spd.inner {
             ModelBlockKind::Column(symbol) => vec![symbol],
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
             ModelBlockKind::Primary(blocks)
             | ModelBlockKind::Unique(blocks)
             | ModelBlockKind::Optional(blocks) => blocks
                 .iter()
-                .filter_map(|b| match &b.block {
+                .filter_map(|b| match &b.inner {
                     SqlBlockKind::Column(symbol) => Some(symbol),
                     SqlBlockKind::Foreign(_) => None,
                 })

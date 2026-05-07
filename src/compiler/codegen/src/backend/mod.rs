@@ -16,8 +16,8 @@ impl BackendTemplate<'_> {
         self.mapper.cidl_type(ty, self.ast)
     }
 
-    fn is_crud_method(&self, name: &str) -> bool {
-        name == "$get" || name == "$save" || name == "$list"
+    fn is_generated_method(&self, name: &str) -> bool {
+        name.starts_with('$')
     }
 }
 

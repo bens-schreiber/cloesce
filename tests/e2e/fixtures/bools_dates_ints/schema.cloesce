@@ -4,7 +4,8 @@ env {
     }
 }
 
-[use db, save, get]
+[use db]
+[crud save, get]
 model Weather {
     primary {
         id: int

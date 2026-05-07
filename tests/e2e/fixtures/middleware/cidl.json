@@ -1,5 +1,5 @@
 {
-  "hash": 304070468593168154,
+  "hash": 10335980690941339895,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,12 +10,12 @@
   },
   "models": {
     "Foo": {
-      "hash": 16858419069770744178,
+      "hash": 2057975560306353780,
       "name": "Foo",
       "d1_binding": "db",
       "primary_columns": [
         {
-          "hash": 3725153530838386741,
+          "hash": 4616061733383249414,
           "field": {
             "name": "id",
             "cidl_type": "String",
@@ -89,15 +89,6 @@
                 }
               },
               "validators": []
-            },
-            {
-              "name": "$datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Foo"
-                }
-              },
-              "validators": []
             }
           ]
         }
@@ -114,17 +105,26 @@
               },
               {
                 "name": "limit",
-                "cidl_type": "Uint",
-                "validators": []
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
               }
             ]
           },
           "get": {
             "parameters": [
               {
-                "name": "id",
-                "cidl_type": "String",
-                "validators": []
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "String",
+                  "validators": []
+                },
+                "instance_field": true
               }
             ]
           },

@@ -9,23 +9,7 @@ use crate::{FileId, FileTable, Span};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token<'src> {
-    // Keywords
-    #[token("env")]
-    Env,
-    #[token("model")]
-    Model,
-    #[token("source")]
-    Source,
-    #[token("service")]
-    Service,
-    #[token("inject")]
-    Inject,
-    #[token("api")]
-    Api,
-    #[token("poo")]
-    Poo,
-    #[token("sql")]
-    Sql,
+    // Reserved
     #[token("self")]
     SelfToken,
 
@@ -193,7 +177,7 @@ impl<'src> CloesceLexer {
 
         // todo: could be parallelized
         for (id_seed, source) in targets.into_iter().enumerate() {
-            let file_id = id_seed.try_into().expect("too many files to lex");
+            let file_id = FileId(id_seed.try_into().expect("too many files to lex"));
 
             file_table.table.insert(file_id, (source.src, source.path));
 

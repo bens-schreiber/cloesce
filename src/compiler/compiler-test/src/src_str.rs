@@ -37,11 +37,11 @@ model HasSqlColumnTypes {
     dub: real
     boo: bool
     dat: date
-    strNull: Option<string>
-    integerNull: Option<int>
-    dubNull: Option<real>
-    booNull: Option<bool>
-    dateNull: Option<date>
+    strNull: option<string>
+    integerNull: option<int>
+    dubNull: option<real>
+    booNull: option<bool>
+    dateNull: option<date>
 }
 
 [use db]
@@ -125,7 +125,7 @@ model ModelWithKv {
 api ModelWithKv {
     post instanceMethod(self, e: env, input: string) -> string
     get staticMethod(input: int) -> int
-    post hasKvParamAndRes(self, input: KvObject<string>) -> KvObject<string>
+    post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
 }
 
 model ModelWithR2 {
@@ -184,7 +184,8 @@ source WithR2 for ToyotaPrius {
     }
 }
 
-[use db, get, save, list]
+[use db]
+[crud get, save, list]
 model ModelWithCruds {
     primary {
         id: int
@@ -200,7 +201,7 @@ model ModelWithCruds {
 source ByName for ModelWithCruds {
     include {}
 
-    sql get(name: string) {
+    sql get([instance] name: string) {
         "SELECT * FROM ModelWithCruds WHERE name = $name"
     }
 
@@ -235,7 +236,7 @@ source Custom for ModelWithCustomDs {
         data
     }
 
-    sql get(id: int, externalParam: string) {
+    sql get([instance] id: int, externalParam: string) {
         "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
     }
 }
