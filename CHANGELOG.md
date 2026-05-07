@@ -6,7 +6,7 @@
   - string validators: `regex`, `maxlen`, `minlen`, `len`
   - number validators: `gt`, `gte`, `lt`, `lte`, `step`
 - `crud` tag for Models
-- `instance` tag for Data Source `get` method 
+- `instance` tag for Data Source `get` method
 
 ### Changed
 
