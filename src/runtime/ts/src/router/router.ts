@@ -1,5 +1,14 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, Service, CrudKind, DataSource, CidlType } from "../cidl.js";
+import {
+  Cidl,
+  Model,
+  ApiMethod,
+  Service,
+  CrudKind,
+  DataSource,
+  CidlType,
+  ValidatedField,
+} from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -50,7 +59,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) {}
+  ) { }
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -322,8 +331,8 @@ export type MatchedRoute = {
   kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
-  getParamValues: Record<string, string>;
-  keyFields: Record<string, string>;
+  getParamValues: Record<string, unknown>;
+  keyFields: Record<string, unknown>;
   impl: ApiImplementation;
   dataSource?: DataSource;
   model?: Model;
@@ -438,13 +447,13 @@ function matchRoute(
     return notFound(RouterError.UnknownRoute);
   }
 
-  const getParamValues: Record<string, string> = {};
+  const getParamValues: Record<string, unknown> = {};
   for (let i = 0; i < numGetParams; i++) {
     const param = dataSource.get!.parameters[i].parameter;
     getParamValues[param.name] = parts[1 + i];
   }
 
-  const keyFields: Record<string, string> = {};
+  const keyFields: Record<string, unknown> = {};
   for (let i = 0; i < numKeyFields; i++) {
     const field = model.key_fields[i];
     keyFields[field.name] = parts[1 + numGetParams + i];
@@ -482,25 +491,21 @@ async function validateRequest(
   if (route.kind === "model" && !route.method.is_static) {
     const model = route.model!;
 
-    // Validate all data source get parameters are present
-    for (const p of route.dataSource?.get?.parameters ?? []) {
-      const field = p.parameter;
-      if (!(field.name in route.getParamValues)) {
-        return invalidRequest(
-          RouterError.InstantiatedMethodMissingGetParam,
-          `Missing data source get parameter ${field.name}`,
-        );
-      }
-    }
+    // All data source get parameters must be present and valid
+    const dsErr = validateIds(
+      (route.dataSource?.get?.parameters ?? []).map((p) => p.parameter),
+      route.getParamValues,
+      RouterError.InstantiatedMethodMissingGetParam,
+    );
+    if (dsErr) return Either.left(dsErr);
 
-    for (const field of model.key_fields) {
-      if (!(field.name in route.keyFields)) {
-        return invalidRequest(
-          RouterError.InstantiatedMethodMissingKeyParam,
-          `Missing key field ${field.name}`,
-        );
-      }
-    }
+    // All key fields must be present and valid
+    const keyErr = validateIds(
+      model.key_fields,
+      route.keyFields,
+      RouterError.InstantiatedMethodMissingKeyParam,
+    );
+    if (keyErr) return Either.left(keyErr);
   }
 
   // Filter out injected parameters
@@ -508,7 +513,7 @@ async function validateRequest(
     (p) => p.cidl_type !== "Env" && !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
-  // Extract all method parameters from the body
+  // Extract all method parameters from the body.
   const url = new URL(request.url);
   let params: RequestParamMap = Object.fromEntries(url.searchParams.entries());
   if (route.method.http_verb !== "Get") {
@@ -545,40 +550,74 @@ async function validateRequest(
     );
   }
 
-  // Validate all parameters type. Octet streams need no validation.
-  if (route.method.parameters_media !== "Octet") {
-    for (const p of requiredParams) {
-      const validateRes = invokeOrmWasm(
-        wasm.validate_type,
-        [
-          WasmResource.fromString(JSON.stringify(p), wasm), // field metadata
-          WasmResource.fromString(JSON.stringify(params[p.name]), wasm), // value
-        ],
-        wasm,
-      );
-
-      if (validateRes.isLeft()) {
-        const message = validateRes.unwrapLeft();
-        return invalidRequest(
-          RouterError.RequestBodyInvalidParameter,
-          `Parameter ${p.name} is invalid: ${message}`,
-        );
-      }
-
-      const validatedRaw = JSON.parse(validateRes.unwrap());
-      const hydrated = hydrateType(validatedRaw, p.cidl_type, {
-        ast,
-        includeTree: null,
-        keyFields: {},
-        env,
-        promises: [],
-      });
-      const validatedParam = hydrated ?? validatedRaw;
-      params[p.name] = validatedParam;
-    }
+  if (route.method.parameters_media === "Octet") {
+    // Octet streams are not validated, as they are opaque to Cloesce 
+    // and the user is expected to handle them manually.
+    return Either.right(params);
   }
 
+  // Validate all parameters type. 
+  for (const p of requiredParams) {
+    const res = validateField(p, params[p.name]);
+    if (res.isLeft()) return Either.left(res.unwrapLeft());
+    const validatedRaw = res.unwrap();
+    const hydrated = hydrateType(validatedRaw, p.cidl_type, {
+      ast,
+      includeTree: null,
+      keyFields: {},
+      env,
+      promises: [],
+    });
+    params[p.name] = hydrated ?? validatedRaw;
+  }
+
+
   return Either.right(params);
+
+  function validateField(field: ValidatedField, value: unknown): Either<HttpResult, unknown> {
+    // Path/query values arrive as raw strings; try JSON-parsing so int/bool/null reach
+    // validate_type as their declared type. Falls back to the raw string when the
+    // value is a plain string (e.g. for `string`-typed fields).
+    let coerced = value;
+    if (typeof value === "string") {
+      try {
+        coerced = JSON.parse(value);
+      } catch {
+        coerced = value;
+      }
+    }
+    const validateRes = invokeOrmWasm(
+      wasm.validate_type,
+      [
+        WasmResource.fromString(JSON.stringify(field), wasm),
+        WasmResource.fromString(JSON.stringify(coerced), wasm),
+      ],
+      wasm,
+    );
+    if (validateRes.isLeft()) {
+      return invalidRequest(
+        RouterError.RequestBodyInvalidParameter,
+        `Parameter ${field.name} is invalid: ${validateRes.unwrapLeft()}`,
+      );
+    }
+    return Either.right(JSON.parse(validateRes.unwrap()));
+  }
+
+  function validateIds(
+    fields: ValidatedField[],
+    bag: Record<string, unknown>,
+    missingErr: RouterError,
+  ): HttpResult | null {
+    for (const field of fields) {
+      if (!(field.name in bag)) {
+        return invalidRequest(missingErr, `Missing ${field.name}`).unwrapLeft();
+      }
+      const res = validateField(field, bag[field.name]);
+      if (res.isLeft()) return res.unwrapLeft();
+      bag[field.name] = res.unwrap();
+    }
+    return null;
+  }
 }
 
 /**

@@ -226,6 +226,14 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 }
 
                 CidlType::Stream => {
+                    // GET requests do not have any body, so Stream parameters
+                    // cannot be used
+                    ensure!(
+                        matches!(method.http_verb, HttpVerb::Get).not(),
+                        self.sink,
+                        invalid_type_err.clone()
+                    );
+
                     has_stream = true;
                     let required_params = method
                         .parameters
@@ -239,6 +247,8 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                         })
                         .count();
 
+                    // Only one Stream parameter is allowed, and it must be the
+                    // only non-injected parameter
                     ensure!(
                         required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                         self.sink,
