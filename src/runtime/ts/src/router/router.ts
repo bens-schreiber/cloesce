@@ -59,7 +59,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) { }
+  ) {}
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -551,12 +551,12 @@ async function validateRequest(
   }
 
   if (route.method.parameters_media === "Octet") {
-    // Octet streams are not validated, as they are opaque to Cloesce 
+    // Octet streams are not validated, as they are opaque to Cloesce
     // and the user is expected to handle them manually.
     return Either.right(params);
   }
 
-  // Validate all parameters type. 
+  // Validate all parameters type.
   for (const p of requiredParams) {
     const res = validateField(p, params[p.name]);
     if (res.isLeft()) return Either.left(res.unwrapLeft());
@@ -570,7 +570,6 @@ async function validateRequest(
     });
     params[p.name] = hydrated ?? validatedRaw;
   }
-
 
   return Either.right(params);
 
