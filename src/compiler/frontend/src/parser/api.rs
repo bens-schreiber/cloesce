@@ -67,8 +67,10 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
     ))
     .map_spanned(|p| p);
 
-    // verb methodName(self, p1: type, ...) -> returnType { ... }
-    verb.then(symbol())
+    // [tags*] verb methodName(self, p1: type, ...) -> returnType { ... }
+    tags()
+        .then(verb)
+        .then(symbol())
         .then(
             parameter
                 .separated_by(just(Token::Comma))
@@ -78,8 +80,8 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
         )
         .then(just(Token::Arrow).ignore_then(cidl_type()).or_not())
         .map_spanned(
-            |(((http_verb, symbol), parameters), return_type)| ApiBlockMethod {
-                symbol,
+            |((((tags, http_verb), symbol), parameters), return_type)| ApiBlockMethod {
+                symbol: Symbol { tags, ..symbol },
                 http_verb,
                 return_type: return_type.unwrap_or_default(),
                 parameters,

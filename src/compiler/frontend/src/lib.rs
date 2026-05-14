@@ -124,10 +124,7 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
         CidlType::Stream => Keyword::TStream.as_str().into(),
         CidlType::Json => Keyword::TJson.as_str().into(),
         CidlType::R2Object => Keyword::TR2Object.as_str().into(),
-        CidlType::Env => "env".into(), // TODO: remove env
-        CidlType::Inject { name }
-        | CidlType::Object { name }
-        | CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Object { name } | CidlType::UnresolvedReference { name } => name.to_string(),
         CidlType::Partial { object_name } => {
             format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
         }
@@ -216,14 +213,17 @@ pub enum Tag<'src> {
     Use {
         binding: Spd<&'src str>,
     },
-    Crud {
-        kinds: Vec<Spd<CrudKind>>,
-    },
     Source {
         name: Spd<&'src str>,
     },
     Internal,
     Instance,
+    Crud {
+        kinds: Vec<Spd<CrudKind>>,
+    },
+    Inject {
+        bindings: Vec<Spd<&'src str>>,
+    },
     Validator {
         name: Keyword,
         argument: ArgumentLiteral<'src>,
@@ -478,8 +478,6 @@ impl<'src> ModelBlock<'src> {
 pub struct ServiceBlock<'src> {
     /// The symbol for the service name, e.g. `MyAppService` in `service MyAppService { ... }`
     pub symbol: Symbol<'src>,
-
-    pub fields: Vec<Symbol<'src>>,
 }
 
 pub struct PlainOldObjectBlock<'src> {

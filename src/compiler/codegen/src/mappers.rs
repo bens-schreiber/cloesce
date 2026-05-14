@@ -75,8 +75,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
                 TypeScriptMapperKind::ClientApi => "R2Object".to_string(),
             },
-            CidlType::Inject { name } => self.namespace(ast, name),
-            CidlType::Env => "Env".to_string(),
             CidlType::UnresolvedReference { name } => {
                 unreachable!("references should have been resolved by this point: {name}")
             }

@@ -430,21 +430,19 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Use { binding } => Doc::kw(Keyword::Use)
                 .then(Doc::text(" "))
                 .then(Doc::text(binding.inner)),
-            Tag::Crud { kinds } => {
-                let mut doc = Doc::kw(Keyword::Crud).then(Doc::text(" "));
-                for (idx, kind) in kinds.iter().enumerate() {
-                    doc = doc.then(ctx.spd_doc(kind, 0, true));
-                    if idx + 1 < kinds.len() {
-                        doc = doc.then(Doc::text(", "));
-                    }
-                }
-                doc
-            }
+
             Tag::Source { name } => Doc::kw(Keyword::Source)
                 .then(Doc::text(" "))
                 .then(Doc::text(name.inner)),
             Tag::Internal => Doc::kw(Keyword::Internal),
             Tag::Instance => Doc::kw(Keyword::Instance),
+
+            Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
+                .then(Doc::text(" "))
+                .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
+            Tag::Inject { bindings: symbols } => Doc::kw(Keyword::Inject)
+                .then(Doc::text(" "))
+                .then(comma_separated(symbols, |spd| ctx.spd_doc(spd, 0, true))),
         };
 
         Doc::text("[").then(inner).then(Doc::text("]"))
@@ -459,6 +457,12 @@ impl<'src> ToDoc<'src> for CrudKind {
             CrudKind::Save => Keyword::Save,
         };
         Doc::text(kw.as_str())
+    }
+}
+
+impl<'src> ToDoc<'src> for &'src str {
+    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
+        Doc::text(*self)
     }
 }
 
@@ -725,17 +729,7 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Service);
-
-        if self.fields.is_empty() {
-            return doc.then(Doc::text(" {}"));
-        }
-
-        let mut inner = Doc::nil();
-        for field in &self.fields {
-            inner = inner.then(ctx.sym_doc(field, 1, false));
-        }
-        doc.then(ctx.block(inner, 1))
+        ctx.top_decl_doc(&self.symbol, Keyword::Service)
     }
 }
 

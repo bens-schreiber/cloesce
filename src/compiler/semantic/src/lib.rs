@@ -52,7 +52,7 @@ impl<'src, 'p> SemanticAnalysis {
             }
         };
 
-        let mut services = Self::services(&table, &mut sink);
+        let mut services = Self::services(&table);
 
         // Merge API methods into their respective namespaces
         for (namespace, apis) in api_map {
@@ -140,15 +140,9 @@ impl<'src, 'p> SemanticAnalysis {
     ) -> BTreeMap<&'src str, PlainOldObject<'src>> {
         let mut res = BTreeMap::new();
 
-        // Cycle detection
-        let mut in_degree = BTreeMap::<&str, usize>::new();
-        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
-
         for poo in table.poos.values() {
             let poo_name = poo.symbol.name;
             let mut fields = Vec::new();
-            graph.entry(poo_name).or_default();
-            in_degree.entry(poo_name).or_insert(0);
 
             for field in &poo.fields {
                 let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
@@ -160,10 +154,6 @@ impl<'src, 'p> SemanticAnalysis {
                 };
 
                 match resolved_type.root_type() {
-                    CidlType::Object { name, .. } if table.poos.contains_key(name) => {
-                        graph.entry(name).or_default().push(poo_name);
-                        in_degree.entry(poo_name).and_modify(|d| *d += 1);
-                    }
                     CidlType::Stream => {
                         sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
                     }
@@ -196,73 +186,21 @@ impl<'src, 'p> SemanticAnalysis {
             );
         }
 
-        match kahns(graph, in_degree, table.poos.len()) {
-            Ok(_) => res,
-            Err(err) => {
-                sink.push(err);
-                BTreeMap::new()
-            }
-        }
+        res
     }
 
-    fn services(
-        table: &SymbolTable<'src, 'p>,
-        sink: &mut ErrorSink<'src, 'p>,
-    ) -> IndexMap<&'src str, Service<'src>> {
+    fn services(table: &SymbolTable<'src, 'p>) -> IndexMap<&'src str, Service<'src>> {
         let mut res = IndexMap::new();
-
-        // Cycle detection via Kahn's
-        let mut in_degree = BTreeMap::<&str, usize>::new();
-        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
-
         for service in table.services.values() {
-            let service_name = service.symbol.name;
-            let mut fields = Vec::new();
-            graph.entry(service_name).or_default();
-            in_degree.entry(service_name).or_insert(0);
-
-            for field in &service.fields {
-                let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
-                    Ok(t) => t,
-                    Err(err) => {
-                        sink.push(err);
-                        continue;
-                    }
-                };
-
-                if let CidlType::Inject { name } = resolved_type
-                    && table.services.contains_key(name)
-                {
-                    graph.entry(name).or_default().push(service_name);
-                    in_degree.entry(service_name).and_modify(|d| *d += 1);
-                }
-
-                fields.push(Field {
-                    name: field.name.into(),
-                    cidl_type: resolved_type,
-                });
-            }
-
             res.insert(
-                service_name,
+                service.symbol.name,
                 Service {
-                    name: service_name,
-                    fields,
+                    name: service.symbol.name,
                     apis: Vec::new(),
                 },
             );
         }
-
-        match kahns(graph, in_degree, table.services.len()) {
-            Ok(rank) => {
-                res.sort_by(|a, _, b, _| rank[a].cmp(&rank[b]));
-                res
-            }
-            Err(err) => {
-                sink.push(err);
-                IndexMap::new()
-            }
-        }
+        res
     }
 }
 
@@ -286,10 +224,6 @@ enum LocalSymbolKind<'src> {
     },
     PlainOldObjectField {
         poo: &'src str,
-        name: &'src str,
-    },
-    ServiceField {
-        service: &'src str,
         name: &'src str,
     },
     ApiMethodDecl {
@@ -395,17 +329,6 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::Service(service_block) => {
                     insert_global(sink, &service_block.symbol);
                     st.services.insert(service_block.symbol.name, service_block);
-
-                    for field in &service_block.fields {
-                        insert_local(
-                            sink,
-                            field,
-                            LocalSymbolKind::ServiceField {
-                                service: service_block.symbol.name,
-                                name: field.name,
-                            },
-                        );
-                    }
                 }
                 AstBlockKind::Api(api_block) => {
                     st.apis.push(api_block);
@@ -560,21 +483,6 @@ fn resolve_cidl_type<'src, 'p>(
                 return Ok(CidlType::Object {
                     name: sym.symbol.name,
                 });
-            }
-
-            if let Some(sym) = table.services.get(name) {
-                return Ok(CidlType::Inject {
-                    name: sym.symbol.name,
-                });
-            }
-
-            if let Some(sym) = table
-                .injects
-                .iter()
-                .flat_map(|i| i.symbols.iter())
-                .find(|s| s.name == *name)
-            {
-                return Ok(CidlType::Inject { name: sym.name });
             }
 
             Err(SemanticError::UnresolvedSymbol { symbol })

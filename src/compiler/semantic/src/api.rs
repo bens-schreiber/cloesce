@@ -103,10 +103,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         };
 
         match resolved_type.root_type() {
-            CidlType::Inject { .. } | CidlType::Env => {
-                self.sink.push(err);
-            }
-
             CidlType::Stream => {
                 // Stream is only valid as bare Stream
                 ensure!(
@@ -198,15 +194,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 param,
             };
             match resolved_type.root_type() {
-                CidlType::Inject { .. } => {
-                    // Option, Array or any other wrapper types are not allowed to wrap Inject
-                    ensure!(
-                        *resolved_type.root_type() == resolved_type,
-                        self.sink,
-                        invalid_type_err
-                    );
-                }
-
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
                     // GET requests do not support Object parameters
                     ensure!(
@@ -238,13 +225,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     let required_params = method
                         .parameters
                         .inners()
-                        .filter(|p| {
-                            let ApiBlockMethodParamKind::Param(symbol) = p else {
-                                return false;
-                            };
-
-                            !matches!(symbol.cidl_type, CidlType::Inject { .. } | CidlType::Env)
-                        })
+                        .filter(|p| matches!(p, ApiBlockMethodParamKind::Param(_)))
                         .count();
 
                     // Only one Stream parameter is allowed, and it must be the

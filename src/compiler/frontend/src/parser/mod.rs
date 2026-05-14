@@ -156,30 +156,21 @@ fn inject_block<'tokens, 'src: 'tokens>()
 /// Parses a block of the form:
 ///
 /// ```cloesce
-/// service MyAppService {
-///     ident1: InjectedService
-///     ident2: cidl_type
-/// }
+/// service MyAppService
 /// ```
 fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // service ServiceName { ... }
+    // service ServiceName
     kw!(Service)
         .ignore_then(symbol())
-        .then(
-            typed_symbol()
-                .repeated()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map(|(symbol, fields)| AstBlockKind::Service(ServiceBlock { symbol, fields }))
+        .map(|symbol| AstBlockKind::Service(ServiceBlock { symbol }))
 }
 
 /// Parses any number of `[ ... ]` tags, returning them as a vector of spanned [Tag]s.
 fn tags<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Vec<Spd<Tag<'src>>>, Extra<'tokens, 'src>> {
     // [validator arg]
-    let validators = just(Token::LBracket)
+    let validator = just(Token::LBracket)
         .ignore_then(choice((
             kw!(GreaterThan).to(Keyword::GreaterThan),
             kw!(GreaterThanOrEqual).to(Keyword::GreaterThanOrEqual),
@@ -201,14 +192,14 @@ fn tags<'tokens, 'src: 'tokens>()
         .map(|(name, argument)| Tag::Validator { name, argument });
 
     // [use binding]
-    let use_tags = just(Token::LBracket)
+    let use_tag = just(Token::LBracket)
         .then(kw!(Use))
         .ignore_then(select! { Token::Ident(name) => name }.map_spanned(|name| name))
         .then_ignore(just(Token::RBracket))
         .map(|binding| Tag::Use { binding });
 
     // [crud get|list|save, get|list|save, ...]
-    let crud_tags = just(Token::LBracket)
+    let crud_tag = just(Token::LBracket)
         .then(kw!(Crud))
         .ignore_then(
             choice((
@@ -223,6 +214,19 @@ fn tags<'tokens, 'src: 'tokens>()
         )
         .then_ignore(just(Token::RBracket))
         .map(|kinds| Tag::Crud { kinds });
+
+    // [inject binding1, binding2, ...]
+    let inject_tag = just(Token::LBracket)
+        .then(kw!(Inject))
+        .ignore_then(
+            select! { Token::Ident(name) => name }
+                .map_spanned(|name| name)
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|bindings| Tag::Inject { bindings });
 
     // [internal]
     let internal_tag = just(Token::LBracket)
@@ -244,9 +248,10 @@ fn tags<'tokens, 'src: 'tokens>()
         .map(|name| Tag::Source { name });
 
     choice((
-        validators,
-        use_tags,
-        crud_tags,
+        validator,
+        use_tag,
+        crud_tag,
+        inject_tag,
         internal_tag,
         instance_tag,
         source_tag,
@@ -312,7 +317,6 @@ fn cidl_type<'tokens, 'src: 'tokens>()
         kw!(TBlob).to(CidlType::Blob),
         kw!(TStream).to(CidlType::Stream),
         kw!(TR2Object).to(CidlType::R2Object),
-        kw!(Env).to(CidlType::Env),
     ));
 
     recursive(|cidl_type| {

@@ -46,14 +46,7 @@ export namespace {{ service.name }} {
     export const Kind = "service" as const;
     export const Tag = "{{ service.name }}" as const;
 
-    export interface Self {
-{%- for field in &service.fields %}
-        {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
-{%- endfor %}
-    }
-
     export interface Api {
-        init?(self: {{ service.name }}.Self): ApiResult<void>;
 {%- for api in &service.apis %}
         {{ api.name }}({% if !api.is_static %}self: {{ service.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): ApiResult<{{ self.map_type(&api.return_type) }}>;
 {%- endfor %}

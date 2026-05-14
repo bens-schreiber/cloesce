@@ -77,7 +77,7 @@ impl ClientTemplate<'_> {
 
     fn object_name<'t>(&self, ty: &'t CidlType<'t>) -> &'t str {
         match ty.root_type() {
-            CidlType::Inject { name } | CidlType::Object { name } => name,
+            CidlType::Object { name } => name,
             CidlType::Partial { object_name } => object_name,
             _ => panic!("Expected object type, got {:?}", ty),
         }
@@ -103,10 +103,6 @@ impl ClientTemplate<'_> {
             ty.root_type(),
             CidlType::Object { .. } | CidlType::Partial { .. }
         )
-    }
-
-    fn is_serializable(&self, ty: &CidlType<'_>) -> bool {
-        !matches!(ty.root_type(), CidlType::Inject { .. } | CidlType::Env)
     }
 
     fn is_get_request(&self, verb: &HttpVerb) -> bool {
