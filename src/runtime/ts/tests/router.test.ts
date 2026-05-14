@@ -456,7 +456,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
-      impl: () => {},
+      impl: () => { },
       getParamValues: {},
       keyFields: {},
     };
@@ -545,5 +545,76 @@ describe("Method Dispatch", () => {
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
+  });
+
+  test("passes bundled explicit injected values as final env argument", async () => {
+    // Arrange
+    const di = createDi();
+    const injectedObject = { tag: "YouTubeApi", key: "secret" };
+    const db = { prepare: vi.fn() };
+    di._set({ tag: "YouTubeApi" }, injectedObject);
+
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method(
+        "testMethod",
+        "Post",
+        [{ name: "name", cidl_type: "String", validators: [] }],
+        "Void",
+      )
+      .build();
+
+    const impl = vi.fn(() => undefined);
+    const route: MatchedRoute = {
+      kind: "model",
+      namespace: "Foo",
+      method: {
+        ...model.apis.find((m) => m.name === "testMethod")!,
+        injected: ["DB_1", "YouTubeApi"],
+      },
+      impl,
+      getParamValues: {},
+      keyFields: {},
+    };
+
+    // Act
+    const res = await _cloesceInternal.methodDispatch({}, di, route, { name: "ben" }, { DB_1: db });
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(impl).toHaveBeenCalledWith("ben", { DB_1: db, YouTubeApi: injectedObject });
+  });
+
+  test("does not pass self to service methods", async () => {
+    // Arrange
+    const di = createDi();
+    const impl = vi.fn(() => undefined);
+
+    const service = ServiceBuilder.service("FooService")
+      .method("testMethod", "Post", false, [], "Void")
+      .build();
+
+    const route: MatchedRoute = {
+      kind: "service",
+      namespace: "FooService",
+      method: service.apis.find((m) => m.name === "testMethod")!,
+      impl,
+      getParamValues: {},
+      keyFields: {},
+      service,
+    };
+
+    // Act
+    const res = await _cloesceInternal.methodDispatch(
+      { shouldNotBePassedAsSelf: true },
+      di,
+      route,
+      {},
+      {},
+    );
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(impl).toHaveBeenCalledWith();
   });
 });

@@ -24,8 +24,17 @@ export namespace A {
     }
 
     export interface Api {
-        create(e: Env, a: A.Self): ApiResult<A.Self>;
-        withoutB(self: A.Self): ApiResult<A.Self>;
+
+        create(
+            a: A.Self,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<A.Self>;
+
+        withoutB(
+            self: A.Self,
+        ): ApiResult<A.Self>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -111,7 +120,10 @@ export namespace B {
     }
 
     export interface Api {
-        testMethod(self: B.Self): ApiResult<void>;
+
+        testMethod(
+            self: B.Self,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -238,8 +250,17 @@ export namespace Person {
     }
 
     export interface Api {
-        create(e: Env, person: Person.Self): ApiResult<Person.Self>;
-        withoutDogs(self: Person.Self): ApiResult<Person.Self>;
+
+        create(
+            person: Person.Self,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<Person.Self>;
+
+        withoutDogs(
+            self: Person.Self,
+        ): ApiResult<Person.Self>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -325,8 +346,17 @@ export namespace Student {
     }
 
     export interface Api {
-        create(e: Env, student: Student.Self): ApiResult<Student.Self>;
-        none(self: Student.Self): ApiResult<Student.Self>;
+
+        create(
+            student: Student.Self,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<Student.Self>;
+
+        none(
+            self: Student.Self,
+        ): ApiResult<Student.Self>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -413,7 +443,10 @@ export namespace Dog {
     }
 
     export interface Api {
-        testMethod(self: Dog.Self): ApiResult<void>;
+
+        testMethod(
+            self: Dog.Self,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 

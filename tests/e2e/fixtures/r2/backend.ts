@@ -31,7 +31,14 @@ export namespace D1BackedModel {
     }
 
     export interface Api {
-        uploadData(self: D1BackedModel.Self, e: Env, data: CfReadableStream): ApiResult<void>;
+
+        uploadData(
+            self: D1BackedModel.Self,
+            data: CfReadableStream,
+            env: {
+                bucket1: Env["bucket1"],
+            },
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -106,8 +113,22 @@ export namespace PureR2Model {
     }
 
     export interface Api {
-        uploadData(self: PureR2Model.Self, e: Env, data: CfReadableStream): ApiResult<void>;
-        uploadOtherData(self: PureR2Model.Self, e: Env, data: CfReadableStream): ApiResult<void>;
+
+        uploadData(
+            self: PureR2Model.Self,
+            data: CfReadableStream,
+            env: {
+                bucket1: Env["bucket1"],
+            },
+        ): ApiResult<void>;
+
+        uploadOtherData(
+            self: PureR2Model.Self,
+            data: CfReadableStream,
+            env: {
+                bucket2: Env["bucket2"],
+            },
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 

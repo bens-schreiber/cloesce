@@ -29,7 +29,12 @@ export namespace Validator {
     }
 
     export interface Api {
-        someMethod(self: Validator.Self, id: number, name: string): ApiResult<void>;
+
+        someMethod(
+            self: Validator.Self,
+            id: number,
+            name: string,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 

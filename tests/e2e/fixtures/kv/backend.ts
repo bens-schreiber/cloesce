@@ -97,7 +97,10 @@ export namespace PaginatedKVModel {
     }
 
     export interface Api {
-        acceptPaginated(ps: Paginated<KValue<unknown>>): ApiResult<Paginated<KValue<unknown>>>;
+
+        acceptPaginated(
+            ps: Paginated<KValue<unknown>>,
+        ): ApiResult<Paginated<KValue<unknown>>>;
     }
     export const _api = undefined as unknown as Api;
 

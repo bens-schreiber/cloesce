@@ -14,8 +14,6 @@ export type CidlType =
   | "Stream"
   | "Json"
   | "R2Object"
-  | "Env"
-  | { Inject: { name: string } }
   | { Object: { name: string } }
   | { Partial: { object_name: string } }
   | { KvObject: CidlType }
@@ -92,6 +90,7 @@ export interface ApiMethod {
   parameters_media: MediaType;
   parameters: ValidatedField[];
   data_source: string | null;
+  injected: string[];
 }
 
 export interface Model {
@@ -115,7 +114,6 @@ export interface PlainOldObject {
 
 export interface Service {
   name: string;
-  fields: Field[];
   apis: ApiMethod[];
 }
 

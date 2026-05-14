@@ -28,8 +28,11 @@ model PureR2Model {
 }
 
 api PureR2Model {
-    put uploadData(self, e: env, data: stream)
-    put uploadOtherData(self, e: env, data: stream)
+    [inject bucket1]
+    put uploadData(self, data: stream)
+
+    [inject bucket2]
+    put uploadOtherData(self, data: stream)
 }
 
 [use db]
@@ -52,5 +55,6 @@ model D1BackedModel {
 }
 
 api D1BackedModel {
-    put uploadData(self, e: env, data: stream)
+    [inject bucket1]
+    put uploadData(self, data: stream)
 }

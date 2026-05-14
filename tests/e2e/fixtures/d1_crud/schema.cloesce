@@ -27,7 +27,6 @@ model Parent {
     
     foreign (Child::id) optional  {
         favoriteChildId
-        
         nav {
             favoriteChild
         }
@@ -53,7 +52,6 @@ model Child {
     
     foreign (Parent::id) {
         parentId
-        
         nav {
             parent
         }

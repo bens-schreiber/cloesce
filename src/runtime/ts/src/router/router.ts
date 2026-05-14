@@ -6,7 +6,6 @@ import {
   Service,
   CrudKind,
   DataSource,
-  CidlType,
   ValidatedField,
 } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
@@ -14,7 +13,6 @@ import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
 
-const ENV_TAG = "$$env";
 export type DependencyKey = { tag: string };
 
 /**
@@ -59,7 +57,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) {}
+  ) { }
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -198,32 +196,6 @@ export class CloesceApp {
       }
     }
 
-    // Initialize services
-    // Note: Services are in topological order
-    for (const name in ast.services) {
-      const serviceMeta: Service = ast.services[name];
-      const service: any = {};
-
-      for (const field of serviceMeta.fields) {
-        const injected = resolveInjected(di, field.cidl_type);
-        service[field.name] = injected;
-      }
-
-      // Run init method
-      type ServiceInit = {
-        init?: (self: any) => Promise<HttpResult<void> | void>;
-      };
-      const serviceApi = this.apiRegistry.get(serviceMeta.name) as ServiceInit | undefined;
-      if (serviceApi?.init) {
-        const res = await serviceApi.init(service);
-        if (res) {
-          return res;
-        }
-      }
-
-      di._set({ tag: serviceMeta.name }, service);
-    }
-
     // Route match
     const routeRes = matchRoute(request, ast, workerUrl, this.apiRegistry, env);
     if (routeRes.isLeft()) {
@@ -269,7 +241,7 @@ export class CloesceApp {
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated?.unwrap(), di, route, params);
+    return await methodDispatch(hydrated?.unwrap(), di, route, params, env);
   }
 
   /**
@@ -284,11 +256,8 @@ export class CloesceApp {
   public async run(request: Request, env: any): Promise<Response> {
     const { ast, wasm, workerUrl } = RuntimeContainer.get();
 
-    // DI will always contain the WranglerEnv
+    // DI contains explicitly registered injected objects.
     const di = new DependencyContainer();
-    if (ast.wrangler_env) {
-      di._set({ tag: ENV_TAG }, env);
-    }
 
     try {
       const httpResult = await this.router(request, env, ast, wasm, di, workerUrl);
@@ -508,10 +477,7 @@ async function validateRequest(
     if (keyErr) return Either.left(keyErr);
   }
 
-  // Filter out injected parameters
-  const requiredParams = route.method.parameters.filter(
-    (p) => p.cidl_type !== "Env" && !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
-  );
+  const requiredParams = route.method.parameters;
 
   // Extract all method parameters from the body.
   const url = new URL(request.url);
@@ -628,14 +594,9 @@ async function hydrate(
   route: MatchedRoute,
   env: any,
 ): Promise<Either<HttpResult, any>> {
-  if (route.method.is_static) {
+  if (route.kind === "service" || route.method.is_static) {
     // No hydration necessary
     return Either.right(null);
-  }
-
-  if (route.kind === "service") {
-    // Fetch the existing service instance from DI
-    return Either.right(di.get({ tag: route.namespace }));
   }
 
   const meta = route.model!;
@@ -686,17 +647,15 @@ async function methodDispatch(
   di: DependencyContainer,
   route: MatchedRoute,
   params: Record<string, unknown>,
+  env: any,
 ): Promise<HttpResult<unknown>> {
-  const paramArray: any[] = route.method.is_static ? [] : [obj];
+  const paramArray: any[] = route.kind === "model" && !route.method.is_static ? [obj] : [];
   for (const param of route.method.parameters) {
-    if (param.name in params) {
-      paramArray.push(params[param.name]);
-      continue;
-    }
+    paramArray.push(params[param.name]);
+  }
 
-    // Assume injected parameter
-    const injected = resolveInjected(di, param.cidl_type);
-    paramArray.push(injected);
+  if (route.method.injected.length > 0) {
+    paramArray.push(resolveInjectedArgs(di, env, route.method.injected));
   }
 
   const wrapResult = (res: any): HttpResult => {
@@ -730,20 +689,25 @@ function exit(
  * Finds an injected dependency from the DI container.
  * @returns The injected dependency, or undefined if not found.
  */
-function resolveInjected(di: DependencyContainer, ty: CidlType): any | undefined {
-  let tag = null;
-  if (typeof ty === "object" && "Inject" in ty) {
-    tag = ty.Inject.name;
-  } else if (typeof ty === "string" && ty === "Env") {
-    tag = ENV_TAG;
-  } else {
-    return undefined;
+function resolveInjectedArgs(
+  di: DependencyContainer,
+  env: any,
+  injectedNames: string[],
+): Record<string, unknown> {
+  const injected: Record<string, unknown> = {};
+
+  for (const name of injectedNames) {
+    if (di.has({ tag: name })) {
+      injected[name] = di.get({ tag: name });
+      continue;
+    }
+
+    injected[name] = env?.[name];
+    if (injected[name] === undefined) {
+      console.warn(`Unable to find injected dependency for ${name}. Leaving as undefined.`);
+    }
   }
 
-  const injected = di.get({ tag });
-  if (injected === undefined) {
-    console.warn(`Unable to find injected dependency for ${tag}. Leaving as undefined.`);
-  }
   return injected;
 }
 

@@ -16,6 +16,8 @@ model Dog {
 }
 
 api Dog {
-    post create(e: env, dog: partial<Dog>) -> Dog
+    [inject db]
+    post create(dog: partial<Dog>) -> Dog
+    
     get getPartialSelf(self) -> partial<Dog>
 }

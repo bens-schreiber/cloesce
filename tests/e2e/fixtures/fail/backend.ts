@@ -13,12 +13,10 @@ export namespace UnregisteredService {
     export const Kind = "service" as const;
     export const Tag = "UnregisteredService" as const;
 
-    export interface Self {
-    }
-
     export interface Api {
-        init?(self: UnregisteredService.Self): ApiResult<void>;
-        unregistered(): ApiResult<string>;
+
+        unregistered(
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -40,9 +38,27 @@ export namespace FailModel {
     }
 
     export interface Api {
-        throwingMethod(self: FailModel.Self): ApiResult<void>;
-        numericValidators(self: FailModel.Self, gtField: number, gteField: number, ltField: number, lteField: number, stepField: number): ApiResult<void>;
-        stringValidators(self: FailModel.Self, lenField: string, minLenField: string, maxLenField: string, regexField: string): ApiResult<void>;
+
+        throwingMethod(
+            self: FailModel.Self,
+        ): ApiResult<void>;
+
+        numericValidators(
+            self: FailModel.Self,
+            gtField: number,
+            gteField: number,
+            ltField: number,
+            lteField: number,
+            stepField: number,
+        ): ApiResult<void>;
+
+        stringValidators(
+            self: FailModel.Self,
+            lenField: string,
+            minLenField: string,
+            maxLenField: string,
+            regexField: string,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 

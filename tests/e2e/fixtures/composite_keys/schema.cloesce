@@ -55,20 +55,21 @@ model Course {
 model StudentCourse {
     primary {
         foreign (Student::id, Student::name) {
-        studentId
-        studentName
-        
-        nav {
-            student
+            studentId
+            studentName
+            
+            nav {
+                student
+            }
         }
-    }
+        
         foreign (Course::id) {
-        courseId
+            courseId
         
-        nav {
-            course
+            nav {
+                course
+            }
         }
-    }
     }
 }
 

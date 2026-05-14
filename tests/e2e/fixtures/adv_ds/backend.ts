@@ -24,8 +24,14 @@ export namespace Hamburger {
     }
 
     export interface Api {
-        noLettuceToppings(self: Hamburger.Self): ApiResult<Topping.Self[]>;
-        onlyBaconToppings(self: Hamburger.Self): ApiResult<Topping.Self[]>;
+
+        noLettuceToppings(
+            self: Hamburger.Self,
+        ): ApiResult<Topping.Self[]>;
+
+        onlyBaconToppings(
+            self: Hamburger.Self,
+        ): ApiResult<Topping.Self[]>;
     }
     export const _api = undefined as unknown as Api;
 

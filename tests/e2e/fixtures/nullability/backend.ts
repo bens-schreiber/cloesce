@@ -24,11 +24,31 @@ export namespace NullabilityChecks {
     }
 
     export interface Api {
-        primitiveTypes(self: NullabilityChecks.Self, a: number | null, b: string | null): ApiResult<boolean | null>;
-        modelTypes(self: NullabilityChecks.Self, a: NullabilityChecks.Self | null): ApiResult<NullabilityChecks.Self | null>;
-        injectableTypes(self: NullabilityChecks.Self): ApiResult<void>;
-        arrayTypes(self: NullabilityChecks.Self, a: number[] | null, b: NullabilityChecks.Self[] | null): ApiResult<string[] | null>;
-        httpResultTypes(self: NullabilityChecks.Self): ApiResult<NullabilityChecks.Self[] | null>;
+
+        primitiveTypes(
+            self: NullabilityChecks.Self,
+            a: number | null,
+            b: string | null,
+        ): ApiResult<boolean | null>;
+
+        modelTypes(
+            self: NullabilityChecks.Self,
+            a: NullabilityChecks.Self | null,
+        ): ApiResult<NullabilityChecks.Self | null>;
+
+        injectableTypes(
+            self: NullabilityChecks.Self,
+        ): ApiResult<void>;
+
+        arrayTypes(
+            self: NullabilityChecks.Self,
+            a: number[] | null,
+            b: NullabilityChecks.Self[] | null,
+        ): ApiResult<string[] | null>;
+
+        httpResultTypes(
+            self: NullabilityChecks.Self,
+        ): ApiResult<NullabilityChecks.Self[] | null>;
     }
     export const _api = undefined as unknown as Api;
 

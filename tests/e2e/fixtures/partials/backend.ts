@@ -24,8 +24,17 @@ export namespace Dog {
     }
 
     export interface Api {
-        create(e: Env, dog: DeepPartial<Dog.Self>): ApiResult<Dog.Self>;
-        getPartialSelf(self: Dog.Self): ApiResult<DeepPartial<Dog.Self>>;
+
+        create(
+            dog: DeepPartial<Dog.Self>,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<Dog.Self>;
+
+        getPartialSelf(
+            self: Dog.Self,
+        ): ApiResult<DeepPartial<Dog.Self>>;
     }
     export const _api = undefined as unknown as Api;
 

@@ -13,12 +13,11 @@ export namespace BlobService {
     export const Kind = "service" as const;
     export const Tag = "BlobService" as const;
 
-    export interface Self {
-    }
-
     export interface Api {
-        init?(self: BlobService.Self): ApiResult<void>;
-        incrementBlob(b: Uint8Array): ApiResult<Uint8Array>;
+
+        incrementBlob(
+            b: Uint8Array,
+        ): ApiResult<Uint8Array>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -41,9 +40,18 @@ export namespace BlobHaver {
     }
 
     export interface Api {
-        getBlob1(self: BlobHaver.Self): ApiResult<Uint8Array>;
-        inputStream(s: CfReadableStream): ApiResult<void>;
-        yieldStream(self: BlobHaver.Self): ApiResult<CfReadableStream>;
+
+        getBlob1(
+            self: BlobHaver.Self,
+        ): ApiResult<Uint8Array>;
+
+        inputStream(
+            s: CfReadableStream,
+        ): ApiResult<void>;
+
+        yieldStream(
+            self: BlobHaver.Self,
+        ): ApiResult<CfReadableStream>;
     }
     export const _api = undefined as unknown as Api;
 

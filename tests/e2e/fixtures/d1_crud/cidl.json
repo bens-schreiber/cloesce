@@ -1,5 +1,5 @@
 {
-  "hash": 16353891316088601461,
+  "hash": 4754597934190067300,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -54,7 +54,8 @@
             "HttpResult": "Void"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "$save",
@@ -80,7 +81,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -102,7 +104,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -137,7 +140,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -185,7 +189,7 @@
       ]
     },
     "Parent": {
-      "hash": 6875682808057942832,
+      "hash": 12731619948998570810,
       "name": "Parent",
       "d1_binding": "db",
       "primary_columns": [
@@ -203,7 +207,7 @@
       ],
       "columns": [
         {
-          "hash": 13382405950980379557,
+          "hash": 3617101773382579157,
           "field": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -223,7 +227,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 4901042800312040762,
+          "hash": 17929984854462866887,
           "field": {
             "name": "favoriteChild",
             "cidl_type": {
@@ -242,7 +246,7 @@
           }
         },
         {
-          "hash": 7529744249387731988,
+          "hash": 14053461633508870265,
           "field": {
             "name": "children",
             "cidl_type": {
@@ -289,7 +293,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save_WithChildren",
@@ -315,7 +320,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -337,7 +343,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get_WithChildren",
@@ -359,7 +366,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -394,7 +402,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list_WithChildren",
@@ -429,7 +438,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -513,7 +523,7 @@
       ]
     },
     "Child": {
-      "hash": 2477743275987146240,
+      "hash": 5516230628474069556,
       "name": "Child",
       "d1_binding": "db",
       "primary_columns": [
@@ -549,7 +559,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 1543591661476837575,
+          "hash": 14572533715627663700,
           "field": {
             "name": "parent",
             "cidl_type": {

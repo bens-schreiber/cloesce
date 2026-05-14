@@ -14,36 +14,18 @@ export namespace FooService {
     export const Kind = "service" as const;
     export const Tag = "FooService" as const;
 
-    export interface Self {
-    }
-
     export interface Api {
-        init?(self: FooService.Self): ApiResult<void>;
-        staticMethod(thing: InjectedThing): ApiResult<string>;
-        instantiatedMethod(self: FooService.Self, thing: InjectedThing): ApiResult<string>;
+
+        method(
+            env: {
+                InjectedThing: InjectedThing,
+            },
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 
     export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
         return _impl(FooService, implObj);
-    }
-}
-export namespace BarService {
-    export const Kind = "service" as const;
-    export const Tag = "BarService" as const;
-
-    export interface Self {
-        foo: FooService.Self;
-    }
-
-    export interface Api {
-        init?(self: BarService.Self): ApiResult<void>;
-        useFoo(self: BarService.Self, injectedThing: InjectedThing): ApiResult<string>;
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
-        return _impl(BarService, implObj);
     }
 }
 

@@ -53,7 +53,9 @@ api FailModel {
     )
 }
 
-service UnregisteredService {}
+service {
+    UnregisteredService
+}
 
 api UnregisteredService {
     get unregistered() -> string

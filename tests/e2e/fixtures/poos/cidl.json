@@ -70,7 +70,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "yieldPoo",
@@ -86,7 +87,8 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         }
       ],
       "data_sources": {

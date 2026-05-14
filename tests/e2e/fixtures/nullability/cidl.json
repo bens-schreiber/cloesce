@@ -1,5 +1,5 @@
 {
-  "hash": 17765369616828601231,
+  "hash": 5579940516950494783,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 7819174499920087688,
+      "hash": 15037484288907580123,
       "name": "NullabilityChecks",
       "d1_binding": "db",
       "primary_columns": [
@@ -39,7 +39,7 @@
           "composite_id": null
         },
         {
-          "hash": 2709437981156923332,
+          "hash": 5567479336425869076,
           "field": {
             "name": "nullableString",
             "cidl_type": {
@@ -84,7 +84,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "modelTypes",
@@ -114,7 +115,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "injectableTypes",
@@ -126,7 +128,8 @@
             "HttpResult": "Void"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "arrayTypes",
@@ -165,7 +168,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "httpResultTypes",
@@ -185,7 +189,8 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         }
       ],
       "data_sources": {

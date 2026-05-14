@@ -1,8 +1,8 @@
 {
-  "hash": 17765369616828601231,
+  "hash": 5579940516950494783,
   "models": {
     "NullabilityChecks": {
-      "hash": 7819174499920087688,
+      "hash": 15037484288907580123,
       "name": "NullabilityChecks",
       "d1_binding": "db",
       "primary_columns": [
@@ -31,7 +31,7 @@
           "composite_id": null
         },
         {
-          "hash": 2709437981156923332,
+          "hash": 5567479336425869076,
           "field": {
             "name": "nullableString",
             "cidl_type": {
