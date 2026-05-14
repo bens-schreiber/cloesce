@@ -233,11 +233,11 @@ export class ModelBuilder {
       gen: { include: tree } as any,
       get: get
         ? {
-          parameters: get.map((f) => ({
-            parameter: { ...f, validators: [] },
-            instance_field: false,
-          })),
-        }
+            parameters: get.map((f) => ({
+              parameter: { ...f, validators: [] },
+              instance_field: false,
+            })),
+          }
         : undefined,
     };
     return this;

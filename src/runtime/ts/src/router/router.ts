@@ -1,13 +1,5 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import {
-  Cidl,
-  Model,
-  ApiMethod,
-  Service,
-  CrudKind,
-  DataSource,
-  ValidatedField,
-} from "../cidl.js";
+import { Cidl, Model, ApiMethod, Service, CrudKind, DataSource, ValidatedField } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -57,7 +49,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) { }
+  ) {}
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;

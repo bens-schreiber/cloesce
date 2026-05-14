@@ -456,7 +456,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
-      impl: () => { },
+      impl: () => {},
       getParamValues: {},
       keyFields: {},
     };
@@ -556,12 +556,7 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method(
-        "testMethod",
-        "Post",
-        [{ name: "name", cidl_type: "String", validators: [] }],
-        "Void",
-      )
+      .method("testMethod", "Post", [{ name: "name", cidl_type: "String", validators: [] }], "Void")
       .build();
 
     const impl = vi.fn(() => undefined);

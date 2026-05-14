@@ -13,7 +13,7 @@
 
 - Renamed `double` to `real`.
 - Client CRUD methods are split per data source.
-- ORM methods return a  `CloesceResult` object.
+- ORM methods return a `CloesceResult` object.
 - Key fields now can take a SQLite compatible type.
 - `use` tag can no longer specify CRUD methods.
 - All built-in types now use lowercase syntax.

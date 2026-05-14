@@ -8,7 +8,7 @@ class InjectedThing extends Cloesce.InjectedThing {
 }
 
 const Foo = Cloesce.Foo.impl({
-  blockedMethod() { },
+  blockedMethod() {},
 
   getInjectedThing(env) {
     const thing = env.InjectedThing as InjectedThing;
