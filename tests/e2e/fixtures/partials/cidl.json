@@ -62,10 +62,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Dog"
-              }
+            "Object": {
+              "name": "Dog"
             }
           },
           "parameters_media": "Json",
@@ -91,10 +89,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Partial": {
-                "object_name": "Dog"
-              }
+            "Partial": {
+              "object_name": "Dog"
             }
           },
           "parameters_media": "Json",
@@ -108,10 +104,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Dog"
-              }
+            "Object": {
+              "name": "Dog"
             }
           },
           "parameters_media": "Json",

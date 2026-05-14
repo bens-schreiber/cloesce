@@ -46,15 +46,15 @@ export class DependencyContainer {
 export class RuntimeContainer {
   private static instance: RuntimeContainer | undefined;
   private constructor(
-    public readonly ast: Cidl,
+    public readonly idl: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
   ) {}
 
-  static async init(ast: Cidl, workerUrl: string) {
+  static async init(idl: Cidl, workerUrl: string) {
     if (this.instance) return;
-    const wasmAbi = await loadOrmWasm(ast);
-    this.instance = new RuntimeContainer(ast, wasmAbi, workerUrl);
+    const wasmAbi = await loadOrmWasm(idl);
+    this.instance = new RuntimeContainer(idl, wasmAbi, workerUrl);
   }
 
   static get(): RuntimeContainer {
@@ -176,20 +176,20 @@ export class CloesceApp {
   private async router(
     request: Request,
     env: any,
-    ast: Cidl,
+    idl: Cidl,
     wasm: OrmWasmExports,
     di: DependencyContainer,
     workerUrl: string,
   ): Promise<HttpResult<unknown>> {
     // Inject all injectables
-    for (const inject of ast.injects) {
+    for (const inject of idl.injects) {
       if (this.apiRegistry.has(inject)) {
         di._set({ tag: inject }, this.apiRegistry.get(inject) ?? undefined);
       }
     }
 
     // Route match
-    const routeRes = matchRoute(request, ast, workerUrl, this.apiRegistry, env);
+    const routeRes = matchRoute(request, idl, workerUrl, this.apiRegistry, env);
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
@@ -212,7 +212,7 @@ export class CloesceApp {
     }
 
     // Request validation
-    const validation = await validateRequest(request, wasm, ast, env, route);
+    const validation = await validateRequest(request, wasm, idl, env, route);
     if (validation.isLeft()) {
       return validation.value;
     }
@@ -246,13 +246,13 @@ export class CloesceApp {
    * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
-    const { ast, wasm, workerUrl } = RuntimeContainer.get();
+    const { idl, wasm, workerUrl } = RuntimeContainer.get();
 
     // DI contains explicitly registered injected objects.
     const di = new DependencyContainer();
 
     try {
-      const httpResult = await this.router(request, env, ast, wasm, di, workerUrl);
+      const httpResult = await this.router(request, env, idl, wasm, di, workerUrl);
 
       // Log any 500 errors
       if (httpResult.status === 500) {
@@ -305,7 +305,7 @@ export type MatchedRoute = {
  */
 function matchRoute(
   request: Request,
-  ast: Cidl,
+  idl: Cidl,
   workerUrl: string,
   registry: Map<string, any>,
   env: any,
@@ -332,7 +332,7 @@ function matchRoute(
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
 
-  const service = ast.services[namespace];
+  const service = idl.services[namespace];
   if (service) {
     if (parts.length !== 2) {
       return notFound(RouterError.UnknownRoute);
@@ -363,7 +363,7 @@ function matchRoute(
     });
   }
 
-  const model = ast.models[namespace];
+  const model = idl.models[namespace];
   if (!model) {
     return notFound(RouterError.UnknownRoute);
   }
@@ -440,7 +440,7 @@ function matchRoute(
 async function validateRequest(
   request: Request,
   wasm: OrmWasmExports,
-  ast: Cidl,
+  idl: Cidl,
   env: any,
   route: MatchedRoute,
 ): Promise<Either<HttpResult, RequestParamMap>> {
@@ -520,7 +520,7 @@ async function validateRequest(
     if (res.isLeft()) return Either.left(res.unwrapLeft());
     const validatedRaw = res.unwrap();
     const hydrated = hydrateType(validatedRaw, p.cidl_type, {
-      ast,
+      idl: idl,
       includeTree: null,
       keyFields: {},
       env,

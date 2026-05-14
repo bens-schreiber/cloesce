@@ -14,7 +14,7 @@ import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.j
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 type HydrateArgs = {
-  ast: Cidl;
+  idl: Cidl;
   includeTree: IncludeTree<any> | null;
   keyFields: Record<string, unknown>;
   env: any;
@@ -117,7 +117,7 @@ export class Orm {
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T>> {
     base ??= {};
-    const { ast } = RuntimeContainer.get();
+    const { idl } = RuntimeContainer.get();
     const modelCidlType: CidlType = {
       Object: { name: meta.name },
     };
@@ -125,7 +125,7 @@ export class Orm {
     const promises: Promise<CloesceResult<void>>[] = [];
 
     const hydrated = hydrateType(base, modelCidlType, {
-      ast,
+      idl,
       includeTree,
       keyFields,
       env,
@@ -161,7 +161,7 @@ export class Orm {
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T | null>> {
     includeTree ??= {} as IncludeTree<T>;
-    const { wasm, ast } = RuntimeContainer.get();
+    const { wasm, idl } = RuntimeContainer.get();
 
     // Invoke the ORM upsert function
     const upsertQueryRes = invokeOrmWasm(
@@ -253,7 +253,7 @@ export class Orm {
         const nestedTree = currentTree[navProp.field.name];
         if (!nestedTree) continue;
 
-        const nestedMeta = ast.models[navProp.model_reference];
+        const nestedMeta = idl.models[navProp.model_reference];
         const value = currentModel[navProp.field.name];
 
         if (Array.isArray(value)) {
@@ -465,8 +465,8 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     return value;
   }
 
-  const modelMeta = args.ast.models[objectName];
-  const pooMeta = args.ast.poos[objectName];
+  const modelMeta = args.idl.models[objectName];
+  const pooMeta = args.idl.poos[objectName];
 
   if (modelMeta) {
     for (const col of modelMeta.columns) {

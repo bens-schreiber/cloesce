@@ -6,7 +6,7 @@ import {
   _cloesceInternal,
 } from "../src/router/router";
 import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
-import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
+import { ModelBuilder, ServiceBuilder, createIdl } from "./builder";
 import { Model, Service } from "../src/cidl";
 
 function createRequest(url: string, method?: string, body?: any) {
@@ -54,12 +54,12 @@ describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/does/not/match");
-    const ast = createAst();
+    const idl = createIdl();
     const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -70,12 +70,12 @@ describe("Match Route", () => {
   test("Unknown Route => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst();
+    const idl = createIdl();
     const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -86,14 +86,14 @@ describe("Match Route", () => {
   test("Unknown Method => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst({
+    const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().build()],
     });
     const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -104,14 +104,14 @@ describe("Match Route", () => {
   test("Unmatched Verb => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst({
+    const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Delete", [], "Void").build()],
     });
     const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -122,22 +122,22 @@ describe("Match Route", () => {
   test("Matches static method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method", "POST");
-    const ast = createAst({
+    const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Post", [], "Void").build()],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.models["Model"]);
+    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       getParamValues: {},
       keyFields: {},
-      method: ast.models["Model"].apis.find((m) => m.name === "method"),
-      model: ast.models["Model"],
+      method: idl.models["Model"].apis.find((m) => m.name === "method"),
+      model: idl.models["Model"],
       namespace: "Model",
       kind: "model",
       impl: mockImpl,
@@ -147,7 +147,7 @@ describe("Match Route", () => {
   test("Matches instantiated method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/0/method", "POST");
-    const ast = createAst({
+    const idl = createIdl({
       models: [
         ModelBuilder.model("Model")
           .idPk()
@@ -157,20 +157,20 @@ describe("Match Route", () => {
       ],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.models["Model"]);
+    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      dataSource: ast.models["Model"].data_sources["ds"],
+      dataSource: idl.models["Model"].data_sources["ds"],
       getParamValues: { id: "0" },
       impl: mockImpl,
       keyFields: {},
-      model: ast.models["Model"],
-      method: ast.models["Model"].apis.find((m) => m.name === "method"),
+      model: idl.models["Model"],
+      method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
@@ -179,7 +179,7 @@ describe("Match Route", () => {
   test("Matches instantiated method with key params", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/0/value1/value2/method", "POST");
-    const ast = createAst({
+    const idl = createIdl({
       models: [
         ModelBuilder.model("Model")
           .idPk()
@@ -191,23 +191,23 @@ describe("Match Route", () => {
       ],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.models["Model"]);
+    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      dataSource: ast.models["Model"].data_sources["ds"],
+      dataSource: idl.models["Model"].data_sources["ds"],
       impl: mockImpl,
       getParamValues: { id: "0" },
       keyFields: {
         key1: "value1",
         key2: "value2",
       },
-      model: ast.models["Model"],
-      method: ast.models["Model"].apis.find((m) => m.name === "method"),
+      model: idl.models["Model"],
+      method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
@@ -219,7 +219,7 @@ describe("Match Route", () => {
       "http://foo.com/api/Model/acme/user123/value1/value2/method",
       "POST",
     );
-    const ast = createAst({
+    const idl = createIdl({
       models: [
         ModelBuilder.model("Model")
           .pk("orgId", "String")
@@ -235,23 +235,23 @@ describe("Match Route", () => {
       ],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.models["Model"]);
+    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      dataSource: ast.models["Model"].data_sources["ds"],
+      dataSource: idl.models["Model"].data_sources["ds"],
       impl: mockImpl,
       getParamValues: { orgId: "acme", userId: "user123" },
       keyFields: {
         key1: "value1",
         key2: "value2",
       },
-      model: ast.models["Model"],
-      method: ast.models["Model"].apis.find((m) => m.name === "method"),
+      model: idl.models["Model"],
+      method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
@@ -260,16 +260,16 @@ describe("Match Route", () => {
   test("Matches static method on Service", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const ast = createAst({
+    const idl = createIdl({
       services: [
         ServiceBuilder.service("Service").method("method", "Post", true, [], "Void").build(),
       ],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.services["Service"]);
+    const registry = createRegistry(idl.services["Service"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -277,8 +277,8 @@ describe("Match Route", () => {
       getParamValues: {},
       impl: mockImpl,
       keyFields: {},
-      method: ast.services["Service"].apis.find((m) => m.name === "method"),
-      service: ast.services["Service"],
+      method: idl.services["Service"].apis.find((m) => m.name === "method"),
+      service: idl.services["Service"],
       kind: "service",
       namespace: "Service",
     });
@@ -287,16 +287,16 @@ describe("Match Route", () => {
   test("Matches instantiated method on Service", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const ast = createAst({
+    const idl = createIdl({
       services: [
         ServiceBuilder.service("Service").method("method", "Post", false, [], "Void").build(),
       ],
     });
     const env = mockWranglerEnv();
-    const registry = createRegistry(ast.services["Service"]);
+    const registry = createRegistry(idl.services["Service"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -304,8 +304,8 @@ describe("Match Route", () => {
       getParamValues: {},
       impl: mockImpl,
       keyFields: {},
-      method: ast.services["Service"].apis.find((m) => m.name === "method"),
-      service: ast.services["Service"],
+      method: idl.services["Service"].apis.find((m) => m.name === "method"),
+      service: idl.services["Service"],
       kind: "service",
       namespace: "Service",
     });
@@ -320,11 +320,11 @@ describe("Namespace Middleware", () => {
   test("Exits early", async () => {
     // Arrange
     const env = mockWranglerEnv();
-    const ast = createAst({
+    const idl = createIdl({
       models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
     });
 
-    await RuntimeContainer.init(ast, api);
+    await RuntimeContainer.init(idl, api);
     const app = new CloesceApp();
     app.register({
       tag: "Foo",
@@ -339,7 +339,7 @@ describe("Namespace Middleware", () => {
     });
 
     // Act
-    const res = await (app as any).router(request, env, ast, undefined, di, api);
+    const res = await (app as any).router(request, env, idl, undefined, di, api);
 
     // Assert
     expect(res.status).toBe(500);
@@ -369,11 +369,11 @@ describe("Request Validation", () => {
     };
 
     const wasmMock = {} as any;
-    const astMock = {} as any;
+    const idlMock = {} as any;
     const envMock = {} as any;
 
     // Act
-    const res = await _cloesceInternal.validateRequest(request, wasmMock, astMock, envMock, route);
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, idlMock, envMock, route);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -397,11 +397,11 @@ describe("Request Validation", () => {
     };
 
     const wasmMock = {} as any;
-    const astMock = {} as any;
+    const idlMock = {} as any;
     const envMock = {} as any;
 
     // Act
-    const res = await _cloesceInternal.validateRequest(request, wasmMock, astMock, envMock, route);
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, idlMock, envMock, route);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -417,11 +417,11 @@ describe("Method Middleware", () => {
   test("Exits early", async () => {
     // Arrange
     const env = mockWranglerEnv();
-    const ast = createAst({
+    const idl = createIdl({
       models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
     });
 
-    await RuntimeContainer.init(ast, api);
+    await RuntimeContainer.init(idl, api);
     const app = new CloesceApp();
     app.register({
       tag: "Foo",
@@ -437,7 +437,7 @@ describe("Method Middleware", () => {
     });
 
     // Act
-    const res = await (app as any).router(request, env, ast, undefined, di, api);
+    const res = await (app as any).router(request, env, idl, undefined, di, api);
 
     // Assert
     expect(res.status).toBe(500);
@@ -469,14 +469,11 @@ describe("Method Dispatch", () => {
     expect(res.data).toBeUndefined();
   });
 
-  test("HttpResult Return Type => HttpResult", async () => {
+  test("Directly returns HttpResult", async () => {
     // Arrange
     const di = createDi();
 
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method("testMethod", "Get", [], { HttpResult: "Void" })
-      .build();
+    const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
       kind: "model",
@@ -494,7 +491,7 @@ describe("Method Dispatch", () => {
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
   });
 
-  test("Non HttpResult => HttpResult", async () => {
+  test("Indirectly returns HttpResult", async () => {
     // Arrange
     const di = createDi();
 

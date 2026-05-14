@@ -38,9 +38,7 @@
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
             {
@@ -80,10 +78,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "PooC"
-              }
+            "Object": {
+              "name": "PooC"
             }
           },
           "parameters_media": "Json",

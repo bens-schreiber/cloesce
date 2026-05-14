@@ -38,9 +38,7 @@
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -51,9 +49,7 @@
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "String"
-          },
+          "return_type": "String",
           "parameters_media": "Json",
           "parameters": [],
           "injected": [
@@ -67,10 +63,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Foo"
-              }
+            "Object": {
+              "name": "Foo"
             }
           },
           "parameters_media": "Json",

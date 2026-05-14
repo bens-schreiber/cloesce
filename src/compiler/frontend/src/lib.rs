@@ -517,7 +517,7 @@ pub enum AstBlockKind<'src> {
     Inject(InjectBlock<'src>),
 }
 
-/// An IR for the raw parsed structure of a Cloesce project
+/// The raw parsed structure of a Cloesce source file, before semantic analysis and transformation into the IDL.
 #[derive(Default)]
 pub struct Ast<'src> {
     pub blocks: Vec<Spd<AstBlockKind<'src>>>,

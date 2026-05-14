@@ -61,7 +61,7 @@ impl CrudExpansion {
                         is_static: true,
                         data_source: None,
                         http_verb: HttpVerb::Get,
-                        return_type: CidlType::http(CidlType::Object { name: model.name }),
+                        return_type: CidlType::Object { name: model.name },
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
@@ -79,9 +79,7 @@ impl CrudExpansion {
                         is_static: true,
                         data_source: None,
                         http_verb: HttpVerb::Get,
-                        return_type: CidlType::http(CidlType::array(CidlType::Object {
-                            name: model.name,
-                        })),
+                        return_type: CidlType::array(CidlType::Object { name: model.name }),
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
@@ -95,7 +93,7 @@ impl CrudExpansion {
                     is_static: true,
                     data_source: None,
                     http_verb: HttpVerb::Post,
-                    return_type: CidlType::http(CidlType::Object { name: model.name }),
+                    return_type: CidlType::Object { name: model.name },
                     return_media: MediaType::Json,
                     parameters_media: MediaType::Json,
                     parameters: vec![ValidatedField {

@@ -105,9 +105,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
             {
@@ -140,10 +138,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Validator"
-              }
+            "Object": {
+              "name": "Validator"
             }
           },
           "parameters_media": "Json",
@@ -167,10 +163,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Validator"
-              }
+            "Object": {
+              "name": "Validator"
             }
           },
           "parameters_media": "Json",
@@ -194,10 +188,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Validator"
-              }
+            "Object": {
+              "name": "Validator"
             }
           },
           "parameters_media": "Json",
@@ -232,10 +224,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Validator"
-              }
+            "Object": {
+              "name": "Validator"
             }
           },
           "parameters_media": "Json",
@@ -270,11 +260,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Validator"
-                }
+            "Array": {
+              "Object": {
+                "name": "Validator"
               }
             }
           },
@@ -312,11 +300,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Validator"
-                }
+            "Array": {
+              "Object": {
+                "name": "Validator"
               }
             }
           },

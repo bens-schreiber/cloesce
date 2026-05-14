@@ -61,9 +61,7 @@
           "data_source": "Default",
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Blob"
-          },
+          "return_type": "Blob",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -74,9 +72,7 @@
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Octet",
           "parameters": [
             {
@@ -93,9 +89,7 @@
           "data_source": "Default",
           "http_verb": "Get",
           "return_media": "Octet",
-          "return_type": {
-            "HttpResult": "Stream"
-          },
+          "return_type": "Stream",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -107,10 +101,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "BlobHaver"
-              }
+            "Object": {
+              "name": "BlobHaver"
             }
           },
           "parameters_media": "Json",
@@ -134,10 +126,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "BlobHaver"
-              }
+            "Object": {
+              "name": "BlobHaver"
             }
           },
           "parameters_media": "Json",
@@ -157,11 +147,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "BlobHaver"
-                }
+            "Array": {
+              "Object": {
+                "name": "BlobHaver"
               }
             }
           },
@@ -242,9 +230,7 @@
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Blob"
-          },
+          "return_type": "Blob",
           "parameters_media": "Json",
           "parameters": [
             {

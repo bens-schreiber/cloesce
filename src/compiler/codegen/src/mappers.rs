@@ -60,7 +60,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::Object { name, .. } => self.namespace(idl, name),
             CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner, idl)),
             CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, idl)),
-            CidlType::HttpResult(inner) => self.cidl_type(inner, idl),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {
                 format!("DeepPartial<{}>", self.namespace(idl, object_name))

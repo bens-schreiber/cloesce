@@ -177,7 +177,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             );
         }
 
-        (CidlType::http(resolved_type), return_media)
+        (resolved_type, return_media)
     }
 
     fn parameters(

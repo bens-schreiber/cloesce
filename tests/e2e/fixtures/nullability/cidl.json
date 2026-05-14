@@ -1,5 +1,5 @@
 {
-  "hash": 5579940516950494783,
+  "hash": 9157797229480452983,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 15037484288907580123,
+      "hash": 9423267146512996101,
       "name": "NullabilityChecks",
       "d1_binding": "db",
       "primary_columns": [
@@ -39,7 +39,7 @@
           "composite_id": null
         },
         {
-          "hash": 5567479336425869076,
+          "hash": 6996500014060341948,
           "field": {
             "name": "nullableString",
             "cidl_type": {
@@ -64,9 +64,7 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Nullable": "Boolean"
-            }
+            "Nullable": "Boolean"
           },
           "parameters_media": "Json",
           "parameters": [
@@ -94,11 +92,9 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Nullable": {
-                "Object": {
-                  "name": "NullabilityChecks"
-                }
+            "Nullable": {
+              "Object": {
+                "name": "NullabilityChecks"
               }
             }
           },
@@ -124,9 +120,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -138,10 +132,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Nullable": {
-                "Array": "String"
-              }
+            "Nullable": {
+              "Array": "String"
             }
           },
           "parameters_media": "Json",
@@ -178,12 +170,10 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Nullable": {
-                "Array": {
-                  "Object": {
-                    "name": "NullabilityChecks"
-                  }
+            "Nullable": {
+              "Array": {
+                "Object": {
+                  "name": "NullabilityChecks"
                 }
               }
             }

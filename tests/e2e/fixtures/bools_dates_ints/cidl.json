@@ -62,10 +62,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Weather"
-              }
+            "Object": {
+              "name": "Weather"
             }
           },
           "parameters_media": "Json",
@@ -89,10 +87,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Weather"
-              }
+            "Object": {
+              "name": "Weather"
             }
           },
           "parameters_media": "Json",

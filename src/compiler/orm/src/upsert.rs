@@ -106,7 +106,7 @@ impl<'a> UpsertModel<'a> {
             let mut select_root_model = select.expr(Expr::cust(&select_query));
 
             // Add WHERE clause for each primary key column
-            // e.g., WHERE "Model"."id" = (SELECT json_extract(primary_key, '$.id') FROM $cloesce_tmp WHERE path = 'Model')
+            // e.g., WHERE "Model"."id" = (SELECT json_extract(primary_key, '$.id') FROM "$cloesce_tmp" WHERE path = 'Model')
             for col in &model.primary_columns {
                 let pk_path = format!("{}.{}", model.name, col.field.name);
                 let pk_expr = match generator.context.get(&pk_path) {

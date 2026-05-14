@@ -14,7 +14,6 @@ macro_rules! cidl_type_contains {
             match cur {
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
-                | CidlType::HttpResult(inner)
                 | CidlType::KvObject(inner)
                 | CidlType::Paginated(inner) => {
                     if matches!(cur, $pattern) {

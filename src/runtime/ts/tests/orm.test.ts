@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
-import { ModelBuilder, createAst } from "./builder";
+import { ModelBuilder, createIdl } from "./builder";
 import { _cloesceInternal } from "../src/router/router.js";
 import { hydrateType } from "../src/router/orm";
 import { Cidl } from "../src/cidl.js";
@@ -8,7 +8,7 @@ import { CloesceResult } from "../src/common.js";
 
 function createHydrateArgs() {
   return {
-    ast: { models: {}, poos: {} } as Cidl,
+    idl: { models: {}, poos: {} } as Cidl,
     includeTree: null,
     keyFields: {},
     env: {},
@@ -84,7 +84,7 @@ describe("hydrateType Tests", () => {
         .col("data", "Blob")
         .build();
 
-      const ast = createAst({ models: [modelMeta] });
+      const idl = createIdl({ models: [modelMeta] });
 
       // Act
       const result = hydrateType(
@@ -92,7 +92,7 @@ describe("hydrateType Tests", () => {
         { Object: { name: "TypedColModel" } },
         {
           ...createHydrateArgs(),
-          ast,
+          idl,
         },
       );
 
@@ -110,7 +110,7 @@ describe("hydrateType Tests", () => {
         .col("createdAt", "DateIso")
         .build();
 
-      const ast = createAst({ models: [modelMeta] });
+      const idl = createIdl({ models: [modelMeta] });
 
       // Act
       const result = hydrateType(
@@ -118,7 +118,7 @@ describe("hydrateType Tests", () => {
         { Object: { name: "SparseModel" } },
         {
           ...createHydrateArgs(),
-          ast,
+          idl,
         },
       );
 
@@ -141,7 +141,7 @@ describe("hydrateType Tests", () => {
         })
         .build();
 
-      const ast = createAst({ models: [parentMeta, childMeta] });
+      const idl = createIdl({ models: [parentMeta, childMeta] });
 
       const base = {
         id: 1,
@@ -157,7 +157,7 @@ describe("hydrateType Tests", () => {
         { Object: { name: "ParentModel" } },
         {
           ...createHydrateArgs(),
-          ast,
+          idl,
           includeTree: null,
         },
       );
@@ -184,7 +184,7 @@ describe("hydrateType Tests", () => {
         })
         .build();
 
-      const ast = createAst({ models: [parentMeta, childMeta] });
+      const idl = createIdl({ models: [parentMeta, childMeta] });
 
       const base = {
         id: 1,
@@ -200,7 +200,7 @@ describe("hydrateType Tests", () => {
         { Object: { name: "ParentModel2" } },
         {
           ...createHydrateArgs(),
-          ast,
+          idl,
           includeTree: {},
         },
       );
@@ -281,7 +281,7 @@ describe("ORM Hydrate Tests", () => {
     await bucket1.put(baseImageObject.key, baseImageObject.body);
     await bucket1.put(otherImageObject.key, otherImageObject.body);
 
-    const ast = createAst({
+    const idl = createIdl({
       models: [modelMeta],
     });
 
@@ -297,7 +297,7 @@ describe("ORM Hydrate Tests", () => {
         { ...base },
         { Object: { name: "TestModel" } },
         {
-          ast,
+          idl,
           includeTree: {},
           keyFields: { configId, imageId },
           env,
@@ -329,7 +329,7 @@ describe("ORM Hydrate Tests", () => {
         { ...base },
         { Object: { name: "TestModel" } },
         {
-          ast,
+          idl,
           includeTree: {
             config: {},
             configStream: {},
@@ -416,7 +416,7 @@ describe("ORM Hydrate Tests", () => {
       await namespace1.put(`cursor-test/${String(i).padStart(4, "0")}`, JSON.stringify({ i }));
     }
 
-    const ast = createAst({ models: [modelMeta] });
+    const idl = createIdl({ models: [modelMeta] });
 
     // Act
     const promises: Promise<CloesceResult<void>>[] = [];
@@ -424,7 +424,7 @@ describe("ORM Hydrate Tests", () => {
       { id: 1 },
       { Object: { name: "CursorModel" } },
       {
-        ast,
+        idl,
         includeTree: { configList: {} },
         keyFields: {},
         env: { namespace1 },

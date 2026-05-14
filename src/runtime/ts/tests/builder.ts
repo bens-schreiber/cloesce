@@ -18,7 +18,7 @@ import {
   R2Field,
 } from "../src/cidl";
 
-export function createAst(args?: { models?: Model[]; services?: Service[] }): Cidl {
+export function createIdl(args?: { models?: Model[]; services?: Service[] }): Cidl {
   const modelsMap = Object.fromEntries(args?.models?.map((m) => [m.name, m]) ?? []);
   const serviceMap = Object.fromEntries(args?.services?.map((s) => [s.name, s]) ?? []);
 

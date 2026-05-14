@@ -12,7 +12,7 @@ export interface OrmWasmExports {
   memory: WebAssembly.Memory;
   get_return_len(): number;
   get_return_ptr(): number;
-  set_ast_ptr(ptr: number, len: number): number;
+  set_idl_ptr(ptr: number, len: number): number;
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
 
@@ -57,7 +57,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -80,14 +80,14 @@ export class WasmResource {
 }
 
 /** @internal */
-export async function loadOrmWasm(ast: Cidl): Promise<OrmWasmExports> {
+export async function loadOrmWasm(idl: Cidl): Promise<OrmWasmExports> {
   // Load WASM
   let exports: OrmWasmExports;
   if (
     mod.memory &&
     mod.alloc &&
     mod.dealloc &&
-    mod.set_ast_ptr &&
+    mod.set_idl_ptr &&
     mod.get_return_ptr &&
     mod.get_return_len
   ) {
@@ -100,10 +100,10 @@ export async function loadOrmWasm(ast: Cidl): Promise<OrmWasmExports> {
     ).exports;
   }
 
-  const astJson = WasmResource.fromString(JSON.stringify(ast), exports);
+  const idlJson = WasmResource.fromString(JSON.stringify(idl), exports);
 
-  if (exports.set_ast_ptr(astJson.ptr, astJson.len) != 0) {
-    astJson.free();
+  if (exports.set_idl_ptr(idlJson.ptr, idlJson.len) != 0) {
+    idlJson.free();
     const resPtr = exports.get_return_ptr();
     const resLen = exports.get_return_len();
     const errorMsg = new TextDecoder().decode(

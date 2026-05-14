@@ -98,9 +98,7 @@
           "data_source": "Default",
           "http_verb": "Put",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Octet",
           "parameters": [
             {
@@ -120,10 +118,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
+            "Object": {
+              "name": "D1BackedModel"
             }
           },
           "parameters_media": "Json",
@@ -148,10 +144,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
+            "Object": {
+              "name": "D1BackedModel"
             }
           },
           "parameters_media": "Json",
@@ -175,11 +169,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "D1BackedModel"
-                }
+            "Array": {
+              "Object": {
+                "name": "D1BackedModel"
               }
             }
           },
@@ -315,9 +307,7 @@
           "data_source": "Default",
           "http_verb": "Put",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Octet",
           "parameters": [
             {
@@ -336,9 +326,7 @@
           "data_source": "Default",
           "http_verb": "Put",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Octet",
           "parameters": [
             {
@@ -358,10 +346,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "PureR2Model"
-              }
+            "Object": {
+              "name": "PureR2Model"
             }
           },
           "parameters_media": "Json",

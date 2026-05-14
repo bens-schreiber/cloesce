@@ -52,10 +52,6 @@ pub enum CidlType<'src> {
     #[serde(borrow)]
     Array(Box<CidlType<'src>>),
 
-    /// A REST API response, which can contain any type or nothing.
-    #[serde(borrow)]
-    HttpResult(Box<CidlType<'src>>),
-
     /// A wrapper denoting the type within can be null.
     /// If the inner value is void, represents just null.
     #[serde(borrow)]
@@ -69,7 +65,7 @@ pub enum CidlType<'src> {
     #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
 
-    /// A reference to an object or injected type that is not yet resolved by the parser
+    /// A reference to an object or injected type that is not yet resolved by semantic analysis.
     UnresolvedReference {
         #[serde(borrow)]
         name: &'src str,
@@ -80,7 +76,6 @@ impl<'src> CidlType<'src> {
     pub fn root_type(&self) -> &CidlType<'src> {
         match self {
             CidlType::Array(inner) => inner.root_type(),
-            CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
             CidlType::KvObject(inner) => inner.root_type(),
             CidlType::Paginated(inner) => inner.root_type(),
@@ -98,10 +93,6 @@ impl<'src> CidlType<'src> {
 
     pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
-    }
-
-    pub fn http(cidl_type: CidlType<'src>) -> CidlType<'src> {
-        CidlType::HttpResult(Box::new(cidl_type))
     }
 
     pub fn paginated(cidl_type: CidlType<'src>) -> CidlType<'src> {
@@ -487,6 +478,9 @@ pub struct WranglerEnv<'src> {
     pub vars: Vec<Field<'src>>,
 }
 
+/// Represents the Cloesce Interface Definition Language (CIDL), describing a full stack app.
+///
+/// Can be seen as the highest level IR of the compiler, as it is the last stage before code generation.
 #[derive(Deserialize, Serialize, Default)]
 pub struct CloesceIdl<'src> {
     #[serde(default)]
@@ -651,8 +645,6 @@ impl<'src> MigrationsModel<'src> {
 }
 
 /// A subset of [CloesceIdl] suited for D1 migrations.
-///
-/// Assumed that the tree is semantically valid.
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsIdl<'src> {
     pub hash: u64,

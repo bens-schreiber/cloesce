@@ -12,9 +12,7 @@
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "String"
-          },
+          "return_type": "String",
           "parameters_media": "Json",
           "parameters": [],
           "injected": [
