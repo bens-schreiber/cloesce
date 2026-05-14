@@ -5,8 +5,8 @@ use crate::{
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
 };
-use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
 use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
+use idl::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
 
 #[derive(Default)]
 pub struct ApiAnalysis<'src, 'p> {

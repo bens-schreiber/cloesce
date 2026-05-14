@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use ast::{CloesceAst, MigrationsAst, MigrationsModel};
+use idl::{CloesceIdl, MigrationsIdl, MigrationsModel};
 
-use compiler_test::{expected_str, src_to_ast};
+use compiler_test::{expected_str, src_to_idl};
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
 use indexmap::IndexMap;
@@ -28,8 +28,8 @@ async fn query(db: &SqlitePool, sql: &str) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-fn as_migration(ast: CloesceAst) -> MigrationsAst {
-    let CloesceAst { hash, models, .. } = ast;
+fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
+    let CloesceIdl { hash, models, .. } = idl;
 
     // Convert each full Model → MigrationsModel
     let migrations_models: IndexMap<String, MigrationsModel> = models
@@ -47,22 +47,22 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
         })
         .collect();
 
-    MigrationsAst {
+    MigrationsIdl {
         hash,
         models: migrations_models,
     }
 }
 
-fn empty_migration() -> MigrationsAst<'static> {
-    let mut empty_ast = CloesceAst::default();
-    empty_ast.set_merkle_hash();
-    as_migration(empty_ast)
+fn empty_migration() -> MigrationsIdl<'static> {
+    let mut empty_idl = CloesceIdl::default();
+    empty_idl.set_merkle_hash();
+    as_migration(empty_idl)
 }
 
-fn src_to_migration(src: &'static str) -> MigrationsAst<'static> {
-    let mut ast = src_to_ast(src);
-    ast.set_merkle_hash();
-    as_migration(ast)
+fn src_to_migration(src: &'static str) -> MigrationsIdl<'static> {
+    let mut idl = src_to_idl(src);
+    idl.set_merkle_hash();
+    as_migration(idl)
 }
 
 #[derive(Default)]
@@ -97,12 +97,12 @@ impl MigrationsIntent for MockMigrationsIntent {
 
 #[sqlx::test]
 async fn migrate_models_scalars(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
     // Create
-    let ast = {
+    let idl = {
         // Arrange
-        let ast = src_to_migration(
+        let idl = src_to_migration(
             r#"
             env {
                 d1 { db }
@@ -123,7 +123,7 @@ async fn migrate_models_scalars(db: SqlitePool) {
 
         // Act
         let sql =
-            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "CREATE TABLE IF NOT EXISTS");
@@ -135,14 +135,14 @@ async fn migrate_models_scalars(db: SqlitePool) {
         query(&db, &sql).await.expect("Insert table query to work");
         assert!(exists_in_db(&db, "User").await);
 
-        ast
+        idl
     };
 
     // Drop
     {
         // Act
         let sql =
-            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&empty_idl, Some(&idl), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "DROP TABLE IF EXISTS \"User\"");
@@ -154,12 +154,12 @@ async fn migrate_models_scalars(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_one_to_one(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
     // Create
-    let ast = {
+    let idl = {
         // Arrange
-        let ast = src_to_migration(
+        let idl = src_to_migration(
             r#"
             env {
                 d1 { db }
@@ -188,7 +188,7 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
 
         // Act
         let sql =
-            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -200,14 +200,14 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         assert!(exists_in_db(&db, "Person").await);
         assert!(exists_in_db(&db, "Dog").await);
 
-        ast
+        idl
     };
 
     // Drop
     {
         // Act
         let sql =
-            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&empty_idl, Some(&idl), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop query to work");
@@ -219,12 +219,12 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_one_to_many(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
     // Create
-    let ast = {
+    let idl = {
         // Arrange
-        let ast = src_to_migration(
+        let idl = src_to_migration(
             r#"
             env {
                 d1 { db }
@@ -286,7 +286,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 
         // Act
         let sql =
-            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -312,14 +312,14 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         assert!(exists_in_db(&db, "Dog").await);
         assert!(exists_in_db(&db, "Cat").await);
 
-        ast
+        idl
     };
 
     // Drop
     {
         // Act
         let sql =
-            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&empty_idl, Some(&idl), &MockMigrationsIntent::default());
 
         query(&db, &sql).await.expect("Drop tables query to work");
         assert!(!exists_in_db(&db, "Boss").await);
@@ -331,12 +331,12 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_many_to_many(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
     // Create
-    let ast = {
+    let idl = {
         // Arrange
-        let ast = src_to_migration(
+        let idl = src_to_migration(
             r#"
             env {
                 d1 { db }
@@ -368,7 +368,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 
         // Act
         let sql =
-            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
@@ -387,14 +387,14 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         query(&db, &sql).await.expect("Insert tables query to work");
         assert!(exists_in_db(&db, "CourseStudent").await);
 
-        ast
+        idl
     };
 
     // Drop
     {
         // Act
         let sql =
-            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+            MigrationsGenerator::migrate(&empty_idl, Some(&idl), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop tables query to work");
@@ -405,7 +405,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn migrate_with_rebuild(db: SqlitePool) {
     let mut base_ast = {
-        let ast = src_to_migration(
+        let idl = src_to_migration(
             r#"
             env {
                 d1 { db }
@@ -424,12 +424,12 @@ async fn migrate_with_rebuild(db: SqlitePool) {
         "#,
         );
 
-        let sql = MigrationsGenerator::migrate(&ast, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&idl, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
 
-        ast
+        idl
     };
 
     // Changes without Rebuild
@@ -581,7 +581,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
 
     // Rebuild: Unique Constraints
     {
-        let empty_ast = empty_migration();
+        let empty_idl = empty_migration();
         let mut base_unique_ast = {
             let migration = src_to_migration(
                 r#"
@@ -611,7 +611,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
 
             let sql = MigrationsGenerator::migrate(
                 &migration,
-                Some(&empty_ast),
+                Some(&empty_idl),
                 &MockMigrationsIntent::default(),
             );
 
@@ -969,9 +969,9 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
-    let ast = src_to_migration(
+    let idl = src_to_migration(
         r#"
         env {
             d1 { db }
@@ -1002,7 +1002,7 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
     );
 
     let sql =
-        MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
     expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "Parent""#);
     expected_str!(sql, r#"PRIMARY KEY ("orgId", "userId")"#);
@@ -1019,9 +1019,9 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
-    let empty_ast = empty_migration();
+    let empty_idl = empty_migration();
 
-    let ast = src_to_migration(
+    let idl = src_to_migration(
         r#"
         env {
             d1 { db }
@@ -1054,7 +1054,7 @@ async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
     );
 
     let sql =
-        MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
 
     expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
     expected_str!(sql, r#""left_deptId" integer NOT NULL"#);

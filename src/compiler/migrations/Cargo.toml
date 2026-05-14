@@ -3,7 +3,7 @@ name = "migrations"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 indexmap = { workspace = true }
 sea-query = { workspace = true }
 sqlformat = { workspace = true }

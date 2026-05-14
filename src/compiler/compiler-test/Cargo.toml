@@ -3,7 +3,7 @@ name = "compiler-test"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 frontend = { path = "../frontend" }
 semantic = { path = "../semantic" }
 

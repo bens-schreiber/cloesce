@@ -1,6 +1,6 @@
 mod common;
 
-use compiler_test::src_to_ast;
+use compiler_test::src_to_idl;
 use orm::upsert::UpsertModel;
 use serde_json::{Map, Value, json};
 use sqlx::{Row, SqlitePool};
@@ -13,7 +13,7 @@ fn include(val: serde_json::Value) -> Option<Map<String, Value>> {
 
 #[sqlx::test]
 async fn upsert_scalar_model(db: SqlitePool) {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -37,11 +37,11 @@ async fn upsert_scalar_model(db: SqlitePool) {
         "age": 5
     });
 
-    let stmts = UpsertModel::query("Horse", &ast, new_model.as_object().unwrap().clone(), None)
+    let stmts = UpsertModel::query("Horse", &idl, new_model.as_object().unwrap().clone(), None)
         .expect("upsert to succeed");
 
     let results = test_sql(
-        ast,
+        idl,
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )
@@ -56,7 +56,7 @@ async fn upsert_scalar_model(db: SqlitePool) {
 
 #[sqlx::test]
 async fn upsert_auto_increment(db: SqlitePool) {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -78,11 +78,11 @@ async fn upsert_auto_increment(db: SqlitePool) {
         "name": "Shadowfax"
     });
 
-    let stmts = UpsertModel::query("Horse", &ast, new_model.as_object().unwrap().clone(), None)
+    let stmts = UpsertModel::query("Horse", &idl, new_model.as_object().unwrap().clone(), None)
         .expect("upsert to succeed");
 
     let results = test_sql(
-        ast,
+        idl,
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )
@@ -96,8 +96,8 @@ async fn upsert_auto_increment(db: SqlitePool) {
 
 #[sqlx::test]
 async fn upsert_one_to_one(db: SqlitePool) {
-    let ast = || {
-        src_to_ast(
+    let idl = || {
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -143,14 +143,14 @@ async fn upsert_one_to_one(db: SqlitePool) {
 
     let stmts = UpsertModel::query(
         "Horse",
-        &ast(),
+        &idl(),
         new_model.as_object().unwrap().clone(),
         include(json!({ "rider": {} })),
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast(),
+        idl(),
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )
@@ -165,8 +165,8 @@ async fn upsert_one_to_one(db: SqlitePool) {
 
 #[sqlx::test]
 async fn upsert_one_to_many(db: SqlitePool) {
-    let ast = || {
-        src_to_ast(
+    let idl = || {
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -212,14 +212,14 @@ async fn upsert_one_to_many(db: SqlitePool) {
 
     let stmts = UpsertModel::query(
         "Horse",
-        &ast(),
+        &idl(),
         new_model.as_object().unwrap().clone(),
         include(json!({ "riders": {} })),
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast(),
+        idl(),
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )
@@ -234,8 +234,8 @@ async fn upsert_one_to_many(db: SqlitePool) {
 
 #[sqlx::test]
 async fn upsert_many_to_many(db: SqlitePool) {
-    let ast = || {
-        src_to_ast(
+    let idl = || {
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -281,14 +281,14 @@ async fn upsert_many_to_many(db: SqlitePool) {
 
     let stmts = UpsertModel::query(
         "Student",
-        &ast(),
+        &idl(),
         new_model.as_object().unwrap().clone(),
         include(json!({ "courses": {} })),
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast(),
+        idl(),
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )
@@ -301,7 +301,7 @@ async fn upsert_many_to_many(db: SqlitePool) {
 
 #[sqlx::test]
 async fn upsert_composite_pk(db: SqlitePool) {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -327,14 +327,14 @@ async fn upsert_composite_pk(db: SqlitePool) {
 
     let stmts = UpsertModel::query(
         "OrderItem",
-        &ast,
+        &idl,
         new_model.as_object().unwrap().clone(),
         None,
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast,
+        idl,
         stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
         db,
     )

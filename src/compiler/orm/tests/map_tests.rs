@@ -1,6 +1,6 @@
 mod common;
 
-use compiler_test::src_to_ast;
+use compiler_test::src_to_idl;
 use orm::map::map_sql;
 use orm::upsert::UpsertModel;
 use serde_json::{Map, Value, json};
@@ -43,7 +43,7 @@ pub fn rows_to_json(rows: &[SqliteRow]) -> Vec<Map<String, Value>> {
 
 #[test]
 fn no_records_returns_empty() {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -77,13 +77,13 @@ fn no_records_returns_empty() {
     "#,
     );
     let rows: Vec<Map<String, Value>> = vec![];
-    let result = map_sql("Horse", rows, None, &ast).unwrap();
+    let result = map_sql("Horse", rows, None, &idl).unwrap();
     assert_eq!(result.len(), 0);
 }
 
 #[test]
 fn flat() {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -106,7 +106,7 @@ fn flat() {
     .into_iter()
     .collect::<Map<String, Value>>();
 
-    let result = map_sql("Horse", vec![row], None, &ast).unwrap();
+    let result = map_sql("Horse", vec![row], None, &idl).unwrap();
     let horse = result.first().unwrap().as_object().unwrap();
     assert_eq!(horse.get("id"), Some(&json!("1")));
     assert_eq!(horse.get("name"), Some(&json!("Lightning")));
@@ -114,8 +114,8 @@ fn flat() {
 
 #[sqlx::test]
 async fn one_to_one(db: SqlitePool) {
-    let ast = || {
-        src_to_ast(
+    let idl = || {
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -163,14 +163,14 @@ async fn one_to_one(db: SqlitePool) {
 
     let upsert_res = UpsertModel::query(
         "Horse",
-        &ast(),
+        &idl(),
         new_model.as_object().unwrap().clone(),
         include(include_tree_json.clone()),
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast(),
+        idl(),
         upsert_res
             .sql
             .into_iter()
@@ -183,7 +183,7 @@ async fn one_to_one(db: SqlitePool) {
 
     let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
-    let result = map_sql("Horse", select_rows, include(include_tree_json), &ast())
+    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl())
         .expect("map_sql to succeed");
 
     assert_eq!(result, vec![new_model]);
@@ -191,8 +191,8 @@ async fn one_to_one(db: SqlitePool) {
 
 #[sqlx::test]
 async fn one_to_many(db: SqlitePool) {
-    let ast = || {
-        src_to_ast(
+    let idl = || {
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -240,14 +240,14 @@ async fn one_to_many(db: SqlitePool) {
 
     let upsert_stmts = UpsertModel::query(
         "Horse",
-        &ast(),
+        &idl(),
         new_model.as_object().unwrap().clone(),
         include(include_tree_json.clone()),
     )
     .expect("upsert to succeed");
 
     let results = test_sql(
-        ast(),
+        idl(),
         upsert_stmts
             .sql
             .into_iter()
@@ -260,7 +260,7 @@ async fn one_to_many(db: SqlitePool) {
 
     let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
-    let result = map_sql("Horse", select_rows, include(include_tree_json), &ast())
+    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl())
         .expect("map_sql to succeed");
 
     assert_eq!(result, vec![new_model]);
@@ -269,7 +269,7 @@ async fn one_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn many_to_many(db: SqlitePool) {
     let meta = || {
-        src_to_ast(
+        src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -345,7 +345,7 @@ async fn many_to_many(db: SqlitePool) {
 
 #[test]
 fn composite_primary_key_deduplication() {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -380,7 +380,7 @@ fn composite_primary_key_deduplication() {
         .collect::<Map<String, Value>>(),
     ];
 
-    let result = map_sql("OrderItem", rows, None, &ast).unwrap();
+    let result = map_sql("OrderItem", rows, None, &idl).unwrap();
     assert_eq!(result.len(), 1);
     let item = result.first().unwrap().as_object().unwrap();
     assert_eq!(item.get("orderId"), Some(&json!(1)));

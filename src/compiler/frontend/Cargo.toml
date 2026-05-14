@@ -4,7 +4,7 @@ edition = "2024"
 
 [dependencies]
 ariadne = { workspace = true }
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 chumsky = "0.12.0"
 indexmap = { workspace = true }
 logos = "0.16.1"

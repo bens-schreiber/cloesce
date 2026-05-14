@@ -1,5 +1,5 @@
 [package]
-name = "ast"
+name = "idl"
 edition = "2024"
 
 [dependencies]

@@ -1,4 +1,4 @@
-use ast::Number;
+use idl::Number;
 use serde_json::Value;
 
 pub mod map;

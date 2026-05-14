@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use ast::{
-    CidlType, CloesceAst, Column, IncludeTree, Model, NavigationField, NavigationFieldKind,
+use idl::{
+    CidlType, CloesceIdl, Column, IncludeTree, Model, NavigationField, NavigationFieldKind,
     ValidatedField,
 };
 
@@ -52,7 +52,7 @@ pub struct UpsertResult {
 }
 
 pub struct UpsertModel<'a> {
-    ast: &'a CloesceAst<'a>,
+    idl: &'a CloesceIdl<'a>,
     context: HashMap<String, Option<Value>>,
     sql_acc: Vec<SqlStatement>,
     kv_upload_acc: Vec<KvUpload>,
@@ -70,14 +70,14 @@ impl<'a> UpsertModel<'a> {
     /// Returns a string of SQL statements, or a descriptive error string.
     pub fn query(
         model_name: &'a str,
-        ast: &'a CloesceAst<'a>,
+        idl: &'a CloesceIdl<'a>,
         new_model: Map<String, Value>,
         include_tree: Option<IncludeTreeJson>,
     ) -> Result<UpsertResult> {
         let include_tree = include_tree.unwrap_or_default();
 
         let mut generator = Self {
-            ast,
+            idl,
             context: HashMap::default(),
             sql_acc: Vec::default(),
             kv_upload_acc: Vec::default(),
@@ -91,14 +91,14 @@ impl<'a> UpsertModel<'a> {
             model_name.to_string(),
         )?;
 
-        let model = ast.models.get(model_name).expect("Model to exist");
+        let model = idl.models.get(model_name).expect("Model to exist");
         if model.has_d1() {
             // Final select to return the upserted model
             let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
                 serde_json::from_str(&include_tree_json_str).unwrap_or_default();
             let select_query =
-                SelectModel::query(model_name, None, Some(&include_tree_typed), ast)?
+                SelectModel::query(model_name, None, Some(&include_tree_typed), idl)?
                     .trim_start_matches("SELECT ")
                     .to_string();
 
@@ -106,11 +106,11 @@ impl<'a> UpsertModel<'a> {
             let mut select_root_model = select.expr(Expr::cust(&select_query));
 
             // Add WHERE clause for each primary key column
-            // e.g., WHERE "Model"."id" = (SELECT json_extract(primary_key, '$.id') FROM _cloesce_tmp WHERE path = 'Model')
+            // e.g., WHERE "Model"."id" = (SELECT json_extract(primary_key, '$.id') FROM $cloesce_tmp WHERE path = 'Model')
             for col in &model.primary_columns {
                 let pk_path = format!("{}.{}", model.name, col.field.name);
                 let pk_expr = match generator.context.get(&pk_path) {
-                    Some(Some(value)) => validate_and_transform(&col.field, value, ast)?,
+                    Some(Some(value)) => validate_and_transform(&col.field, value, idl)?,
                     _ => SqlUpsertBuilder::value_from_ctx(&pk_path),
                 };
                 select_root_model = select_root_model.and_where(
@@ -143,7 +143,7 @@ impl<'a> UpsertModel<'a> {
         include_tree: &IncludeTreeJson,
         path: String,
     ) -> Result<()> {
-        let model = match self.ast.models.get(model_name) {
+        let model = match self.idl.models.get(model_name) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel {
                 name: model_name.to_string(),
@@ -195,7 +195,7 @@ impl<'a> UpsertModel<'a> {
             return Ok(());
         }
 
-        let mut builder = SqlUpsertBuilder::new(model_name, &model.primary_columns, self.ast);
+        let mut builder = SqlUpsertBuilder::new(model_name, &model.primary_columns, self.idl);
 
         // Primary keys
         let mut pk_vals: Vec<(String, Option<Value>)> = Vec::new();
@@ -281,10 +281,10 @@ impl<'a> UpsertModel<'a> {
             let parent_id_paths: Vec<String> = parent_model_name
                 .map(|p| {
                     let parent_path = path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path);
-                    self.ast
+                    self.idl
                         .models
                         .get(p)
-                        .expect("Parent model not found in AST")
+                        .expect("Parent model not found in IDL")
                         .primary_columns
                         .iter()
                         .map(|pk_col| format!("{}.{}", parent_path, pk_col.field.name))
@@ -402,7 +402,7 @@ impl<'a> UpsertModel<'a> {
         unique_id: &str,
         model: &Model,
     ) -> Result<()> {
-        let nav_meta = self.ast.models.get(&nav.model_reference).unwrap();
+        let nav_meta = self.idl.models.get(&nav.model_reference).unwrap();
 
         // Resolve both sides of the M:M relationship
         // Each side may have multiple PK columns (composite keys)
@@ -413,7 +413,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &nav_meta.primary_columns {
             let path_key = format!("{path}.{}.{}", nav.field.name, pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             left_entries.push(value);
@@ -423,7 +423,7 @@ impl<'a> UpsertModel<'a> {
         for pk_col in &model.primary_columns {
             let path_key = format!("{path}.{}", pk_col.field.name);
             let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
                 None => SqlUpsertBuilder::value_from_ctx(&path_key),
             };
             right_entries.push(value);
@@ -514,7 +514,7 @@ impl<'a> UpsertModel<'a> {
     }
 }
 
-const VARIABLES_TABLE_NAME: &str = "_cloesce_tmp";
+const VARIABLES_TABLE_NAME: &str = "$cloesce_tmp";
 const VARIABLES_TABLE_COL_PATH: &str = "path";
 const VARIABLES_TABLE_COL_PRIMARY_KEY: &str = "primary_key";
 
@@ -569,7 +569,7 @@ struct SqlUpsertBuilder<'a> {
     cols: Vec<Alias>,
     vals: Vec<SimpleExpr>,
     pk_cols: &'a [Column<'a>],
-    ast: &'a CloesceAst<'a>,
+    idl: &'a CloesceIdl<'a>,
     has_missing_non_nullable: bool,
 }
 
@@ -577,14 +577,14 @@ impl<'a> SqlUpsertBuilder<'a> {
     fn new(
         model_name: &'a str,
         pk_cols: &'a [Column<'a>],
-        ast: &'a CloesceAst<'a>,
+        idl: &'a CloesceIdl<'a>,
     ) -> SqlUpsertBuilder<'a> {
         Self {
             model_name,
             pk_cols,
             cols: Vec::default(),
             vals: Vec::default(),
-            ast,
+            idl,
             has_missing_non_nullable: false,
         }
     }
@@ -594,7 +594,7 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Returns an error if the value does not match the meta type.
     fn push_val(&mut self, field: &ValidatedField, value: &Value) -> Result<()> {
         self.cols.push(alias(field.name.as_ref()));
-        let val = validate_and_transform(field, value, self.ast)?;
+        let val = validate_and_transform(field, value, self.idl)?;
         self.vals.push(val);
         Ok(())
     }
@@ -631,7 +631,7 @@ impl<'a> SqlUpsertBuilder<'a> {
         // Subquery to retrieve the value from the variables table based on the path.
         let base_path = &path[..path.rfind('.').unwrap_or(path.len())];
         let json_extract = format!(
-            "(SELECT json_extract({}, '$.{}') FROM {} WHERE {} = '{}')",
+            "(SELECT json_extract({}, '$.{}') FROM \"{}\" WHERE {} = '{}')",
             VARIABLES_TABLE_COL_PRIMARY_KEY,
             col_name,
             VARIABLES_TABLE_NAME,
@@ -651,7 +651,7 @@ impl<'a> SqlUpsertBuilder<'a> {
         let mut pk_exprs: Vec<(String, SimpleExpr)> = Vec::new();
         for (pk_col, (pk_name, pk_val)) in self.pk_cols.iter().zip(pk_vals.iter()) {
             let expr = match pk_val {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.ast)?,
+                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
                 None => {
                     // Value will come from context (auto-generated)
                     continue;
@@ -805,9 +805,9 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
 fn validate_and_transform(
     field: &ValidatedField,
     value: &Value,
-    ast: &CloesceAst,
+    idl: &CloesceIdl,
 ) -> Result<SimpleExpr> {
-    let res = validate_cidl_type(field, Some(value.clone()), ast, false);
+    let res = validate_cidl_type(field, Some(value.clone()), idl, false);
     let value = match res {
         Ok(Some(v)) => v,
         Ok(None) => fail!(OrmErrorKind::MissingField {

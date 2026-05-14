@@ -1,6 +1,6 @@
 use ariadne::{Color, Label, Report, ReportKind};
-use ast::CrudKind;
 use frontend::{FileTable, Span, Spd, Tag, err::DisplayError};
+use idl::CrudKind;
 
 use crate::Symbol;
 

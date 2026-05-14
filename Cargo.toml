@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "src/compiler/cli",
-  "src/compiler/ast",
+  "src/compiler/idl",
   "src/compiler/frontend",
   "src/compiler/semantic",
   "src/compiler/codegen",

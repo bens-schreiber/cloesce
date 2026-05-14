@@ -1,6 +1,6 @@
-use ast::CloesceAst;
-use ast::Model;
-use ast::NavigationFieldKind;
+use idl::CloesceIdl;
+use idl::Model;
+use idl::NavigationFieldKind;
 use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
@@ -17,9 +17,9 @@ pub fn map_sql(
     model_name: &str,
     rows: D1Result,
     include_tree: Option<IncludeTreeJson>,
-    ast: &CloesceAst<'_>,
+    idl: &CloesceIdl<'_>,
 ) -> Result<Vec<Value>> {
-    let model = match ast.models.get(model_name) {
+    let model = match idl.models.get(model_name) {
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel {
             name: model_name.to_string(),
@@ -94,7 +94,7 @@ pub fn map_sql(
         };
 
         if let Value::Object(model_json) = model_json {
-            process_navigation_properties(model_json, model, "", tree, row, ast)?;
+            process_navigation_properties(model_json, model, "", tree, row, idl)?;
         }
     }
 
@@ -107,7 +107,7 @@ fn process_navigation_properties(
     prefix: &str,
     include_tree: &IncludeTreeJson,
     row: &Map<String, Value>,
-    ast: &CloesceAst<'_>,
+    idl: &CloesceIdl<'_>,
 ) -> Result<()> {
     for nav_prop in &model.navigation_fields {
         // Skip any property not in the tree.
@@ -115,7 +115,7 @@ fn process_navigation_properties(
             continue;
         }
 
-        let nested_model = match ast.models.get(&nav_prop.model_reference) {
+        let nested_model = match idl.models.get(&nav_prop.model_reference) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel {
                 name: nav_prop.model_reference.to_string(),
@@ -197,7 +197,7 @@ fn process_navigation_properties(
                 prefix.as_str(),
                 nested_include_tree,
                 row,
-                ast,
+                idl,
             )?;
         }
 

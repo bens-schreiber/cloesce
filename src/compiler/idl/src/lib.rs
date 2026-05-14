@@ -488,7 +488,7 @@ pub struct WranglerEnv<'src> {
 }
 
 #[derive(Deserialize, Serialize, Default)]
-pub struct CloesceAst<'src> {
+pub struct CloesceIdl<'src> {
     #[serde(default)]
     pub hash: u64,
 
@@ -508,12 +508,12 @@ pub struct CloesceAst<'src> {
     pub injects: Vec<&'src str>,
 }
 
-impl CloesceAst<'_> {
+impl CloesceIdl<'_> {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 
-    /// Traverses the AST setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
+    /// Traverses the IDL setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
     pub fn set_merkle_hash(&mut self) {
         if self.hash != 0u64 {
             // If the root is hashed, it's safe to assume all children are hashed.
@@ -650,18 +650,18 @@ impl<'src> MigrationsModel<'src> {
     }
 }
 
-/// A subset of [CloesceAst] suited for D1 migrations.
+/// A subset of [CloesceIdl] suited for D1 migrations.
 ///
 /// Assumed that the tree is semantically valid.
 #[derive(Serialize, Deserialize)]
-pub struct MigrationsAst<'src> {
+pub struct MigrationsIdl<'src> {
     pub hash: u64,
 
     #[serde(borrow)]
     pub models: IndexMap<String, MigrationsModel<'src>>,
 }
 
-impl<'src> MigrationsAst<'src> {
+impl<'src> MigrationsIdl<'src> {
     pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
         serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
     }

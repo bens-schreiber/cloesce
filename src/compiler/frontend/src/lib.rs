@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
+use idl::{CidlType, CrudKind, HttpVerb};
 use indexmap::IndexMap;
 
 use crate::lexer::Token;
@@ -519,12 +519,12 @@ pub enum AstBlockKind<'src> {
 
 /// An IR for the raw parsed structure of a Cloesce project
 #[derive(Default)]
-pub struct ParseAst<'src> {
+pub struct Ast<'src> {
     pub blocks: Vec<Spd<AstBlockKind<'src>>>,
 }
 
-impl<'src> ParseAst<'src> {
-    fn merge(&mut self, mut other: ParseAst<'src>) {
+impl<'src> Ast<'src> {
+    fn merge(&mut self, mut other: Ast<'src>) {
         self.blocks.append(&mut other.blocks);
     }
 }

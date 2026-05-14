@@ -1,5 +1,5 @@
-use ast::{ApiMethod, HttpVerb, Model, Number, Validator};
-use compiler_test::src_to_ast;
+use compiler_test::src_to_idl;
+use idl::{ApiMethod, HttpVerb, Model, Number, Validator};
 
 fn find_method<'src>(model: &'src Model, name: &str) -> Option<&'src ApiMethod<'src>> {
     model
@@ -11,7 +11,7 @@ fn find_method<'src>(model: &'src Model, name: &str) -> Option<&'src ApiMethod<'
 #[test]
 fn adds_crud_methods_to_models() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -29,7 +29,7 @@ fn adds_crud_methods_to_models() {
     );
 
     // Assert
-    let order_item = ast.models.get("OrderItem").unwrap();
+    let order_item = idl.models.get("OrderItem").unwrap();
     assert!(find_method(order_item, "$get").is_some());
     assert!(find_method(order_item, "$list").is_some());
     assert!(find_method(order_item, "$save").is_some());
@@ -52,7 +52,7 @@ fn adds_crud_methods_to_models() {
 #[test]
 fn crud_key_params() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -79,7 +79,7 @@ fn crud_key_params() {
     );
 
     // Assert
-    let product = ast.models.get("Product").unwrap();
+    let product = idl.models.get("Product").unwrap();
     let get_method = find_method(product, "$get").unwrap();
 
     let category_param = get_method.parameters.iter().find(|p| p.name == "category");
@@ -98,7 +98,7 @@ fn crud_key_params() {
 #[test]
 fn crud_methods_namespace_sources_inherit_validators() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -137,7 +137,7 @@ fn crud_methods_namespace_sources_inherit_validators() {
     );
 
     // Assert
-    let product = ast.models.get("Product").unwrap();
+    let product = idl.models.get("Product").unwrap();
 
     // $get
     {

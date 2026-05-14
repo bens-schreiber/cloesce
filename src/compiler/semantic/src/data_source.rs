@@ -3,11 +3,11 @@ use std::{
     ops::Not,
 };
 
-use ast::{
-    CidlType, CloesceAst, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
+use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol, Tag};
+use idl::{
+    CidlType, CloesceIdl, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
     DataSourceListMethod, IncludeTree, Model, NavigationFieldKind, ValidatedField, Validator,
 };
-use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol, Tag};
 use indexmap::IndexMap;
 use orm::select::SelectModel;
 
@@ -257,9 +257,9 @@ impl<'src> DataSourceExpansion {
     fn default_data_source(
         model: &Model<'src>,
         tree: IncludeTree<'src>,
-        ast: &CloesceAst,
+        idl: &CloesceIdl,
     ) -> DataSource<'src> {
-        let Ok(include_sql) = SelectModel::query(model.name, None, Some(&tree), ast) else {
+        let Ok(include_sql) = SelectModel::query(model.name, None, Some(&tree), idl) else {
             // Model doesn't have any D1 fields, no SQL needed.
             return DataSource {
                 name: "Default",
@@ -332,7 +332,7 @@ impl<'src> DataSourceExpansion {
             .chain(vec![ValidatedField {
                 name: "limit".into(),
                 cidl_type: CidlType::Int,
-                validators: vec![ast::Validator::GreaterThan(ast::Number::Int(0))],
+                validators: vec![idl::Validator::GreaterThan(idl::Number::Int(0))],
             }])
             .collect();
 
@@ -443,10 +443,10 @@ impl<'src> DataSourceExpansion {
     ///
     /// Each data source has a default [IncludeTree] with all KV, R2, 1:1, 1:N and M:N relationships by default.
     /// Does not include relationships after a 1:N or M:N to avoid explosion (of sql joins not the computer).
-    pub fn expand(ast: &mut CloesceAst<'src>) {
+    pub fn expand(idl: &mut CloesceIdl<'src>) {
         // For each model without a default DS, build one
         {
-            let models_to_process = ast
+            let models_to_process = idl
                 .models
                 .iter()
                 .filter(|(_, model)| model.default_data_source().is_none())
@@ -455,12 +455,12 @@ impl<'src> DataSourceExpansion {
 
             for model_name in models_to_process {
                 let data_source = {
-                    let tree = Self::include_dfs(&ast.models, model_name, &mut HashSet::new());
-                    let model = ast.models.get(&model_name).unwrap();
-                    Self::default_data_source(model, tree, ast)
+                    let tree = Self::include_dfs(&idl.models, model_name, &mut HashSet::new());
+                    let model = idl.models.get(&model_name).unwrap();
+                    Self::default_data_source(model, tree, idl)
                 };
 
-                ast.models
+                idl.models
                     .get_mut(model_name)
                     .unwrap()
                     .data_sources
@@ -469,7 +469,7 @@ impl<'src> DataSourceExpansion {
         }
 
         // Fill in any missing get/list with the default implementation
-        let pending = ast
+        let pending = idl
             .models
             .values()
             .filter(|m| m.has_d1())
@@ -479,7 +479,7 @@ impl<'src> DataSourceExpansion {
                     .iter()
                     .map(|(ds_name, ds)| {
                         let sql =
-                            SelectModel::query(model.name, None, Some(&ds.tree), ast).unwrap();
+                            SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap();
 
                         let get = ds
                             .get
@@ -497,7 +497,7 @@ impl<'src> DataSourceExpansion {
             .collect::<Vec<(&str, Vec<_>)>>();
 
         for (name, defaults) in pending {
-            let model = ast.models.get_mut(name).unwrap();
+            let model = idl.models.get_mut(name).unwrap();
             for (ds_name, get, list, include_sql) in defaults {
                 // Update the existing data source with missing get/list methods
                 let ds = model.data_sources.get_mut(ds_name).unwrap();

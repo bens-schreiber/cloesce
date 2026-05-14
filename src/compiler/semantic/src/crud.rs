@@ -1,13 +1,13 @@
-use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, Model,
+use idl::{
+    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model,
     ValidatedField,
 };
 
 pub struct CrudExpansion;
 impl CrudExpansion {
     /// Expands a [Model]'s [CrudKind]s into actual API methods on the model.
-    pub fn expand(ast: &mut CloesceAst) {
-        for model in ast.models.values_mut() {
+    pub fn expand(idl: &mut CloesceIdl) {
+        for model in idl.models.values_mut() {
             let mut crud_methods = vec![];
             for crud in &model.cruds {
                 crud_methods.extend(Self::methods(crud, model));

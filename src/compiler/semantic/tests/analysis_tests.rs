@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, MediaType, NavigationFieldKind, Number, Validator};
-use compiler_test::lex_and_parse;
+use compiler_test::lex_and_ast;
+use idl::{CidlType, MediaType, NavigationFieldKind, Number, Validator};
 use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -55,7 +55,7 @@ fn missing_wrangler_env_block() {
     let src = r#"
         model User {}
     "#;
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (_, errors) = SemanticAnalysis::analyze(&parse);
@@ -77,7 +77,7 @@ fn wrangler_duplicate_symbol() {
             }
         }
     "#;
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -110,7 +110,7 @@ fn d1_model_basic_errors() {
         }
     "#,
     );
-    let parse = lex_and_parse(&src);
+    let parse = lex_and_ast(&src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -195,7 +195,7 @@ fn d1_model_column_fk_errors() {
             }
         }
     "#;
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -311,7 +311,7 @@ fn d1_model_nav_errors() {
             }
         }
     "#;
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -364,7 +364,7 @@ fn d1_model_nav_one_to_one() {
         }
         "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -417,7 +417,7 @@ fn d1_model_nav_one_to_many() {
     );
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -465,7 +465,7 @@ fn d1_model_nav_many_to_many() {
     );
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -520,7 +520,7 @@ fn d1_model_cyclical_relationship_error() {
     );
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -573,7 +573,7 @@ fn d1_model_nullability_prevents_cycle() {
     );
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -605,7 +605,7 @@ fn kv_r2_errors() {
         }
         "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -649,7 +649,7 @@ fn kv_and_d1_coexist() {
         }
         "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -704,7 +704,7 @@ fn api_errors() {
         }
     "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (_, errors) = SemanticAnalysis::analyze(&parse);
@@ -742,7 +742,7 @@ fn api_sets_media_types() {
         }
     "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -833,7 +833,7 @@ fn data_source_errors() {
 
     "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (_, errors) = SemanticAnalysis::analyze(&parse);
@@ -898,7 +898,7 @@ fn data_source_include_tree_kv_r2() {
         }
     "#,
     );
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(&parse);
@@ -921,7 +921,7 @@ fn poo_errors() {
     "#;
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (_result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -950,7 +950,7 @@ fn service_collects_api_blocks() {
     "#;
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -979,7 +979,7 @@ fn poo_with_model_reference() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1013,7 +1013,7 @@ fn cidl_types_resolve() {
     "#;
 
     // Act
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -1061,7 +1061,7 @@ fn fk_inherits_validators() {
         }
         "#,
     );
-    let parse = lex_and_parse(&src);
+    let parse = lex_and_ast(&src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -1113,7 +1113,7 @@ fn validator_errors() {
         }
         "#,
     );
-    let parse = lex_and_parse(&src);
+    let parse = lex_and_ast(&src);
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -1157,7 +1157,7 @@ fn validator_valid() {
         }
         "#,
     );
-    let parse = lex_and_parse(&src);
+    let parse = lex_and_ast(&src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
@@ -1200,7 +1200,7 @@ fn inject_tag_populates_api_method_injected() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
@@ -1233,7 +1233,7 @@ fn inject_tag_dedupes_duplicates() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
@@ -1263,7 +1263,7 @@ fn service_block_with_multiple_symbols_resolves_each() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
@@ -1287,7 +1287,7 @@ fn service_cannot_be_injected() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (_result, errors) = SemanticAnalysis::analyze(&parse);
     assert!(
         errors
@@ -1309,7 +1309,7 @@ fn service_method_instantiated_errors() {
         }
     "#;
 
-    let parse = lex_and_parse(src);
+    let parse = lex_and_ast(src);
     let (_result, errors) = SemanticAnalysis::analyze(&parse);
 
     assert_eq!(errors.len(), 1);

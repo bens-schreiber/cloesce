@@ -1,13 +1,13 @@
-use ast::{CloesceAst, MigrationsAst, MigrationsModel};
+use idl::{CloesceIdl, MigrationsIdl, MigrationsModel};
 
 pub async fn test_sql(
-    ast: CloesceAst<'_>,
+    ast: CloesceIdl<'_>,
     stmts: Vec<(String, Vec<serde_json::Value>)>,
     db: sqlx::SqlitePool,
 ) -> std::result::Result<Vec<Vec<sqlx::sqlite::SqliteRow>>, sqlx::Error> {
     // Generate and run schema migration
     let migration_ast = {
-        let CloesceAst { models, hash, .. } = ast;
+        let CloesceIdl { models, hash, .. } = ast;
         let migrations_models = models
             .into_iter()
             .map(|(name, model)| {
@@ -25,7 +25,7 @@ pub async fn test_sql(
             })
             .collect();
 
-        MigrationsAst {
+        MigrationsIdl {
             hash,
             models: migrations_models,
         }

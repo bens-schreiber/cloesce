@@ -4,13 +4,13 @@ use crate::{
     err::{BatchResult, ErrorSink, SemanticError},
     is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
 };
-use ast::{
-    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
-    NavigationFieldKind, R2Field, ValidatedField,
-};
 use frontend::{
     ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
     R2Block, Spd, SpdSlice, SqlBlockKind, Symbol, Tag,
+};
+use idl::{
+    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
+    NavigationFieldKind, R2Field, ValidatedField,
 };
 use indexmap::IndexMap;
 use std::collections::HashSet;

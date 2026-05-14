@@ -389,7 +389,7 @@ mod compile {
         }
 
         // Semantic
-        let (ast, errors) = SemanticAnalysis::analyze(&parse.ast);
+        let (idl, errors) = SemanticAnalysis::analyze(&parse.ast);
         if !errors.is_empty() {
             for error in &errors {
                 error.display_error(&lexed.file_table);
@@ -399,12 +399,12 @@ mod compile {
 
         // Codegen
         let wrangler = {
-            WranglerDefault::set_defaults(&mut wrangler_spec, &ast, &config.parsed.migrations_path);
+            WranglerDefault::set_defaults(&mut wrangler_spec, &idl, &config.parsed.migrations_path);
             wrangler.generate(wrangler_spec, config.env.as_deref())
         };
 
-        let backend = BackendGenerator::generate(&ast, &config.parsed.workers_url);
-        let client = ClientGenerator::generate(&ast, &config.parsed.workers_url);
+        let backend = BackendGenerator::generate(&idl, &config.parsed.workers_url);
+        let client = ClientGenerator::generate(&idl, &config.parsed.workers_url);
 
         let output_name = |name: &str| {
             #[cfg(feature = "regression-tests")]
@@ -423,7 +423,7 @@ mod compile {
             let cidl_path = config.cloesce_dir().join(output_name("cidl.json"));
             let mut file = open_file_or_create(&cidl_path)?;
 
-            file.write_all(ast.to_json().as_bytes())
+            file.write_all(idl.to_json().as_bytes())
                 .map_err(|e| format!("Failed to write CIDL file {}: {}", cidl_path.display(), e))?;
             tracing::info!("Generated JSON CIDL at {}", cidl_path.display());
         };
@@ -494,8 +494,8 @@ mod compile {
 }
 
 mod migrate {
-    use ast::MigrationsAst;
     use codegen::wrangler::WranglerGenerator;
+    use idl::MigrationsIdl;
     use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
     use super::*;
@@ -656,27 +656,27 @@ mod migrate {
                 })
                 .transpose()?;
 
-            let lm_ast: Option<MigrationsAst> = lm_contents
+            let lm_ast: Option<MigrationsIdl> = lm_contents
                 .as_deref()
-                .map(MigrationsAst::from_json)
+                .map(MigrationsIdl::from_json)
                 .transpose()?;
 
             let ast_contents = std::fs::read_to_string(&cidl_path)
                 .map_err(|e| format!("Failed to read CIDL file {}: {}", cidl_path.display(), e))?;
 
             // Migrate only the models with the specified D1 binding
-            let ast = {
-                let mut ast = MigrationsAst::from_json(&ast_contents)?;
-                ast.models
+            let idl = {
+                let mut idl = MigrationsIdl::from_json(&ast_contents)?;
+                idl.models
                     .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
 
-                ast
+                idl
             };
 
-            let generated_sql = MigrationsGenerator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
+            let generated_sql = MigrationsGenerator::migrate(&idl, lm_ast.as_ref(), &MigrationsCli);
 
             migrated_cidl_file
-                .write_all(ast.to_json().as_bytes())
+                .write_all(idl.to_json().as_bytes())
                 .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
             migrated_sql_file
                 .write_all(generated_sql.as_bytes())

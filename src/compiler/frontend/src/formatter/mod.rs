@@ -2,22 +2,21 @@ mod doc;
 
 use std::cell::{Cell, RefCell};
 
-use ast::{CidlType, CrudKind, HttpVerb};
+use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind,
+    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
     ForeignBlock, ForeignBlockNav, ForeignQualifier, InjectBlock, Keyword, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree,
-    PlainOldObjectBlock, R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, fmt_cidl_type,
-    lexer::CommentMap,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParsedIncludeTree, PlainOldObjectBlock,
+    R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
 pub struct Formatter;
 
 impl Formatter {
-    pub fn format(ast: &ParseAst<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
+    pub fn format(ast: &Ast<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
         let ctx = FmtCtx::new(comment_map, src);
         let doc = ast.to_doc(&ctx);
         render(&doc).trim_start_matches('\n').to_string()
@@ -362,7 +361,7 @@ trait ToDoc<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src>;
 }
 
-impl<'src> ParseAst<'src> {
+impl<'src> Ast<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = Doc::nil();
 

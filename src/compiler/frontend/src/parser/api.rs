@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use ast::HttpVerb;
+use idl::HttpVerb;
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
