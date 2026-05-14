@@ -222,7 +222,7 @@ pub enum Tag<'src> {
         kinds: Vec<Spd<CrudKind>>,
     },
     Inject {
-        bindings: Vec<Spd<&'src str>>,
+        bindings: Vec<Symbol<'src>>,
     },
     Validator {
         name: Keyword,

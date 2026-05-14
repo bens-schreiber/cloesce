@@ -31,15 +31,24 @@ export namespace BasicService {
     export const Kind = "service" as const;
     export const Tag = "BasicService" as const;
 
-    export interface Self {
-    }
+    export interface Self {}
 
     export interface Api {
-        init?(self: BasicService.Self): ApiResult<void>;
-        downloadData(): ApiResult<CfReadableStream>;
-        instanceMethod(input: number): ApiResult<number>;
-        staticMethod(input: string): ApiResult<string>;
-        uploadData(data: CfReadableStream): ApiResult<boolean>;
+
+        downloadData(
+        ): ApiResult<CfReadableStream>;
+
+        instanceMethod(
+            input: number,
+        ): ApiResult<number>;
+
+        staticMethod(
+            input: string,
+        ): ApiResult<string>;
+
+        uploadData(
+            data: CfReadableStream,
+        ): ApiResult<boolean>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -260,7 +269,14 @@ export namespace ModelWithCompositePk {
     }
 
     export interface Api {
-        instanceMethod(self: ModelWithCompositePk.Self, e: Env, input: string): ApiResult<string>;
+
+        instanceMethod(
+            self: ModelWithCompositePk.Self,
+            input: string,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -336,9 +352,23 @@ export namespace ModelWithKv {
     }
 
     export interface Api {
-        instanceMethod(self: ModelWithKv.Self, e: Env, input: string): ApiResult<string>;
-        staticMethod(input: number): ApiResult<number>;
-        hasKvParamAndRes(self: ModelWithKv.Self, input: KValue<string>): ApiResult<KValue<string>>;
+
+        instanceMethod(
+            self: ModelWithKv.Self,
+            input: string,
+            env: {
+                db: Env["db"],
+            },
+        ): ApiResult<string>;
+
+        staticMethod(
+            input: number,
+        ): ApiResult<number>;
+
+        hasKvParamAndRes(
+            self: ModelWithKv.Self,
+            input: KValue<string>,
+        ): ApiResult<KValue<string>>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -404,7 +434,11 @@ export namespace ModelWithR2 {
     }
 
     export interface Api {
-        hasR2ParamAndRes(self: ModelWithR2.Self, input: R2ObjectBody): ApiResult<R2ObjectBody>;
+
+        hasR2ParamAndRes(
+            self: ModelWithR2.Self,
+            input: R2ObjectBody,
+        ): ApiResult<R2ObjectBody>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -536,7 +570,11 @@ export namespace ToyotaPrius {
     }
 
     export interface Api {
-        instanceMethod(self: ToyotaPrius.Self, input: string): ApiResult<string>;
+
+        instanceMethod(
+            self: ToyotaPrius.Self,
+            input: string,
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -691,7 +729,11 @@ export namespace ModelWithCustomDs {
     }
 
     export interface Api {
-        instanceMethod(self: ModelWithCustomDs.Self, input: string): ApiResult<string>;
+
+        instanceMethod(
+            self: ModelWithCustomDs.Self,
+            input: string,
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 

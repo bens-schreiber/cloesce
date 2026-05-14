@@ -259,7 +259,10 @@ fn service_block() {
     // Act
     let ast = lex_and_parse(
         r#"
-        service MyAppService
+        service {
+            MyAppService
+            AnotherService
+        }
         api MyAppService {
             post createItem(
                 name: string,
@@ -273,7 +276,7 @@ fn service_block() {
         "#,
     );
 
-    // Assert
+    // Assert: the single `service { ... }` block contains two service symbols
     let services: Vec<_> = ast
         .blocks
         .iter()
@@ -282,7 +285,9 @@ fn service_block() {
             _ => None,
         })
         .collect();
-    assert_eq!(services.len(), 2);
+    assert_eq!(services.len(), 1);
+    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
+    assert_eq!(names, vec!["MyAppService", "AnotherService"]);
 
     let api_blocks: Vec<_> = ast
         .blocks
@@ -864,4 +869,30 @@ fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
             _ => None,
         })
         .unwrap_or_else(|| panic!("{name} model to be present"))
+}
+
+#[test]
+fn service_block_supports_multiple_symbols() {
+    let ast = lex_and_parse(
+        r#"
+        service {
+            FooService
+            BarService
+            BazService
+        }
+        "#,
+    );
+
+    let services: Vec<_> = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.inner {
+            AstBlockKind::Service(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(services.len(), 1);
+    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
+    assert_eq!(names, vec!["FooService", "BarService", "BazService"]);
 }

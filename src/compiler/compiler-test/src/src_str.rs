@@ -100,7 +100,8 @@ model ModelWithCompositePk {
 }
 
 api ModelWithCompositePk {
-    post instanceMethod(self, e: env, input: string) -> string
+    [inject db]
+    post instanceMethod(self, input: string) -> string
 }
 
 model ModelWithKv {
@@ -123,7 +124,8 @@ model ModelWithKv {
 }
 
 api ModelWithKv {
-    post instanceMethod(self, e: env, input: string) -> string
+    [inject db]
+    post instanceMethod(self, input: string) -> string
     get staticMethod(input: int) -> int
     post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
 }
@@ -245,7 +247,9 @@ api ModelWithCustomDs {
     post instanceMethod([source Custom] self, input: string) -> string
 }
 
-service BasicService {}
+service {
+    BasicService
+}
 api BasicService {
     get downloadData() -> stream
     post instanceMethod(input: int) -> int

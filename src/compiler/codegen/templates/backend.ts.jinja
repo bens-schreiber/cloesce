@@ -2,6 +2,24 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, Paginated, CloesceResult } from "cloesce";
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Result, R2ObjectBody, ReadableStream } from "@cloudflare/workers-types";
 
+{%- macro api_signature(api, namespace_name) %}
+        {{ api.name }}(
+{%- if !api.is_static %}
+            self: {{ namespace_name }}.Self,
+{%- endif %}
+{%- for param in &api.parameters %}
+            {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
+{%- endfor %}
+{%- if !api.injected.is_empty() %}
+            env: {
+{%- for name in &api.injected %}
+                {{ name }}: {% if self.is_env_injected(name) %}Env["{{ name }}"]{% else %}{{ name }}{% endif %},
+{%- endfor %}
+            },
+{%- endif %}
+        ): ApiResult<{{ self.map_type(&api.return_type) }}>;
+{%- endmacro %}
+
 export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
@@ -50,7 +68,7 @@ export namespace {{ service.name }} {
 
     export interface Api {
 {%- for api in &service.apis %}
-        {{ api.name }}({% if !api.is_static %}self: {{ service.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}{{ self.injected_env_param(api, !api.is_static || !api.parameters.is_empty()) }}): ApiResult<{{ self.map_type(&api.return_type) }}>;
+{{ api_signature(api, service.name) -}}
 {%- endfor %}
     }
     export const _api = undefined as unknown as Api;
@@ -104,7 +122,7 @@ export namespace {{ model.name }} {
     export interface Api {
 {%- for api in &model.apis %}
 {%- if !self.is_generated_method(api.name) %}
-        {{ api.name }}({% if !api.is_static %}self: {{ model.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}{{ self.injected_env_param(api, !api.is_static || !api.parameters.is_empty()) }}): ApiResult<{{ self.map_type(&api.return_type) }}>;
+{{ api_signature(api, model.name) -}}
 {%- endif %}
 {%- endfor %}
     }

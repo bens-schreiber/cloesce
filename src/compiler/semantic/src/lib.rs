@@ -4,8 +4,8 @@ use ast::{
 };
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, DataSourceBlock,
-    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
-    ServiceBlock, Spd, SpdSlice, Symbol, Tag,
+    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, Spd,
+    SpdSlice, Symbol, Tag,
 };
 use indexmap::IndexMap;
 
@@ -191,11 +191,11 @@ impl<'src, 'p> SemanticAnalysis {
 
     fn services(table: &SymbolTable<'src, 'p>) -> IndexMap<&'src str, Service<'src>> {
         let mut res = IndexMap::new();
-        for service in table.services.values() {
+        for symbol in table.services.values() {
             res.insert(
-                service.symbol.name,
+                symbol.name,
                 Service {
-                    name: service.symbol.name,
+                    name: symbol.name,
                     apis: Vec::new(),
                 },
             );
@@ -251,7 +251,7 @@ struct SymbolTable<'src, 'p> {
     // Globals
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
-    services: BTreeMap<&'src str, &'p ServiceBlock<'src>>,
+    services: BTreeMap<&'src str, &'p Symbol<'src>>,
     envs: Vec<&'p EnvBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
@@ -327,8 +327,11 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                     }
                 }
                 AstBlockKind::Service(service_block) => {
-                    insert_global(sink, &service_block.symbol);
-                    st.services.insert(service_block.symbol.name, service_block);
+                    for symbol in &service_block.symbols {
+                        if insert_global(sink, symbol) {
+                            st.services.insert(symbol.name, symbol);
+                        }
+                    }
                 }
                 AstBlockKind::Api(api_block) => {
                     st.apis.push(api_block);

@@ -27,7 +27,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 table.services.get(api_block.symbol.name),
             ) {
                 (Some(model), _) => model.symbol.name,
-                (_, Some(service)) => service.symbol.name,
+                (_, Some(symbol)) => symbol.name,
                 _ => {
                     self.sink.push(SemanticError::ApiUnknownNamespaceReference {
                         api: &api_block.symbol,
@@ -103,7 +103,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             };
 
             for binding in bindings {
-                let name = binding.inner;
+                let name = binding.name;
 
                 let is_env_binding = [EnvBindingKind::D1, EnvBindingKind::Kv, EnvBindingKind::R2]
                     .iter()
@@ -122,17 +122,16 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     .flat_map(|i| i.symbols.iter())
                     .any(|s| s.name == name);
 
-                if !is_env_binding && !is_env_var && !is_inject_block_symbol {
-                    self.sink.push(SemanticError::UnknownInjectSymbol {
-                        method: &method.symbol,
-                        binding,
-                    });
+                let is_service = table.services.contains_key(name);
+
+                if !is_env_binding && !is_env_var && !is_inject_block_symbol && !is_service {
+                    self.sink
+                        .push(SemanticError::UnresolvedSymbol { symbol: binding });
                     continue;
                 }
 
                 if injected.contains(&name) {
-                    // Duplicate within the same method - silently de-dupe rather
-                    // than erroring; the explicit list is for the user's benefit.
+                    // Duplicate within the same method, silently de-dupe.
                     continue;
                 }
                 injected.push(name);
@@ -164,17 +163,13 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             _ => MediaType::Json,
         };
 
-        match resolved_type.root_type() {
-            CidlType::Stream => {
-                // Stream is only valid as bare Stream
-                ensure!(
-                    matches!(method.return_type, CidlType::Stream),
-                    self.sink,
-                    err
-                );
-            }
-
-            _ => {}
+        if matches!(resolved_type.root_type(), CidlType::Stream) {
+            // Stream is only valid as a return type if it's the root type
+            ensure!(
+                matches!(method.return_type, CidlType::Stream),
+                self.sink,
+                err.clone()
+            );
         }
 
         (CidlType::http(resolved_type), return_media)

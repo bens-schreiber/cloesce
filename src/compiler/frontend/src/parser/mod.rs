@@ -227,8 +227,7 @@ fn tags<'tokens, 'src: 'tokens>()
     let inject_tag = just(Token::LBracket)
         .then(kw!(Inject))
         .ignore_then(
-            select! { Token::Ident(name) => name }
-                .map_spanned(|name| name)
+            symbol()
                 .separated_by(just(Token::Comma))
                 .allow_trailing()
                 .collect::<Vec<_>>(),
