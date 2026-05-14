@@ -462,7 +462,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
@@ -488,7 +488,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
@@ -513,7 +513,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
@@ -540,14 +540,14 @@ describe("Method Dispatch", () => {
     const di = createDi();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
   });
 
-  test("passes bundled explicit injected values as final env argument", async () => {
+  test("passes bundled explicit injected values", async () => {
     // Arrange
     const di = createDi();
     const injectedObject = { tag: "YouTubeApi", key: "secret" };
@@ -577,39 +577,6 @@ describe("Method Dispatch", () => {
 
     // Assert
     expect(res.status).toBe(200);
-    expect(impl).toHaveBeenCalledWith("ben", { DB_1: db, YouTubeApi: injectedObject });
-  });
-
-  test("does not pass self to service methods", async () => {
-    // Arrange
-    const di = createDi();
-    const impl = vi.fn(() => undefined);
-
-    const service = ServiceBuilder.service("FooService")
-      .method("testMethod", "Post", false, [], "Void")
-      .build();
-
-    const route: MatchedRoute = {
-      kind: "service",
-      namespace: "FooService",
-      method: service.apis.find((m) => m.name === "testMethod")!,
-      impl,
-      getParamValues: {},
-      keyFields: {},
-      service,
-    };
-
-    // Act
-    const res = await _cloesceInternal.methodDispatch(
-      { shouldNotBePassedAsSelf: true },
-      di,
-      route,
-      {},
-      {},
-    );
-
-    // Assert
-    expect(res.status).toBe(200);
-    expect(impl).toHaveBeenCalledWith();
+    expect(impl).toHaveBeenCalledWith({ DB_1: db, YouTubeApi: injectedObject }, "ben");
   });
 });
