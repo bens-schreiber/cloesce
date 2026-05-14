@@ -31,7 +31,7 @@ api PureR2Model {
     [inject bucket1]
     put uploadData(self, data: stream)
 
-    [inject bucket2]
+    [inject bucket1]
     put uploadOtherData(self, data: stream)
 }
 

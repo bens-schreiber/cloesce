@@ -26,10 +26,10 @@ export namespace Dog {
     export interface Api {
 
         create(
-            dog: DeepPartial<Dog.Self>,
             env: {
                 db: Env["db"],
             },
+            dog: DeepPartial<Dog.Self>,
         ): ApiResult<Dog.Self>;
 
         getPartialSelf(

@@ -1,4 +1,4 @@
-import { FooService, BarService, InjectedThing, cloesce, Env } from "./backend.js";
+import { FooService, InjectedThing, cloesce, Env } from "./backend.js";
 import { HttpResult } from "cloesce";
 
 export class InjectedThingImpl extends InjectedThing {
@@ -6,26 +6,10 @@ export class InjectedThingImpl extends InjectedThing {
 }
 
 export const FooServiceImpl = FooService.impl({
-  staticMethod(): string {
-    return "foo's static invocation";
-  },
-
-  instantiatedMethod(): string {
-    return `foo's instantiated invocation`;
-  },
-});
-
-export const BarServiceImpl = BarService.impl({
-  async init(self: BarService.Self) {
-    if (!self.foo) throw new Error("FooService injection failed");
-  },
-
-  useFoo(self, injectedThing: InjectedThingImpl) {
-    if (!injectedThing) throw new Error("Injected thing is missing");
-    return HttpResult.ok(
-      200,
-      `foo's instantiated invocation from BarService; injected: ${injectedThing.value}`,
-    );
+  method(env) {
+    const inj = env.InjectedThing as InjectedThingImpl;
+    const injVal = inj.value;
+    return HttpResult.ok(200, `foo's invocation; injected: ${injVal}`);
   },
 });
 
@@ -34,7 +18,6 @@ export default {
     const app = await cloesce();
     app.register(new InjectedThingImpl());
     app.register(FooServiceImpl);
-    app.register(BarServiceImpl);
 
     return await app.run(request, env);
   },

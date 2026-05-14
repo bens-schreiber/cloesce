@@ -1,14 +1,14 @@
 import { PureR2Model, D1BackedModel, Env, cloesce, CfReadableStream } from "./backend.js";
 
 export const PureR2ModelImpl = PureR2Model.impl({
-  async uploadData(self, e, data: CfReadableStream) {
+  async uploadData(self, env, data: CfReadableStream) {
     const key = this.Key.data(self.id);
-    await e.bucket1.put(key, data);
+    await env.bucket1.put(key, data);
   },
 
-  async uploadOtherData(self, e, data: CfReadableStream) {
+  async uploadOtherData(self, env, data: CfReadableStream) {
     const key = this.Key.otherData(self.id);
-    await e.bucket1.put(key, data as any);
+    await env.bucket1.put(key, data as any);
   },
 });
 

@@ -26,10 +26,10 @@ export namespace A {
     export interface Api {
 
         create(
-            a: A.Self,
             env: {
                 db: Env["db"],
             },
+            a: A.Self,
         ): ApiResult<A.Self>;
 
         withoutB(
@@ -252,10 +252,10 @@ export namespace Person {
     export interface Api {
 
         create(
-            person: Person.Self,
             env: {
                 db: Env["db"],
             },
+            person: Person.Self,
         ): ApiResult<Person.Self>;
 
         withoutDogs(
@@ -348,10 +348,10 @@ export namespace Student {
     export interface Api {
 
         create(
-            student: Student.Self,
             env: {
                 db: Env["db"],
             },
+            student: Student.Self,
         ): ApiResult<Student.Self>;
 
         none(

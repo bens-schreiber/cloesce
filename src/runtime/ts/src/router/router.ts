@@ -650,12 +650,13 @@ async function methodDispatch(
   env: any,
 ): Promise<HttpResult<unknown>> {
   const paramArray: any[] = route.kind === "model" && !route.method.is_static ? [obj] : [];
-  for (const param of route.method.parameters) {
-    paramArray.push(params[param.name]);
-  }
 
   if (route.method.injected.length > 0) {
     paramArray.push(resolveInjectedArgs(di, env, route.method.injected));
+  }
+
+  for (const param of route.method.parameters) {
+    paramArray.push(params[param.name]);
   }
 
   const wrapResult = (res: any): HttpResult => {

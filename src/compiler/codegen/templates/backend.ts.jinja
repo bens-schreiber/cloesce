@@ -7,9 +7,6 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Res
 {%- if !api.is_static %}
             self: {{ namespace_name }}.Self,
 {%- endif %}
-{%- for param in &api.parameters %}
-            {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
-{%- endfor %}
 {%- if !api.injected.is_empty() %}
             env: {
 {%- for name in &api.injected %}
@@ -17,6 +14,9 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, D1Res
 {%- endfor %}
             },
 {%- endif %}
+{%- for param in &api.parameters %}
+            {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
+{%- endfor %}
         ): ApiResult<{{ self.map_type(&api.return_type) }}>;
 {%- endmacro %}
 
