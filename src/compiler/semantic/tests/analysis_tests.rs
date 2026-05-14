@@ -1281,3 +1281,24 @@ fn service_block_with_multiple_symbols_resolves_each() {
     let use_bar = foo.apis.iter().find(|a| a.name == "useBar").unwrap();
     assert_eq!(use_bar.injected, vec!["BarService"]);
 }
+
+#[test]
+fn service_method_instantiated_errors() {
+    let src = r#"
+        env { d1 { db } }
+        service { Foo }
+
+        api Foo {
+            get instanceLike(self) -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+
+    assert_eq!(errors.len(), 1);
+    let method = expect_err!(errors,
+        SemanticError::ServiceMethodInstantiated { method } => method
+    );
+    assert_eq!(method.name, "instanceLike");
+}

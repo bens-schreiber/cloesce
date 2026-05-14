@@ -62,6 +62,13 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
+        if !is_static && table.services.contains_key(namespace) {
+            // Services have no instance state
+            self.sink.push(SemanticError::ServiceMethodInstantiated {
+                method: &method.symbol,
+            });
+        }
+
         // Validate method-level tags (only `[inject ...]` is permitted here)
         let injected = self.method_injects(method, table);
 

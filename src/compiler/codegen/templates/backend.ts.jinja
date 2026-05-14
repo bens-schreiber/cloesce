@@ -64,8 +64,6 @@ export namespace {{ service.name }} {
     export const Kind = "service" as const;
     export const Tag = "{{ service.name }}" as const;
 
-    export interface Self {}
-
     export interface Api {
 {%- for api in &service.apis %}
 {{ api_signature(api, service.name) -}}

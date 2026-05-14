@@ -206,6 +206,10 @@ pub enum SemanticError<'src, 'p> {
         tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
     },
+
+    ServiceMethodInstantiated {
+        method: &'p Symbol<'src>,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -838,6 +842,21 @@ fn display(
                     Label::new((path, range))
                         .with_message(
                             "key fields must be a valid SQLite type (string, int, real, date, json, bool, or blob)"
+                        )
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ServiceMethodInstantiated { method } => {
+            let (path, range) = span_parts(&method.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "service API method '{}' cannot declare `self`",
+                    method.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "services have no instance state; only static methods are allowed",
                         )
                         .with_color(Color::Red),
                 )
