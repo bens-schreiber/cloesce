@@ -46,9 +46,11 @@ export namespace {{ service.name }} {
     export const Kind = "service" as const;
     export const Tag = "{{ service.name }}" as const;
 
+    export interface Self {}
+
     export interface Api {
 {%- for api in &service.apis %}
-        {{ api.name }}({% if !api.is_static %}self: {{ service.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): ApiResult<{{ self.map_type(&api.return_type) }}>;
+        {{ api.name }}({% if !api.is_static %}self: {{ service.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}{{ self.injected_env_param(api, !api.is_static || !api.parameters.is_empty()) }}): ApiResult<{{ self.map_type(&api.return_type) }}>;
 {%- endfor %}
     }
     export const _api = undefined as unknown as Api;
@@ -102,7 +104,7 @@ export namespace {{ model.name }} {
     export interface Api {
 {%- for api in &model.apis %}
 {%- if !self.is_generated_method(api.name) %}
-        {{ api.name }}({% if !api.is_static %}self: {{ model.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): ApiResult<{{ self.map_type(&api.return_type) }}>;
+        {{ api.name }}({% if !api.is_static %}self: {{ model.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}{{ self.injected_env_param(api, !api.is_static || !api.parameters.is_empty()) }}): ApiResult<{{ self.map_type(&api.return_type) }}>;
 {%- endif %}
 {%- endfor %}
     }

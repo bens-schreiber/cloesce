@@ -729,7 +729,7 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        ctx.top_decl_doc(&self.symbol, Keyword::Service)
+        
     }
 }
 

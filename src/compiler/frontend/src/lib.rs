@@ -476,8 +476,7 @@ impl<'src> ModelBlock<'src> {
 }
 
 pub struct ServiceBlock<'src> {
-    /// The symbol for the service name, e.g. `MyAppService` in `service MyAppService { ... }`
-    pub symbol: Symbol<'src>,
+    pub symbols: Vec<Symbol<'src>>,
 }
 
 pub struct PlainOldObjectBlock<'src> {

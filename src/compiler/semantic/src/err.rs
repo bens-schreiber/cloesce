@@ -842,6 +842,24 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
+        SemanticError::UnknownInjectSymbol { method, binding } => {
+            let (b_path, b_range) = span_parts(&binding.span, file_table);
+            let (m_path, m_range) = span_parts(&method.span, file_table);
+            report!(b_path.clone(), b_range.clone())
+                .with_message(format!("'{}' is not an injectable symbol", binding.inner))
+                .with_label(
+                    Label::new((b_path, b_range))
+                        .with_message(
+                            "must reference an `env` binding, env var, or `inject` block symbol",
+                        )
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((m_path, m_range))
+                        .with_message(format!("on method '{}'", method.name))
+                        .with_color(Color::Yellow),
+                )
+        }
         SemanticError::InstanceTagOnNonField { source, param, tag } => {
             let (s_path, s_range) = span_parts(&source.span, file_table);
             let (p_path, p_range) = span_parts(&param.span, file_table);

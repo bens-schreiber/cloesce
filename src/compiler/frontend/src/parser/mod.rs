@@ -156,14 +156,22 @@ fn inject_block<'tokens, 'src: 'tokens>()
 /// Parses a block of the form:
 ///
 /// ```cloesce
-/// service MyAppService
+/// service {
+///     ident1
+///     ident2
+/// }
 /// ```
 fn service_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // service ServiceName
+    // service {}
     kw!(Service)
-        .ignore_then(symbol())
-        .map(|symbol| AstBlockKind::Service(ServiceBlock { symbol }))
+        .ignore_then(
+            symbol()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|symbols| AstBlockKind::Service(ServiceBlock { symbols }))
 }
 
 /// Parses any number of `[ ... ]` tags, returning them as a vector of spanned [Tag]s.

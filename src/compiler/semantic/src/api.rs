@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use crate::{
-    LocalSymbolKind, SymbolTable, ensure,
+    EnvBindingKind, LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
 };
@@ -62,6 +62,9 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
+        // Validate method-level tags (only `[inject ...]` is permitted here)
+        let injected = self.method_injects(method, table);
+
         let data_source = if table.models.contains_key(namespace) && !is_static {
             Some(data_source_name.unwrap_or("Default"))
         } else {
@@ -77,7 +80,66 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             return_type,
             parameters_media,
             parameters,
+            injected,
         })
+    }
+
+    /// Validates method-level tags. Only `[inject ...]` tags are valid here.
+    /// Returns the flattened list of injected symbol names declared on this method.
+    fn method_injects(
+        &mut self,
+        method: &'p ApiBlockMethod<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> Vec<&'src str> {
+        let mut injected: Vec<&'src str> = Vec::new();
+
+        for tag in &method.symbol.tags {
+            let Tag::Inject { bindings } = &tag.inner else {
+                self.sink.push(SemanticError::TagInvalidInContext {
+                    tag,
+                    symbol: &method.symbol,
+                });
+                continue;
+            };
+
+            for binding in bindings {
+                let name = binding.inner;
+
+                let is_env_binding = [EnvBindingKind::D1, EnvBindingKind::Kv, EnvBindingKind::R2]
+                    .iter()
+                    .any(|kind| {
+                        table.local.contains_key(&LocalSymbolKind::EnvBinding {
+                            kind: kind.clone(),
+                            name,
+                        })
+                    });
+
+                let is_env_var = table.local.contains_key(&LocalSymbolKind::EnvVar(name));
+
+                let is_inject_block_symbol = table
+                    .injects
+                    .iter()
+                    .flat_map(|i| i.symbols.iter())
+                    .any(|s| s.name == name);
+
+                if !is_env_binding && !is_env_var && !is_inject_block_symbol {
+                    self.sink.push(SemanticError::UnknownInjectSymbol {
+                        method: &method.symbol,
+                        binding,
+                    });
+                    continue;
+                }
+
+                if injected.contains(&name) {
+                    // Duplicate within the same method - silently de-dupe rather
+                    // than erroring; the explicit list is for the user's benefit.
+                    continue;
+                }
+                injected.push(name);
+            }
+        }
+
+        injected
     }
 
     fn return_type(
