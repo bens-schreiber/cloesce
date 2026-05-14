@@ -17,9 +17,9 @@
 - Key fields now can take a SQLite compatible type.
 - `use` tag can no longer specify CRUD methods.
 - All built-in types now use lowercase syntax.
-- Services no longer have fields, and are not instantiable.
-- `self` on a Service API method throws a semantic error
-- Removed `env` as a type
+- Services no longer have fields, and are not instantiable. They cannot be injected.
+- `self` on a Service API method throws a semantic error.
+- Removed `env` as a type.
 
 ### Fixed
 

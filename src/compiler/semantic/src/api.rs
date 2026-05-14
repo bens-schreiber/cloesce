@@ -129,9 +129,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     .flat_map(|i| i.symbols.iter())
                     .any(|s| s.name == name);
 
-                let is_service = table.services.contains_key(name);
-
-                if !is_env_binding && !is_env_var && !is_inject_block_symbol && !is_service {
+                if !is_env_binding && !is_env_var && !is_inject_block_symbol {
                     self.sink
                         .push(SemanticError::UnresolvedSymbol { symbol: binding });
                     continue;

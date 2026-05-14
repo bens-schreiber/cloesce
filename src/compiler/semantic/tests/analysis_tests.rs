@@ -1006,10 +1006,8 @@ fn cidl_types_resolve() {
             field: string
         }
 
-        service { MyService }
-
         api User {
-            [inject my_d1, MyService]
+            [inject my_d1]
             post resolveAll(p: array<MyPoo>, u: User) -> string
         }
     "#;
@@ -1030,7 +1028,7 @@ fn cidl_types_resolve() {
             CidlType::Object { name: "User" },
         ]
     );
-    assert_eq!(api.injected, vec!["my_d1", "MyService"]);
+    assert_eq!(api.injected, vec!["my_d1"]);
 }
 
 #[test]
@@ -1191,15 +1189,13 @@ fn inject_tag_populates_api_method_injected() {
 
         inject { YouTubeApi }
 
-        service { FooService }
-
         [use db]
         model M {
             primary { id: int }
         }
 
         api M {
-            [inject db, cache, API_KEY, YouTubeApi, FooService]
+            [inject db, cache, API_KEY, YouTubeApi]
             get all(self) -> string
         }
     "#;
@@ -1216,10 +1212,7 @@ fn inject_tag_populates_api_method_injected() {
         .iter()
         .find(|a| a.name == "all")
         .unwrap();
-    assert_eq!(
-        api.injected,
-        vec!["db", "cache", "API_KEY", "YouTubeApi", "FooService"]
-    );
+    assert_eq!(api.injected, vec!["db", "cache", "API_KEY", "YouTubeApi"]);
     // Explicit params remain empty (only `self`).
     assert!(api.parameters.is_empty());
 }
@@ -1266,7 +1259,6 @@ fn service_block_with_multiple_symbols_resolves_each() {
         }
 
         api FooService {
-            [inject BarService]
             get useBar() -> string
         }
     "#;
@@ -1277,9 +1269,33 @@ fn service_block_with_multiple_symbols_resolves_each() {
 
     assert!(result.services.contains_key("FooService"));
     assert!(result.services.contains_key("BarService"));
-    let foo = result.services.get("FooService").unwrap();
-    let use_bar = foo.apis.iter().find(|a| a.name == "useBar").unwrap();
-    assert_eq!(use_bar.injected, vec!["BarService"]);
+}
+
+#[test]
+fn service_cannot_be_injected() {
+    let src = r#"
+        env { d1 { db } }
+
+        service {
+            FooService
+            BarService
+        }
+
+        api FooService {
+            [inject BarService]
+            get useBar() -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+    assert!(
+        errors
+            .iter()
+            .any(|e| matches!(e, SemanticError::UnresolvedSymbol { symbol } if symbol.name == "BarService")),
+        "expected UnresolvedSymbol error for service injection, got: {:#?}",
+        errors
+    );
 }
 
 #[test]
