@@ -54,7 +54,8 @@
             "HttpResult": "Void"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "numericValidators",
@@ -120,7 +121,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "stringValidators",
@@ -169,7 +171,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -195,7 +198,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -217,7 +221,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -252,7 +257,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -303,7 +309,6 @@
   "services": {
     "UnregisteredService": {
       "name": "UnregisteredService",
-      "fields": [],
       "apis": [
         {
           "name": "unregistered",
@@ -315,7 +320,8 @@
             "HttpResult": "String"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         }
       ]
     }

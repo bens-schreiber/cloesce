@@ -79,7 +79,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -101,7 +102,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

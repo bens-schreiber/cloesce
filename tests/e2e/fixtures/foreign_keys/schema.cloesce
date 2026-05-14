@@ -47,7 +47,8 @@ source WithoutB for A {
 }
 
 api A {
-    post create(e: env, a: A) -> A
+    [inject db]
+    post create(a: A) -> A
     get withoutB([source WithoutB] self) -> A
 }
 // #endregion
@@ -75,7 +76,8 @@ source WithoutDogs for Person {
 }
 
 api Person {
-    post create(e: env, person: Person) -> Person
+    [inject db]
+    post create(person: Person) -> Person
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
@@ -127,7 +129,8 @@ source None for Student {
 }
 
 api Student {
-    post create(e: env, student: Student) -> Student
+    [inject db]
+    post create(student: Student) -> Student
     get none([source None] self) -> Student
 }
 

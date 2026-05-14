@@ -34,15 +34,6 @@ pub enum CidlType<'src> {
     /// A Cloudflare R2 object (HEAD object response)
     R2Object,
 
-    /// Cloudflare Wrangler Environment
-    Env,
-
-    /// A dependency injected instance, containing a type name.
-    Inject {
-        #[serde(borrow)]
-        name: &'src str,
-    },
-
     /// A model, or plain old object, containing the name of the class.
     Object {
         #[serde(borrow)]
@@ -388,6 +379,9 @@ pub struct ApiMethod<'src> {
 
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
+
+    #[serde(borrow)]
+    pub injected: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -464,9 +458,6 @@ impl Model<'_> {
 pub struct Service<'src> {
     #[serde(borrow)]
     pub name: &'src str,
-
-    #[serde(borrow)]
-    pub fields: Vec<Field<'src>>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,

@@ -25,8 +25,15 @@ export namespace Foo {
     }
 
     export interface Api {
-        blockedMethod(): ApiResult<void>;
-        getInjectedThing(thing: InjectedThing): ApiResult<string>;
+
+        blockedMethod(
+        ): ApiResult<void>;
+
+        getInjectedThing(
+            env: {
+                InjectedThing: InjectedThing,
+            },
+        ): ApiResult<string>;
     }
     export const _api = undefined as unknown as Api;
 

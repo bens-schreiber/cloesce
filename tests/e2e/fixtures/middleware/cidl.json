@@ -42,7 +42,8 @@
             "HttpResult": "Void"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "getInjectedThing",
@@ -54,16 +55,9 @@
             "HttpResult": "String"
           },
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": {
-                  "name": "InjectedThing"
-                }
-              },
-              "validators": []
-            }
+          "parameters": [],
+          "injected": [
+            "InjectedThing"
           ]
         },
         {
@@ -90,7 +84,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

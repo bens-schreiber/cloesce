@@ -1,5 +1,5 @@
 {
-  "hash": 18365234846283661017,
+  "hash": 974407415389773040,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "Hamburger": {
-      "hash": 18435153889760686788,
+      "hash": 14499320733461841178,
       "name": "Hamburger",
       "d1_binding": "db",
       "primary_columns": [
@@ -43,7 +43,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 361948687780715865,
+          "hash": 5001806448139386955,
           "field": {
             "name": "toppings",
             "cidl_type": {
@@ -76,7 +76,8 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "onlyBaconToppings",
@@ -94,7 +95,8 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "$save_BurgersWithLettuceOrdered",
@@ -120,7 +122,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -146,7 +149,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list_BurgersWithLettuceOrdered",
@@ -175,7 +179,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -210,7 +215,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -359,7 +365,7 @@
       ]
     },
     "Topping": {
-      "hash": 1237273738752186119,
+      "hash": 8564943250551181191,
       "name": "Topping",
       "d1_binding": "db",
       "primary_columns": [
@@ -392,7 +398,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 8976062246114831100,
+          "hash": 13615920006540611054,
           "field": {
             "name": "hamburger",
             "cidl_type": {
@@ -433,7 +439,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

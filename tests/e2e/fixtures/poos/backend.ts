@@ -33,8 +33,15 @@ export namespace PooAcceptYield {
     }
 
     export interface Api {
-        acceptPoos(a: PooA, b: PooB, c: PooC): ApiResult<void>;
-        yieldPoo(): ApiResult<PooC>;
+
+        acceptPoos(
+            a: PooA,
+            b: PooB,
+            c: PooC,
+        ): ApiResult<void>;
+
+        yieldPoo(
+        ): ApiResult<PooC>;
     }
     export const _api = undefined as unknown as Api;
 

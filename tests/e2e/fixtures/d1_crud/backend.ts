@@ -23,7 +23,10 @@ export namespace CrudHaver {
     }
 
     export interface Api {
-        notCrud(self: CrudHaver.Self): ApiResult<void>;
+
+        notCrud(
+            self: CrudHaver.Self,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 

@@ -120,7 +120,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -146,7 +147,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -181,7 +183,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -285,7 +288,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -307,7 +311,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -396,7 +401,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -422,7 +428,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

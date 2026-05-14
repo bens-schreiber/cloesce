@@ -65,6 +65,7 @@ impl CrudExpansion {
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
+                        injected: vec![],
                     }
                 })
                 .collect(),
@@ -84,6 +85,7 @@ impl CrudExpansion {
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
+                        injected: vec![],
                     }
                 })
                 .collect(),
@@ -103,6 +105,7 @@ impl CrudExpansion {
                         },
                         validators: vec![],
                     }],
+                    injected: vec![],
                 })
                 .collect(),
         }

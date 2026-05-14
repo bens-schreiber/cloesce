@@ -19,6 +19,10 @@ impl BackendTemplate<'_> {
     fn is_generated_method(&self, name: &str) -> bool {
         name.starts_with('$')
     }
+
+    fn is_env_injected(&self, name: &str) -> bool {
+        !self.ast.injects.contains(&name)
+    }
 }
 
 pub struct BackendGenerator;

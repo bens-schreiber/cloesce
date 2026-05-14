@@ -736,7 +736,8 @@ fn api_sets_media_types() {
         }
 
         api User {
-            post streamInputOutput(self, e: env, s: stream) -> stream
+            [inject my_d1]
+            post streamInputOutput(self, s: stream) -> stream
             get jsonInputOutput(j: json) -> json
         }
     "#,
@@ -916,22 +917,15 @@ fn poo_errors() {
     let src = r#"
         poo MyPoo {
             streamField: stream
-            cyclicalField: MyPoo
         }
     "#;
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 2);
-
-    let cycle = expect_err!(errors,
-        SemanticError::CyclicalRelationship { cycle } => cycle.clone()
-    );
-    assert_eq!(cycle, vec!["MyPoo"]);
-
+    assert_eq!(errors.len(), 1);
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
@@ -942,13 +936,12 @@ fn poo_errors() {
 fn service_collects_api_blocks() {
     // Arrange
     let src = r#"
+        env { d1 { db } }
         inject { YouTubeApi }
-        service MyService {
-            tube: YouTubeApi
-            foo: string
-        }
+        service { MyService }
         api MyService {
-            post firstMethod(e: env) -> string
+            [inject db, YouTubeApi]
+            post firstMethod() -> string
         }
 
         api MyService {
@@ -1013,10 +1006,9 @@ fn cidl_types_resolve() {
             field: string
         }
 
-        service MyService {}
-
         api User {
-            post resolveAll(e: env, p: array<MyPoo>, u: User, s: MyService) -> string
+            [inject my_d1]
+            post resolveAll(p: array<MyPoo>, u: User) -> string
         }
     "#;
 
@@ -1032,12 +1024,11 @@ fn cidl_types_resolve() {
     assert_eq!(
         param_types,
         vec![
-            CidlType::Env,
             CidlType::Array(Box::new(CidlType::Object { name: "MyPoo" })),
             CidlType::Object { name: "User" },
-            CidlType::Inject { name: "MyService" },
         ]
     );
+    assert_eq!(api.injected, vec!["my_d1"]);
 }
 
 #[test]
@@ -1185,4 +1176,145 @@ fn validator_valid() {
     let poo = result.poos.get("MyPoo").unwrap();
     let score = poo.fields.iter().find(|f| f.name == "score").unwrap();
     assert_eq!(score.validators.len(), 2);
+}
+
+#[test]
+fn inject_tag_populates_api_method_injected() {
+    let src = r#"
+        env {
+            d1 { db }
+            kv { cache }
+            vars { API_KEY: string }
+        }
+
+        inject { YouTubeApi }
+
+        [use db]
+        model M {
+            primary { id: int }
+        }
+
+        api M {
+            [inject db, cache, API_KEY, YouTubeApi]
+            get all(self) -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let api = result
+        .models
+        .get("M")
+        .unwrap()
+        .apis
+        .iter()
+        .find(|a| a.name == "all")
+        .unwrap();
+    assert_eq!(api.injected, vec!["db", "cache", "API_KEY", "YouTubeApi"]);
+    // Explicit params remain empty (only `self`).
+    assert!(api.parameters.is_empty());
+}
+
+#[test]
+fn inject_tag_dedupes_duplicates() {
+    let src = r#"
+        env { d1 { db } }
+
+        [use db]
+        model M {
+            primary { id: int }
+        }
+
+        api M {
+            [inject db, db]
+            get dup(self) -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let api = result
+        .models
+        .get("M")
+        .unwrap()
+        .apis
+        .iter()
+        .find(|a| a.name == "dup")
+        .unwrap();
+    assert_eq!(api.injected, vec!["db"]);
+}
+
+#[test]
+fn service_block_with_multiple_symbols_resolves_each() {
+    let src = r#"
+        env { d1 { db } }
+
+        service {
+            FooService
+            BarService
+        }
+
+        api FooService {
+            get useBar() -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    assert!(result.services.contains_key("FooService"));
+    assert!(result.services.contains_key("BarService"));
+}
+
+#[test]
+fn service_cannot_be_injected() {
+    let src = r#"
+        env { d1 { db } }
+
+        service {
+            FooService
+            BarService
+        }
+
+        api FooService {
+            [inject BarService]
+            get useBar() -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+    assert!(
+        errors
+            .iter()
+            .any(|e| matches!(e, SemanticError::UnresolvedSymbol { symbol } if symbol.name == "BarService")),
+        "expected UnresolvedSymbol error for service injection, got: {:#?}",
+        errors
+    );
+}
+
+#[test]
+fn service_method_instantiated_errors() {
+    let src = r#"
+        env { d1 { db } }
+        service { Foo }
+
+        api Foo {
+            get instanceLike(self) -> string
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+
+    assert_eq!(errors.len(), 1);
+    let method = expect_err!(errors,
+        SemanticError::ServiceMethodInstantiated { method } => method
+    );
+    assert_eq!(method.name, "instanceLike");
 }

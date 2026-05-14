@@ -462,7 +462,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
@@ -488,7 +488,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
@@ -513,7 +513,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
@@ -540,10 +540,43 @@ describe("Method Dispatch", () => {
     const di = createDi();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
+  });
+
+  test("passes bundled explicit injected values", async () => {
+    // Arrange
+    const di = createDi();
+    const injectedObject = { tag: "YouTubeApi", key: "secret" };
+    const db = { prepare: vi.fn() };
+    di._set({ tag: "YouTubeApi" }, injectedObject);
+
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method("testMethod", "Post", [{ name: "name", cidl_type: "String", validators: [] }], "Void")
+      .build();
+
+    const impl = vi.fn(() => undefined);
+    const route: MatchedRoute = {
+      kind: "model",
+      namespace: "Foo",
+      method: {
+        ...model.apis.find((m) => m.name === "testMethod")!,
+        injected: ["DB_1", "YouTubeApi"],
+      },
+      impl,
+      getParamValues: {},
+      keyFields: {},
+    };
+
+    // Act
+    const res = await _cloesceInternal.methodDispatch({}, di, route, { name: "ben" }, { DB_1: db });
+
+    // Assert
+    expect(res.status).toBe(200);
+    expect(impl).toHaveBeenCalledWith({ DB_1: db, YouTubeApi: injectedObject }, "ben");
   });
 });

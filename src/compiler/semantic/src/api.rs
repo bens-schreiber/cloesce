@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use crate::{
-    LocalSymbolKind, SymbolTable, ensure,
+    EnvBindingKind, LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
 };
@@ -27,7 +27,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 table.services.get(api_block.symbol.name),
             ) {
                 (Some(model), _) => model.symbol.name,
-                (_, Some(service)) => service.symbol.name,
+                (_, Some(symbol)) => symbol.name,
                 _ => {
                     self.sink.push(SemanticError::ApiUnknownNamespaceReference {
                         api: &api_block.symbol,
@@ -62,6 +62,16 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
+        if !is_static && table.services.contains_key(namespace) {
+            // Services have no instance state
+            self.sink.push(SemanticError::ServiceMethodInstantiated {
+                method: &method.symbol,
+            });
+        }
+
+        // Validate method-level tags (only `[inject ...]` is permitted here)
+        let injected = self.method_injects(method, table);
+
         let data_source = if table.models.contains_key(namespace) && !is_static {
             Some(data_source_name.unwrap_or("Default"))
         } else {
@@ -77,7 +87,63 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             return_type,
             parameters_media,
             parameters,
+            injected,
         })
+    }
+
+    /// Validates method-level tags. Only `[inject ...]` tags are valid here.
+    /// Returns the flattened list of injected symbol names declared on this method.
+    fn method_injects(
+        &mut self,
+        method: &'p ApiBlockMethod<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> Vec<&'src str> {
+        let mut injected: Vec<&'src str> = Vec::new();
+
+        for tag in &method.symbol.tags {
+            let Tag::Inject { bindings } = &tag.inner else {
+                self.sink.push(SemanticError::TagInvalidInContext {
+                    tag,
+                    symbol: &method.symbol,
+                });
+                continue;
+            };
+
+            for binding in bindings {
+                let name = binding.name;
+
+                let is_env_binding = [EnvBindingKind::D1, EnvBindingKind::Kv, EnvBindingKind::R2]
+                    .iter()
+                    .any(|kind| {
+                        table.local.contains_key(&LocalSymbolKind::EnvBinding {
+                            kind: kind.clone(),
+                            name,
+                        })
+                    });
+
+                let is_env_var = table.local.contains_key(&LocalSymbolKind::EnvVar(name));
+
+                let is_inject_block_symbol = table
+                    .injects
+                    .iter()
+                    .flat_map(|i| i.symbols.iter())
+                    .any(|s| s.name == name);
+
+                if !is_env_binding && !is_env_var && !is_inject_block_symbol {
+                    self.sink
+                        .push(SemanticError::UnresolvedSymbol { symbol: binding });
+                    continue;
+                }
+
+                if injected.contains(&name) {
+                    // Duplicate within the same method, silently de-dupe.
+                    continue;
+                }
+                injected.push(name);
+            }
+        }
+
+        injected
     }
 
     fn return_type(
@@ -102,21 +168,13 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             _ => MediaType::Json,
         };
 
-        match resolved_type.root_type() {
-            CidlType::Inject { .. } | CidlType::Env => {
-                self.sink.push(err);
-            }
-
-            CidlType::Stream => {
-                // Stream is only valid as bare Stream
-                ensure!(
-                    matches!(method.return_type, CidlType::Stream),
-                    self.sink,
-                    err
-                );
-            }
-
-            _ => {}
+        if matches!(resolved_type.root_type(), CidlType::Stream) {
+            // Stream is only valid as a return type if it's the root type
+            ensure!(
+                matches!(method.return_type, CidlType::Stream),
+                self.sink,
+                err.clone()
+            );
         }
 
         (CidlType::http(resolved_type), return_media)
@@ -198,15 +256,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                 param,
             };
             match resolved_type.root_type() {
-                CidlType::Inject { .. } => {
-                    // Option, Array or any other wrapper types are not allowed to wrap Inject
-                    ensure!(
-                        *resolved_type.root_type() == resolved_type,
-                        self.sink,
-                        invalid_type_err
-                    );
-                }
-
                 CidlType::Object { .. } | CidlType::Partial { .. } => {
                     // GET requests do not support Object parameters
                     ensure!(
@@ -238,13 +287,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     let required_params = method
                         .parameters
                         .inners()
-                        .filter(|p| {
-                            let ApiBlockMethodParamKind::Param(symbol) = p else {
-                                return false;
-                            };
-
-                            !matches!(symbol.cidl_type, CidlType::Inject { .. } | CidlType::Env)
-                        })
+                        .filter(|p| matches!(p, ApiBlockMethodParamKind::Param(_)))
                         .count();
 
                     // Only one Stream parameter is allowed, and it must be the

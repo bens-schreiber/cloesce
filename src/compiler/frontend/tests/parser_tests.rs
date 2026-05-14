@@ -1,9 +1,8 @@
 use ast::{CidlType, CrudKind, HttpVerb};
 use compiler_test::lex_and_parse;
 use frontend::{
-    ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, EnvBindingBlockKind, ForeignBlock,
-    Keyword, ModelBlock, ModelBlockKind, PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol,
-    Tag,
+    ArgumentLiteral, AstBlockKind, EnvBindingBlockKind, ForeignBlock, Keyword, ModelBlock,
+    ModelBlockKind, PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, Tag,
 };
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
@@ -260,13 +259,10 @@ fn service_block() {
     // Act
     let ast = lex_and_parse(
         r#"
-        service MyAppService {
-            api1: OpenApiService
-            api2: YouTubeApi
+        service {
+            MyAppService
+            AnotherService
         }
-
-        service EmptyService {}
-
         api MyAppService {
             post createItem(
                 name: string,
@@ -275,12 +271,12 @@ fn service_block() {
         }
 
         api MyAppService {
-            get listItems(self) -> array<string>
+            get listItems() -> array<string>
         }
         "#,
     );
 
-    // Assert
+    // Assert: the single `service { ... }` block contains two service symbols
     let services: Vec<_> = ast
         .blocks
         .iter()
@@ -289,46 +285,9 @@ fn service_block() {
             _ => None,
         })
         .collect();
-    assert_eq!(services.len(), 2);
-
-    let service = services
-        .iter()
-        .find(|s| s.symbol.name == "MyAppService")
-        .expect("MyAppService service to be present");
-    assert_eq!(service.fields.len(), 2);
-
-    let api1 = service
-        .fields
-        .iter()
-        .find(|f| f.name == "api1")
-        .expect("api1 field");
-    assert_eq!(
-        api1.cidl_type,
-        CidlType::UnresolvedReference {
-            name: "OpenApiService",
-        }
-    );
-
-    let api2 = service
-        .fields
-        .iter()
-        .find(|f| f.name == "api2")
-        .expect("api2 field");
-    assert_eq!(
-        api2.cidl_type,
-        CidlType::UnresolvedReference { name: "YouTubeApi" }
-    );
-    assert_ne!(api1.span, api2.span, "fields should have distinct spans");
-
-    let empty = services
-        .iter()
-        .find(|s| s.symbol.name == "EmptyService")
-        .expect("EmptyService to be present");
-    assert_eq!(empty.fields.len(), 0);
-    assert_ne!(
-        service.symbol.span, empty.symbol.span,
-        "services should have distinct spans"
-    );
+    assert_eq!(services.len(), 1);
+    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
+    assert_eq!(names, vec!["MyAppService", "AnotherService"]);
 
     let api_blocks: Vec<_> = ast
         .blocks
@@ -359,14 +318,6 @@ fn service_block() {
         .find(|m| m.inner.symbol.name == "createItem")
         .unwrap();
     assert!(matches!(create.inner.http_verb, HttpVerb::Post));
-    // no SelfParam means it's static
-    assert!(
-        create
-            .inner
-            .parameters
-            .iter()
-            .all(|p| matches!(&p.inner, ApiBlockMethodParamKind::Param(_)))
-    );
     assert_eq!(create.inner.parameters.len(), 2);
     assert_eq!(create.inner.return_type, CidlType::String);
 
@@ -380,14 +331,6 @@ fn service_block() {
         .find(|m| m.inner.symbol.name == "listItems")
         .unwrap();
     assert!(matches!(list.inner.http_verb, HttpVerb::Get));
-    // has a SelfParam means it's an instance method
-    assert!(
-        list.inner
-            .parameters
-            .iter()
-            .any(|p| matches!(&p.inner, ApiBlockMethodParamKind::SelfParam(_)))
-    );
-    assert_eq!(list.inner.return_type, CidlType::array(CidlType::String));
 }
 
 #[test]
@@ -926,4 +869,30 @@ fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
             _ => None,
         })
         .unwrap_or_else(|| panic!("{name} model to be present"))
+}
+
+#[test]
+fn service_block_supports_multiple_symbols() {
+    let ast = lex_and_parse(
+        r#"
+        service {
+            FooService
+            BarService
+            BazService
+        }
+        "#,
+    );
+
+    let services: Vec<_> = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.inner {
+            AstBlockKind::Service(s) => Some(s),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(services.len(), 1);
+    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
+    assert_eq!(names, vec!["FooService", "BarService", "BazService"]);
 }

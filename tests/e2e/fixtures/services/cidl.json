@@ -5,10 +5,9 @@
   "services": {
     "FooService": {
       "name": "FooService",
-      "fields": [],
       "apis": [
         {
-          "name": "staticMethod",
+          "name": "method",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -17,75 +16,9 @@
             "HttpResult": "String"
           },
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": {
-                  "name": "InjectedThing"
-                }
-              },
-              "validators": []
-            }
-          ]
-        },
-        {
-          "name": "instantiatedMethod",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": "String"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": {
-                  "name": "InjectedThing"
-                }
-              },
-              "validators": []
-            }
-          ]
-        }
-      ]
-    },
-    "BarService": {
-      "name": "BarService",
-      "fields": [
-        {
-          "name": "foo",
-          "cidl_type": {
-            "Inject": {
-              "name": "FooService"
-            }
-          }
-        }
-      ],
-      "apis": [
-        {
-          "name": "useFoo",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": "String"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "injectedThing",
-              "cidl_type": {
-                "Inject": {
-                  "name": "InjectedThing"
-                }
-              },
-              "validators": []
-            }
+          "parameters": [],
+          "injected": [
+            "InjectedThing"
           ]
         }
       ]

@@ -34,12 +34,12 @@ model D1BackedModel {
         keyParam: string
     }
     
-    someColumn: real
-    someOtherColumn: string
-    
     kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
         kvData: json
     }
+
+    someColumn: real
+    someOtherColumn: string
 }
 
 [crud get]

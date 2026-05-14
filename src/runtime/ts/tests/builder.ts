@@ -57,6 +57,7 @@ abstract class ApiMethodBuilder {
     return_media: MediaType = "Json",
     parameters_media: MediaType = "Json",
     data_source: string | null = null,
+    injected: string[] = [],
   ): this {
     this.apis.push({
       name,
@@ -67,6 +68,7 @@ abstract class ApiMethodBuilder {
       return_media,
       parameters_media,
       data_source,
+      injected,
     });
     return this;
   }
@@ -219,6 +221,7 @@ export class ModelBuilder {
       return_media: "Json",
       parameters_media: "Json",
       data_source,
+      injected: [],
     });
     return this;
   }
@@ -286,7 +289,6 @@ export class ModelBuilder {
 
 export class ServiceBuilder extends ApiMethodBuilder {
   private name: string;
-  private fields: Field[] = [];
 
   constructor(name: string) {
     super();
@@ -297,15 +299,9 @@ export class ServiceBuilder extends ApiMethodBuilder {
     return new ServiceBuilder(name);
   }
 
-  field(name: string, cidl_type: CidlType): this {
-    this.fields.push({ name, cidl_type });
-    return this;
-  }
-
   build(): Service {
     return {
       name: this.name,
-      fields: this.fields,
       apis: this.apis,
     };
   }

@@ -7,15 +7,19 @@
   - number validators: `gt`, `gte`, `lt`, `lte`, `step`
 - `crud` tag for Models
 - `instance` tag for Data Source `get` method
+- `inject` tag for API methods to inject environment bindings or injected dependencies into the method.
 
 ### Changed
 
-- Renamed `double` to `real`
-- Client CRUD methods are now split per data source.
-- ORM methods return a new `CloesceResult` object.
+- Renamed `double` to `real`.
+- Client CRUD methods are split per data source.
+- ORM methods return a `CloesceResult` object.
 - Key fields now can take a SQLite compatible type.
-- The `use` tag can no longer specify CRUD methods.
-- All built-in types now use lowercase syntax (e.g. `option<T>` instead of `Option<T>`)
+- `use` tag can no longer specify CRUD methods.
+- All built-in types now use lowercase syntax.
+- Services no longer have fields, and are not instantiable. They cannot be injected.
+- `self` on a Service API method throws a semantic error.
+- Removed `env` as a type.
 
 ### Fixed
 

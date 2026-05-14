@@ -71,11 +71,6 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "e",
-              "cidl_type": "Env",
-              "validators": []
-            },
-            {
               "name": "dog",
               "cidl_type": {
                 "Partial": {
@@ -84,6 +79,9 @@
               },
               "validators": []
             }
+          ],
+          "injected": [
+            "db"
           ]
         },
         {
@@ -100,7 +98,8 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "$save",
@@ -126,7 +125,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

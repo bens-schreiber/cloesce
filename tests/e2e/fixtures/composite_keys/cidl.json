@@ -1,5 +1,5 @@
 {
-  "hash": 9563088113416759681,
+  "hash": 6288574505062725002,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "Course": {
-      "hash": 154833210238316151,
+      "hash": 3886618121582101491,
       "name": "Course",
       "d1_binding": "db",
       "primary_columns": [
@@ -43,7 +43,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 2632012030643028160,
+          "hash": 9155729414764166437,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -86,7 +86,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -121,7 +122,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -147,7 +149,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -195,7 +198,7 @@
       ]
     },
     "Student": {
-      "hash": 3307802068798637679,
+      "hash": 9911641945952268111,
       "name": "Student",
       "d1_binding": "db",
       "primary_columns": [
@@ -239,7 +242,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 754518381149749717,
+          "hash": 8011501021198080433,
           "field": {
             "name": "studentCourses",
             "cidl_type": {
@@ -288,7 +291,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -315,7 +319,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list_CoursesOrderedDescending",
@@ -349,7 +354,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -389,7 +395,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save_CoursesOrderedDescending",
@@ -415,7 +422,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -441,7 +449,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -545,7 +554,7 @@
       ]
     },
     "StudentCourse": {
-      "hash": 10966023593578992102,
+      "hash": 5636406891270849129,
       "name": "StudentCourse",
       "d1_binding": "db",
       "primary_columns": [
@@ -597,7 +606,7 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 14709591228973544548,
+          "hash": 4944287051308635284,
           "field": {
             "name": "student",
             "cidl_type": {
@@ -617,7 +626,7 @@
           }
         },
         {
-          "hash": 5350157530375410263,
+          "hash": 18379099584526236388,
           "field": {
             "name": "course",
             "cidl_type": {
@@ -668,7 +677,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get_WithStudentCourse",
@@ -700,7 +710,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -745,7 +756,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list_WithStudentCourse",
@@ -790,7 +802,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -816,7 +829,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save_WithStudentCourse",
@@ -842,7 +856,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

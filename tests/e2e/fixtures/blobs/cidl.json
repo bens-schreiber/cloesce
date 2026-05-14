@@ -65,7 +65,8 @@
             "HttpResult": "Blob"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "inputStream",
@@ -83,7 +84,8 @@
               "cidl_type": "Stream",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "yieldStream",
@@ -95,7 +97,8 @@
             "HttpResult": "Stream"
           },
           "parameters_media": "Json",
-          "parameters": []
+          "parameters": [],
+          "injected": []
         },
         {
           "name": "$save",
@@ -121,7 +124,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$get",
@@ -143,7 +147,8 @@
               "cidl_type": "Int",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -178,7 +183,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -229,7 +235,6 @@
   "services": {
     "BlobService": {
       "name": "BlobService",
-      "fields": [],
       "apis": [
         {
           "name": "incrementBlob",
@@ -247,7 +252,8 @@
               "cidl_type": "Blob",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ]
     }

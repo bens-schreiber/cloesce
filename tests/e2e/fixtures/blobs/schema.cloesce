@@ -4,7 +4,9 @@ env {
     }
 }
 
-service BlobService {}
+service {
+    BlobService
+}
 
 api BlobService {
     post incrementBlob(b: blob) -> blob

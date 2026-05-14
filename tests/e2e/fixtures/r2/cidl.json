@@ -104,15 +104,13 @@
           "parameters_media": "Octet",
           "parameters": [
             {
-              "name": "e",
-              "cidl_type": "Env",
-              "validators": []
-            },
-            {
               "name": "data",
               "cidl_type": "Stream",
               "validators": []
             }
+          ],
+          "injected": [
+            "bucket1"
           ]
         },
         {
@@ -140,7 +138,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$save",
@@ -166,7 +165,8 @@
               },
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         },
         {
           "name": "$list",
@@ -201,7 +201,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {
@@ -320,15 +321,13 @@
           "parameters_media": "Octet",
           "parameters": [
             {
-              "name": "e",
-              "cidl_type": "Env",
-              "validators": []
-            },
-            {
               "name": "data",
               "cidl_type": "Stream",
               "validators": []
             }
+          ],
+          "injected": [
+            "bucket1"
           ]
         },
         {
@@ -343,15 +342,13 @@
           "parameters_media": "Octet",
           "parameters": [
             {
-              "name": "e",
-              "cidl_type": "Env",
-              "validators": []
-            },
-            {
               "name": "data",
               "cidl_type": "Stream",
               "validators": []
             }
+          ],
+          "injected": [
+            "bucket1"
           ]
         },
         {
@@ -374,7 +371,8 @@
               "cidl_type": "String",
               "validators": []
             }
-          ]
+          ],
+          "injected": []
         }
       ],
       "data_sources": {

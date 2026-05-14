@@ -430,21 +430,19 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Use { binding } => Doc::kw(Keyword::Use)
                 .then(Doc::text(" "))
                 .then(Doc::text(binding.inner)),
-            Tag::Crud { kinds } => {
-                let mut doc = Doc::kw(Keyword::Crud).then(Doc::text(" "));
-                for (idx, kind) in kinds.iter().enumerate() {
-                    doc = doc.then(ctx.spd_doc(kind, 0, true));
-                    if idx + 1 < kinds.len() {
-                        doc = doc.then(Doc::text(", "));
-                    }
-                }
-                doc
-            }
+
             Tag::Source { name } => Doc::kw(Keyword::Source)
                 .then(Doc::text(" "))
                 .then(Doc::text(name.inner)),
             Tag::Internal => Doc::kw(Keyword::Internal),
             Tag::Instance => Doc::kw(Keyword::Instance),
+
+            Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
+                .then(Doc::text(" "))
+                .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
+            Tag::Inject { bindings: symbols } => Doc::kw(Keyword::Inject)
+                .then(Doc::text(" "))
+                .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
         };
 
         Doc::text("[").then(inner).then(Doc::text("]"))
@@ -630,21 +628,39 @@ impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
 
 impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        // Method-level tags precede the verb so they can be parsed back
+        // (e.g. `[inject db] post foo(...)`).
+        let mut tags_doc = Doc::nil();
+        for tag in &self.symbol.tags {
+            ctx.node_ends.borrow_mut().push(tag.span.end);
+            let tag_content = tag.inner.to_doc(ctx);
+            ctx.node_ends.borrow_mut().pop();
+            ctx.advance(tag.span.end);
+
+            let post_sep = if ctx.gap(tag.span.end, self.symbol.span.start) > 0 {
+                Doc::hardline(1)
+            } else {
+                Doc::text(" ")
+            };
+            tags_doc = tags_doc.then(tag_content).then(post_sep);
+        }
+
         let params = comma_separated(&self.parameters, |param| ctx.spd_doc(param, 0, true));
 
-        Doc::text(match &self.http_verb {
-            HttpVerb::Get => Keyword::Get.as_str(),
-            HttpVerb::Post => Keyword::Post.as_str(),
-            HttpVerb::Put => Keyword::Put.as_str(),
-            HttpVerb::Delete => Keyword::Delete.as_str(),
-            HttpVerb::Patch => Keyword::Patch.as_str(),
-        })
-        .then(Doc::text(" "))
-        .then(ctx.sym_doc(&self.symbol, 0, true))
-        .then(Doc::text("("))
-        .then(params)
-        .then(Doc::text(") -> "))
-        .then(Doc::owned(fmt_cidl_type(&self.return_type)))
+        tags_doc
+            .then(Doc::text(match &self.http_verb {
+                HttpVerb::Get => Keyword::Get.as_str(),
+                HttpVerb::Post => Keyword::Post.as_str(),
+                HttpVerb::Put => Keyword::Put.as_str(),
+                HttpVerb::Delete => Keyword::Delete.as_str(),
+                HttpVerb::Patch => Keyword::Patch.as_str(),
+            }))
+            .then(Doc::text(" "))
+            .then(Doc::text(self.symbol.name))
+            .then(Doc::text("("))
+            .then(params)
+            .then(Doc::text(") -> "))
+            .then(Doc::owned(fmt_cidl_type(&self.return_type)))
     }
 }
 
@@ -725,17 +741,15 @@ impl ParsedIncludeTree<'_> {
 
 impl<'src> ToDoc<'src> for ServiceBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Service);
-
-        if self.fields.is_empty() {
-            return doc.then(Doc::text(" {}"));
+        if self.symbols.is_empty() {
+            return Doc::kw(Keyword::Service).then(Doc::text(" {}"));
         }
 
         let mut inner = Doc::nil();
-        for field in &self.fields {
-            inner = inner.then(ctx.sym_doc(field, 1, false));
+        for symbol in &self.symbols {
+            inner = inner.then(ctx.sym_doc(symbol, 1, false));
         }
-        doc.then(ctx.block(inner, 1))
+        Doc::kw(Keyword::Service).then(ctx.block(inner, 1))
     }
 }
 

@@ -63,9 +63,7 @@ export class {{ service.name }} {
 {%- for api in &service.apis %}
   static async {{ api.name }}(
 {%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
     {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
-{%- endif %}
 {%- endfor %}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
@@ -75,12 +73,10 @@ export class {{ service.name }} {
 {%- endif %}
 
 {%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
 {%- if self.is_get_request(&api.http_verb) %}
     __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
 {%- else %}
     __$payload["{{ param.name }}"] = {{ param.name }};
-{%- endif %}
 {%- endif %}
 {%- endfor %}
 {{ fetch_call(api) }}
@@ -115,9 +111,7 @@ export class {{ model.name }} {
 {%- for api in &model.apis %}
   {% if api.is_static %}static {% endif %}async {{ api.name }}(
 {%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
     {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
-{%- endif %}
 {%- endfor %}
 {%- if !api.is_static %}
 {%- for p in self.ds_get(model, api) %}
@@ -150,12 +144,10 @@ export class {{ model.name }} {
 {%- endif %}
 
 {%- for param in &api.parameters %}
-{%- if self.is_serializable(&param.cidl_type) %}
 {%- if self.is_get_request(&api.http_verb) %}
     __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
 {%- else %}
     __$payload["{{ param.name }}"] = {{ param.name }};
-{%- endif %}
 {%- endif %}
 {%- endfor %}
 {{ fetch_call(api) }}
