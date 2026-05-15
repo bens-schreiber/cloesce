@@ -880,8 +880,20 @@ mod version {
             return Some(c.version.clone());
         }
 
+        // Pin TLS to native to avoid recompiling Rustls
+        let agent = ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .provider(ureq::tls::TlsProvider::NativeTls)
+                    .build(),
+            )
+            .build()
+            .new_agent();
+
         // Build the request, attaching If-None-Match when we have a cached ETag.
-        let mut req = ureq::get(GITHUB_RELEASE_API).header("User-Agent", "cloesce-cli");
+        let mut req = agent
+            .get(GITHUB_RELEASE_API)
+            .header("User-Agent", "cloesce-cli");
         if let Some(c) = &cached
             && !c.etag.is_empty()
         {
