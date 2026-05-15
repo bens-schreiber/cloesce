@@ -1,3 +1,24 @@
+//! Cloesce Semantic Analysis + Expansion phase.
+//!
+//! # Overview
+//!
+//! Semantic analysis is responsible for validating the [Ast] produced by the parser and converting it into the [CloesceIdl],
+//! a HIR that describes the full semantics of the program. This includes:
+//!
+//! - Resolving type references to produce fully resolved [CidlType]s
+//! - Tying APIs to their respective namespaces (models or services)
+//! - Validating that all symbols are uniquely defined and correctly used
+//! - Validating the Wrangler environment configuration (Cloudflares infrastructure bindings)
+//! - Various other semantic checks (see the [SemanticError] enum for details)
+//!
+//! Additionally, after semantic analysis, the IDL is expanded with synthetic APIs and data sources based on the presence of models
+//! and the configuration of existing data sources. This is done in the [CrudExpansion] and [DataSourceExpansion] structs.
+//!
+//! ## Error Sink
+//!
+//! No single error halts the entire analysis process. Instead, errors are collected in an [ErrorSink] and reported together at the end.
+//! Some errors may cause a certain structure to be escaped or treated as if it were not present, but will be reported in the final error list.
+
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, DataSourceBlock,
     EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, PlainOldObjectBlock, Spd, SpdSlice,

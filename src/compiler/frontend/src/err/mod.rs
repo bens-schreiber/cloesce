@@ -1,8 +1,7 @@
 use ariadne::{Color, Label, Report};
 use chumsky::error::RichReason;
 
-use crate::FileTable;
-use crate::lexer::{LexResult, Token};
+use crate::lexer::{FileTable, LexResult, Token};
 use crate::parser::ParserResult;
 
 impl std::fmt::Display for Token<'_> {

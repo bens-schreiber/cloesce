@@ -1,3 +1,5 @@
+//! Utilities for testing the compiler.
+
 use std::path::PathBuf;
 
 use frontend::{

@@ -1,3 +1,25 @@
+//! The Cloesce CLI, providing commands for compiling, migrating and formatting Cloesce source files.
+//!
+//! # Features
+//!
+//! The `cloesce` binary provides the following subcommands:
+//!
+//! - `compile`: Compiles `.clo` and `.cloesce` source files into a JSON CIDL file, a Wrangler config file,
+//!   and TypeScript client and backend code. By default, the output files are placed in the `.cloesce` directory,
+//!   but this can be configured in the `cloesce.jsonc` config file.
+//!
+//! - `migrate`: Generates a SQL migration file and a CIDL file containing only the migrated models based on the
+//!   differences between the current CIDL and the last migrated CIDL.
+//!
+//! - `fmt`: Formats `.clo` and `.cloesce` source files according to a consistent style.
+//!
+//! - `version`: Displays the current version of the `cloesce` binary and checks for updates.
+//!
+//! # Configuration File
+//!
+//! The `cloesce` binary looks for a `cloesce.jsonc` configuration file ([ParsedCloesceConfig]) in the current working directory by default,
+//! or `<env>.cloesce.jsonc` if the `--env` flag is provided, which specifies various settings for the compilation and migration processes.
+
 use std::{
     collections::VecDeque,
     fs::File,

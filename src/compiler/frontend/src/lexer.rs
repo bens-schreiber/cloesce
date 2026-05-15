@@ -1,11 +1,24 @@
+//! Converts source strings into a stream of tokens, emitting file and span information for each token.
+//!
+//! # Overview
+//!
+//! The main entry point is [CloesceLexer::lex], which takes in a list of [LexTarget]s and produces
+//! a [LexResult] containing the token stream for each file, along with any lexing errors and a [FileTable] for
+//! resolving file IDs to source strings and paths for error reporting.
+//!
+//! Each [Token] is either some kind of punctuation, a literal, or an identifier. The only reserved keyword in Cloesce
+//! is `self`. The `$` character is intentionally excluded from identifiers since it is used for generated content in the codegen phase.
+//!
+//! All comments are extracted and stored in a [CommentMap] such that the parser does not need to handle them.
+//!
+//! TODO: Currently, the lexer is synchronous across all files, but could be parallelized in the future.
+
 use chumsky::span::{SimpleSpan, Spanned};
 use logos::Logos;
 
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::PathBuf;
-
-use crate::{FileId, FileTable, Span};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token<'src> {
@@ -82,6 +95,7 @@ pub struct LexTarget<'src> {
     pub path: PathBuf,
 }
 
+pub type Span = SimpleSpan<usize, FileId>;
 pub type SpannedToken<'src> = Spanned<Token<'src>, Span>;
 
 pub struct CommentMap<'src> {
@@ -95,6 +109,29 @@ impl<'src> CommentMap<'src> {
         let lo = self.entries.partition_point(|(off, _)| *off < prev_end);
         let hi = self.entries.partition_point(|(off, _)| *off < node_start);
         &self.entries[lo..hi]
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
+pub struct FileId(u16);
+
+pub struct FileTable<'src> {
+    table: HashMap<FileId, (&'src str, PathBuf)>,
+}
+
+impl<'src> FileTable<'src> {
+    /// Panics if the ID is not found
+    pub fn resolve(&self, file_id: FileId) -> (&str, &PathBuf) {
+        let (src, path) = self.table.get(&file_id).expect("invalid file ID");
+        (src, path)
+    }
+
+    pub fn cache(&self) -> impl ariadne::Cache<String> + '_ {
+        ariadne::sources(
+            self.table
+                .values()
+                .map(|(src, path)| (path.display().to_string(), *src)),
+        )
     }
 }
 

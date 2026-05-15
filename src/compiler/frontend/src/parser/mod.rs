@@ -8,10 +8,10 @@ use chumsky::input::MappedInput;
 use chumsky::prelude::*;
 use idl::{CidlType, CrudKind};
 
-use crate::lexer::{LexedFile, SpannedToken, Token};
+use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, FileTable, InjectBlock, Keyword, PlainOldObjectBlock,
-    ServiceBlock, Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, ServiceBlock,
+    Span, Spd, Symbol, Tag,
 };
 
 /// Converts a [Keyword] to a `just` [Token] parser

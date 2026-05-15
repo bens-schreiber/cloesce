@@ -1,3 +1,14 @@
+//! The Cloesce Interface Definition Language (CIDL) and related structures.
+//!
+//! # CIDL
+//!
+//! The CIDL represents the full structure of a Cloesce application, including models, services,
+//! and plain old objects. It is the final output of the compiler's semantic analysis phase to
+//! be consumed by the code generation phase.
+//!
+//! Additionally, when serialized, the CIDL serves as the input for migrations, the "program text"
+//! of the runtime (both the Cloesce Router and Cloesce ORM use the CIDL to understand the structure of an app).
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashMap;

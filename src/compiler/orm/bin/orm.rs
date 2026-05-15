@@ -1,3 +1,17 @@
+//! WASM bindings for the Cloesce ORM
+//!
+//! # Overview
+//! This module provides a set of unsafe extern "C" functions that can be called in foreign environments.
+//! In order for the ORM to work properly, the [IDL] must be set by calling [set_idl_ptr] with a pointer to a JSON string representing the IDL.
+//! (TODO: Try to bake the IDL directly into the memory of the WASM module at compile time to avoid this step)
+//!
+//! Each function returns 0 on success and 1 on failure, with the result or error message stored in [RETURN_PTR] and its length in [RETURN_LEN].
+//!
+//! ## Safety
+//! All functions in this module are unsafe because they involve raw pointer manipulation and require adherence to specific
+//! data formats. Callers must ensure that all pointers passed to these functions are valid and that the data they point to is
+//! correctly formatted as UTF-8 encoded strings or JSON, as specified in each function's documentation.
+
 use idl::ValidatedField;
 use idl::{CloesceIdl, IncludeTree};
 use orm::OrmErrorKind;

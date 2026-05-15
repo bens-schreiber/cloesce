@@ -1,3 +1,18 @@
+//! Formatter for a Cloesce [Ast], preserving as much of the original formatting as possible, including comments and blank lines.
+//!
+//! # Overview
+//!
+//! The formatter works by traversing the [Ast] and emitting a [Doc] for each node. The [Doc] is an IR that represents the formatted output,
+//! which is rendered to a string after being fully constructed. All comments are left in their original position, but the formatter
+//! will adjust whitespace in an opinionated way (at most two consectutive newlines are preserved).
+//!
+//! ## Cursor
+//!
+//! The only portions of the formatter that require manual cursor management are comments, handeled entirely in the
+//! [FmtCtx] struct. The formatter consults the [CommentMap] to determine which comments to emit at each point in the traversal, and advances the cursor
+//! accordingly. Comments are categorized as leading, trailing, or inner based on their position relative to the syntax nodes,
+//! and the formatter ensures they are emitted in the correct order and with appropriate spacing.
+
 mod doc;
 
 use std::cell::{Cell, RefCell};
