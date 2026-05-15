@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS "Dog" (
 );
 
 --- Cloesce Temporary Table
-CREATE TABLE IF NOT EXISTS "_cloesce_tmp" (
+CREATE TABLE IF NOT EXISTS "$cloesce_tmp" (
   "path" text PRIMARY KEY,
   "primary_key" text NOT NULL
 );

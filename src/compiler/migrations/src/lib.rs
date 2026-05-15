@@ -1,3 +1,22 @@
+//! SQLite Migrations generator
+//!
+//! # Overview
+//!
+//! This module takes in a [MigrationsIdl], representing the current state of the world, and an optional
+//! second [MigrationsIdl] representing the last migrated (abbreviated as "lm") state. From these, it produces
+//! a sequence of SQL statements that will migrate a database from the last migrated state to the new state.
+//!
+//! The main entry point is [MigrationsGenerator::migrate], which produces a new SQL schema from the given IDL pair.
+//! If no last migrated IDL is given, it produces a SQL schema from scratch. Otherwise, it identifies the differences
+//! between the two IDLs and produces a sequence of SQL statements to alter the last migrated schema into the new schema.
+//!
+//! ## [MigrationsIntent]
+//!
+//! Some migration scenarios require user intervention, such as when a model or column is dropped in the new IDL but could
+//! potentially be a rename. Because it is impossible to determine the intent from the IDLs alone, the generator poses a
+//! [MigrationsDilemma] to a provided [MigrationsIntent], which is a potentially blocking call to allow the user to respond
+//! with their intent.
+
 mod fmt;
 
 use std::{
@@ -5,7 +24,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
 };
 
-use ast::{CidlType, Column, MigrationsAst, MigrationsModel, NavigationField, NavigationFieldKind};
+use idl::{CidlType, Column, MigrationsIdl, MigrationsModel, NavigationField, NavigationFieldKind};
 
 use indexmap::IndexMap;
 use sea_query::{
@@ -19,22 +38,22 @@ impl MigrationsGenerator {
     /// Some migration scenarios require user intervention through a [MigrationsIntent], which
     /// can be blocking.
     pub fn migrate(
-        ast: &MigrationsAst,
-        lm_ast: Option<&MigrationsAst>,
+        idl: &MigrationsIdl,
+        lm_idl: Option<&MigrationsIdl>,
         intent: &dyn MigrationsIntent,
     ) -> String {
-        if let Some(lm_ast) = lm_ast
-            && lm_ast.hash == ast.hash
+        if let Some(lm_ast) = lm_idl
+            && lm_ast.hash == idl.hash
         {
             // No work to be done
             return String::default();
         }
 
-        let tables = MigrateTables::make_migrations(ast, lm_ast, intent);
-        if lm_ast.is_none() {
+        let tables = MigrateTables::make_migrations(idl, lm_idl, intent);
+        if lm_idl.is_none() {
             let cloesce_tmp = to_sqlite(
                 Table::create()
-                    .table(alias("_cloesce_tmp"))
+                    .table(alias("$cloesce_tmp"))
                     .if_not_exists()
                     .col(
                         ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
@@ -728,15 +747,15 @@ impl MigrateTables {
         res
     }
 
-    /// Given an AST and the last migrated AST, produces a sequence of SQL queries `CREATE`-ing, `DROP`-ing
-    /// and `ALTER`-ing the last migrated AST to sync with the new.
+    /// Given an IDL and the last migrated IDL, produces a sequence of SQL queries `CREATE`-ing, `DROP`-ing
+    /// and `ALTER`-ing the last migrated IDL to sync with the new.
     fn make_migrations(
-        ast: &MigrationsAst,
-        lm_ast: Option<&MigrationsAst>,
+        idl: &MigrationsIdl,
+        lm_idl: Option<&MigrationsIdl>,
         intent: &dyn MigrationsIntent,
     ) -> String {
         let _empty = IndexMap::default();
-        let lm_models = lm_ast.map(|a| &a.models).unwrap_or(&_empty);
+        let lm_models = lm_idl.map(|a| &a.models).unwrap_or(&_empty);
 
         // Partition all models into three sets, discarding the rest.
         let (creates, create_jcts, alters, drops) = {
@@ -746,7 +765,7 @@ impl MigrateTables {
             let mut drops = vec![];
 
             // Altered and newly created models
-            for model in ast.models.values() {
+            for model in idl.models.values() {
                 match lm_models.get(&model.name) {
                     Some(lm_model) if lm_model.hash != model.hash => {
                         alters.push((model, lm_model));
@@ -758,7 +777,7 @@ impl MigrateTables {
                             };
 
                             let m2m_table_name = nav.many_to_many_table_name(&model.name);
-                            let jct_model = ast.models.get(nav.model_reference).unwrap();
+                            let jct_model = idl.models.get(nav.model_reference).unwrap();
                             create_m2ms.insert(
                                 m2m_table_name,
                                 if jct_model.name > model.name {
@@ -779,7 +798,7 @@ impl MigrateTables {
 
             // Dropped models
             for lm_model in lm_models.values() {
-                if ast.models.get(&lm_model.name).is_none() {
+                if idl.models.get(&lm_model.name).is_none() {
                     drops.push(lm_model);
                     continue;
                 }
@@ -803,10 +822,10 @@ impl MigrateTables {
 
                     // Topological order must be preserved in the alters list.
                     let model = creates.remove(solution);
-                    let model_index = ast.models.get_full(&model.name).unwrap().0;
+                    let model_index = idl.models.get_full(&model.name).unwrap().0;
                     let insert_index = alters
                         .iter()
-                        .position(|(m, _)| ast.models.get_full(&m.name).unwrap().0 > model_index)
+                        .position(|(m, _)| idl.models.get_full(&m.name).unwrap().0 > model_index)
                         .unwrap_or(alters.len());
                     alters.insert(insert_index, (model, lm_model));
                     false
@@ -822,9 +841,9 @@ impl MigrateTables {
             ("Dropped Models", &Self::drop(drops)),
             (
                 "New Models",
-                &Self::create(creates, create_jcts, &ast.models),
+                &Self::create(creates, create_jcts, &idl.models),
             ),
-            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
+            ("Altered Models", &Self::alter(alters, &idl.models, intent)),
         ] {
             if stmts.is_empty() {
                 continue;

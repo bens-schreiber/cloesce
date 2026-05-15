@@ -1,3 +1,14 @@
+//! The Cloesce Interface Definition Language (CIDL) and related structures.
+//!
+//! # CIDL
+//!
+//! The CIDL represents the full structure of a Cloesce application, including models, services,
+//! and plain old objects. It is the final output of the compiler's semantic analysis phase to
+//! be consumed by the code generation phase.
+//!
+//! Additionally, when serialized, the CIDL serves as the input for migrations, the "program text"
+//! of the runtime (both the Cloesce Router and Cloesce ORM use the CIDL to understand the structure of an app).
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -52,10 +63,6 @@ pub enum CidlType<'src> {
     #[serde(borrow)]
     Array(Box<CidlType<'src>>),
 
-    /// A REST API response, which can contain any type or nothing.
-    #[serde(borrow)]
-    HttpResult(Box<CidlType<'src>>),
-
     /// A wrapper denoting the type within can be null.
     /// If the inner value is void, represents just null.
     #[serde(borrow)]
@@ -69,7 +76,7 @@ pub enum CidlType<'src> {
     #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
 
-    /// A reference to an object or injected type that is not yet resolved by the parser
+    /// A reference to an object or injected type that is not yet resolved by semantic analysis.
     UnresolvedReference {
         #[serde(borrow)]
         name: &'src str,
@@ -80,7 +87,6 @@ impl<'src> CidlType<'src> {
     pub fn root_type(&self) -> &CidlType<'src> {
         match self {
             CidlType::Array(inner) => inner.root_type(),
-            CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
             CidlType::KvObject(inner) => inner.root_type(),
             CidlType::Paginated(inner) => inner.root_type(),
@@ -98,10 +104,6 @@ impl<'src> CidlType<'src> {
 
     pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
-    }
-
-    pub fn http(cidl_type: CidlType<'src>) -> CidlType<'src> {
-        CidlType::HttpResult(Box::new(cidl_type))
     }
 
     pub fn paginated(cidl_type: CidlType<'src>) -> CidlType<'src> {
@@ -487,8 +489,11 @@ pub struct WranglerEnv<'src> {
     pub vars: Vec<Field<'src>>,
 }
 
+/// Represents the Cloesce Interface Definition Language (CIDL), describing a full stack app.
+///
+/// Can be seen as the highest level IR of the compiler, as it is the last stage before code generation.
 #[derive(Deserialize, Serialize, Default)]
-pub struct CloesceAst<'src> {
+pub struct CloesceIdl<'src> {
     #[serde(default)]
     pub hash: u64,
 
@@ -508,12 +513,12 @@ pub struct CloesceAst<'src> {
     pub injects: Vec<&'src str>,
 }
 
-impl CloesceAst<'_> {
+impl CloesceIdl<'_> {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 
-    /// Traverses the AST setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
+    /// Traverses the IDL setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
     pub fn set_merkle_hash(&mut self) {
         if self.hash != 0u64 {
             // If the root is hashed, it's safe to assume all children are hashed.
@@ -650,18 +655,16 @@ impl<'src> MigrationsModel<'src> {
     }
 }
 
-/// A subset of [CloesceAst] suited for D1 migrations.
-///
-/// Assumed that the tree is semantically valid.
+/// A subset of [CloesceIdl] suited for D1 migrations.
 #[derive(Serialize, Deserialize)]
-pub struct MigrationsAst<'src> {
+pub struct MigrationsIdl<'src> {
     pub hash: u64,
 
     #[serde(borrow)]
     pub models: IndexMap<String, MigrationsModel<'src>>,
 }
 
-impl<'src> MigrationsAst<'src> {
+impl<'src> MigrationsIdl<'src> {
     pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
         serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
     }

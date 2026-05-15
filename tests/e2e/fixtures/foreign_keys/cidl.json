@@ -1,5 +1,5 @@
 {
-  "hash": 12981868208410648467,
+  "hash": 16379568330859829046,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -10,7 +10,7 @@
   },
   "models": {
     "A": {
-      "hash": 16957130977581493025,
+      "hash": 13694065073971378326,
       "name": "A",
       "d1_binding": "db",
       "primary_columns": [
@@ -28,7 +28,7 @@
       ],
       "columns": [
         {
-          "hash": 13712100858799432597,
+          "hash": 8829448770000532397,
           "field": {
             "name": "bId",
             "cidl_type": {
@@ -76,10 +76,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -105,10 +103,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -122,10 +118,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -149,10 +143,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -176,10 +168,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -203,10 +193,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -226,10 +214,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -249,10 +235,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
+            "Object": {
+              "name": "A"
             }
           },
           "parameters_media": "Json",
@@ -432,9 +416,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -446,10 +428,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "B"
-              }
+            "Object": {
+              "name": "B"
             }
           },
           "parameters_media": "Json",
@@ -473,10 +453,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "B"
-              }
+            "Object": {
+              "name": "B"
             }
           },
           "parameters_media": "Json",
@@ -579,10 +557,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Course"
-              }
+            "Object": {
+              "name": "Course"
             }
           },
           "parameters_media": "Json",
@@ -694,10 +670,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -723,10 +697,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -740,10 +712,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -767,10 +737,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -794,10 +762,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -821,10 +787,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -844,10 +808,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -867,10 +829,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
+            "Object": {
+              "name": "Person"
             }
           },
           "parameters_media": "Json",
@@ -1045,10 +1005,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1074,10 +1032,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1091,10 +1047,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1118,10 +1072,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1145,10 +1097,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1172,10 +1122,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1195,10 +1143,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1218,10 +1164,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -1414,9 +1358,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -1428,10 +1370,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Dog"
-              }
+            "Object": {
+              "name": "Dog"
             }
           },
           "parameters_media": "Json",

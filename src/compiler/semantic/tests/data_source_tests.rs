@@ -1,4 +1,4 @@
-use compiler_test::src_to_ast;
+use compiler_test::src_to_idl;
 use sqlx::{Row, SqlitePool};
 
 async fn create_tables(db: &SqlitePool, ddl: &str) {
@@ -10,7 +10,7 @@ async fn create_tables(db: &SqlitePool, ddl: &str) {
 #[sqlx::test]
 async fn default_data_sources(db: SqlitePool) {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -78,7 +78,7 @@ async fn default_data_sources(db: SqlitePool) {
     );
 
     // Assert
-    let user = ast.models.get("User").unwrap();
+    let user = idl.models.get("User").unwrap();
     let default_ds = user
         .default_data_source()
         .expect("User should have default data source");
@@ -163,7 +163,7 @@ async fn default_data_sources(db: SqlitePool) {
 #[test]
 fn default_data_source_methods() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -193,7 +193,7 @@ fn default_data_source_methods() {
     );
 
     // Assert
-    let item = ast.models.get("Item").unwrap();
+    let item = idl.models.get("Item").unwrap();
     let with_kv = item
         .data_sources
         .get("WithKv")
@@ -215,7 +215,7 @@ fn default_data_source_methods() {
 #[sqlx::test]
 async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -261,7 +261,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
     );
 
     // Assert
-    let teacher = ast.models.get("Teacher").unwrap();
+    let teacher = idl.models.get("Teacher").unwrap();
     let default_ds = teacher
         .default_data_source()
         .expect("Teacher should have default data source");
@@ -319,7 +319,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
 #[sqlx::test]
 async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -362,7 +362,7 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
     );
 
     // Assert
-    let owner = ast.models.get("Owner").unwrap();
+    let owner = idl.models.get("Owner").unwrap();
     let default_ds = owner
         .default_data_source()
         .expect("Owner should have default data source");
@@ -426,7 +426,7 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
 #[sqlx::test]
 async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -472,7 +472,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
     );
 
     // Assert
-    let company = ast.models.get("Company").unwrap();
+    let company = idl.models.get("Company").unwrap();
     let default_ds = company
         .default_data_source()
         .expect("Company should have default data source");
@@ -534,7 +534,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
 #[sqlx::test]
 async fn default_data_sources_composite_pk(db: SqlitePool) {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -565,7 +565,7 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
     .await
     .unwrap();
 
-    let ds = ast
+    let ds = idl
         .models
         .get("OrderItem")
         .unwrap()
@@ -599,7 +599,7 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
 #[test]
 fn resolve_sql_params() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -635,7 +635,7 @@ fn resolve_sql_params() {
     );
 
     // Assert
-    let item = ast.models.get("Item").unwrap();
+    let item = idl.models.get("Item").unwrap();
     let by_id = item.data_sources.get("ById").unwrap();
     let get_sql = &by_id.get.as_ref().unwrap().raw_sql;
     assert!(!get_sql.contains("$itemId"), "got: {get_sql}");
@@ -670,7 +670,7 @@ fn resolve_sql_params() {
 #[sqlx::test]
 async fn include_placeholder_expands_to_select(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -691,7 +691,7 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
     "#,
     );
 
-    let ds = ast
+    let ds = idl
         .models
         .get("Post")
         .unwrap()
@@ -727,7 +727,7 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
 #[test]
 fn api_method_defaults_to_default_data_source() {
     // Act
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -757,7 +757,7 @@ fn api_method_defaults_to_default_data_source() {
     "#,
     );
 
-    let item = ast.models.get("Item").unwrap();
+    let item = idl.models.get("Item").unwrap();
 
     let fetch = item.apis.iter().find(|m| m.name == "fetch").unwrap();
     assert_eq!(

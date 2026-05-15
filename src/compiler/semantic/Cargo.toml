@@ -4,7 +4,7 @@ edition = "2024"
 
 [dependencies]
 ariadne = { workspace = true }
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 frontend = { path = "../frontend" }
 indexmap = { workspace = true }
 regex = { workspace = true }

@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 clap = { workspace = true }
 codegen = { path = "../codegen" }
 dirs = "6.0.0"

@@ -41,7 +41,7 @@
 {%- endmacro %}
 
 {#- --- PLAIN OLD OBJECTS --- #}
-{%- for (_key, poo) in &ast.poos %}
+{%- for (_key, poo) in &idl.poos %}
 export class {{ poo.name }} {
 {%- for field in &poo.fields %}
   {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
@@ -58,7 +58,7 @@ export class {{ poo.name }} {
 {%- endfor %}
 
 {#- --- SERVICES --- #}
-{%- for (_key, service) in &ast.services %}
+{%- for (_key, service) in &idl.services %}
 export class {{ service.name }} {
 {%- for api in &service.apis %}
   static async {{ api.name }}(
@@ -87,7 +87,7 @@ export class {{ service.name }} {
 {%- endfor %}
 
 {#- --- MODELS --- #}
-{%- for (_key, model) in &ast.models %}
+{%- for (_key, model) in &idl.models %}
 export class {{ model.name }} {
 {%- for col in &model.primary_columns %}
   {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};

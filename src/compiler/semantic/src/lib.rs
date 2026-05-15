@@ -1,11 +1,32 @@
-use ast::{
-    CidlType, CloesceAst, Field, Number, PlainOldObject, Service, ValidatedField, Validator,
-    WranglerEnv,
-};
+//! Cloesce Semantic Analysis + Expansion phase.
+//!
+//! # Overview
+//!
+//! Semantic analysis is responsible for validating the [Ast] produced by the parser and converting it into the [CloesceIdl],
+//! a HIR that describes the full semantics of the program. This includes:
+//!
+//! - Resolving type references to produce fully resolved [CidlType]s
+//! - Tying APIs to their respective namespaces (models or services)
+//! - Validating that all symbols are uniquely defined and correctly used
+//! - Validating the Wrangler environment configuration (Cloudflares infrastructure bindings)
+//! - Various other semantic checks (see the [SemanticError] enum for details)
+//!
+//! Additionally, after semantic analysis, the IDL is expanded with synthetic APIs and data sources based on the presence of models
+//! and the configuration of existing data sources. This is done in the [CrudExpansion] and [DataSourceExpansion] structs.
+//!
+//! ## Error Sink
+//!
+//! No single error halts the entire analysis process. Instead, errors are collected in an [ErrorSink] and reported together at the end.
+//! Some errors may cause a certain structure to be escaped or treated as if it were not present, but will be reported in the final error list.
+
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind, DataSourceBlock,
-    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock, Spd,
-    SpdSlice, Symbol, Tag,
+    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, DataSourceBlock,
+    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, PlainOldObjectBlock, Spd, SpdSlice,
+    Symbol, Tag,
+};
+use idl::{
+    CidlType, CloesceIdl, Field, Number, PlainOldObject, Service, ValidatedField, Validator,
+    WranglerEnv,
 };
 use indexmap::IndexMap;
 
@@ -27,9 +48,9 @@ mod model;
 
 pub struct SemanticAnalysis;
 impl<'src, 'p> SemanticAnalysis {
-    pub fn analyze(parse: &'p ParseAst<'src>) -> (CloesceAst<'src>, Vec<SemanticError<'src, 'p>>) {
+    pub fn analyze(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>) {
         let mut sink = ErrorSink::new();
-        let table = SymbolTable::from_parse(parse, &mut sink);
+        let table = SymbolTable::from_ast(ast, &mut sink);
 
         let wrangler_env = Self::wrangler(&table, &mut sink);
 
@@ -76,7 +97,7 @@ impl<'src, 'p> SemanticAnalysis {
             .flat_map(|i| i.symbols.iter().map(|f| f.name))
             .collect();
 
-        let mut ast = CloesceAst {
+        let mut idl = CloesceIdl {
             hash: 0,
             wrangler_env,
             models,
@@ -86,14 +107,14 @@ impl<'src, 'p> SemanticAnalysis {
         };
         let errs = sink.drain();
         if !errs.is_empty() {
-            return (ast, errs);
+            return (idl, errs);
         }
 
-        DataSourceExpansion::expand(&mut ast);
-        CrudExpansion::expand(&mut ast);
-        ast.set_merkle_hash();
+        DataSourceExpansion::expand(&mut idl);
+        CrudExpansion::expand(&mut idl);
+        idl.set_merkle_hash();
 
-        (ast, vec![])
+        (idl, vec![])
     }
 
     fn wrangler(
@@ -262,10 +283,10 @@ struct SymbolTable<'src, 'p> {
 }
 
 impl<'src, 'p> SymbolTable<'src, 'p> {
-    /// Creates a [SymbolTable] by walking the [ParseAst].
+    /// Creates a [SymbolTable] by walking the [Ast].
     ///
     /// Catches [SemanticError::DuplicateSymbol] errors.
-    fn from_parse(parse: &'p ParseAst<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
+    fn from_ast(ast: &'p Ast<'src>, sink: &mut ErrorSink<'src, 'p>) -> Self {
         let mut st = SymbolTable::default();
         let mut global_names = HashMap::new();
 
@@ -293,7 +314,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             true
         };
 
-        for block in parse.blocks.inners() {
+        for block in ast.blocks.inners() {
             match block {
                 AstBlockKind::Model(model_block) => {
                     insert_global(sink, &model_block.symbol);

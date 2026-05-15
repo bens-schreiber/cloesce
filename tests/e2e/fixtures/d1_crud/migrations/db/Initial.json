@@ -1,5 +1,5 @@
 {
-  "hash": 4754597934190067300,
+  "hash": 2584065736982692040,
   "models": {
     "CrudHaver": {
       "hash": 3221090397089686579,
@@ -34,7 +34,7 @@
       "navigation_fields": []
     },
     "Parent": {
-      "hash": 12731619948998570810,
+      "hash": 1579048073847534623,
       "name": "Parent",
       "d1_binding": "db",
       "primary_columns": [
@@ -52,7 +52,7 @@
       ],
       "columns": [
         {
-          "hash": 3617101773382579157,
+          "hash": 17181193758226121708,
           "field": {
             "name": "favoriteChildId",
             "cidl_type": {

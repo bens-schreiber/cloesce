@@ -1,13 +1,13 @@
-use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, Model,
+use idl::{
+    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model,
     ValidatedField,
 };
 
 pub struct CrudExpansion;
 impl CrudExpansion {
     /// Expands a [Model]'s [CrudKind]s into actual API methods on the model.
-    pub fn expand(ast: &mut CloesceAst) {
-        for model in ast.models.values_mut() {
+    pub fn expand(idl: &mut CloesceIdl) {
+        for model in idl.models.values_mut() {
             let mut crud_methods = vec![];
             for crud in &model.cruds {
                 crud_methods.extend(Self::methods(crud, model));
@@ -61,7 +61,7 @@ impl CrudExpansion {
                         is_static: true,
                         data_source: None,
                         http_verb: HttpVerb::Get,
-                        return_type: CidlType::http(CidlType::Object { name: model.name }),
+                        return_type: CidlType::Object { name: model.name },
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
@@ -79,9 +79,7 @@ impl CrudExpansion {
                         is_static: true,
                         data_source: None,
                         http_verb: HttpVerb::Get,
-                        return_type: CidlType::http(CidlType::array(CidlType::Object {
-                            name: model.name,
-                        })),
+                        return_type: CidlType::array(CidlType::Object { name: model.name }),
                         return_media: MediaType::Json,
                         parameters_media: MediaType::Json,
                         parameters,
@@ -95,7 +93,7 @@ impl CrudExpansion {
                     is_static: true,
                     data_source: None,
                     http_verb: HttpVerb::Post,
-                    return_type: CidlType::http(CidlType::Object { name: model.name }),
+                    return_type: CidlType::Object { name: model.name },
                     return_media: MediaType::Json,
                     parameters_media: MediaType::Json,
                     parameters: vec![ValidatedField {

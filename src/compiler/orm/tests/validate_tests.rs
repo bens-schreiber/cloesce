@@ -1,11 +1,11 @@
-use ast::{CidlType, Number, ValidatedField, Validator};
 use base64::Engine;
-use compiler_test::src_to_ast;
+use compiler_test::src_to_idl;
+use idl::{CidlType, CloesceIdl, Number, ValidatedField, Validator};
 use orm::{OrmErrorKind, validate::validate_cidl_type};
 use serde_json::{Value, json};
 
-fn empty_ast() -> ast::CloesceAst<'static> {
-    src_to_ast(
+fn empty_idl() -> CloesceIdl<'static> {
+    src_to_idl(
         r#"
         env {
             d1 { db }
@@ -22,26 +22,24 @@ fn make_field<'a>(cidl_type: CidlType<'a>, validators: Vec<Validator<'a>>) -> Va
     }
 }
 
-// Helper to validate without validators
 fn validate(
     cidl_type: CidlType,
     value: Option<Value>,
-    ast: &ast::CloesceAst,
+    idl: &CloesceIdl,
 ) -> Result<Option<Value>, OrmErrorKind> {
-    validate_cidl_type(&make_field(cidl_type, vec![]), value, ast, false)
+    validate_cidl_type(&make_field(cidl_type, vec![]), value, idl, false)
 }
 
-// Helper to validate with custom validators
 fn validate_with(
     cidl_type: CidlType,
     validators: &[Validator],
     value: Option<Value>,
-    ast: &ast::CloesceAst,
+    idl: &CloesceIdl,
 ) -> Result<Option<Value>, OrmErrorKind> {
     validate_cidl_type(
         &make_field(cidl_type, validators.to_vec()),
         value,
-        ast,
+        idl,
         false,
     )
 }
@@ -50,14 +48,14 @@ fn validate_with(
 fn undefined() {
     // Missing required field
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::String, None, &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::String, None, &idl);
         assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
     }
 
     // Allowed for partial types
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -76,7 +74,7 @@ fn undefined() {
                 object_name: "SomeModel",
             },
             None,
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
@@ -84,8 +82,8 @@ fn undefined() {
 
     // Arrays return empty array when undefined, even if not partial
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Array(Box::new(CidlType::Int)), None, &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Array(Box::new(CidlType::Int)), None, &idl);
         assert_eq!(result.unwrap(), Some(Value::Array(vec![])));
     }
 }
@@ -94,32 +92,32 @@ fn undefined() {
 fn null_value() {
     // Null required field
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::String, Some(Value::Null), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::String, Some(Value::Null), &idl);
         assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
     }
 
     // Null string for non-nullable type
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::String, Some(json!("null")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::String, Some(json!("null")), &idl);
         assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
     }
 
     // Null allowed for nullable type
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let result = validate(
             CidlType::nullable(CidlType::String),
             Some(Value::Null),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(Value::Null));
     }
 
     // Null allowed for partial type
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -138,7 +136,7 @@ fn null_value() {
                 object_name: "SomeModel",
             },
             Some(Value::Null),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(Value::Null));
     }
@@ -148,22 +146,22 @@ fn null_value() {
 fn integer() {
     // Non integer returns error
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Int, Some(json!("not_an_int")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Int, Some(json!("not_an_int")), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Floats return error
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Int, Some(json!(3.01)), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Int, Some(json!(3.01)), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Integers pass
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Int, Some(json!(42)), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Int, Some(json!(42)), &idl);
         assert_eq!(result.unwrap(), Some(json!(42)));
     }
 }
@@ -172,15 +170,15 @@ fn integer() {
 fn real() {
     // Float passes
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Real, Some(json!(3.01)), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Real, Some(json!(3.01)), &idl);
         assert_eq!(result.unwrap(), Some(json!(3.01)));
     }
 
     // Int passes
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Real, Some(json!(42)), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Real, Some(json!(42)), &idl);
         assert_eq!(result.unwrap(), Some(json!(42)));
     }
 }
@@ -189,15 +187,15 @@ fn real() {
 fn date_iso() {
     // Non ISO string returns error
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::DateIso, Some(json!("2024-01-15 10:30:00")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::DateIso, Some(json!("2024-01-15 10:30:00")), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid ISO string with timezone passes
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::DateIso, Some(json!("2024-01-15T10:30:00Z")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::DateIso, Some(json!("2024-01-15T10:30:00Z")), &idl);
         assert_eq!(result.unwrap(), Some(json!("2024-01-15T10:30:00Z")));
     }
 }
@@ -206,16 +204,16 @@ fn date_iso() {
 fn blob() {
     // Invalid b64 returns error
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::Blob, Some(json!("not valid base64!!!")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::Blob, Some(json!("not valid base64!!!")), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid B64 passes
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let encoded = base64::prelude::BASE64_STANDARD.encode(b"hello world");
-        let result = validate(CidlType::Blob, Some(json!(encoded)), &ast);
+        let result = validate(CidlType::Blob, Some(json!(encoded)), &idl);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -230,21 +228,21 @@ fn blob() {
 fn kv() {
     // Missing key
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "raw": "hello"
         });
         let result = validate(
             CidlType::KvObject(Box::new(CidlType::String)),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
     }
 
     // Non object metadata
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "key": "my-key",
             "raw": "hello",
@@ -253,14 +251,14 @@ fn kv() {
         let result = validate(
             CidlType::KvObject(Box::new(CidlType::String)),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid KV passes
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "key": "my-key",
             "raw": "hello"
@@ -268,7 +266,7 @@ fn kv() {
         let result = validate(
             CidlType::KvObject(Box::new(CidlType::String)),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -278,19 +276,19 @@ fn kv() {
 fn array() {
     // Non array returns error
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let result = validate(
             CidlType::array(CidlType::Int),
             Some(json!("not an array")),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid array passes
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::array(CidlType::Int), Some(json!([1, 2, 3])), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::array(CidlType::Int), Some(json!([1, 2, 3])), &idl);
         assert_eq!(result.unwrap(), Some(json!([1, 2, 3])));
     }
 }
@@ -299,35 +297,35 @@ fn array() {
 fn r2() {
     // Missing required fields returns error
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "key": "some-key"
         });
-        let result = validate(CidlType::R2Object, Some(value), &ast);
+        let result = validate(CidlType::R2Object, Some(value), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Non object returns error
     {
-        let ast = empty_ast();
-        let result = validate(CidlType::R2Object, Some(json!("just a string")), &ast);
+        let idl = empty_idl();
+        let result = validate(CidlType::R2Object, Some(json!("just a string")), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Invalid elements propagate error
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let result = validate(
             CidlType::array(CidlType::Int),
             Some(json!(["not", "integers"])),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid R2 passes
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "key": "uploads/photo.jpg",
             "version": "v1",
@@ -337,7 +335,7 @@ fn r2() {
             "uploaded": "2024-01-15T10:30:00Z",
             "custom_metadata": null
         });
-        let result = validate(CidlType::R2Object, Some(value), &ast);
+        let result = validate(CidlType::R2Object, Some(value), &idl);
         assert!(result.is_ok());
     }
 }
@@ -346,7 +344,7 @@ fn r2() {
 fn objects_partials() {
     // Invalid column propagates
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -366,13 +364,13 @@ fn objects_partials() {
             "id": 1,
             "name": 99
         });
-        let result = validate(CidlType::Object { name: "Horse" }, Some(value), &ast);
+        let result = validate(CidlType::Object { name: "Horse" }, Some(value), &idl);
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 
     // Valid object passes
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -413,7 +411,7 @@ fn objects_partials() {
         let result = validate(
             CidlType::Object { name: "Horse" },
             Some(value.clone()),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(value));
@@ -421,7 +419,7 @@ fn objects_partials() {
 
     // Partial type allows missing fields
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 d1 { db }
@@ -443,7 +441,7 @@ fn objects_partials() {
                 object_name: "Horse",
             },
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         let obj = result.unwrap();
@@ -452,7 +450,7 @@ fn objects_partials() {
 
     // partial KV passes
     {
-        let ast = src_to_ast(
+        let idl = src_to_idl(
             r#"
             env {
                 kv { namespace otherNamespace }
@@ -478,7 +476,7 @@ fn objects_partials() {
                 object_name: "PureKVModel",
             },
             Some(value),
-            &ast,
+            &idl,
         );
 
         assert!(result.is_ok());
@@ -504,7 +502,7 @@ fn objects_partials() {
 
 #[test]
 fn one_to_many_nav_person_dogs() {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -546,7 +544,7 @@ fn one_to_many_nav_person_dogs() {
     let result = validate(
         CidlType::Object { name: "Person" },
         Some(value.clone()),
-        &ast,
+        &idl,
     );
 
     assert!(result.is_ok());
@@ -555,7 +553,7 @@ fn one_to_many_nav_person_dogs() {
 
 #[test]
 fn json_value_type_accepts_anything() {
-    let ast = empty_ast();
+    let idl = empty_idl();
     for val in [
         json!(null),
         json!(1),
@@ -563,7 +561,7 @@ fn json_value_type_accepts_anything() {
         json!([1, 2]),
         json!({"a": 1}),
     ] {
-        let result = validate(CidlType::Json, Some(val.clone()), &ast);
+        let result = validate(CidlType::Json, Some(val.clone()), &idl);
         assert_eq!(result.unwrap(), Some(val));
     }
 }
@@ -572,7 +570,7 @@ fn json_value_type_accepts_anything() {
 fn paginated() {
     // Valid KV paginated result
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({
             "results": [
                 { "key": "item1", "raw": { "data": "value1" }, "metadata": null },
@@ -584,7 +582,7 @@ fn paginated() {
         let result = validate(
             CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::Json)))),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         let validated = result.unwrap().unwrap();
@@ -600,12 +598,12 @@ fn paginated() {
 
     // Missing cursor defaults to null
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({ "results": [], "complete": true });
         let result = validate(
             CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::Json)))),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         let validated = result.unwrap().unwrap();
@@ -614,12 +612,12 @@ fn paginated() {
 
     // Invalid cursor type fails
     {
-        let ast = empty_ast();
+        let idl = empty_idl();
         let value = json!({ "results": [], "cursor": 123, "complete": true });
         let result = validate(
             CidlType::Paginated(Box::new(CidlType::R2Object)),
             Some(value),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
@@ -627,7 +625,7 @@ fn paginated() {
 
 #[test]
 fn validator_less_than() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Int fail: 5 is not < 5
     {
@@ -635,7 +633,7 @@ fn validator_less_than() {
             CidlType::Int,
             &[Validator::LessThan(Number::Int(5))],
             Some(json!(5)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -652,7 +650,7 @@ fn validator_less_than() {
             CidlType::Int,
             &[Validator::LessThan(Number::Int(5))],
             Some(json!(4)),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!(4)));
     }
@@ -663,7 +661,7 @@ fn validator_less_than() {
             CidlType::Real,
             &[Validator::LessThan(Number::Float(3.0))],
             Some(json!(3.0)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -680,7 +678,7 @@ fn validator_less_than() {
             CidlType::Real,
             &[Validator::LessThan(Number::Float(3.0))],
             Some(json!(2.9)),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -688,7 +686,7 @@ fn validator_less_than() {
 
 #[test]
 fn validator_less_than_or_equal() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Int fail: 6 is not <= 5
     {
@@ -696,7 +694,7 @@ fn validator_less_than_or_equal() {
             CidlType::Int,
             &[Validator::LessThanOrEqual(Number::Int(5))],
             Some(json!(6)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -713,7 +711,7 @@ fn validator_less_than_or_equal() {
             CidlType::Int,
             &[Validator::LessThanOrEqual(Number::Int(5))],
             Some(json!(5)),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!(5)));
     }
@@ -724,7 +722,7 @@ fn validator_less_than_or_equal() {
             CidlType::Real,
             &[Validator::LessThanOrEqual(Number::Float(3.0))],
             Some(json!(3.1)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -738,7 +736,7 @@ fn validator_less_than_or_equal() {
             CidlType::Real,
             &[Validator::LessThanOrEqual(Number::Float(3.0))],
             Some(json!(3.0)),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -746,7 +744,7 @@ fn validator_less_than_or_equal() {
 
 #[test]
 fn validator_greater_than() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Int fail: 5 is not > 5
     {
@@ -754,7 +752,7 @@ fn validator_greater_than() {
             CidlType::Int,
             &[Validator::GreaterThan(Number::Int(5))],
             Some(json!(5)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -771,7 +769,7 @@ fn validator_greater_than() {
             CidlType::Int,
             &[Validator::GreaterThan(Number::Int(5))],
             Some(json!(6)),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!(6)));
     }
@@ -782,7 +780,7 @@ fn validator_greater_than() {
             CidlType::Real,
             &[Validator::GreaterThan(Number::Float(3.0))],
             Some(json!(2.9)),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::NotGreaterThan { .. })));
     }
@@ -793,7 +791,7 @@ fn validator_greater_than() {
             CidlType::Real,
             &[Validator::GreaterThan(Number::Float(3.0))],
             Some(json!(3.1)),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -801,7 +799,7 @@ fn validator_greater_than() {
 
 #[test]
 fn validator_greater_than_or_equal() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Int fail: 4 is not >= 5
     {
@@ -809,7 +807,7 @@ fn validator_greater_than_or_equal() {
             CidlType::Int,
             &[Validator::GreaterThanOrEqual(Number::Int(5))],
             Some(json!(4)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -826,7 +824,7 @@ fn validator_greater_than_or_equal() {
             CidlType::Int,
             &[Validator::GreaterThanOrEqual(Number::Int(5))],
             Some(json!(5)),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!(5)));
     }
@@ -837,7 +835,7 @@ fn validator_greater_than_or_equal() {
             CidlType::Real,
             &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
             Some(json!(2.9)),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -851,7 +849,7 @@ fn validator_greater_than_or_equal() {
             CidlType::Real,
             &[Validator::GreaterThanOrEqual(Number::Float(3.0))],
             Some(json!(3.0)),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -859,11 +857,11 @@ fn validator_greater_than_or_equal() {
 
 #[test]
 fn validator_step() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Fail: 7 % 5 != 0
     {
-        let result = validate_with(CidlType::Int, &[Validator::Step(5)], Some(json!(7)), &ast);
+        let result = validate_with(CidlType::Int, &[Validator::Step(5)], Some(json!(7)), &idl);
         assert!(matches!(
             result,
             Err(OrmErrorKind::NotStep {
@@ -875,14 +873,14 @@ fn validator_step() {
 
     // Pass: 15 % 5 == 0
     {
-        let result = validate_with(CidlType::Int, &[Validator::Step(5)], Some(json!(15)), &ast);
+        let result = validate_with(CidlType::Int, &[Validator::Step(5)], Some(json!(15)), &idl);
         assert_eq!(result.unwrap(), Some(json!(15)));
     }
 }
 
 #[test]
 fn validator_length() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Fail
     {
@@ -890,7 +888,7 @@ fn validator_length() {
             CidlType::String,
             &[Validator::Length(5)],
             Some(json!("hi")),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -907,7 +905,7 @@ fn validator_length() {
             CidlType::String,
             &[Validator::Length(5)],
             Some(json!("hello")),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!("hello")));
     }
@@ -915,7 +913,7 @@ fn validator_length() {
 
 #[test]
 fn validator_min_length() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Fail: < 5
     {
@@ -923,7 +921,7 @@ fn validator_min_length() {
             CidlType::String,
             &[Validator::MinLength(5)],
             Some(json!("hi")),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -940,7 +938,7 @@ fn validator_min_length() {
             CidlType::String,
             &[Validator::MinLength(5)],
             Some(json!("hello world")),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -951,7 +949,7 @@ fn validator_min_length() {
             CidlType::String,
             &[Validator::MinLength(5)],
             Some(json!("hello")),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -959,7 +957,7 @@ fn validator_min_length() {
 
 #[test]
 fn validator_max_length() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Fail: length > 5
     {
@@ -967,7 +965,7 @@ fn validator_max_length() {
             CidlType::String,
             &[Validator::MaxLength(5)],
             Some(json!("hello world")),
-            &ast,
+            &idl,
         );
         assert!(matches!(
             result,
@@ -984,7 +982,7 @@ fn validator_max_length() {
             CidlType::String,
             &[Validator::MaxLength(5)],
             Some(json!("hi")),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -995,7 +993,7 @@ fn validator_max_length() {
             CidlType::String,
             &[Validator::MaxLength(5)],
             Some(json!("hello")),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
     }
@@ -1003,7 +1001,7 @@ fn validator_max_length() {
 
 #[test]
 fn validator_regex() {
-    let ast = empty_ast();
+    let idl = empty_idl();
 
     // Fail
     {
@@ -1011,7 +1009,7 @@ fn validator_regex() {
             CidlType::String,
             &[Validator::Regex("^[a-z]+$".into())],
             Some(json!("hello123")),
-            &ast,
+            &idl,
         );
         assert!(matches!(result, Err(OrmErrorKind::UnmatchedRegex { .. })));
     }
@@ -1022,7 +1020,7 @@ fn validator_regex() {
             CidlType::String,
             &[Validator::Regex("^[a-z]+$".into())],
             Some(json!("hello")),
-            &ast,
+            &idl,
         );
         assert_eq!(result.unwrap(), Some(json!("hello")));
     }
@@ -1030,7 +1028,7 @@ fn validator_regex() {
 
 #[test]
 fn validators_in_model() {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
         env {
             d1 { db }
@@ -1079,7 +1077,7 @@ fn validators_in_model() {
         let result = validate(
             CidlType::Object { name: "Product" },
             Some(value.clone()),
-            &ast,
+            &idl,
         );
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(value));
@@ -1098,7 +1096,7 @@ fn validators_in_model() {
             },
             "kf": "key123"
         });
-        let result = validate(CidlType::Object { name: "Product" }, Some(value), &ast);
+        let result = validate(CidlType::Object { name: "Product" }, Some(value), &idl);
         assert!(matches!(
             result,
             Err(OrmErrorKind::NotGreaterThan {
@@ -1121,7 +1119,7 @@ fn validators_in_model() {
             },
             "kf": "key123"
         });
-        let result = validate(CidlType::Object { name: "Product" }, Some(value), &ast);
+        let result = validate(CidlType::Object { name: "Product" }, Some(value), &idl);
         assert!(matches!(
             result,
             Err(OrmErrorKind::NotMinLength {
@@ -1144,7 +1142,7 @@ fn validators_in_model() {
             },
             "kf": "key123"
         });
-        let result = validate(CidlType::Object { name: "Product" }, Some(value), &ast);
+        let result = validate(CidlType::Object { name: "Product" }, Some(value), &idl);
         assert!(matches!(result, Err(OrmErrorKind::UnmatchedRegex { .. })));
     }
 
@@ -1161,7 +1159,7 @@ fn validators_in_model() {
             },
             "kf": "this_key_is_way_too_long"
         });
-        let result = validate(CidlType::Object { name: "Product" }, Some(value), &ast);
+        let result = validate(CidlType::Object { name: "Product" }, Some(value), &idl);
         assert!(matches!(
             result,
             Err(OrmErrorKind::NotMaxLength {

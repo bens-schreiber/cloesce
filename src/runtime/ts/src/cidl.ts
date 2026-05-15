@@ -19,8 +19,7 @@ export type CidlType =
   | { KvObject: CidlType }
   | { Paginated: CidlType }
   | { Nullable: CidlType }
-  | { Array: CidlType }
-  | { HttpResult: CidlType };
+  | { Array: CidlType };
 
 export type HttpVerb = "Get" | "Post" | "Put" | "Patch" | "Delete";
 

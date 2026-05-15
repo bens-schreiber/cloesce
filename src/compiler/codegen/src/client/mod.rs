@@ -1,6 +1,6 @@
 use askama::Template;
-use ast::{
-    ApiMethod, CidlType, CloesceAst, DataSourceGetMethodParam, HttpVerb, MediaType, Model,
+use idl::{
+    ApiMethod, CidlType, CloesceIdl, DataSourceGetMethodParam, HttpVerb, MediaType, Model,
     NavigationField, NavigationFieldKind,
 };
 
@@ -14,7 +14,6 @@ macro_rules! cidl_type_contains {
             match cur {
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
-                | CidlType::HttpResult(inner)
                 | CidlType::KvObject(inner)
                 | CidlType::Paginated(inner) => {
                     if matches!(cur, $pattern) {
@@ -32,18 +31,18 @@ macro_rules! cidl_type_contains {
 #[derive(Template)]
 #[template(path = "client.ts.jinja", escape = "none")]
 struct ClientTemplate<'src> {
-    ast: &'src CloesceAst<'src>,
+    idl: &'src CloesceIdl<'src>,
     worker_url: &'src str,
     mapper: TypeScriptMapper,
 }
 
 impl ClientTemplate<'_> {
     fn map_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(ty, self.ast)
+        self.mapper.cidl_type(ty, self.idl)
     }
 
     fn map_root_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(ty.root_type(), self.ast)
+        self.mapper.cidl_type(ty.root_type(), self.idl)
     }
 
     fn map_media(&self, ty: &MediaType) -> String {
@@ -61,7 +60,7 @@ impl ClientTemplate<'_> {
                 })
             }
         };
-        self.mapper.cidl_type(&cidl_type, self.ast)
+        self.mapper.cidl_type(&cidl_type, self.idl)
     }
 
     fn kv_inner_type<'t>(&self, ty: &'t CidlType<'t>) -> &'t CidlType<'t> {
@@ -140,9 +139,9 @@ impl ClientTemplate<'_> {
 
 pub struct ClientGenerator;
 impl ClientGenerator {
-    pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
+    pub fn generate(idl: &CloesceIdl, worker_url: &str) -> String {
         let tmpl = ClientTemplate {
-            ast,
+            idl,
             worker_url,
             mapper: TypeScriptMapper::client(),
         };

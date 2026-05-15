@@ -3,15 +3,15 @@ mod data_source;
 mod env;
 mod model;
 
-use ast::{CidlType, CrudKind};
 use chumsky::extra;
 use chumsky::input::MappedInput;
 use chumsky::prelude::*;
+use idl::{CidlType, CrudKind};
 
-use crate::lexer::{LexedFile, SpannedToken, Token};
+use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, AstBlockKind, FileTable, InjectBlock, Keyword, ParseAst, PlainOldObjectBlock,
-    ServiceBlock, Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, ServiceBlock,
+    Span, Spd, Symbol, Tag,
 };
 
 /// Converts a [Keyword] to a `just` [Token] parser
@@ -52,7 +52,7 @@ impl<'tokens, 'src: 'tokens, P, O> MapSpanned<'tokens, 'src, O> for P where
 }
 
 pub struct ParserResult<'src, 'tokens> {
-    pub ast: ParseAst<'src>,
+    pub ast: Ast<'src>,
     pub errors: Vec<Rich<'tokens, Token<'src>, Span>>,
 }
 
@@ -68,7 +68,7 @@ impl CloesceParser {
         lexed: &'tokens [LexedFile<'src>],
         file_table: &'tokens FileTable<'src>,
     ) -> ParserResult<'src, 'tokens> {
-        let mut ast = ParseAst::default();
+        let mut ast = Ast::default();
         let mut errors = Vec::new();
 
         for lf in lexed {
@@ -93,7 +93,7 @@ impl CloesceParser {
 }
 
 fn parser<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParseAst<'src>, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Ast<'src>, Extra<'tokens, 'src>> {
     choice((
         model::model_block(),
         data_source::data_source_block(),
@@ -105,7 +105,7 @@ fn parser<'tokens, 'src: 'tokens>()
     ))
     .repeated()
     .collect::<Vec<_>>()
-    .map(|blocks| ParseAst { blocks })
+    .map(|blocks| Ast { blocks })
 }
 
 /// Parses a block of the form:

@@ -73,10 +73,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Course"
-              }
+            "Object": {
+              "name": "Course"
             }
           },
           "parameters_media": "Json",
@@ -96,11 +94,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Course"
-                }
+            "Array": {
+              "Object": {
+                "name": "Course"
               }
             }
           },
@@ -132,10 +128,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Course"
-              }
+            "Object": {
+              "name": "Course"
             }
           },
           "parameters_media": "Json",
@@ -273,10 +267,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -301,10 +293,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -329,11 +319,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Student"
-                }
+            "Array": {
+              "Object": {
+                "name": "Student"
               }
             }
           },
@@ -364,11 +352,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Student"
-                }
+            "Array": {
+              "Object": {
+                "name": "Student"
               }
             }
           },
@@ -405,10 +391,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -432,10 +416,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
+            "Object": {
+              "name": "Student"
             }
           },
           "parameters_media": "Json",
@@ -654,10 +636,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "StudentCourse"
-              }
+            "Object": {
+              "name": "StudentCourse"
             }
           },
           "parameters_media": "Json",
@@ -687,10 +667,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "StudentCourse"
-              }
+            "Object": {
+              "name": "StudentCourse"
             }
           },
           "parameters_media": "Json",
@@ -720,11 +698,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "StudentCourse"
-                }
+            "Array": {
+              "Object": {
+                "name": "StudentCourse"
               }
             }
           },
@@ -766,11 +742,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "StudentCourse"
-                }
+            "Array": {
+              "Object": {
+                "name": "StudentCourse"
               }
             }
           },
@@ -812,10 +786,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "StudentCourse"
-              }
+            "Object": {
+              "name": "StudentCourse"
             }
           },
           "parameters_media": "Json",
@@ -839,10 +811,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "StudentCourse"
-              }
+            "Object": {
+              "name": "StudentCourse"
             }
           },
           "parameters_media": "Json",

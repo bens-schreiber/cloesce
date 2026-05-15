@@ -102,10 +102,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
+            "Object": {
+              "name": "D1BackedModel"
             }
           },
           "parameters_media": "Json",
@@ -130,10 +128,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
+            "Object": {
+              "name": "D1BackedModel"
             }
           },
           "parameters_media": "Json",
@@ -157,11 +153,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "D1BackedModel"
-                }
+            "Array": {
+              "Object": {
+                "name": "D1BackedModel"
               }
             }
           },
@@ -271,10 +265,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Paginated": {
-                "KvObject": "Json"
-              }
+            "Paginated": {
+              "KvObject": "Json"
             }
           },
           "parameters_media": "Json",
@@ -298,10 +290,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "PaginatedKVModel"
-              }
+            "Object": {
+              "name": "PaginatedKVModel"
             }
           },
           "parameters_media": "Json",
@@ -388,10 +378,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "PureKVModel"
-              }
+            "Object": {
+              "name": "PureKVModel"
             }
           },
           "parameters_media": "Json",
@@ -411,10 +399,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "PureKVModel"
-              }
+            "Object": {
+              "name": "PureKVModel"
             }
           },
           "parameters_media": "Json",

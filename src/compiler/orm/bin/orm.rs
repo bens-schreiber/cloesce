@@ -1,5 +1,19 @@
-use ast::ValidatedField;
-use ast::{CloesceAst, IncludeTree};
+//! WASM bindings for the Cloesce ORM
+//!
+//! # Overview
+//! This module provides a set of unsafe extern "C" functions that can be called in foreign environments.
+//! In order for the ORM to work properly, the [IDL] must be set by calling [set_idl_ptr] with a pointer to a JSON string representing the IDL.
+//! (TODO: Try to bake the IDL directly into the memory of the WASM module at compile time to avoid this step)
+//!
+//! Each function returns 0 on success and 1 on failure, with the result or error message stored in [RETURN_PTR] and its length in [RETURN_LEN].
+//!
+//! ## Safety
+//! All functions in this module are unsafe because they involve raw pointer manipulation and require adherence to specific
+//! data formats. Callers must ensure that all pointers passed to these functions are valid and that the data they point to is
+//! correctly formatted as UTF-8 encoded strings or JSON, as specified in each function's documentation.
+
+use idl::ValidatedField;
+use idl::{CloesceIdl, IncludeTree};
 use orm::OrmErrorKind;
 use orm::map::map_sql;
 use orm::select::SelectModel;
@@ -43,19 +57,19 @@ pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
 
 thread_local! {
     /// intended to be imported once at WASM initializaton
-    pub static AST: RefCell<CloesceAst<'static>> = RefCell::new(CloesceAst::default());
+    pub static IDL: RefCell<CloesceIdl<'static>> = RefCell::new(CloesceIdl::default());
 }
 
-/// Sets the [AST] global variable, returning 0 on success.
+/// Sets the [IDL] global variable, returning 0 on success.
 ///
 /// # Safety
-/// `ptr` must be a pointer to a UTF-8 encoded JSON string representing the AST
+/// `ptr` must be a pointer to a UTF-8 encoded JSON string representing the IDL
 /// and `cap` must be the length of the JSON string in bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
+pub unsafe extern "C" fn set_idl_ptr(ptr: *mut u8, cap: usize) -> i32 {
     let slice = unsafe { std::slice::from_raw_parts(ptr, cap) };
 
-    let parsed: CloesceAst = match serde_json::from_slice(slice) {
+    let parsed: CloesceIdl = match serde_json::from_slice(slice) {
         Ok(val) => val,
         Err(e) => {
             yield_error(serde_err(e));
@@ -63,8 +77,8 @@ pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
         }
     };
 
-    AST.with(|ast| {
-        *ast.borrow_mut() = parsed;
+    IDL.with(|idl| {
+        *idl.borrow_mut() = parsed;
     });
 
     0
@@ -136,7 +150,7 @@ pub unsafe extern "C" fn upsert_model(
     };
 
     let res =
-        AST.with(|ast| UpsertModel::query(model_name, &ast.borrow(), new_model, include_tree));
+        IDL.with(|idl| UpsertModel::query(model_name, &idl.borrow(), new_model, include_tree));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
@@ -193,7 +207,7 @@ pub unsafe extern "C" fn select_model(
     };
 
     let res =
-        AST.with(|ast| SelectModel::query(model_name, from, include_tree.as_ref(), &ast.borrow()));
+        IDL.with(|idl| SelectModel::query(model_name, from, include_tree.as_ref(), &idl.borrow()));
     match res {
         Ok(res) => {
             let bytes = res.into_bytes();
@@ -257,7 +271,7 @@ pub unsafe extern "C" fn map(
         }
     };
 
-    let res = AST.with(|ast| map_sql(model_name, d1_results, include_tree, &ast.borrow()));
+    let res = IDL.with(|idl| map_sql(model_name, d1_results, include_tree, &idl.borrow()));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
@@ -317,7 +331,7 @@ pub unsafe extern "C" fn validate_type(
         }
     };
 
-    let res = AST.with(|ast| validate_cidl_type(&validated_field, value, &ast.borrow(), false));
+    let res = IDL.with(|idl| validate_cidl_type(&validated_field, value, &idl.borrow(), false));
     match res {
         Ok(value) => {
             let bytes = serde_json::to_string(&value).unwrap().into_bytes();

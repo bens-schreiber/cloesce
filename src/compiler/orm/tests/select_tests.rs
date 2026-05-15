@@ -1,7 +1,7 @@
 mod common;
 
-use ast::IncludeTree;
-use compiler_test::{expected_str, src_to_ast};
+use compiler_test::{expected_str, src_to_idl};
+use idl::IncludeTree;
 use serde_json::json;
 use sqlx::{Row, SqlitePool};
 
@@ -20,7 +20,7 @@ fn include(val: serde_json::Value) -> Option<IncludeTree<'static>> {
 #[sqlx::test]
 async fn scalar_model(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -44,7 +44,7 @@ async fn scalar_model(db: SqlitePool) {
 
     // Act
     let select_stmt =
-        SelectModel::query("Person", None, None, &ast).expect("SelectModel::query to work");
+        SelectModel::query("Person", None, None, &idl).expect("SelectModel::query to work");
 
     // Assert
     expected_str!(
@@ -52,7 +52,7 @@ async fn scalar_model(db: SqlitePool) {
         r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -64,7 +64,7 @@ async fn scalar_model(db: SqlitePool) {
 #[sqlx::test]
 async fn one_to_one(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -101,7 +101,7 @@ async fn one_to_one(db: SqlitePool) {
 
     // Act
     let select_stmt =
-        SelectModel::query("Person", None, include(json!({"dog": {}})).as_ref(), &ast)
+        SelectModel::query("Person", None, include(json!({"dog": {}})).as_ref(), &idl)
             .expect("SelectModel::query to work");
 
     // Assert
@@ -110,7 +110,7 @@ async fn one_to_one(db: SqlitePool) {
         r#"SELECT "Person"."id" AS "id", "Person"."dogId" AS "dogId", "Dog_1"."id" AS "dog.id" FROM "Person" LEFT JOIN "Dog" AS "Dog_1" ON "Person"."dogId" = "Dog_1"."id""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -121,7 +121,7 @@ async fn one_to_one(db: SqlitePool) {
 
 #[sqlx::test]
 async fn one_to_many(db: SqlitePool) {
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -200,7 +200,7 @@ async fn one_to_many(db: SqlitePool) {
             }
         }))
         .as_ref(),
-        &ast,
+        &idl,
     )
     .expect("list models to work");
 
@@ -223,7 +223,7 @@ async fn one_to_many(db: SqlitePool) {
         "#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (sql, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (sql, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -240,7 +240,7 @@ async fn one_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn many_to_many(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -282,7 +282,7 @@ async fn many_to_many(db: SqlitePool) {
         "Student",
         None,
         include(json!({"courses": {}})).as_ref(),
-        &ast,
+        &idl,
     )
     .expect("SelectModel::query to work");
 
@@ -292,7 +292,7 @@ async fn many_to_many(db: SqlitePool) {
         r#"SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -304,7 +304,7 @@ async fn many_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn composite_one_to_one(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -350,7 +350,7 @@ async fn composite_one_to_one(db: SqlitePool) {
         "Enrollment",
         None,
         include(json!({"student": {}})).as_ref(),
-        &ast,
+        &idl,
     )
     .expect("SelectModel::query to work");
 
@@ -360,7 +360,7 @@ async fn composite_one_to_one(db: SqlitePool) {
         r#"SELECT "Enrollment"."id" AS "id", "Enrollment"."school_id" AS "school_id", "Enrollment"."student_number" AS "student_number", "Enrollment"."course" AS "course", "Student_1"."school_id" AS "student.school_id", "Student_1"."student_number" AS "student.student_number", "Student_1"."name" AS "student.name" FROM "Enrollment" LEFT JOIN "Student" AS "Student_1" ON "Enrollment"."school_id" = "Student_1"."school_id" AND "Enrollment"."student_number" = "Student_1"."student_number""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -380,7 +380,7 @@ async fn composite_one_to_one(db: SqlitePool) {
 #[sqlx::test]
 async fn composite_one_to_many(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -424,7 +424,7 @@ async fn composite_one_to_many(db: SqlitePool) {
 
     // Act
     let select_stmt =
-        SelectModel::query("Order", None, include(json!({"items": {}})).as_ref(), &ast)
+        SelectModel::query("Order", None, include(json!({"items": {}})).as_ref(), &idl)
             .expect("SelectModel::query to work");
 
     // Assert
@@ -433,7 +433,7 @@ async fn composite_one_to_many(db: SqlitePool) {
         r#"SELECT "Order"."region_id" AS "region_id", "Order"."order_number" AS "order_number", "Order"."customer" AS "customer", "OrderItem_1"."id" AS "items.id", "OrderItem_1"."region_id" AS "items.region_id", "OrderItem_1"."order_number" AS "items.order_number", "OrderItem_1"."product" AS "items.product" FROM "Order" LEFT JOIN "OrderItem" AS "OrderItem_1" ON "Order"."region_id" = "OrderItem_1"."region_id" AND "Order"."order_number" = "OrderItem_1"."order_number""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -465,7 +465,7 @@ async fn composite_one_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn composite_many_to_many(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -514,7 +514,7 @@ async fn composite_many_to_many(db: SqlitePool) {
         "Teacher",
         None,
         include(json!({"courses": {}})).as_ref(),
-        &ast,
+        &idl,
     )
     .expect("SelectModel::query to work");
 
@@ -524,7 +524,7 @@ async fn composite_many_to_many(db: SqlitePool) {
         r#"SELECT "Teacher"."school_id" AS "school_id", "Teacher"."employee_id" AS "employee_id", "Teacher"."name" AS "name", "CourseTeacher_2"."left_department_id" AS "courses.department_id", "CourseTeacher_2"."left_course_code" AS "courses.course_code", "Course_1"."title" AS "courses.title" FROM "Teacher" LEFT JOIN "CourseTeacher" AS "CourseTeacher_2" ON "Teacher"."school_id" = "CourseTeacher_2"."right_school_id" AND "Teacher"."employee_id" = "CourseTeacher_2"."right_employee_id" LEFT JOIN "Course" AS "Course_1" ON "CourseTeacher_2"."left_department_id" = "Course_1"."department_id" AND "CourseTeacher_2"."left_course_code" = "Course_1"."course_code""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -546,7 +546,7 @@ async fn composite_many_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -598,7 +598,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
         "#.to_string();
 
     // Act
-    let sql = SelectModel::query("Horse", None, include(include_tree).as_ref(), &ast)
+    let sql = SelectModel::query("Horse", None, include(include_tree).as_ref(), &idl)
         .expect("list models to work");
 
     // Assert
@@ -607,7 +607,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
         r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId1" = "Horse_2"."id""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (sql, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (sql, vec![])], db)
         .await
         .expect("SQL to execute");
 
@@ -620,7 +620,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
 #[sqlx::test]
 async fn custom_from(db: SqlitePool) {
     // Arrange
-    let ast = src_to_ast(
+    let idl = src_to_idl(
         r#"
             env {
                 d1 { db }
@@ -644,7 +644,7 @@ async fn custom_from(db: SqlitePool) {
 
     // Act
     let custom_from = "SELECT * FROM Person WHERE name = 'Alice'".to_string();
-    let select_stmt = SelectModel::query("Person", Some(custom_from), None, &ast)
+    let select_stmt = SelectModel::query("Person", Some(custom_from), None, &idl)
         .expect("SelectModel::query to work");
 
     // Assert
@@ -653,7 +653,7 @@ async fn custom_from(db: SqlitePool) {
         r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM (SELECT * FROM Person WHERE name = 'Alice') AS "Person""#
     );
 
-    let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
         .await
         .expect("SQL to execute");
 

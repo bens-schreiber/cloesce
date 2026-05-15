@@ -67,11 +67,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Topping"
-                }
+            "Array": {
+              "Object": {
+                "name": "Topping"
               }
             }
           },
@@ -86,11 +84,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Topping"
-                }
+            "Array": {
+              "Object": {
+                "name": "Topping"
               }
             }
           },
@@ -105,10 +101,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Hamburger"
-              }
+            "Object": {
+              "name": "Hamburger"
             }
           },
           "parameters_media": "Json",
@@ -132,10 +126,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Hamburger"
-              }
+            "Object": {
+              "name": "Hamburger"
             }
           },
           "parameters_media": "Json",
@@ -159,11 +151,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Hamburger"
-                }
+            "Array": {
+              "Object": {
+                "name": "Hamburger"
               }
             }
           },
@@ -189,11 +179,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Hamburger"
-                }
+            "Array": {
+              "Object": {
+                "name": "Hamburger"
               }
             }
           },
@@ -422,10 +410,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Topping"
-              }
+            "Object": {
+              "name": "Topping"
             }
           },
           "parameters_media": "Json",

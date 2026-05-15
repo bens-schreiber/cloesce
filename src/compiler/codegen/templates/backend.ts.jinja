@@ -25,7 +25,7 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-{%- if let Some(env) = &ast.wrangler_env %}
+{%- if let Some(env) = &idl.wrangler_env %}
 export interface Env {
 {%- for binding in &env.d1_bindings %}
     {{ binding }}: D1Database;
@@ -45,13 +45,13 @@ export interface Env {}
 {%- endif %}
 
 
-{%- for inject in &ast.injects %}
+{%- for inject in &idl.injects %}
 export abstract class {{ inject }} {
     readonly tag = "{{ inject }}";
 }
 {%- endfor %}
 
-{%- for (_key, poo) in &ast.poos %}
+{%- for (_key, poo) in &idl.poos %}
 export interface {{ poo.name }} {
 {%- for field in &poo.fields %}
     {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
@@ -59,7 +59,7 @@ export interface {{ poo.name }} {
 }
 {%- endfor %}
 
-{%- for (_key, service) in &ast.services %}
+{%- for (_key, service) in &idl.services %}
 export namespace {{ service.name }} {
     export const Kind = "service" as const;
     export const Tag = "{{ service.name }}" as const;
@@ -77,7 +77,7 @@ export namespace {{ service.name }} {
 }
 {%- endfor %}
 
-{%- for (_key, model) in &ast.models %}
+{%- for (_key, model) in &idl.models %}
 export namespace {{ model.name }} {
     export const Kind = "model" as const;
     export const Tag = "{{ model.name }}" as const;
@@ -207,7 +207,7 @@ function _impl(namespace: any, implObj: any) {
 }
 
 import cidl from "./cidl.json" with { type: "json" };
-{%- for (_key, model) in &ast.models %}
+{%- for (_key, model) in &idl.models %}
 {%- for ds in model.data_sources.values() %}
 (cidl.models.{{ model.name }}.data_sources["{{ ds.name }}"] as any).gen = {{ model.name }}.Source.{{ ds.name }};
 {%- endfor %}

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst, Number, ValidatedField, Validator};
+use idl::{CidlType, CloesceIdl, Number, ValidatedField, Validator};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
 use frontend::fmt_cidl_type;
@@ -11,11 +11,11 @@ use crate::{OrmErrorKind, fail};
 /// Runtime type validation, asserting that the structure of a JSON value
 /// matches the structure of the provided CIDL type.
 ///
-/// Additionally, runs any validators on the value (should it be an [ast::ValidatedField])
+/// Additionally, runs any validators on the value (should it be an [idl::ValidatedField])
 pub fn validate_cidl_type(
     field: &ValidatedField,
     value: Option<Value>,
-    ast: &CloesceAst,
+    idl: &CloesceIdl,
     partial: bool,
 ) -> Result<Option<Value>, OrmErrorKind> {
     let cidl_type = &field.cidl_type;
@@ -193,7 +193,7 @@ pub fn validate_cidl_type(
                     validators: field.validators.clone(),
                 },
                 raw,
-                ast,
+                idl,
                 partial,
             )?;
             if let Some(raw) = raw {
@@ -205,7 +205,7 @@ pub fn validate_cidl_type(
 
         // Plain old objects
         CidlType::Object { name } | CidlType::Partial { object_name: name }
-            if let Some(poo) = ast.poos.get(name) =>
+            if let Some(poo) = idl.poos.get(name) =>
         {
             if !value.is_object() {
                 fail!(type_mismatch_err(value));
@@ -218,7 +218,7 @@ pub fn validate_cidl_type(
                 let res = validate_cidl_type(
                     field,
                     field_value,
-                    ast,
+                    idl,
                     is_partial || matches!(cidl_type, CidlType::Partial { .. }),
                 )?;
 
@@ -237,11 +237,11 @@ pub fn validate_cidl_type(
                 fail!(type_mismatch_err(value));
             }
             let obj = value.as_object_mut().unwrap();
-            let model = ast.models.get(name).unwrap();
+            let model = idl.models.get(name).unwrap();
 
             for field in &model.key_fields {
                 let field_value = obj.remove(field.name.as_ref());
-                let res = validate_cidl_type(field, field_value, ast, is_partial)?;
+                let res = validate_cidl_type(field, field_value, idl, is_partial)?;
 
                 if let Some(res) = res {
                     new_obj.insert(field.name.to_string(), res);
@@ -250,7 +250,7 @@ pub fn validate_cidl_type(
 
             for (col, _) in model.all_columns() {
                 let col_value = obj.remove(col.field.name.as_ref());
-                let res = validate_cidl_type(&col.field, col_value, ast, is_partial)?;
+                let res = validate_cidl_type(&col.field, col_value, idl, is_partial)?;
 
                 if let Some(res) = res {
                     new_obj.insert(col.field.name.to_string(), res);
@@ -271,7 +271,7 @@ pub fn validate_cidl_type(
                         validators: vec![],
                     },
                     nav_value,
-                    ast,
+                    idl,
                     is_partial,
                 )?;
 
@@ -287,7 +287,7 @@ pub fn validate_cidl_type(
                     continue;
                 }
 
-                let res = validate_cidl_type(&kv_field.field, kv_field_value, ast, is_partial)?;
+                let res = validate_cidl_type(&kv_field.field, kv_field_value, idl, is_partial)?;
 
                 if let Some(res) = res {
                     new_obj.insert(kv_field.field.name.to_string(), res);
@@ -307,7 +307,7 @@ pub fn validate_cidl_type(
                         validators: vec![],
                     },
                     r2_obj_value,
-                    ast,
+                    idl,
                     is_partial,
                 )?;
 
@@ -331,7 +331,7 @@ pub fn validate_cidl_type(
                 validators: field.validators.clone(),
             };
             for item in arr {
-                let res = validate_cidl_type(&field, Some(item.clone()), ast, is_partial)?;
+                let res = validate_cidl_type(&field, Some(item.clone()), idl, is_partial)?;
                 if let Some(res) = res {
                     new_arr.push(res);
                 }
@@ -356,7 +356,7 @@ pub fn validate_cidl_type(
                     validators: vec![],
                 },
                 results,
-                ast,
+                idl,
                 is_partial,
             )?;
             if let Some(results_value) = results_value {
@@ -383,7 +383,7 @@ pub fn validate_cidl_type(
                     validators: vec![],
                 },
                 complete,
-                ast,
+                idl,
                 is_partial,
             )?;
             if let Some(complete_value) = complete_value {

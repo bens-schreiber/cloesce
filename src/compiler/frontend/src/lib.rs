@@ -1,15 +1,33 @@
-use std::{collections::HashMap, path::PathBuf};
-
-use ast::{CidlType, CrudKind, HttpVerb};
-use chumsky::span::SimpleSpan;
-use indexmap::IndexMap;
-
-use crate::lexer::Token;
+//! Responsible for lexing and parsing Cloesce source files into an [Ast], a direct representation of the
+//! parsed source code. Additionally, houses the formatter for Cloesce source files.
+//!
+//! # Cloesce AST
+//!
+//! The AST is a direct representation of the parsed source code, with the only transformations being
+//! the streaming of comments into a seperate "comment map" channel during lexing.
+//!
+//! ## Symbols
+//!
+//! The [Symbol] struct is used to represent any named entity in the source code, such as a model name, field name, API method name, etc.
+//! It contains the symbol's name, type, span, and any tags applied to it. Not all [Symbol]s will have a meaningful type, or any tags,
+//! but this struct is used for all named entities for consistency and ease of error reporting.
+//!
+//! ## Memory management
+//!
+//! All string data in the AST is borrowed from the original heap-allocated source string. The [Ast] is non-recursive at the node level
+//! (with the exception of [CidlType]). Child nodes are stored in flat [Vec]s rather than via recursive node-to-node ownership,
+//! so no arena or custom allocator is required.
 
 pub mod err;
 pub mod formatter;
 pub mod lexer;
 pub mod parser;
+
+use idl::{CidlType, CrudKind, HttpVerb};
+use indexmap::IndexMap;
+
+use crate::lexer::Token;
+pub use crate::lexer::{FileTable, Span};
 
 macro_rules! contextual_keywords {
     ($($variant:ident => $str:literal),* $(,)?) => {
@@ -144,11 +162,6 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
-pub struct FileId(u16);
-
-pub type Span = SimpleSpan<usize, FileId>;
-
 /// A spanned value
 #[derive(Debug, Clone)]
 pub struct Spd<T> {
@@ -177,26 +190,6 @@ impl<T> SpdSlice<T> for Vec<Spd<T>> {
         T: 'a,
     {
         self.iter().map(|spd| &spd.inner)
-    }
-}
-
-pub struct FileTable<'src> {
-    table: HashMap<FileId, (&'src str, PathBuf)>,
-}
-
-impl<'src> FileTable<'src> {
-    /// Panics if the ID is not found
-    pub fn resolve(&self, file_id: FileId) -> (&str, &PathBuf) {
-        let (src, path) = self.table.get(&file_id).expect("invalid file ID");
-        (src, path)
-    }
-
-    pub fn cache(&self) -> impl ariadne::Cache<String> + '_ {
-        ariadne::sources(
-            self.table
-                .values()
-                .map(|(src, path)| (path.display().to_string(), *src)),
-        )
     }
 }
 
@@ -517,14 +510,14 @@ pub enum AstBlockKind<'src> {
     Inject(InjectBlock<'src>),
 }
 
-/// An IR for the raw parsed structure of a Cloesce project
+/// The raw parsed structure of a Cloesce source file, before semantic analysis and transformation into the IDL.
 #[derive(Default)]
-pub struct ParseAst<'src> {
+pub struct Ast<'src> {
     pub blocks: Vec<Spd<AstBlockKind<'src>>>,
 }
 
-impl<'src> ParseAst<'src> {
-    fn merge(&mut self, mut other: ParseAst<'src>) {
+impl<'src> Ast<'src> {
+    fn merge(&mut self, mut other: Ast<'src>) {
         self.blocks.append(&mut other.blocks);
     }
 }

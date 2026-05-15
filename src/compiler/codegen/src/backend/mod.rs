@@ -1,19 +1,19 @@
 use askama::Template;
-use ast::{CidlType, CloesceAst};
+use idl::{CidlType, CloesceIdl};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
 #[derive(Template)]
 #[template(path = "backend.ts.jinja", escape = "none")]
 struct BackendTemplate<'src> {
-    ast: &'src CloesceAst<'src>,
+    idl: &'src CloesceIdl<'src>,
     worker_url: &'src str,
     mapper: TypeScriptMapper,
 }
 
 impl BackendTemplate<'_> {
     fn map_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(ty, self.ast)
+        self.mapper.cidl_type(ty, self.idl)
     }
 
     fn is_generated_method(&self, name: &str) -> bool {
@@ -21,15 +21,15 @@ impl BackendTemplate<'_> {
     }
 
     fn is_env_injected(&self, name: &str) -> bool {
-        !self.ast.injects.contains(&name)
+        !self.idl.injects.contains(&name)
     }
 }
 
 pub struct BackendGenerator;
 impl BackendGenerator {
-    pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
+    pub fn generate(idl: &CloesceIdl, worker_url: &str) -> String {
         let tmpl = BackendTemplate {
-            ast,
+            idl,
             worker_url,
             mapper: TypeScriptMapper::backend(),
         };

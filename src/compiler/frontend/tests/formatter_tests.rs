@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use compiler_test::COMPREHENSIVE_SRC;
 use frontend::{
-    ParseAst,
+    Ast,
     err::DisplayError,
     formatter::Formatter,
     lexer::{CloesceLexer, LexResult, LexTarget},
     parser::CloesceParser,
 };
 
-fn lex_parse(src: &str) -> (ParseAst<'_>, LexResult<'_>) {
+fn lex_parse(src: &str) -> (Ast<'_>, LexResult<'_>) {
     let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),

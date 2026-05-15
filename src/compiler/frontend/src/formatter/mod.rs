@@ -1,23 +1,37 @@
+//! Formatter for a Cloesce [Ast], preserving as much of the original formatting as possible, including comments and blank lines.
+//!
+//! # Overview
+//!
+//! The formatter works by traversing the [Ast] and emitting a [Doc] for each node. The [Doc] is an IR that represents the formatted output,
+//! which is rendered to a string after being fully constructed. All comments are left in their original position, but the formatter
+//! will adjust whitespace in an opinionated way (at most two consectutive newlines are preserved).
+//!
+//! ## Cursor
+//!
+//! The only portions of the formatter that require manual cursor management are comments, handeled entirely in the
+//! [FmtCtx] struct. The formatter consults the [CommentMap] to determine which comments to emit at each point in the traversal, and advances the cursor
+//! accordingly. Comments are categorized as leading, trailing, or inner based on their position relative to the syntax nodes,
+//! and the formatter ensures they are emitted in the correct order and with appropriate spacing.
+
 mod doc;
 
 use std::cell::{Cell, RefCell};
 
-use ast::{CidlType, CrudKind, HttpVerb};
+use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, AstBlockKind,
+    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
     ForeignBlock, ForeignBlockNav, ForeignQualifier, InjectBlock, Keyword, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParseAst, ParsedIncludeTree,
-    PlainOldObjectBlock, R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, fmt_cidl_type,
-    lexer::CommentMap,
+    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParsedIncludeTree, PlainOldObjectBlock,
+    R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
 pub struct Formatter;
 
 impl Formatter {
-    pub fn format(ast: &ParseAst<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
+    pub fn format(ast: &Ast<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
         let ctx = FmtCtx::new(comment_map, src);
         let doc = ast.to_doc(&ctx);
         render(&doc).trim_start_matches('\n').to_string()
@@ -362,7 +376,7 @@ trait ToDoc<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src>;
 }
 
-impl<'src> ParseAst<'src> {
+impl<'src> Ast<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = Doc::nil();
 

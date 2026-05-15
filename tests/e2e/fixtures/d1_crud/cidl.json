@@ -1,5 +1,5 @@
 {
-  "hash": 4754597934190067300,
+  "hash": 2584065736982692040,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -50,9 +50,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -64,10 +62,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "CrudHaver"
-              }
+            "Object": {
+              "name": "CrudHaver"
             }
           },
           "parameters_media": "Json",
@@ -91,10 +87,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "CrudHaver"
-              }
+            "Object": {
+              "name": "CrudHaver"
             }
           },
           "parameters_media": "Json",
@@ -114,11 +108,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "CrudHaver"
-                }
+            "Array": {
+              "Object": {
+                "name": "CrudHaver"
               }
             }
           },
@@ -189,7 +181,7 @@
       ]
     },
     "Parent": {
-      "hash": 12731619948998570810,
+      "hash": 1579048073847534623,
       "name": "Parent",
       "d1_binding": "db",
       "primary_columns": [
@@ -207,7 +199,7 @@
       ],
       "columns": [
         {
-          "hash": 3617101773382579157,
+          "hash": 17181193758226121708,
           "field": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -276,10 +268,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Parent"
-              }
+            "Object": {
+              "name": "Parent"
             }
           },
           "parameters_media": "Json",
@@ -303,10 +293,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Parent"
-              }
+            "Object": {
+              "name": "Parent"
             }
           },
           "parameters_media": "Json",
@@ -330,10 +318,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Parent"
-              }
+            "Object": {
+              "name": "Parent"
             }
           },
           "parameters_media": "Json",
@@ -353,10 +339,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Parent"
-              }
+            "Object": {
+              "name": "Parent"
             }
           },
           "parameters_media": "Json",
@@ -376,11 +360,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Parent"
-                }
+            "Array": {
+              "Object": {
+                "name": "Parent"
               }
             }
           },
@@ -412,11 +394,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "Parent"
-                }
+            "Array": {
+              "Object": {
+                "name": "Parent"
               }
             }
           },

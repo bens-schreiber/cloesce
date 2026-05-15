@@ -1,8 +1,8 @@
-use ast::{CidlType, CloesceAst, Field, IncludeTree, MediaType};
+use idl::{CidlType, CloesceIdl, Field, IncludeTree, MediaType};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
-    fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;
+    fn cidl_type(&self, ty: &CidlType, idl: &CloesceIdl) -> String;
 
     /// Maps a [MediaType] to a type in the target language
     fn media_type(&self, ty: &MediaType) -> String;
@@ -36,12 +36,12 @@ impl TypeScriptMapper {
         }
     }
 
-    fn namespace(&self, ast: &CloesceAst, name: &str) -> String {
+    fn namespace(&self, idl: &CloesceIdl, name: &str) -> String {
         if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
             return name.to_string();
         }
 
-        if ast.models.contains_key(name) || ast.services.contains_key(name) {
+        if idl.models.contains_key(name) || idl.services.contains_key(name) {
             format!("{name}.Self")
         } else {
             name.to_string()
@@ -49,7 +49,7 @@ impl TypeScriptMapper {
     }
 }
 impl LanguageTypeMapper for TypeScriptMapper {
-    fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
+    fn cidl_type(&self, ty: &CidlType, idl: &CloesceIdl) -> String {
         match ty {
             CidlType::Json => "unknown".to_string(),
             CidlType::Int | CidlType::Real => "number".to_string(),
@@ -57,20 +57,19 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::Boolean => "boolean".to_string(),
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
-            CidlType::Object { name, .. } => self.namespace(ast, name),
-            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner, ast)),
-            CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, ast)),
-            CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
+            CidlType::Object { name, .. } => self.namespace(idl, name),
+            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner, idl)),
+            CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, idl)),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {
-                format!("DeepPartial<{}>", self.namespace(ast, object_name))
+                format!("DeepPartial<{}>", self.namespace(idl, object_name))
             }
             CidlType::Stream => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
-            CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, ast)),
-            CidlType::Paginated(inner) => format!("Paginated<{}>", self.cidl_type(inner, ast)),
+            CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, idl)),
+            CidlType::Paginated(inner) => format!("Paginated<{}>", self.cidl_type(inner, idl)),
             CidlType::R2Object => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
                 TypeScriptMapperKind::ClientApi => "R2Object".to_string(),

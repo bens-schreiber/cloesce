@@ -3,7 +3,7 @@ name = "orm"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 base64 = "0.22"
 chrono = { version = "0.4.44", features = ["serde"], default-features = false }
 frontend = { path = "../frontend" }

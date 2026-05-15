@@ -1,4 +1,4 @@
-use ast::{CloesceAst, IncludeTree, Model, NavigationFieldKind};
+use idl::{CloesceIdl, IncludeTree, Model, NavigationFieldKind};
 use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
@@ -6,7 +6,7 @@ use sea_query::{
 use crate::{OrmErrorKind, Result, alias, fail};
 
 pub struct SelectModel<'a> {
-    ast: &'a CloesceAst<'a>,
+    idl: &'a CloesceIdl<'a>,
     path: Vec<String>,
     counter: usize,
     query: SelectStatement,
@@ -18,9 +18,9 @@ impl<'a> SelectModel<'a> {
         model_name: &str,
         from: Option<String>,
         include_tree: Option<&IncludeTree>,
-        ast: &'a CloesceAst<'a>,
+        idl: &'a CloesceIdl<'a>,
     ) -> Result<String> {
-        let model = match ast.models.get(model_name) {
+        let model = match idl.models.get(model_name) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel {
                 name: model_name.to_string(),
@@ -44,7 +44,7 @@ impl<'a> SelectModel<'a> {
         }
 
         let mut sm = Self {
-            ast,
+            idl,
             path: vec![],
             counter: 0,
             query,
@@ -124,7 +124,7 @@ impl<'a> SelectModel<'a> {
                 continue;
             };
 
-            let child = self.ast.models.get(&nav.model_reference).unwrap();
+            let child = self.idl.models.get(&nav.model_reference).unwrap();
             let child_alias = self.id(child.name);
             let mut child_m2m_alias = None;
 

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ast::{CidlType, CloesceAst, D1Database, KVNamespace, WranglerSpec};
+use idl::{CidlType, CloesceIdl, D1Database, KVNamespace, WranglerSpec};
 
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
@@ -389,7 +389,7 @@ pub struct WranglerDefault;
 impl WranglerDefault {
     /// Ensures that all required values exist or places a default
     /// for them
-    pub fn set_defaults(spec: &mut WranglerSpec, ast: &CloesceAst, default_migrations_path: &str) {
+    pub fn set_defaults(spec: &mut WranglerSpec, idl: &CloesceIdl, default_migrations_path: &str) {
         let default_migrations_path = default_migrations_path
             .trim_end_matches('/')
             .trim_end_matches('\\');
@@ -417,7 +417,7 @@ impl WranglerDefault {
         );
 
         // Ensure all bindings referenced in the WranglerEnv exist in the spec
-        if let Some(env) = &ast.wrangler_env {
+        if let Some(env) = &idl.wrangler_env {
             for d1 in &env.d1_bindings {
                 let db = spec
                     .d1_databases
@@ -513,7 +513,7 @@ impl WranglerDefault {
                         }
                     }
                     None => {
-                        spec.r2_buckets.push(ast::R2Bucket {
+                        spec.r2_buckets.push(idl::R2Bucket {
                             binding: Some(r2_binding.to_string()),
                             bucket_name: Some(format!("replace-with-{}-name", r2_binding)),
                         });
@@ -527,8 +527,8 @@ impl WranglerDefault {
             }
         }
 
-        // Generate default vars from the AST's WranglerEnv
-        if let Some(env) = &ast.wrangler_env {
+        // Generate default vars from the IDL's WranglerEnv
+        if let Some(env) = &idl.wrangler_env {
             for var in &env.vars {
                 spec.vars.entry(var.name.to_string()).or_insert_with(|| {
                     let default = match var.cidl_type {

@@ -1,12 +1,14 @@
+//! Utilities for testing the compiler.
+
 use std::path::PathBuf;
 
-use ast::CloesceAst;
 use frontend::{
-    ParseAst,
+    Ast,
     err::DisplayError,
     lexer::{CloesceLexer, LexTarget},
     parser::CloesceParser,
 };
+use idl::CloesceIdl;
 use semantic::SemanticAnalysis;
 
 mod src_str;
@@ -27,8 +29,8 @@ macro_rules! expected_str {
     }};
 }
 
-/// Given a source string, lex and parse it into a [ParseAst], panicking if either step fails.
-pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
+/// Given a source string, lex and parse it into an [Ast], panicking if either step fails.
+pub fn lex_and_ast(src: &str) -> Ast<'_> {
     let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),
@@ -49,9 +51,9 @@ pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
     result.ast
 }
 
-/// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
+/// Given a source string, lex, parse, and semantically analyze it into a [CloesceIdl],
 /// panicking if any step fails.
-pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
+pub fn src_to_idl(src: &str) -> CloesceIdl<'_> {
     let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),

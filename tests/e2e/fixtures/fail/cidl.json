@@ -50,9 +50,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []
@@ -63,9 +61,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
             {
@@ -130,9 +126,7 @@
           "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
             {
@@ -181,10 +175,8 @@
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "FailModel"
-              }
+            "Object": {
+              "name": "FailModel"
             }
           },
           "parameters_media": "Json",
@@ -208,10 +200,8 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "FailModel"
-              }
+            "Object": {
+              "name": "FailModel"
             }
           },
           "parameters_media": "Json",
@@ -231,11 +221,9 @@
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": {
-                  "name": "FailModel"
-                }
+            "Array": {
+              "Object": {
+                "name": "FailModel"
               }
             }
           },
@@ -316,9 +304,7 @@
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": "String"
-          },
+          "return_type": "String",
           "parameters_media": "Json",
           "parameters": [],
           "injected": []

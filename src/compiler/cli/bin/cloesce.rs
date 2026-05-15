@@ -1,3 +1,25 @@
+//! The Cloesce CLI, providing commands for compiling, migrating and formatting Cloesce source files.
+//!
+//! # Features
+//!
+//! The `cloesce` binary provides the following subcommands:
+//!
+//! - `compile`: Compiles `.clo` and `.cloesce` source files into a JSON CIDL file, a Wrangler config file,
+//!   and TypeScript client and backend code. By default, the output files are placed in the `.cloesce` directory,
+//!   but this can be configured in the `cloesce.jsonc` config file.
+//!
+//! - `migrate`: Generates a SQL migration file and a CIDL file containing only the migrated models based on the
+//!   differences between the current CIDL and the last migrated CIDL.
+//!
+//! - `fmt`: Formats `.clo` and `.cloesce` source files according to a consistent style.
+//!
+//! - `version`: Displays the current version of the `cloesce` binary and checks for updates.
+//!
+//! # Configuration File
+//!
+//! The `cloesce` binary looks for a `cloesce.jsonc` configuration file ([ParsedCloesceConfig]) in the current working directory by default,
+//! or `<env>.cloesce.jsonc` if the `--env` flag is provided, which specifies various settings for the compilation and migration processes.
+
 use std::{
     collections::VecDeque,
     fs::File,
@@ -389,7 +411,7 @@ mod compile {
         }
 
         // Semantic
-        let (ast, errors) = SemanticAnalysis::analyze(&parse.ast);
+        let (idl, errors) = SemanticAnalysis::analyze(&parse.ast);
         if !errors.is_empty() {
             for error in &errors {
                 error.display_error(&lexed.file_table);
@@ -399,12 +421,12 @@ mod compile {
 
         // Codegen
         let wrangler = {
-            WranglerDefault::set_defaults(&mut wrangler_spec, &ast, &config.parsed.migrations_path);
+            WranglerDefault::set_defaults(&mut wrangler_spec, &idl, &config.parsed.migrations_path);
             wrangler.generate(wrangler_spec, config.env.as_deref())
         };
 
-        let backend = BackendGenerator::generate(&ast, &config.parsed.workers_url);
-        let client = ClientGenerator::generate(&ast, &config.parsed.workers_url);
+        let backend = BackendGenerator::generate(&idl, &config.parsed.workers_url);
+        let client = ClientGenerator::generate(&idl, &config.parsed.workers_url);
 
         let output_name = |name: &str| {
             #[cfg(feature = "regression-tests")]
@@ -423,7 +445,7 @@ mod compile {
             let cidl_path = config.cloesce_dir().join(output_name("cidl.json"));
             let mut file = open_file_or_create(&cidl_path)?;
 
-            file.write_all(ast.to_json().as_bytes())
+            file.write_all(idl.to_json().as_bytes())
                 .map_err(|e| format!("Failed to write CIDL file {}: {}", cidl_path.display(), e))?;
             tracing::info!("Generated JSON CIDL at {}", cidl_path.display());
         };
@@ -494,8 +516,8 @@ mod compile {
 }
 
 mod migrate {
-    use ast::MigrationsAst;
     use codegen::wrangler::WranglerGenerator;
+    use idl::MigrationsIdl;
     use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
     use super::*;
@@ -656,27 +678,27 @@ mod migrate {
                 })
                 .transpose()?;
 
-            let lm_ast: Option<MigrationsAst> = lm_contents
+            let lm_ast: Option<MigrationsIdl> = lm_contents
                 .as_deref()
-                .map(MigrationsAst::from_json)
+                .map(MigrationsIdl::from_json)
                 .transpose()?;
 
             let ast_contents = std::fs::read_to_string(&cidl_path)
                 .map_err(|e| format!("Failed to read CIDL file {}: {}", cidl_path.display(), e))?;
 
             // Migrate only the models with the specified D1 binding
-            let ast = {
-                let mut ast = MigrationsAst::from_json(&ast_contents)?;
-                ast.models
+            let idl = {
+                let mut idl = MigrationsIdl::from_json(&ast_contents)?;
+                idl.models
                     .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
 
-                ast
+                idl
             };
 
-            let generated_sql = MigrationsGenerator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
+            let generated_sql = MigrationsGenerator::migrate(&idl, lm_ast.as_ref(), &MigrationsCli);
 
             migrated_cidl_file
-                .write_all(ast.to_json().as_bytes())
+                .write_all(idl.to_json().as_bytes())
                 .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
             migrated_sql_file
                 .write_all(generated_sql.as_bytes())

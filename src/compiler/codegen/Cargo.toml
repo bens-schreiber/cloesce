@@ -3,7 +3,7 @@ name = "codegen"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
+idl = { path = "../idl" }
 askama = "0.15.6"
 indexmap = { workspace = true }
 json_comments = { workspace = true }

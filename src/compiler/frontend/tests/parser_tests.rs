@@ -1,9 +1,9 @@
-use ast::{CidlType, CrudKind, HttpVerb};
-use compiler_test::lex_and_parse;
+use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, AstBlockKind, EnvBindingBlockKind, ForeignBlock, Keyword, ModelBlock,
-    ModelBlockKind, PaginatedBlockKind, ParseAst, Spd, SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, EnvBindingBlockKind, ForeignBlock, Keyword, ModelBlock,
+    ModelBlockKind, PaginatedBlockKind, Spd, SqlBlockKind, Symbol, Tag,
 };
+use idl::{CidlType, CrudKind, HttpVerb};
 
 fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
     adj.len() == expected.len()
@@ -16,7 +16,7 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
 #[test]
 fn env_block() {
     // Act
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
 
         env {
@@ -113,7 +113,7 @@ fn env_block() {
 #[test]
 fn poo_block() {
     // Act
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         poo Address {
             street: string
@@ -223,7 +223,7 @@ fn poo_block() {
 #[test]
 fn inject_block() {
     // Act
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         inject {
             OpenApiService
@@ -257,7 +257,7 @@ fn inject_block() {
 #[test]
 fn service_block() {
     // Act
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         service {
             MyAppService
@@ -335,7 +335,7 @@ fn service_block() {
 
 #[test]
 fn model_primary_unique_optional_foreign() {
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         [use d1_db]
         [use d2_db]
@@ -522,7 +522,7 @@ fn model_primary_unique_optional_foreign() {
 
 #[test]
 fn model_navigation() {
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         model M {
             foreign(Location::id) {
@@ -585,7 +585,7 @@ fn model_navigation() {
 
 #[test]
 fn model_kv_r2_paginated() {
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         [crud get, save, list]
         model Cache {
@@ -792,7 +792,7 @@ fn model_kv_r2_paginated() {
 
 #[test]
 fn validator_tags() {
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         model M {
             [regex /[a-z]+/]
@@ -861,7 +861,7 @@ fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock
         .collect()
 }
 
-fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
+fn find_model<'a>(ast: &'a Ast<'a>, name: &str) -> &'a ModelBlock<'a> {
     ast.blocks
         .iter()
         .find_map(|spd| match &spd.inner {
@@ -873,7 +873,7 @@ fn find_model<'a>(ast: &'a ParseAst<'a>, name: &str) -> &'a ModelBlock<'a> {
 
 #[test]
 fn service_block_supports_multiple_symbols() {
-    let ast = lex_and_parse(
+    let ast = lex_and_ast(
         r#"
         service {
             FooService

@@ -145,16 +145,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ast"
-version = "0.0.0"
-dependencies = [
- "indexmap",
- "rustc-hash",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -314,11 +304,11 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 name = "cli"
 version = "0.0.0"
 dependencies = [
- "ast",
  "clap",
  "codegen",
  "dirs",
  "frontend",
+ "idl",
  "json_comments",
  "migrations",
  "semantic",
@@ -334,8 +324,8 @@ name = "codegen"
 version = "0.0.0"
 dependencies = [
  "askama",
- "ast",
  "compiler-test",
+ "idl",
  "indexmap",
  "insta",
  "json_comments",
@@ -358,8 +348,8 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 name = "compiler-test"
 version = "0.0.0"
 dependencies = [
- "ast",
  "frontend",
+ "idl",
  "semantic",
 ]
 
@@ -723,9 +713,9 @@ name = "frontend"
 version = "0.0.0"
 dependencies = [
  "ariadne",
- "ast",
  "chumsky",
  "compiler-test",
+ "idl",
  "indexmap",
  "insta",
  "logos",
@@ -1052,6 +1042,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
+name = "idl"
+version = "0.0.0"
+dependencies = [
+ "indexmap",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "idna"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1260,8 +1260,8 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 name = "migrations"
 version = "0.0.0"
 dependencies = [
- "ast",
  "compiler-test",
+ "idl",
  "indexmap",
  "sea-query",
  "serde_json",
@@ -1434,11 +1434,11 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 name = "orm"
 version = "0.0.0"
 dependencies = [
- "ast",
  "base64",
  "chrono",
  "compiler-test",
  "frontend",
+ "idl",
  "indexmap",
  "migrations",
  "regex",
@@ -1847,9 +1847,9 @@ name = "semantic"
 version = "0.0.0"
 dependencies = [
  "ariadne",
- "ast",
  "compiler-test",
  "frontend",
+ "idl",
  "indexmap",
  "orm",
  "regex",
