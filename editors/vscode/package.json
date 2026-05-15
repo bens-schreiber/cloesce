@@ -13,7 +13,7 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bens-schreiber/cloesce-vscode"
+    "url": "https://github.com/bens-schreiber/cloesce"
   },
   "contributes": {
     "languages": [
