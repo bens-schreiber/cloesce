@@ -349,3 +349,6 @@ src/runtime/ts/package-lock.json
 book
 docs/langtabs.js
 docs/langtabs.css
+
+# ----------- EDITOR BULLSHIT VVV ----------- 
+*.vsix

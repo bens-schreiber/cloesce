@@ -1,0 +1,776 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cloesce",
+  "scopeName": "source.cloesce",
+  "fileTypes": ["cloesce", "clo"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#tags" },
+    { "include": "#env-block" },
+    { "include": "#inject-block" },
+    { "include": "#service-block" },
+    { "include": "#model-declaration" },
+    { "include": "#api-declaration" },
+    { "include": "#source-declaration" },
+    { "include": "#poo-declaration" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.region.cloesce",
+          "match": "//\\s*#(?:region|endregion)\\b.*$"
+        },
+        {
+          "name": "comment.line.double-slash.cloesce",
+          "match": "//.*$"
+        }
+      ]
+    },
+
+    "expression": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#tags" },
+        { "include": "#string" },
+        { "include": "#regex-literal" },
+        { "include": "#number" },
+        { "include": "#self-keyword" },
+        { "include": "#arrow" },
+        { "include": "#double-colon" },
+        { "include": "#generic-types" },
+        { "include": "#builtin-types" },
+        { "include": "#type-name" },
+        { "include": "#identifier" }
+      ]
+    },
+
+    "string": {
+      "name": "string.quoted.double.cloesce",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.cloesce" }
+      },
+      "patterns": [
+        {
+          "name": "variable.other.interpolation.cloesce",
+          "match": "\\{[a-zA-Z_][a-zA-Z0-9_]*\\}"
+        },
+        {
+          "name": "constant.character.escape.cloesce",
+          "match": "\\\\."
+        }
+      ]
+    },
+
+    "regex-literal": {
+      "name": "string.regexp.cloesce",
+      "begin": "/(?=[^/\\n])",
+      "end": "/",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.regexp.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.regexp.end.cloesce" }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.cloesce",
+          "match": "\\\\."
+        }
+      ]
+    },
+
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.cloesce",
+          "match": "\\b[0-9]+\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.cloesce",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+
+    "arrow": {
+      "name": "keyword.operator.arrow.cloesce",
+      "match": "->"
+    },
+
+    "double-colon": {
+      "name": "keyword.operator.namespace.cloesce",
+      "match": "::"
+    },
+
+    "self-keyword": {
+      "name": "variable.language.self.cloesce",
+      "match": "\\bself\\b"
+    },
+
+    "builtin-types": {
+      "name": "support.type.primitive.cloesce",
+      "match": "\\b(string|int|real|date|bool|json|blob|stream|r2object)\\b"
+    },
+
+    "generic-types": {
+      "name": "support.type.generic.cloesce",
+      "match": "\\b(option|array|paginated|kvobject|partial)\\b"
+    },
+
+    "type-name": {
+      "name": "entity.name.type.cloesce",
+      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+    },
+
+    "identifier": {
+      "name": "variable.other.cloesce",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    },
+
+    "tags": {
+      "patterns": [
+        { "include": "#tag-use" },
+        { "include": "#tag-crud" },
+        { "include": "#tag-inject" },
+        { "include": "#tag-source" },
+        { "include": "#tag-internal" },
+        { "include": "#tag-instance" },
+        { "include": "#tag-validator-numeric" },
+        { "include": "#tag-validator-len" },
+        { "include": "#tag-validator-regex" }
+      ]
+    },
+
+    "tag-use": {
+      "comment": "[use binding]",
+      "begin": "(\\[)\\s*(use)\\b",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.use.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.tag.end.cloesce" }
+      },
+      "patterns": [
+        {
+          "name": "variable.other.binding.cloesce",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+
+    "tag-crud": {
+      "comment": "[crud get, save, list]",
+      "begin": "(\\[)\\s*(crud)\\b",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.crud.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.tag.end.cloesce" }
+      },
+      "patterns": [
+        {
+          "name": "constant.language.crud.cloesce",
+          "match": "\\b(get|list|save)\\b"
+        },
+        {
+          "name": "punctuation.separator.comma.cloesce",
+          "match": ","
+        }
+      ]
+    },
+
+    "tag-inject": {
+      "comment": "[inject binding1, binding2, ...]",
+      "begin": "(\\[)\\s*(inject)\\b",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.inject.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.tag.end.cloesce" }
+      },
+      "patterns": [
+        {
+          "name": "variable.other.binding.cloesce",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        },
+        {
+          "name": "punctuation.separator.comma.cloesce",
+          "match": ","
+        }
+      ]
+    },
+
+    "tag-source": {
+      "comment": "[source SourceName]",
+      "match": "(\\[)\\s*(source)\\s+([A-Z][a-zA-Z0-9_]*)\\s*(\\])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.source.cloesce" },
+        "3": { "name": "entity.name.type.source.cloesce" },
+        "4": { "name": "punctuation.definition.tag.end.cloesce" }
+      }
+    },
+
+    "tag-internal": {
+      "comment": "[internal]",
+      "match": "(\\[)\\s*(internal)\\s*(\\])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.internal.cloesce" },
+        "3": { "name": "punctuation.definition.tag.end.cloesce" }
+      }
+    },
+
+    "tag-instance": {
+      "comment": "[instance]",
+      "match": "(\\[)\\s*(instance)\\s*(\\])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.instance.cloesce" },
+        "3": { "name": "punctuation.definition.tag.end.cloesce" }
+      }
+    },
+
+    "tag-validator-numeric": {
+      "comment": "[lt|lte|gt|gte|step N]",
+      "match": "(\\[)\\s*(lt|lte|gt|gte|step)\\s+(-?[0-9]+(?:\\.[0-9]+)?)\\s*(\\])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.validator.cloesce" },
+        "3": { "name": "constant.numeric.cloesce" },
+        "4": { "name": "punctuation.definition.tag.end.cloesce" }
+      }
+    },
+
+    "tag-validator-len": {
+      "comment": "[len|minlen|maxlen N]",
+      "match": "(\\[)\\s*(len|minlen|maxlen)\\s+([0-9]+)\\s*(\\])",
+      "captures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.validator.cloesce" },
+        "3": { "name": "constant.numeric.cloesce" },
+        "4": { "name": "punctuation.definition.tag.end.cloesce" }
+      }
+    },
+
+    "tag-validator-regex": {
+      "comment": "[regex /pattern/]",
+      "begin": "(\\[)\\s*(regex)\\b",
+      "end": "\\]",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.cloesce" },
+        "2": { "name": "storage.modifier.tag.validator.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.tag.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#regex-literal" }
+      ]
+    },
+
+    "env-block": {
+      "comment": "env { d1 { db } kv { ns } r2 { bucket } vars { NAME: type } }",
+      "begin": "\\b(env)\\b\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.env.cloesce" },
+        "2": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "begin": "\\b(d1|kv|r2|vars)\\b\\s*(\\{)",
+          "end": "\\}",
+          "beginCaptures": {
+            "1": { "name": "storage.type.binding.cloesce" },
+            "2": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#builtin-types" },
+            { "include": "#generic-types" },
+            {
+              "name": "variable.other.binding.cloesce",
+              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+            }
+          ]
+        }
+      ]
+    },
+
+    "inject-block": {
+      "comment": "Top-level: inject { Name1 Name2 }",
+      "begin": "\\b(inject)\\b\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.inject.cloesce" },
+        "2": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#type-name" },
+        { "include": "#identifier" }
+      ]
+    },
+
+    "service-block": {
+      "comment": "Top-level: service { Name1 Name2 }",
+      "begin": "\\b(service)\\b\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.service.cloesce" },
+        "2": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#type-name" },
+        { "include": "#identifier" }
+      ]
+    },
+
+    "model-declaration": {
+      "comment": "model ModelName { ... }",
+      "begin": "\\b(model)\\s+([A-Z][a-zA-Z0-9_]*)\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.model.cloesce" },
+        "2": { "name": "entity.name.type.model.cloesce" },
+        "3": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#tags" },
+        { "include": "#foreign-block" },
+        { "include": "#nav-block" },
+        { "include": "#kv-r2-block" },
+        { "include": "#model-sub-block" },
+        { "include": "#expression" }
+      ]
+    },
+
+    "model-sub-block": {
+      "comment": "primary | optional | unique | keyfield | paginated { ... }",
+      "begin": "\\b(primary|optional|unique|keyfield|paginated)\\b\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.model.cloesce" },
+        "2": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#tags" },
+        { "include": "#foreign-block" },
+        { "include": "#kv-r2-block" },
+        { "include": "#expression" }
+      ]
+    },
+
+    "foreign-block": {
+      "comment": "foreign(AdjModel::field) [primary|optional|unique] { localField nav { ... } }",
+      "begin": "\\b(foreign)\\b\\s*(?=\\()",
+      "end": "(?<=\\})",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.foreign.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.parens.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.parens.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#double-colon" },
+            { "include": "#type-name" },
+            { "include": "#identifier" },
+            {
+              "name": "punctuation.separator.comma.cloesce",
+              "match": ","
+            }
+          ]
+        },
+        {
+          "name": "storage.modifier.qualifier.cloesce",
+          "match": "\\b(primary|optional|unique)\\b"
+        },
+        { "include": "#nav-block" },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#tags" },
+            { "include": "#nav-block" },
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+
+    "nav-block": {
+      "comment": "nav(...) { ... }  or  nav { ... }",
+      "begin": "\\b(nav)\\b(?=\\s*[\\(\\{])",
+      "end": "(?<=\\})",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.nav.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.parens.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.parens.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#double-colon" },
+            { "include": "#type-name" },
+            { "include": "#identifier" },
+            {
+              "name": "punctuation.separator.comma.cloesce",
+              "match": ","
+            }
+          ]
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+
+    "kv-r2-block": {
+      "comment": "kv(binding, \"key/{interp}\") [paginated] { field: type }   or  r2(binding, \"key\") [paginated] { field }",
+      "begin": "\\b(kv|r2)\\b\\s*(?=\\()",
+      "end": "(?<=\\})",
+      "beginCaptures": {
+        "1": { "name": "storage.type.binding.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.parens.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.parens.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#string" },
+            {
+              "name": "punctuation.separator.comma.cloesce",
+              "match": ","
+            },
+            {
+              "name": "variable.other.binding.cloesce",
+              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+            }
+          ]
+        },
+        {
+          "name": "keyword.control.paginated.cloesce",
+          "match": "\\b(paginated)\\b"
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#tags" },
+            { "include": "#expression" }
+          ]
+        }
+      ]
+    },
+
+    "api-declaration": {
+      "comment": "api Name { http_verb methodName(params) -> return }",
+      "begin": "\\b(api)\\s+([A-Z][a-zA-Z0-9_]*)\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.api.cloesce" },
+        "2": { "name": "entity.name.type.api.cloesce" },
+        "3": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#tags" },
+        { "include": "#api-method" },
+        { "include": "#expression" }
+      ]
+    },
+
+    "api-method": {
+      "comment": "http_verb methodName(...)",
+      "match": "\\b(get|post|put|patch|delete)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.control.http-verb.cloesce" },
+        "2": { "name": "entity.name.function.method.cloesce" }
+      }
+    },
+
+    "source-declaration": {
+      "comment": "source Name for Model { include { ... } sql get/list(...) { \"...\" } }",
+      "begin": "\\b(source)\\s+([A-Z][a-zA-Z0-9_]*)\\s+(for)\\s+([A-Z][a-zA-Z0-9_]*)\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.source.cloesce" },
+        "2": { "name": "entity.name.type.source.cloesce" },
+        "3": { "name": "keyword.other.for.cloesce" },
+        "4": { "name": "entity.name.type.model.cloesce" },
+        "5": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#include-block" },
+        { "include": "#sql-method" },
+        { "include": "#expression" }
+      ]
+    },
+
+    "include-block": {
+      "comment": "include { ident   ident { ... } }",
+      "begin": "\\b(include)\\b\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.include.cloesce" },
+        "2": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#include-block-body" }
+      ]
+    },
+
+    "include-block-body": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#include-block-body" }
+          ]
+        },
+        {
+          "name": "variable.other.member.cloesce",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+
+    "sql-method": {
+      "comment": "sql get/list(params) { \"SQL\" }",
+      "begin": "\\b(sql)\\s+(get|list)\\b",
+      "end": "(?<=\\})",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.sql.cloesce" },
+        "2": { "name": "keyword.control.crud.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "begin": "\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.parens.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.parens.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#tags" },
+            { "include": "#expression" },
+            {
+              "name": "punctuation.separator.comma.cloesce",
+              "match": ","
+            }
+          ]
+        },
+        {
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.block.begin.cloesce" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.block.end.cloesce" }
+          },
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#sql-string" }
+          ]
+        }
+      ]
+    },
+
+    "sql-string": {
+      "name": "string.quoted.double.sql.cloesce",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.cloesce" }
+      },
+      "contentName": "meta.embedded.block.sql source.sql",
+      "patterns": [
+        {
+          "name": "variable.other.parameter.sql",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+        },
+        {
+          "name": "keyword.other.DML.sql",
+          "match": "(?i)\\b(SELECT|FROM|WHERE|AND|OR|NOT|IN|LIKE|LIMIT|OFFSET|ORDER\\s+BY|GROUP\\s+BY|HAVING|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|ON|AS|DISTINCT|BETWEEN|EXISTS|UNION|ALL|ANY|CASE|WHEN|THEN|ELSE|END|IS|NULL|WITH|RETURNING)\\b"
+        },
+        {
+          "name": "keyword.other.DDL.sql",
+          "match": "(?i)\\b(CREATE|TABLE|ALTER|DROP|INDEX|PRIMARY|KEY|FOREIGN|REFERENCES|CONSTRAINT|DEFAULT|CHECK|UNIQUE|CASCADE)\\b"
+        },
+        {
+          "name": "support.function.aggregate.sql",
+          "match": "(?i)\\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT|TOTAL)\\b"
+        },
+        {
+          "name": "support.function.sql",
+          "match": "(?i)\\b(COALESCE|IFNULL|CAST|SUBSTR|LENGTH|TRIM|UPPER|LOWER|REPLACE|ROUND|ABS|TYPEOF|GLOB|INSTR|HEX|QUOTE|RANDOM|RANDOMBLOB|ZEROBLOB|NULLIF|IIF|LIKELY|UNLIKELY)\\b"
+        },
+        {
+          "name": "keyword.operator.sort.sql",
+          "match": "(?i)\\b(ASC|DESC)\\b"
+        },
+        {
+          "name": "keyword.other.interpolation.sql",
+          "match": "\\$include\\b"
+        },
+        {
+          "name": "constant.other.column.sql",
+          "begin": "\\[",
+          "end": "\\]",
+          "patterns": [
+            {
+              "name": "punctuation.accessor.sql",
+              "match": "\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.sql",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "constant.numeric.sql",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        },
+        {
+          "name": "keyword.operator.star.sql",
+          "match": "\\*"
+        },
+        {
+          "name": "keyword.operator.comparison.sql",
+          "match": "(=|!=|<>|<=|>=|<|>)"
+        }
+      ]
+    },
+
+    "poo-declaration": {
+      "comment": "poo Name { field: type }",
+      "begin": "\\b(poo)\\s+([A-Z][a-zA-Z0-9_]*)\\s*(\\{)",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.poo.cloesce" },
+        "2": { "name": "entity.name.type.poo.cloesce" },
+        "3": { "name": "punctuation.section.block.begin.cloesce" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.cloesce" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#tags" },
+        { "include": "#expression" }
+      ]
+    }
+  }
+}
