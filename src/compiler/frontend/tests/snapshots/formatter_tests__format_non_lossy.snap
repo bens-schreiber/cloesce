@@ -157,7 +157,7 @@ model ModelWithR2 {
 }
 
 api ModelWithR2 {
-    post hasR2ParamAndRes(self, input: R2Object) -> R2Object
+    post hasR2ParamAndRes(self, input: r2object) -> r2object
 }
 
 [use db]

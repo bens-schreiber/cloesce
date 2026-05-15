@@ -1,0 +1,41 @@
+{
+  "name": "cloesce-lang",
+  "displayName": "Cloesce Language Support",
+  "description": "Syntax highlighting for the Cloesce schema language",
+  "version": "0.4.0",
+  "publisher": "BenSchreiber",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bens-schreiber/cloesce"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "cloesce",
+        "aliases": [
+          "Cloesce",
+          "cloesce"
+        ],
+        "extensions": [
+          ".cloesce",
+          ".clo"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cloesce",
+        "scopeName": "source.cloesce",
+        "path": "./syntaxes/cloesce.tmLanguage.json"
+      }
+    ]
+  }
+}

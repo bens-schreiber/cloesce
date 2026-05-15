@@ -128,7 +128,7 @@ contextual_keywords! {
     TJson => "json",
     TBlob => "blob",
     TStream => "stream",
-    TR2Object => "R2Object",
+    TR2Object => "r2object",
 }
 
 pub fn fmt_cidl_type(ty: &CidlType) -> String {
@@ -158,7 +158,7 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
         CidlType::KvObject(inner) => {
             format!("{}<{}>", Keyword::GKvObject.as_str(), fmt_cidl_type(inner))
         }
-        _ => unreachable!("unsupported CIDL type in fmt_cidl_type"),
+        CidlType::Void => panic!("void type should not appear in CidlType formatting"),
     }
 }
 

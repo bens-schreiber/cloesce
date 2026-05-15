@@ -1,0 +1,250 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cloesce",
+  "scopeName": "source.cloesce",
+  "fileTypes": [
+    "cloesce",
+    "clo"
+  ],
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#sql-string"
+    },
+    {
+      "include": "#tag"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#regex-literal"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#self-keyword"
+    },
+    {
+      "include": "#declaration"
+    },
+    {
+      "include": "#http-verb"
+    },
+    {
+      "include": "#sql-keyword"
+    },
+    {
+      "include": "#structural-keyword"
+    },
+    {
+      "include": "#binding-keyword"
+    },
+    {
+      "include": "#generic-type"
+    },
+    {
+      "include": "#builtin-type"
+    },
+    {
+      "include": "#arrow"
+    },
+    {
+      "include": "#double-colon"
+    },
+    {
+      "include": "#type-name"
+    },
+    {
+      "include": "#identifier"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.cloesce",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.cloesce",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "variable.other.interpolation.cloesce",
+          "match": "\\{[a-zA-Z_][a-zA-Z0-9_]*\\}"
+        },
+        {
+          "name": "constant.character.escape.cloesce",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "regex-literal": {
+      "name": "string.regexp.cloesce",
+      "begin": "/(?=[^/\\n])",
+      "end": "/",
+      "patterns": [
+        {
+          "name": "constant.character.escape.cloesce",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.cloesce",
+      "match": "\\b-?[0-9]+(?:\\.[0-9]+)?\\b"
+    },
+    "arrow": {
+      "name": "keyword.operator.arrow.cloesce",
+      "match": "->"
+    },
+    "double-colon": {
+      "name": "keyword.operator.namespace.cloesce",
+      "match": "::"
+    },
+    "self-keyword": {
+      "name": "variable.language.self.cloesce",
+      "match": "\\bself\\b"
+    },
+    "declaration": {
+      "comment": "Top-level block keywords",
+      "name": "keyword.declaration.cloesce",
+      "match": "\\b(env|inject|service|model|api|source|poo)\\b"
+    },
+    "http-verb": {
+      "comment": "HTTP verbs (also includes get/list/save used by crud and sql, since they share the same token color naturally)",
+      "name": "keyword.control.http.cloesce",
+      "match": "\\b(get|post|put|patch|delete|list|save)\\b"
+    },
+    "sql-keyword": {
+      "name": "keyword.other.sql.cloesce",
+      "match": "\\b(sql)\\b"
+    },
+    "structural-keyword": {
+      "comment": "Block/sub-block keywords used by the parser",
+      "name": "keyword.other.cloesce",
+      "match": "\\b(primary|optional|unique|foreign|nav|keyfield|paginated|include|for|crud|use|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
+    },
+    "binding-keyword": {
+      "comment": "Storage binding kinds",
+      "name": "storage.type.binding.cloesce",
+      "match": "\\b(d1|kv|r2|vars)\\b"
+    },
+    "builtin-type": {
+      "name": "support.type.primitive.cloesce",
+      "match": "\\b(string|int|real|date|bool|json|blob|stream|r2object)\\b"
+    },
+    "generic-type": {
+      "name": "support.type.generic.cloesce",
+      "match": "\\b(option|array|kvobject|partial)\\b"
+    },
+    "type-name": {
+      "comment": "PascalCase identifiers — visually distinguishes model/source/poo references",
+      "name": "entity.name.type.cloesce",
+      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+    },
+    "identifier": {
+      "name": "variable.other.cloesce",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    },
+    "sql-string": {
+      "comment": "`sql get|list (...) { \"...\" }` — string body is delegated to the built-in SQL grammar",
+      "begin": "\\b(sql)\\s+(get|list)\\b",
+      "end": "(?<=\\})",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.sql.cloesce"
+        },
+        "2": {
+          "name": "keyword.control.http.cloesce"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comment"
+        },
+        {
+          "include": "#tag"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#self-keyword"
+        },
+        {
+          "include": "#structural-keyword"
+        },
+        {
+          "include": "#builtin-type"
+        },
+        {
+          "include": "#generic-type"
+        },
+        {
+          "include": "#type-name"
+        },
+        {
+          "include": "#identifier"
+        },
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.sql.cloesce",
+          "contentName": "meta.embedded.block.sql",
+          "patterns": [
+            {
+              "include": "source.sql"
+            }
+          ]
+        }
+      ]
+    },
+    "tag": {
+      "comment": "Anything wrapped in [ ... ] — picks up tag keyword via inner patterns",
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.begin.cloesce"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.tag.end.cloesce"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#regex-literal"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#structural-keyword"
+        },
+        {
+          "include": "#http-verb"
+        },
+        {
+          "include": "#type-name"
+        },
+        {
+          "name": "variable.other.cloesce",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        },
+        {
+          "name": "punctuation.separator.comma.cloesce",
+          "match": ","
+        }
+      ]
+    }
+  }
+}

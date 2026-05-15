@@ -695,7 +695,7 @@ fn api_errors() {
 
         // R2Object parameter on GET
         api User {
-            get badGetR2(r: R2Object) -> string
+            get badGetR2(r: r2object) -> string
         }
 
         // Stream param with extra non-inject params (invalid)

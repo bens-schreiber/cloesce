@@ -661,7 +661,7 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
 
         let params = comma_separated(&self.parameters, |param| ctx.spd_doc(param, 0, true));
 
-        tags_doc
+        let signature = tags_doc
             .then(Doc::text(match &self.http_verb {
                 HttpVerb::Get => Keyword::Get.as_str(),
                 HttpVerb::Post => Keyword::Post.as_str(),
@@ -673,8 +673,15 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
             .then(Doc::text(self.symbol.name))
             .then(Doc::text("("))
             .then(params)
-            .then(Doc::text(") -> "))
-            .then(Doc::owned(fmt_cidl_type(&self.return_type)))
+            .then(Doc::text(")"));
+
+        if matches!(self.return_type, CidlType::Void) {
+            signature
+        } else {
+            signature
+                .then(Doc::text(" -> "))
+                .then(Doc::owned(fmt_cidl_type(&self.return_type)))
+        }
     }
 }
 
