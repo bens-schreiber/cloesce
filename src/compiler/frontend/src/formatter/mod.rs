@@ -495,7 +495,10 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
             ModelBlockKind::Primary(blocks) => model_block(Keyword::Primary.as_str(), blocks, ctx),
-            ModelBlockKind::Unique(blocks) => model_block(Keyword::Unique.as_str(), blocks, ctx),
+            ModelBlockKind::Unique(fields) => Doc::kw(Keyword::Unique)
+                .then(Doc::text(" ("))
+                .then(comma_separated(fields, |sym| ctx.sym_doc(sym, 0, true)))
+                .then(Doc::text(")")),
             ModelBlockKind::Optional(blocks) => {
                 model_block(Keyword::Optional.as_str(), blocks, ctx)
             }
@@ -546,7 +549,6 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
         let qualifier = match &self.qualifier {
             Some(ForeignQualifier::Primary) => Doc::text(" ").then(Doc::kw(Keyword::Primary)),
             Some(ForeignQualifier::Optional) => Doc::text(" ").then(Doc::kw(Keyword::Optional)),
-            Some(ForeignQualifier::Unique) => Doc::text(" ").then(Doc::kw(Keyword::Unique)),
             None => Doc::nil(),
         };
 

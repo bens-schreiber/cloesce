@@ -342,6 +342,9 @@ fn model_primary_unique_optional_foreign() {
         [crud get, save, list]
         model M {
             score: real
+            a: int
+            b: int
+            role: string
 
             primary {
                 id: int
@@ -351,22 +354,17 @@ fn model_primary_unique_optional_foreign() {
 
             foreign(Tag::id) { tagId }
             foreign(Person::id) primary { personId }
-            foreign(Org::id) unique { orgId }
+            foreign(Org::id) { orgId2 }
             foreign(Author::id) optional { authorId }
+            foreign(Dept::id) { deptId }
 
             optional {
                 foreign(Draft::id) { draftId }
             }
 
-            unique {
-                a: int
-                b: int
-            }
-
-            unique {
-                foreign(Dept::id) unique { deptId }
-                role: string
-            }
+            unique (a, b)
+            unique (orgId2)
+            unique (deptId, role)
         }
         "#,
     );
@@ -399,15 +397,15 @@ fn model_primary_unique_optional_foreign() {
             && cruds.iter().any(|c| matches!(c, CrudKind::List))
     );
 
-    let col = m
+    let columns: Vec<&str> = m
         .blocks
         .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Column(s) => Some(s),
+        .filter_map(|spd| match &spd.inner {
+            ModelBlockKind::Column(s) => Some(s.name),
             _ => None,
         })
-        .unwrap();
-    assert_eq!((col.name, &col.cidl_type), ("score", &CidlType::Real));
+        .collect();
+    assert!(columns.contains(&"score"));
 
     let primary = m
         .blocks
@@ -463,19 +461,6 @@ fn model_primary_unique_optional_foreign() {
         Some(frontend::ForeignQualifier::Primary)
     ));
 
-    let org_fb = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Org", "id")]) => Some(fb),
-            _ => None,
-        })
-        .unwrap();
-    assert!(matches!(
-        org_fb.qualifier,
-        Some(frontend::ForeignQualifier::Unique)
-    ));
-
     let author_fb = m
         .blocks
         .iter()
@@ -496,28 +481,19 @@ fn model_primary_unique_optional_foreign() {
         .unwrap();
     assert_eq!(sql_foreigns(opt)[0].fields[0].name, "draftId");
 
-    let uniques: Vec<&Vec<Spd<SqlBlockKind>>> = m
+    let uniques: Vec<Vec<&str>> = m
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
-            ModelBlockKind::Unique(blocks) => Some(blocks),
+            ModelBlockKind::Unique(fields) => {
+                Some(fields.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
             _ => None,
         })
         .collect();
-    assert!(uniques.iter().any(|u| sql_columns(u) == vec!["a", "b"]));
-
-    let dept_unique = uniques
-        .iter()
-        .find(|u| {
-            u.iter()
-                .any(|b| matches!(&b.inner, SqlBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Dept", "id")])))
-        })
-        .unwrap();
-    assert_eq!(sql_columns(dept_unique), vec!["role"]);
-    assert!(matches!(
-        sql_foreigns(dept_unique)[0].qualifier,
-        Some(frontend::ForeignQualifier::Unique)
-    ));
+    assert!(uniques.iter().any(|u| u == &vec!["a", "b"]));
+    assert!(uniques.iter().any(|u| u == &vec!["orgId2"]));
+    assert!(uniques.iter().any(|u| u == &vec!["deptId", "role"]));
 }
 
 #[test]

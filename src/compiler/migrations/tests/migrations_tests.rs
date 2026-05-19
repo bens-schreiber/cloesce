@@ -595,16 +595,13 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
-                        email: string
-                    }
-
-                    unique {
-                        first_name: string
-                        last_name: string
-                    }
-
+                    email: string
+                    first_name: string
+                    last_name: string
                     age: int
+
+                    unique (email)
+                    unique (first_name, last_name)
                 }
             "#,
             );
@@ -640,18 +637,14 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
-                        email: string
-                    }
+                    email: string
+                    first_name: string
+                    last_name: string
+                    age: int
 
-                    unique {
-                        first_name: string
-                        last_name: string
-                    }
-
-                    unique {
-                        age: int
-                    }
+                    unique (email)
+                    unique (first_name, last_name)
+                    unique (age)
                 }
             "#,
             );
@@ -688,16 +681,13 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
-                        email: string
-                    }
-
-                    unique {
-                        first_name: string
-                        last_name: string
-                    }
-
+                    email: string
+                    first_name: string
+                    last_name: string
                     age: int
+
+                    unique (email)
+                    unique (first_name, last_name)
                 }
             "#,
             );

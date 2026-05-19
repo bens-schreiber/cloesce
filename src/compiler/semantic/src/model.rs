@@ -211,24 +211,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Unique(blocks) => {
-                    let binding = binding.unwrap().inner;
-                    let qual = FieldQualifiers {
-                        unique_ids: vec![self.unique_seed],
-                        ..Default::default()
-                    };
-                    self.unique_seed += 1;
-
-                    for block in blocks {
-                        match &block.inner {
-                            SqlBlockKind::Column(symbol) => {
-                                self.column(ma, symbol, qual.clone());
-                            }
-                            SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding, foreign_block, qual.clone())
-                            }
-                        }
-                    }
+                ModelBlockKind::Unique(_) => {
+                    // Processed once all columns are built
                 }
                 ModelBlockKind::Optional(blocks) => {
                     let binding = binding.unwrap().inner;
@@ -299,6 +283,12 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         }
 
+        for block in self.model.blocks.inners() {
+            if let ModelBlockKind::Unique(fields) = block {
+                self.unique_constraint(ma, fields);
+            }
+        }
+
         if binding.is_some() && !self.has_defined_pk {
             ma.sink
                 .push(SemanticError::D1ModelMissingPrimaryKey { model: self.symbol });
@@ -366,7 +356,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 validators,
             },
             foreign_key_reference: None,
-            unique_ids: qual.unique_ids,
+            unique_ids: Vec::new(),
             composite_id: None,
         };
 
@@ -374,6 +364,37 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             self.primary_columns.push(col);
         } else {
             self.columns.push(col);
+        }
+    }
+
+    fn unique_constraint(&mut self, ma: &mut ModelAnalysis<'src, 'p>, fields: &'p [Symbol<'src>]) {
+        let mut targets: Vec<usize> = Vec::new();
+        for field in fields {
+            if self
+                .primary_columns
+                .iter()
+                .any(|c| c.field.name == field.name)
+            {
+                // References to primary-key columns can just be
+                // dropped, since the PK is already unique.
+                continue;
+            }
+            match self.columns.iter().position(|c| c.field.name == field.name) {
+                Some(i) => targets.push(i),
+                None => ma
+                    .sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: field }),
+            }
+        }
+
+        if targets.is_empty() {
+            return;
+        }
+
+        let id = self.unique_seed;
+        self.unique_seed += 1;
+        for idx in targets {
+            self.columns[idx].unique_ids.push(id);
         }
     }
 
@@ -388,10 +409,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         // Add to qualifiers
         qual.is_optional |= fk.is_optional();
         qual.is_primary |= matches!(fk.qualifier, Some(ForeignQualifier::Primary));
-        if matches!(fk.qualifier, Some(ForeignQualifier::Unique)) {
-            qual.unique_ids.push(self.unique_seed);
-            self.unique_seed += 1;
-        }
         self.has_defined_pk |= qual.is_primary;
 
         // Check that the adjacent model exists
@@ -505,7 +522,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     model_name: adj_model_sym.name,
                     column_name: adj_field_sym.name,
                 }),
-                unique_ids: qual.unique_ids.clone(),
+                unique_ids: Vec::new(),
                 composite_id,
             };
 
@@ -856,7 +873,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 struct FieldQualifiers {
     is_optional: bool,
     is_primary: bool,
-    unique_ids: Vec<usize>,
 }
 
 /// Extracts braced variables from a format string.

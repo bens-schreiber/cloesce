@@ -97,6 +97,8 @@ model Person {
 }
 ```
 
+The valid infix qualifiers for a `foreign` block are `primary` and `optional`.
+
 ### Composite Foreign Key
 
 A Model can have a composite primary key by listing multiple fields in a primary block. Similarly, a Model can have a composite foreign key by listing multiple fields in a foreign block.
@@ -162,7 +164,10 @@ model Course {
 
 ## Unique Constraint
 
-The `unique` block allows you to define unique constraints across any number of fields in a Model. It translates to the SQLite `UNIQUE` constraint.
+The `unique (field1, field2, ...)` declaration adds a unique constraint over one or more
+existing fields on a Model. It translates to the SQLite `UNIQUE` constraint.
+
+Unlike `primary` or `optional`, `unique` does **not** declare fields it references fields. A field may participate in any number of unique constraints.
 
 ```cloesce
 model User {
@@ -170,29 +175,25 @@ model User {
         id: int
     }
 
-    unique {
-        email: string
+    email: string
+    username: string
 
-        foreign (Profile::id) {
-            profileId
-        }
-
-        // Infix form is also supported for foreign keys,
-        // even under a unique block
-        foreign (Dog::id) unique {
-            dogId
-        }
+    foreign (Profile::id) {
+        profileId
     }
 
-    unique {
-        username: string
+    foreign (Dog::id) {
+        dogId
     }
+
+    // The combination (email, profileId, dogId) must be unique.
+    unique (email, profileId, dogId)
+
+    // `username` must be unique on its own.
+    unique (username)
+
+    // `dogId` must also be unique on its own — a field can participate in
+    // multiple, independent unique constraints.
+    unique (dogId)
 }
 ```
-
-The above `User` Model has four unique constraints:
-
-1. The combination of `email`, `profileId`, and `dogId` must be unique across all rows in the `User` table.
-2. `dogId` must be unique across all rows in the `User` table.
-3. `username` must be unique across all rows in the `User` table.
-4. `id` is unique across all rows in the `User` table by virtue of being a primary key.

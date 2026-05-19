@@ -20,7 +20,7 @@ fn foreign_nav_block<'tokens, 'src: 'tokens>()
         .map_spanned(|s| s)
 }
 
-/// `foreign(AdjModel::field1, ...) [primary|optional|unique] { localField ... nav { navName } }`
+/// `foreign(AdjModel::field1, ...) [primary|optional] { localField ... nav { navName } }`
 fn foreign_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
     let adj_ref = symbol()
@@ -30,7 +30,6 @@ fn foreign_block<'tokens, 'src: 'tokens>()
     let qualifier = choice((
         kw!(Primary).to(ForeignQualifier::Primary),
         kw!(Optional).to(ForeignQualifier::Optional),
-        kw!(Unique).to(ForeignQualifier::Unique),
     ))
     .or_not();
 
@@ -128,12 +127,14 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(ModelBlockKind::Optional),
     );
 
-    // `unique { foreign(...) { ... } | typed_symbol ... }`
+    // `unique (field1, field2, ...)`
     let unique_block = kw!(Unique).ignore_then(
-        choice_sql()
-            .repeated()
+        symbol()
+            .separated_by(just(Token::Comma))
+            .at_least(1)
+            .allow_trailing()
             .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .delimited_by(just(Token::LParen), just(Token::RParen))
             .map(ModelBlockKind::Unique),
     );
 
