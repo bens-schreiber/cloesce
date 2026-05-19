@@ -87,8 +87,6 @@ model Person {
 }
 ```
 
-`optional` is the only modifier available on a `foreign` block.
-
 ### Composite Foreign Key
 
 A Model can have a composite primary key by listing multiple fields in a primary block. Similarly, a Model can have a composite foreign key by listing multiple fields in a foreign block.
@@ -146,9 +144,7 @@ model Course {
 ## Unique Constraint
 
 The `unique (field1, field2, ...)` declaration adds a unique constraint over one or more
-existing fields on a Model. It translates to the SQLite `UNIQUE` constraint.
-
-Unlike `primary` and `column`, `unique` does **not** declare fields; it references existing fields. A field may participate in any number of unique constraints.
+existing fields on a Model. It translates to the SQLite `UNIQUE` constraint. A field may participate in any number of unique constraints.
 
 ```cloesce
 model User {

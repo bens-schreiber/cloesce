@@ -8,7 +8,7 @@
 - `crud` tag for Models
 - `instance` tag for Data Source `get` method
 - `inject` tag for API methods to inject environment bindings or injected dependencies into the method.
-- `column` block 
+- `column` block
 
 ### Changed
 
