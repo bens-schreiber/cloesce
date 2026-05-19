@@ -11,9 +11,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
       - name: Setup Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -52,3 +49,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy docs/book --project-name=cloesce --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          packageManager: npm
