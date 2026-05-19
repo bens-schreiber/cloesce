@@ -1,16 +1,12 @@
 # Building and Migrating
 
-Building a Cloesce project consists of three steps
+## Configuration
 
-1. Compilation
-2. Running database migrations
-3. Building your frontend code
+Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`. 
 
-## Cloesce Config
+This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
 
-A cloesce config may be defined in a `cloesce.jsonc` file in your project root. This file is used to configure various aspects of the Cloesce compiler and generated code, such as source paths for your schema, the output directory for generated files, and the format of the generated Wrangler configuration file.
-
-```jsonc
+```json
 {
   "src_paths": ["./src/schema"],
   "workers_url": "http://localhost:5000/api",
@@ -18,44 +14,39 @@ A cloesce config may be defined in a `cloesce.jsonc` file in your project root. 
 }
 ```
 
-If you have multiple environments (e.g., staging, tests, production), you can define multiple config files by prefixing the name: `staging.cloesce.jsonc`, `production.cloesce.jsonc`, etc. Then, specify which environment to use when running the CLI command:
+Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`). Select the desired configuration file using the `--env` flag when running Cloesce commands:
 
 ```bash
 cloesce --env staging ...
 ```
 
-## Compiling
+## Compilation
 
-In your project directory, run the following command to compile your Cloesce Models:
+Compilation will transform your Cloesce schema into backend stubs and a client side API under the `.cloesce` directory. In your project directory, run the following command to compile your schema:
 
 ```bash
 cloesce compile
 ```
 
-This command looks for a `cloesce.jsonc` file in your current directory, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used. Because `cloesce.jsonc` is JSONC, it provides static configuration rather than executable code. For environment-specific settings, use separate config files such as `staging.cloesce.jsonc` or `production.cloesce.jsonc` and select them with `cloesce --env <name> ...`; for values that need to vary at invocation time, prefer supported CLI flags in your build or deployment scripts.
+Any generated artifacts should not be modified directly or committed to source control. Simply import them into your backend and client code, relying on a build step to run the Cloesce compiler and keep the generated code up to date.
 
-After compilation, a `.cloesce` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build.
+## Migrations
 
-| File         | Description                                                                                                                                                                                                                                               |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cidl.json`  | The Cloesce Interface Definition Language AST exported to JSON. This file is used internally by Cloesce during migrations, and is utilized by the generated backend code as a source of truth for the structure of your Models and their linked features. |
-| `client.ts`  | The generated client code for accessing your Models from the frontend. Import this file in your frontend code to interact with your Cloesce Models over HTTP.                                                                                             |
-| `backend.ts` | The generated Cloesce ORM and API stubs for your backend. All Cloesce features translate to a namespace or interface in this file.                                                                                                                        |
-
-## Generating Migrations
-
-To generate database migration files based on changes to your Cloesce Models, run the following command:
+Cloesce supports any number of [D1](https://developers.cloudflare.com/d1/) databases in a single project. To generate SQL migration files for a specific D1 binding, run the following command:
 
 ```bash
-cloesce migrate <d1-binding> <migration-name>
+cloesce migrate --binding <d1-binding> <migration-name>
+```
 
-# Or to generate a migration for all D1 bindings:
+To generate migrations for all D1 bindings in your project, use the `--all` flag:
+
+```bash
 cloesce migrate --all <migration-name>
 ```
 
-This command compares your current Cloesce Models against the last applied migration and generates a new migration file in the `migrations/<d1-binding>` folder with the specified `<migration-name>`. The migration file contains SQL statements to update your D1 database schema to match your Models.
+### Applying Migrations
 
-You must apply the generated migrations to your D1 database using the Wrangler CLI:
+Cloesce will only generate the SQL for migrations. You must apply the generated migrations to your D1 database using the Wrangler CLI:
 
 ```bash
 npx wrangler d1 migrations apply <d1-binding-name>
@@ -63,8 +54,16 @@ npx wrangler d1 migrations apply <d1-binding-name>
 
 ## Running
 
-After compiling and applying migrations, you can build and run your application locally using Wrangler:
+After compilation and migrations, run your application locally with Wrangler:
 
 ```bash
 npx wrangler dev --port <port-number>
+```
+
+## Deploying
+
+Deploy your application to Cloudflare's edge with Wrangler:
+
+```bash
+npx wrangler deploy
 ```
