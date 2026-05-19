@@ -15,7 +15,6 @@ export namespace FooService {
     export const Tag = "FooService" as const;
 
     export interface Api {
-
         method(
             env: {
                 InjectedThing: InjectedThing,

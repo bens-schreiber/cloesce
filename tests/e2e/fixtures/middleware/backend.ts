@@ -25,10 +25,8 @@ export namespace Foo {
     }
 
     export interface Api {
-
         blockedMethod(
         ): ApiResult<void>;
-
         getInjectedThing(
             env: {
                 InjectedThing: InjectedThing,
@@ -44,28 +42,28 @@ export namespace Foo {
     export namespace Source {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: string) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`).bind(id),
-            async get(env: Env, id: string): Promise<CloesceResult<Foo.Self | null>> {
+            getQuery: (env: { db: Env["db"] }, id: string) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`).bind(id),
+            async get(env: { db: Env["db"] }, id: string): Promise<CloesceResult<Foo.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Foo.Self>(Foo.Meta, Foo.Source.Default.getQuery(env, id), Foo.Source.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: string, limit: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" > ?1 ORDER BY "Foo"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: Env, lastSeen_id: string, limit: number): Promise<CloesceResult<Foo.Self[]>> {
+            listQuery: (env: { db: Env["db"] }, lastSeen_id: string, limit: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" > ?1 ORDER BY "Foo"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { db: Env["db"] }, lastSeen_id: string, limit: number): Promise<CloesceResult<Foo.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<Foo.Self>(Foo.Meta, Foo.Source.Default.listQuery(env, lastSeen_id, limit), Foo.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Foo.Self[]>> {
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Foo.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -78,7 +76,7 @@ export namespace Foo {
             return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
         }
 
-        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
         }
     }

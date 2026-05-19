@@ -14,7 +14,6 @@ export namespace BlobService {
     export const Tag = "BlobService" as const;
 
     export interface Api {
-
         incrementBlob(
             b: Uint8Array,
         ): ApiResult<Uint8Array>;
@@ -40,15 +39,12 @@ export namespace BlobHaver {
     }
 
     export interface Api {
-
         getBlob1(
             self: BlobHaver.Self,
         ): ApiResult<Uint8Array>;
-
         inputStream(
             s: CfReadableStream,
         ): ApiResult<void>;
-
         yieldStream(
             self: BlobHaver.Self,
         ): ApiResult<CfReadableStream>;
@@ -62,28 +58,28 @@ export namespace BlobHaver {
     export namespace Source {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" = ?1`).bind(id),
-            async get(env: Env, id: number): Promise<CloesceResult<BlobHaver.Self | null>> {
+            getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" = ?1`).bind(id),
+            async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<BlobHaver.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.Source.Default.getQuery(env, id), BlobHaver.Source.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" > ?1 ORDER BY "BlobHaver"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: Env, lastSeen_id: number, limit: number): Promise<CloesceResult<BlobHaver.Self[]>> {
+            listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" > ?1 ORDER BY "BlobHaver"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<BlobHaver.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.Source.Default.listQuery(env, lastSeen_id, limit), BlobHaver.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<BlobHaver.Self[]>> {
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<BlobHaver.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -96,7 +92,7 @@ export namespace BlobHaver {
             return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
         }
 
-        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
         }
     }

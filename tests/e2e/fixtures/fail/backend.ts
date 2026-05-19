@@ -14,7 +14,6 @@ export namespace UnregisteredService {
     export const Tag = "UnregisteredService" as const;
 
     export interface Api {
-
         unregistered(
         ): ApiResult<string>;
     }
@@ -38,11 +37,9 @@ export namespace FailModel {
     }
 
     export interface Api {
-
         throwingMethod(
             self: FailModel.Self,
         ): ApiResult<void>;
-
         numericValidators(
             self: FailModel.Self,
             gtField: number,
@@ -51,7 +48,6 @@ export namespace FailModel {
             lteField: number,
             stepField: number,
         ): ApiResult<void>;
-
         stringValidators(
             self: FailModel.Self,
             lenField: string,
@@ -69,28 +65,28 @@ export namespace FailModel {
     export namespace Source {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id),
-            async get(env: Env, id: number): Promise<CloesceResult<FailModel.Self | null>> {
+            getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id),
+            async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<FailModel.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<FailModel.Self>(FailModel.Meta, FailModel.Source.Default.getQuery(env, id), FailModel.Source.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" > ?1 ORDER BY "FailModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: Env, lastSeen_id: number, limit: number): Promise<CloesceResult<FailModel.Self[]>> {
+            listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" > ?1 ORDER BY "FailModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<FailModel.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<FailModel.Self>(FailModel.Meta, FailModel.Source.Default.listQuery(env, lastSeen_id, limit), FailModel.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: Env, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: Env, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<FailModel.Self[]>> {
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<FailModel.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -103,7 +99,7 @@ export namespace FailModel {
             return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
         }
 
-        export async function hydrate(env: Env, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
         }
     }
