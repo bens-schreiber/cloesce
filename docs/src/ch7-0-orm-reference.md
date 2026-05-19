@@ -1,4 +1,4 @@
-# Cloesce ORM
+# ORM Reference
 
 > [!CAUTION]
 > The ORM is subject to change as new features are added.

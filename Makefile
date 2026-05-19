@@ -110,11 +110,6 @@ build-docs:
 		echo "CLOESCE: pandoc not found, skipping llms-full.txt generation"; \
 	fi
 
-.PHONY: build-typedoc
-build-typedoc:
-	@echo "CLOESCE: Building TypeScript documentation using TypeDoc..."
-	cd ./$(TS_DIR) && pnpm exec typedoc --out build
-
 .PHONY: clean
 clean:
 	@echo "CLOESCE: Cleaning build artifacts..."
@@ -134,4 +129,4 @@ clean:
 	@echo "✅ Build artifacts removed!"
 
 .PHONY: all
-all: check-deps format build-src format-check build-docs build-typedoc test
+all: check-deps format build-src format-check build-docs test

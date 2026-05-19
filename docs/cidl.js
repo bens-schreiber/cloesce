@@ -1,13 +1,12 @@
-// Super basic highlight.js for the Cloesce IDL.
 hljs.registerLanguage("cloesce", function (hljs) {
-  // Top-level reserved words (actual lexer keywords)
+  // Top-level declaration keywords
   const KEYWORDS = [
     "env",
-    "model",
-    "source",
-    "service",
     "inject",
+    "service",
+    "model",
     "api",
+    "source",
     "poo",
     "sql",
     "d1",
@@ -17,37 +16,48 @@ hljs.registerLanguage("cloesce", function (hljs) {
     "self",
   ];
 
-  // Contextual block keywords
+  // Contextual block / structural keywords
   const BLOCK_KEYWORDS = [
     "primary",
-    "foreign",
     "optional",
     "unique",
-    "paginated",
-    "keyfield",
+    "foreign",
     "nav",
+    "keyfield",
+    "paginated",
     "include",
     "for",
+    "crud",
     "use",
+    "internal",
+    "instance",
+    "lt",
+    "lte",
+    "gt",
+    "gte",
+    "step",
+    "len",
+    "minlen",
+    "maxlen",
+    "regex",
   ];
 
   // CRUD / HTTP verbs
-  const VERBS = ["get", "post", "put", "patch", "delete", "save", "list"];
+  const VERBS = ["get", "post", "put", "patch", "delete", "list", "save"];
 
   const PRIMITIVES = [
     "string",
     "int",
-    "double",
+    "real",
     "date",
     "bool",
     "json",
-    "void",
     "blob",
     "stream",
-    "R2Object",
+    "r2object",
   ];
 
-  const GENERICS = ["Option", "Array", "Paginated", "KvObject", "Partial", "DataSource"];
+  const GENERICS = ["option", "array", "kvobject", "partial"];
 
   return {
     name: "cloesce",
