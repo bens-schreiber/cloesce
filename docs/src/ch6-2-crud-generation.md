@@ -70,7 +70,7 @@ source OffsetPagination for Person {
 
 The above schema will generate two API methods:
 
-- `GET /Person/$list`: Accepts arguments `limit` and `cursor`, hydrates with the Default Data Source, and returns a paginated list of `Person` instances
+- `GET /Person/$list`: Accepts arguments `limit` and `lastSeen_id`, hydrates with the Default Data Source, and returns a paginated list of `Person` instances
 
 - `GET /Person/$list_OffsetPagination`: Accepts arguments `offset` and `limit`, hydrates with the Custom Data Source, and returns a paginated list of `Person` instances
 

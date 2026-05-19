@@ -2,9 +2,11 @@
 
 ## Configuration
 
-Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`. This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
+Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`. 
 
-```jsonc
+This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
+
+```json
 {
   "src_paths": ["./src/schema"],
   "workers_url": "http://localhost:5000/api",
@@ -20,13 +22,13 @@ cloesce --env staging ...
 
 ## Compilation
 
-Compilation will generate backend stubs and a frontend API client under the `.cloesce` directory. In your project directory, run the following command to compile your Cloesce schema:
+Compilation will transform your Cloesce schema into backend stubs and a client side API under the `.cloesce` directory. In your project directory, run the following command to compile your schema:
 
 ```bash
 cloesce compile
 ```
 
-Generated artifacts should not be modified directly or committed to source control. Instead, they should be imported and used in your application code.
+Any generated artifacts should not be modified directly or committed to source control. Simply import them into your backend and client code, relying on a build step to run the Cloesce compiler and keep the generated code up to date.
 
 ## Migrations
 

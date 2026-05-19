@@ -51,7 +51,7 @@ model Image {
         id: string
     }
 
-    r2 (my_bucket, "images") paginated {
+    r2 (my_bucket, "images/") paginated {
         my_image
     }
 }

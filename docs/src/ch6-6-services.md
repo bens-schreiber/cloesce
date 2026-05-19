@@ -9,7 +9,8 @@ To define a service, you can use the following syntax:
 ```cloesce
 service {
     FooService
-    BarService
+    // BarService
+    // ...
 }
 
 api FooService {

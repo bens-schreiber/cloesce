@@ -71,7 +71,7 @@ In future releases, we plan to rely solely on the Cloesce schema for environment
 
 Once environment bindings are declared in your schema, they can be referenced and injected across your application code. Cloesce will generate the necessary code to access these bindings based on the context of where they are being used (e.g., in a [Model](./ch4-0-models.md) method, [API](./ch6-1-rest-apis.md) route handler, etc.). See [Dependency Injection](./ch6-3-dependency-injection.md) for more on injecting bindings into API methods.
 
-For example, to declare that a Model uses a [D1 database](./ch4-1-d1-backed-model.md):
+For example, to declare that a Model [backed by a D1 database](./ch4-1-d1-backed-model.md):
 
 ```cloesce
 [use my_db]
