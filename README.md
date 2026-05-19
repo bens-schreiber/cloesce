@@ -1,19 +1,19 @@
-# cloesce (alpha, v0.3.0)
+# cloesce (alpha, v0.4.0)
 
 > [!WARNING]
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
 > support across any language. The syntax and features described here are subject to change as the project evolves.
 
-**Cloesce** is a schema language (or IDL) that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). It provides a single source of truth for your application, with a single language to define:
+**Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From one language, generate an entire application with support for:
 
-| Feature            | Status |
-| ------------------ | ------ |
-| D1,KV,R2 ORM       | ✅     |
-| RPC stubs          | ✅     |
-| Middleware         | ✅     |
-| IaC                | ✅     |
-| SQL Migrations     | ✅     |
-| Runtime Validation | ✅     |
+| Feature                 | Support |
+| ----------------------- | ------- |
+| ORM                     | ✅      |
+| RPC stubs               | ✅      |
+| Infrastructure as Code  | ✅      |
+| SQL Migrations          | ✅      |
+| Middleware              | ✅      |
+| Runtime Type Validation | ✅      |
 
 ## How Easy can Full Stack Development Be?
 
@@ -25,10 +25,14 @@ env {
 }
 
 [use db]
-[use get, save, list]
+[crud get, save, list]
 model User {
     primary {
         id: int
+    }
+
+    column {
+        name: string
     }
 
     nav(Posts::id) {
@@ -42,8 +46,6 @@ model User {
     r2(bucket, "user/avatars/{id}.png") {
         avatar
     }
-
-    name: string
 }
 
 api User {
@@ -57,11 +59,9 @@ See the [Cloesce Docs](https://cloesce.pages.dev) for more information on gettin
 
 Utilize an LLM to interact with the docs in a conversational way:
 
-```
+```bash
 curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
 ```
-
-See the [Typescript API Reference](https://cloesce-ts.pages.dev) for the generated client library documentation.
 
 ## VS Code Extension
 
