@@ -6,13 +6,13 @@
 
 **Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From one language, generate an entire application with support for:
 
-| Feature            | Support |
-| ------------------ | ------- |
-| ORM                | ✅      |
-| RPC stubs          | ✅      |
-| Infrastructure as Code | ✅      |
-| SQL Migrations     | ✅      |
-| Middleware         | ✅      |
+| Feature                 | Support |
+| ----------------------- | ------- |
+| ORM                     | ✅      |
+| RPC stubs               | ✅      |
+| Infrastructure as Code  | ✅      |
+| SQL Migrations          | ✅      |
+| Middleware              | ✅      |
 | Runtime Type Validation | ✅      |
 
 ## Contributing

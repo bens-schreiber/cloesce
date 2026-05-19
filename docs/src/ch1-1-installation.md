@@ -25,7 +25,7 @@ cloesce version
 
 ## Starting a New Project
 
-The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template, which includes all necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly. 
+The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template, which includes all necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly.
 
 ### Prerequisites
 

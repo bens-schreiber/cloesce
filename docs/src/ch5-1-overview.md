@@ -1,6 +1,6 @@
 # Data Sources Overview
 
-If query against an instantiated API endpoint of a Model, you may notice that Cloesce will leave undefined or empty arrays in deeply nested composition with other Models. This is intentional, and is handled by Data Sources.
+If you query an instantiated [API](./ch6-1-rest-apis.md) endpoint of a [Model](./ch4-0-models.md), you may notice that Cloesce will leave undefined values or empty arrays in deeply nested compositions with other Models. This is intentional, and is handled by Data Sources.
 
 ## What are Data Sources?
 
@@ -38,6 +38,7 @@ If we were to follow this structure naively, fetching a `Person` would lead to f
 ## Default Data Source
 
 To prevent overfetching (and infinite loops), Cloesce will generate a Default Data Source for each Model, which includes:
+
 - All R2 and KV fields
 - All [1:1 Navigation Fields](./ch4-3-d1-navigation-fields.md#one-to-one-relationship)
 - The near side of all [1:M Navigation Fields](./ch4-3-d1-navigation-fields.md#one-to-many-relationship)
@@ -51,7 +52,7 @@ For example, in the `Person` and `Dog` Models above, the Default Data Source's _
 ```cloesce
 // Include Tree for Person
 include {
-    dogs 
+    dogs
 }
 
 // Include Tree for Dog

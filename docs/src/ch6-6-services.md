@@ -1,13 +1,12 @@
 # Services
 
-It is reasonable to have an API endpoint that doesn't quite fit into a Models namespace, or that needs to interact with multiple Models and Data Sources. For these cases, Cloesce provides a `service` block that allows you to define standalone API methods that can be implemented in the backend and called from the frontend.
+It is reasonable to have an [API](./ch6-1-rest-apis.md) endpoint that doesn't quite fit into a [Model's](./ch4-0-models.md) namespace, or that needs to interact with multiple Models and [Data Sources](./ch5-0-data-sources.md). For these cases, Cloesce provides a `service` block that allows you to define standalone API methods that can be implemented in the backend and called from the frontend.
 
 ## Defining a Service
 
 To define a service, you can use the following syntax:
 
 ```cloesce
-
 service {
     FooService
     BarService
@@ -26,8 +25,8 @@ Implement a Service just as you would implement an API for a Model:
 import * as clo from "@cloesce/backend.js";
 
 const FooService = clo.FooService.impl({
-    do_foo() {
-        return "foo";
-    }
+  do_foo() {
+    return "foo";
+  },
 });
 ```

@@ -1,4 +1,5 @@
 # D1 Column Constraints
+
 > [!TIP]
 > All fields of a D1 backed Model must be [SQLite compatible types](./ch2-0-type-reference.md#sqlite-compatible-types).
 
@@ -44,7 +45,6 @@ model User {
 }
 ```
 
-
 ## Foreign Key
 
 The `foreign` block allows you to define foreign key relationships between Models. It translates to the SQLite `FOREIGN KEY` constraint.
@@ -62,14 +62,14 @@ model Person {
     }
 
     // Person has a foreign key relationship to Dog's field `id`
-    // through it's own field `dogId`.
+    // through its own field `dogId`.
     foreign (Dog::id) {
         dogId
     }
 }
 ```
 
-Foreign key fields inherit the type of field that they reference. In the above example, `Person::dogId` is of type `int` because it references `Dog::id`, which is of type `int`. Foreign key fields are also `NOT NULL` by default, but they do not have to be unique.
+Foreign key fields inherit the type of the field they reference. In the above example, `Person::dogId` is of type `int` because it references `Dog::id`, which is of type `int`. Foreign key fields are also `NOT NULL` by default, but they do not have to be unique.
 
 ### Optional Foreign Key
 
@@ -177,7 +177,7 @@ model User {
             profileId
         }
 
-        // Infix form is also supported for foreign keys, 
+        // Infix form is also supported for foreign keys,
         // even under a unique block
         foreign (Dog::id) unique {
             dogId

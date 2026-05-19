@@ -20,7 +20,7 @@ In the above example, we have defined an R2 environment binding called `my_bucke
 
 ## Defining an R2 Field
 
-> [!NOTE] 
+> [!NOTE]
 > R2 is used to store large unstructured data. For this reason, Cloesce will not query and buffer the full value of an R2 field into the worker runtime. Instead, only a `HEAD` request is made to R2 to check for existence and retrieve metadata.
 
 A field in a Model can exist in Cloudflare R2 by using the `r2` block, which specifies the binding and key for a field. Unlike [KV fields](./ch4-4-kv-fields.md), no specific type is necessary for an R2 field declaration, as the actual value is never queried and buffered into memory in the application layer.
@@ -37,9 +37,9 @@ model Image {
 }
 ```
 
-The above snippet defines a Model `Image` with an R2 field `my_image` that is stored in the bucket `my_bucket` under the key "images/{id}.jpg". 
+The above snippet defines a Model `Image` with an R2 field `my_image` that is stored in the bucket `my_bucket` under the key "images/{id}.jpg".
 
-The `{id}` in the key is a placeholder that will be replaced with the actual value of the `id` keyfield when accessing R2. See information about [keyfields](./ch4-4-kv-fields.md#key-fields) in the KV fields chapter, as the same concept applies to R2 fields as well.
+The `{id}` in the key is a placeholder that will be replaced with the actual value of the `id` keyfield when accessing R2. See information about [keyfields](./ch4-4-kv-fields.md#key-fields-and-interpolation) in the KV fields chapter, as the same concept applies to R2 fields as well.
 
 ## Paginated List Queries
 
@@ -80,4 +80,3 @@ export class R2Object {
   customMetadata?: Record<string, string>;
 }
 ```
-

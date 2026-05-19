@@ -2,9 +2,9 @@
 
 ## Configuration
 
-Before compilation, a  configuration file should be defined in your project root under `cloesce.jsonc`. This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
+Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`. This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
 
-```json
+```jsonc
 {
   "src_paths": ["./src/schema"],
   "workers_url": "http://localhost:5000/api",
@@ -26,16 +26,18 @@ Compilation will generate backend stubs and a frontend API client under the `.cl
 cloesce compile
 ```
 
-Generated artifacts should not be modified directly, or committed to source control. Instead, they should be imported and used in your application code.
+Generated artifacts should not be modified directly or committed to source control. Instead, they should be imported and used in your application code.
 
 ## Migrations
 
-Cloesce supports any number of D1 databases in a single project. To generate SQL migration files for a specific D1 binding, run the following command:
+Cloesce supports any number of [D1](https://developers.cloudflare.com/d1/) databases in a single project. To generate SQL migration files for a specific D1 binding, run the following command:
+
 ```bash
 cloesce migrate --binding <d1-binding> <migration-name>
 ```
 
 To generate migrations for all D1 bindings in your project, use the `--all` flag:
+
 ```bash
 cloesce migrate --all <migration-name>
 ```
@@ -58,7 +60,7 @@ npx wrangler dev --port <port-number>
 
 ## Deploying
 
-Deploy your application to Cloudflare's edge with Wrangler
+Deploy your application to Cloudflare's edge with Wrangler:
 
 ```bash
 npx wrangler deploy

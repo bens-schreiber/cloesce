@@ -22,7 +22,7 @@ api Person {
 }
 ```
 
-The above code defines an API for the `Person` model with three endpoints:
+The above code defines an API for the `Person` Model with three endpoints:
 
 - `GET /Person/by_id` - Fetch a person by their ID
 - `POST /Person/create` - Create a new person with a name
@@ -38,17 +38,17 @@ After running `cloesce compile`, the above API definition could be implemented i
 import * as clo from "@cloesce/backend.js";
 
 export const Person = clo.Person.impl({
-    by_id(id) {
-        // ...
-    },
+  by_id(id) {
+    // ...
+  },
 
-    create(name) {
-        // ...
-    },
+  create(name) {
+    // ...
+  },
 
-    del(id) {
-        // ...
-    }
+  del(id) {
+    // ...
+  },
 });
 ```
 
@@ -57,19 +57,19 @@ While the backend code must be implemented manually, the frontend client methods
 ```ts
 // .cloesce/client.ts
 export class Person {
-    id: number;
+  id: number;
 
-    static async by_id(id: number): Promise<HttpResult<Person>> {
-        // ...
-    }
+  static async by_id(id: number): Promise<HttpResult<Person>> {
+    // ...
+  }
 
-    static async create(name: string): Promise<HttpResult<Person>> {
-        // ...
-    }
+  static async create(name: string): Promise<HttpResult<Person>> {
+    // ...
+  }
 
-    static async del(id: number): Promise<HttpResult<void>> {
-        // ...
-    }
+  static async del(id: number): Promise<HttpResult<void>> {
+    // ...
+  }
 }
 ```
 
@@ -95,16 +95,16 @@ The above code defines an API method `GET /Person/:id/myself`, which can be impl
 import * as clo from "@cloesce/backend.js";
 
 export const Person = clo.Person.impl({
-    myself(self) {
-        // `self` is an instance of `clo.Person.Self` that has been automatically hydrated by Cloesce
-        return self;
-    }
+  myself(self) {
+    // `self` is an instance of `clo.Person.Self` that has been automatically hydrated by Cloesce
+    return self;
+  },
 });
 ```
 
 ### Using a Custom Data Source
 
-By default, all API methods will use the [Default Data Source](./ch5-0-data-sources.md#default-data-source) to hydrate the `self` instance. However, you can specify a custom data source with the `source` tag:
+By default, all API methods will use the [Default Data Source](./ch5-1-overview.md#default-data-source) to hydrate the `self` instance. However, you can specify a custom data source with the `source` tag:
 
 ```cloesce
 model Person {
@@ -118,7 +118,7 @@ model Person {
 }
 
 source WithoutAvatar for Person {
-    include { 
+    include {
         // Empty!
     }
 }
@@ -149,7 +149,7 @@ api File {
 }
 ```
 
-The above code defines two API methods for the `File` model:
+The above code defines two API methods for the `File` Model:
 
 - `POST /File/upload` - Accepts a streaming file upload and returns a `File` instance
 - `GET /File/download` - Returns a streaming response for downloading a file by its ID
@@ -176,14 +176,13 @@ export class HttpResult<T = unknown> {
   /**
    * Return some OK result with the given status, data, and headers.
    */
-  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T>
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T>;
 
   /**
    * Return a failure result with the given status, message, and headers.
    * No body may be attached.
    */
-  static fail(status: number, message?: string, init?: HeadersInit): HttpResult<never>
-
+  static fail(status: number, message?: string, init?: HeadersInit): HttpResult<never>;
 }
 ```
 
@@ -207,15 +206,15 @@ The implementation of the `by_id` method could return an `HttpResult` like so:
 import * as clo from "@cloesce/backend.js";
 
 export const Garfield = clo.Garfield.impl({
-    by_id(id) {
-        const today = new Date();
-        const isMonday = today.getDay() === 1;
+  by_id(id) {
+    const today = new Date();
+    const isMonday = today.getDay() === 1;
 
-        if (isMonday) {
-            return HttpResult.fail(503, "Garfield hates Mondays");
-        }
-
-        return HttpResult.ok(200, { id });
+    if (isMonday) {
+      return HttpResult.fail(503, "Garfield hates Mondays");
     }
+
+    return HttpResult.ok(200, { id });
+  },
 });
 ```

@@ -1,8 +1,10 @@
+# Resources
+
 ## LLMs
 
 Interact with this documentation with an LLM by utilizing the [llms-full.txt found here](https://cloesce.pages.dev/llms-full.txt). Download from the terminal using `curl`:
 
-```
+```sh
 curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
 ```
 

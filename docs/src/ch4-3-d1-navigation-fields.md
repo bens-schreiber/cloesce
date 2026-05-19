@@ -1,9 +1,9 @@
 # D1 Navigation Fields
 
 > [!NOTE]
-> Navigation Field are (currently) constrained to work within one particular database. This means that if you have two separate D1 databases, you cannot define a navigation field that references a foreign key in the other database.
+> Navigation Fields are (currently) constrained to work within a single database. This means that if you have two separate D1 databases, you cannot define a navigation field that references a foreign key in the other database.
 
-Simply defining foreign key relationships between your Models is often not enough. You also want to be able to easily access related data without having to write complex `JOIN` queries. This is where Navigation Fields come in.
+Simply defining [foreign key relationships](./ch4-2-d1-constraints.md#foreign-key) between your Models is often not enough. You also want to be able to easily access related data without having to write complex `JOIN` queries. This is where Navigation Fields come in.
 
 ## One-to-One Relationship
 
@@ -39,21 +39,21 @@ While one-to-one navigation fields do not directly translate to the SQL schema, 
 ```ts
 // .cloesce/client.ts
 export class Person {
-    id: number;
-    dogId: number;
-    dog: Dog; // navigation field
+  id: number;
+  dogId: number;
+  dog: Dog; // navigation field
 }
 ```
 
 ```ts
 // .cloesce/backend.ts
 export namespace Person {
-    // ...
-    export interface Self {
-        id: number;
-        dogId: number;
-        dog: Dog.Self; // navigation field
-    }
+  // ...
+  export interface Self {
+    id: number;
+    dogId: number;
+    dog: Dog.Self; // navigation field
+  }
 }
 ```
 
@@ -90,19 +90,19 @@ In this example, `Dog` has a foreign key relationship to `Person` through the `o
 ```ts
 // .cloesce/client.ts
 export class Person {
-    id: number;
-    dogs: Dog[]; // navigation field
+  id: number;
+  dogs: Dog[]; // navigation field
 }
 ```
 
 ```ts
 // .cloesce/backend.ts
 export namespace Person {
-    // ...
-    export interface Self {
-        id: number;
-        dogs: Dog.Self[]; // navigation field
-    }
+  // ...
+  export interface Self {
+    id: number;
+    dogs: Dog.Self[]; // navigation field
+  }
 }
 ```
 

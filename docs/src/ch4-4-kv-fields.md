@@ -8,6 +8,7 @@
 > KV Fields in the schema do not yet support cache control directives and expiration times. This feature is planned for a future release.
 
 Cloudflare KV has a simple toolset and API for storing and retrieving key-value pairs. Specifically, KV supports:
+
 - Eventually consistent writes
 - Sub 5ms read latency on cached reads
 - List queries with key based prefix matching and pagination
@@ -16,6 +17,7 @@ Cloudflare KV has a simple toolset and API for storing and retrieving key-value 
 - 25MB value size limit
 
 Cloesce respects the design constraints of KV storage. For Models with only KV fields, the following features are not supported:
+
 - Relationships
 - Navigation fields
 - Migrations
@@ -52,7 +54,7 @@ The above snippet defines a Model `Settings` with a KV field `theme` that is sto
 
 In a [D1 backed Model](./ch4-1-d1-backed-model.md), when querying an instantiated API method, if the Model at some primary key does not exist, Cloesce will return a `404` error.
 
-However, in a Model with only KV fields (or R2 fields), there is no underlying "backing". That is to say, if a value does not exist for a particular key, there is no way for Cloesce to know whether that key is supposed to exist with a `null` value, or if it simply does not exist at all. 
+However, in a Model with only KV fields (or R2 fields), there is no underlying "backing". That is to say, if a value does not exist for a particular key, there is no way for Cloesce to know whether that key is supposed to exist with a `null` value, or if it simply does not exist at all.
 
 For this reason, when querying an instantiated API method on a non-D1 backed Model, you may find `null` values for fields that do not exist in KV, rather than a `404` error. It is up to you as the developer to handle this case appropriately in your application code.
 
@@ -94,7 +96,7 @@ model User {
 }
 ```
 
-The Cloesce ORM will know to first hydrate the table `User` to get the value of `id`, and then use that value to construct the key for the KV field `theme`, finally fetching the value from KV. 
+The Cloesce ORM will know to first hydrate the table `User` to get the value of `id`, and then use that value to construct the key for the KV field `theme`, finally fetching the value from KV.
 
 This allows you to easily associate KV data with your D1 backed Models without having to manually handle the logic of fetching from D1 and then using that data to fetch from KV (one Model to rule them all!).
 
@@ -145,4 +147,3 @@ export class KValue<V> {
 This class encapsulates the key, raw value, and metadata of a KV entry. The `value` getter provides a typed view of the raw value, though, Cloesce will not validate that the raw value actually conforms to the expected type `V`.
 
 Metadata is left as `unknown` because it can be any arbitrary JSON object that you choose to associate with the key-value pair in KV. Cloesce does not impose any structure on this metadata, allowing you to use it for any purpose you see fit (e.g. storing timestamps, user information, etc.).
-

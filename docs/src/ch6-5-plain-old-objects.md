@@ -1,6 +1,6 @@
 # Plain Old Objects
 
-In addition to models, Cloesce also supports plain old objects (POOs) that can be used for various purposes such as data transfer objects (DTOs), view models, or any other structured data that doesn't require database backing. POOs are defined using the `poo` keyword and can have fields just like Models, but they don't have any of the ORM or API capabilities that Models have.
+In addition to [Models](./ch4-0-models.md), Cloesce also supports Plain Old Objects (POOs) that can be used for various purposes such as data transfer objects (DTOs), view models, or any other structured data that doesn't require database backing. POOs are defined using the `poo` keyword and can have fields just like Models, but they don't have any of the [ORM](./ch7-0-orm-reference.md) or [API](./ch6-1-rest-apis.md) capabilities that Models have.
 
 ## Defining a POO
 
@@ -29,4 +29,3 @@ poo GraphNode {
 ```
 
 In the above code, the `GraphNode` POO has a field `children` which is an array of `GraphNode`s, allowing you to represent tree-like structures.
-
