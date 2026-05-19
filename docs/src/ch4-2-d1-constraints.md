@@ -73,9 +73,6 @@ Foreign key fields inherit the type of the field they reference. In the above ex
 
 ### Optional Foreign Key
 
-> [!TIP]
-> The `optional` modifier can be used to wrap any number of columns or foreign blocks, modifying all of them to allow `NULL` values.
-
 To allow `NULL` values in a foreign key field, use the `optional` modifier:
 
 ```cloesce
@@ -84,20 +81,13 @@ model Person {
         id: int
     }
 
-    optional {
-        foreign (Dog::id) {
-            dogId
-        }
-    }
-
-    // Or, use the infix notation, which is equivalent:
     foreign (Dog::id) optional {
         dogId
     }
 }
 ```
 
-The valid infix qualifiers for a `foreign` block are `primary` and `optional`.
+`optional` is the only modifier available on a `foreign` block.
 
 ### Composite Foreign Key
 
@@ -138,15 +128,6 @@ model Enrollment {
             courseId
         }
     }
-
-    // Or, equivalently, use the infix notation:
-    foreign (Student::id) primary {
-        studentId
-    }
-
-    foreign (Course::id) primary {
-        courseId
-    }
 }
 
 model Student {
@@ -167,7 +148,7 @@ model Course {
 The `unique (field1, field2, ...)` declaration adds a unique constraint over one or more
 existing fields on a Model. It translates to the SQLite `UNIQUE` constraint.
 
-Unlike `primary` or `optional`, `unique` does **not** declare fields it references fields. A field may participate in any number of unique constraints.
+Unlike `primary` and `column`, `unique` does **not** declare fields; it references existing fields. A field may participate in any number of unique constraints.
 
 ```cloesce
 model User {
@@ -175,8 +156,10 @@ model User {
         id: int
     }
 
-    email: string
-    username: string
+    column {
+        email: string
+        username: string
+    }
 
     foreign (Profile::id) {
         profileId

@@ -13,7 +13,7 @@ env {
     }
 }
 
-inject { YouTubeApi } 
+inject { YouTubeApi }
 
 [use db]
 model BasicModel {
@@ -32,16 +32,18 @@ model HasSqlColumnTypes {
         id: int
     }
 
-    str: string
-    integer: int
-    dub: real
-    boo: bool
-    dat: date
-    strNull: option<string>
-    integerNull: option<int>
-    dubNull: option<real>
-    booNull: option<bool>
-    dateNull: option<date>
+    column {
+        str: string
+        integer: int
+        dub: real
+        boo: bool
+        dat: date
+        strNull: option<string>
+        integerNull: option<int>
+        dubNull: option<real>
+        booNull: option<bool>
+        dateNull: option<date>
+    }
 }
 
 [use db]
@@ -96,7 +98,9 @@ model ModelWithCompositePk {
         rowId: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 }
 
 api ModelWithCompositePk {
@@ -154,8 +158,10 @@ model ToyotaPrius {
         id: int
     }
 
-    ownerId: string
-    modelYear: int
+    column {
+        ownerId: string
+        modelYear: int
+    }
 
     keyfield {
         someKey: string
@@ -193,7 +199,9 @@ model ModelWithCruds {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 
     foreign(BasicModel::id) {
         categoryId
@@ -218,7 +226,9 @@ model ModelWithCustomDs {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 
     r2 (my_r2, "{id}/data") {
         data

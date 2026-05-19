@@ -24,6 +24,7 @@ hljs.registerLanguage("cloesce", function (hljs) {
     "foreign",
     "nav",
     "keyfield",
+    "column",
     "paginated",
     "include",
     "for",

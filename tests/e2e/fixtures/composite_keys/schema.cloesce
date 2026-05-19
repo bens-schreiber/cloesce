@@ -12,7 +12,9 @@ model Student {
         name: string
     }
     
-    favoriteColor: string
+    column {
+        favoriteColor: string
+    }
     
     nav (StudentCourse::studentId, StudentCourse::studentName) {
         studentCourses
@@ -43,7 +45,9 @@ model Course {
         id: int
     }
     
-    title: string
+    column {
+        title: string
+    }
     
     nav (StudentCourse::courseId) {
         studentCourses

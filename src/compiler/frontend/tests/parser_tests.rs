@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
     ArgumentLiteral, Ast, AstBlockKind, EnvBindingBlockKind, ForeignBlock, Keyword, ModelBlock,
-    ModelBlockKind, PaginatedBlockKind, Spd, SqlBlockKind, Symbol, Tag,
+    ModelBlockKind, Spd, SqlBlockKind, Symbol, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -341,10 +341,12 @@ fn model_primary_unique_optional_foreign() {
         [use d2_db]
         [crud get, save, list]
         model M {
-            score: real
-            a: int
-            b: int
-            role: string
+            column {
+                score: real
+                a: int
+                b: int
+                role: string
+            }
 
             primary {
                 id: int
@@ -353,14 +355,10 @@ fn model_primary_unique_optional_foreign() {
             }
 
             foreign(Tag::id) { tagId }
-            foreign(Person::id) primary { personId }
             foreign(Org::id) { orgId2 }
             foreign(Author::id) optional { authorId }
             foreign(Dept::id) { deptId }
-
-            optional {
-                foreign(Draft::id) { draftId }
-            }
+            foreign(Draft::id) optional { draftId }
 
             unique (a, b)
             unique (orgId2)
@@ -400,9 +398,9 @@ fn model_primary_unique_optional_foreign() {
     let columns: Vec<&str> = m
         .blocks
         .iter()
-        .filter_map(|spd| match &spd.inner {
-            ModelBlockKind::Column(s) => Some(s.name),
-            _ => None,
+        .flat_map(|spd| match &spd.inner {
+            ModelBlockKind::Column(syms) => syms.iter().map(|s| s.name).collect::<Vec<_>>(),
+            _ => Vec::new(),
         })
         .collect();
     assert!(columns.contains(&"score"));
@@ -446,20 +444,7 @@ fn model_primary_unique_optional_foreign() {
         })
         .unwrap();
     assert_eq!(tag_fb.fields[0].name, "tagId");
-    assert!(tag_fb.qualifier.is_none());
-
-    let person_fb = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Person", "id")]) => Some(fb),
-            _ => None,
-        })
-        .unwrap();
-    assert!(matches!(
-        person_fb.qualifier,
-        Some(frontend::ForeignQualifier::Primary)
-    ));
+    assert!(!tag_fb.is_optional);
 
     let author_fb = m
         .blocks
@@ -469,17 +454,18 @@ fn model_primary_unique_optional_foreign() {
             _ => None,
         })
         .unwrap();
-    assert!(author_fb.is_optional());
+    assert!(author_fb.is_optional);
 
-    let opt = m
+    let draft_fb = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Optional(blocks) => Some(blocks),
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Draft", "id")]) => Some(fb),
             _ => None,
         })
         .unwrap();
-    assert_eq!(sql_foreigns(opt)[0].fields[0].name, "draftId");
+    assert!(draft_fb.is_optional);
+    assert_eq!(draft_fb.fields[0].name, "draftId");
 
     let uniques: Vec<Vec<&str>> = m
         .blocks
@@ -569,23 +555,15 @@ fn model_kv_r2_paginated() {
             kv(ns_b, "list/{cursor}") paginated { page: json }
             r2(bucket_a, "photos/{id}.jpg") { photo }
             r2(bucket_b, "thumbs/{cursor}") paginated { thumb }
-            paginated {
-                kv(ns_c, "cache/{id}") { cached_val: string }
-                r2(bucket_c, "archive/{id}") { archive }
-                kv(ns_d, "feed/{cursor}") paginated { feed_item: json }
-                r2(bucket_d, "feed/{cursor}.mp4") paginated { feed_video }
-            }
         }
 
         [crud get, save, list]
         model PureKv {
-            keyfield { 
+            keyfield {
                 key: string
-                secondary: int 
+                secondary: int
             }
-            paginated {
-                kv(kv_ns, "entry/{key}/{secondary}") { entry: json }
-            }
+            kv(kv_ns, "entry/{key}/{secondary}") paginated { entry: json }
         }
         "#,
     );
@@ -644,96 +622,7 @@ fn model_kv_r2_paginated() {
         ("thumbs/{cursor}", "thumb", true)
     );
 
-    let pblocks: Vec<_> = m
-        .blocks
-        .iter()
-        .filter_map(|spd| match &spd.inner {
-            ModelBlockKind::Paginated(blocks) => Some(blocks),
-            _ => None,
-        })
-        .flat_map(|bs| bs.iter())
-        .collect();
-
-    let kv_c = pblocks
-        .iter()
-        .find_map(|b| match &b.inner {
-            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_c" => Some(kv),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (
-            kv_c.key_format,
-            kv_c.field.name,
-            kv_c.field.cidl_type.clone(),
-            kv_c.is_paginated
-        ),
-        ("cache/{id}", "cached_val", CidlType::String, false)
-    );
-
-    let r2_c = pblocks
-        .iter()
-        .find_map(|b| match &b.inner {
-            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_c" => Some(r2),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (r2_c.key_format, r2_c.field.name, r2_c.is_paginated),
-        ("archive/{id}", "archive", false)
-    );
-
-    let kv_d = pblocks
-        .iter()
-        .find_map(|b| match &b.inner {
-            PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "ns_d" => Some(kv),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (kv_d.key_format, kv_d.field.name, kv_d.is_paginated),
-        ("feed/{cursor}", "feed_item", true)
-    );
-
-    let r2_d = pblocks
-        .iter()
-        .find_map(|b| match &b.inner {
-            PaginatedBlockKind::R2(r2) if r2.env_binding.name == "bucket_d" => Some(r2),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (r2_d.key_format, r2_d.field.name, r2_d.is_paginated),
-        ("feed/{cursor}.mp4", "feed_video", true)
-    );
-
     let kv_model = find_model(&ast, "PureKv");
-
-    let kv_env_bindings = kv_model
-        .symbol
-        .tags
-        .iter()
-        .filter_map(|t| match &t.inner {
-            Tag::Use { binding } => Some(binding),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert!(kv_env_bindings.is_empty());
-
-    let kv_cruds: Vec<CrudKind> = kv_model
-        .symbol
-        .tags
-        .iter()
-        .flat_map(|t| match &t.inner {
-            Tag::Crud { kinds } => kinds.iter().map(|k| k.inner.clone()).collect::<Vec<_>>(),
-            _ => Vec::new(),
-        })
-        .collect();
-    assert!(
-        kv_cruds.iter().any(|c| matches!(c, CrudKind::Get))
-            && kv_cruds.iter().any(|c| matches!(c, CrudKind::Save))
-            && kv_cruds.iter().any(|c| matches!(c, CrudKind::List))
-    );
 
     let keyfields: Vec<&str> = kv_model
         .blocks
@@ -749,10 +638,7 @@ fn model_kv_r2_paginated() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Paginated(blocks) => blocks.iter().find_map(|b| match &b.inner {
-                PaginatedBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
-                _ => None,
-            }),
+            ModelBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
             _ => None,
         })
         .unwrap();
@@ -760,9 +646,10 @@ fn model_kv_r2_paginated() {
         (
             kv_entry.key_format,
             kv_entry.field.name,
-            kv_entry.field.cidl_type.clone()
+            kv_entry.field.cidl_type.clone(),
+            kv_entry.is_paginated,
         ),
-        ("entry/{key}/{secondary}", "entry", CidlType::Json)
+        ("entry/{key}/{secondary}", "entry", CidlType::Json, true)
     );
 }
 
@@ -771,11 +658,13 @@ fn validator_tags() {
     let ast = lex_and_ast(
         r#"
         model M {
-            [regex /[a-z]+/]
-            [minlen 1]
-            [gt 42]
-            [lte 100.5]
-            email: string
+            column {
+                [regex /[a-z]+/]
+                [minlen 1]
+                [gt 42]
+                [lte 100.5]
+                email: string
+            }
         }
         "#,
     );
@@ -785,7 +674,7 @@ fn validator_tags() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Column(s) => Some(s),
+            ModelBlockKind::Column(syms) => syms.first(),
             _ => None,
         })
         .unwrap();

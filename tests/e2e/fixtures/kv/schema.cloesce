@@ -38,8 +38,10 @@ model D1BackedModel {
         kvData: json
     }
 
-    someColumn: real
-    someOtherColumn: string
+    column {
+        someColumn: real
+        someOtherColumn: string
+    }
 }
 
 [crud get]

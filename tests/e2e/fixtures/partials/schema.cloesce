@@ -11,8 +11,10 @@ model Dog {
         id: int
     }
     
-    name: string
-    age: int
+    column {
+        name: string
+        age: int
+    }
 }
 
 api Dog {

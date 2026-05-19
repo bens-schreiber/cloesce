@@ -1,8 +1,8 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, ForeignBlock, ForeignBlockNav, ForeignQualifier, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, R2Block, Spd, SqlBlockKind, Symbol,
+    AstBlockKind, ForeignBlock, ForeignBlockNav, KvBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, R2Block, Spd, SqlBlockKind, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
@@ -20,18 +20,12 @@ fn foreign_nav_block<'tokens, 'src: 'tokens>()
         .map_spanned(|s| s)
 }
 
-/// `foreign(AdjModel::field1, ...) [primary|optional] { localField ... nav { navName } }`
+/// `foreign(AdjModel::field1, ...) [optional] { localField ... nav { navName } }`
 fn foreign_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
     let adj_ref = symbol()
         .then_ignore(just(Token::DoubleColon))
         .then(symbol());
-
-    let qualifier = choice((
-        kw!(Primary).to(ForeignQualifier::Primary),
-        kw!(Optional).to(ForeignQualifier::Optional),
-    ))
-    .or_not();
 
     let field = kw!(Nav).not().ignore_then(symbol());
 
@@ -43,7 +37,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(qualifier)
+        .then(kw!(Optional).or_not())
         .then(
             field
                 .repeated()
@@ -51,15 +45,15 @@ fn foreign_block<'tokens, 'src: 'tokens>()
                 .then(foreign_nav_block().or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((adj, qualifier), (fields, nav))| ForeignBlock {
+        .map(|((adj, optional), (fields, nav))| ForeignBlock {
             adj,
-            qualifier,
+            is_optional: optional.is_some(),
             fields,
             nav,
         })
 }
 
-/// `kv (binding, "key/format/{id}") paginated { ident: cidl_type }`
+/// `kv (binding, "key/format/{id}") [paginated] { ident: cidl_type }`
 fn kv_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvBlock<'src>, Extra<'tokens, 'src>> {
     kw!(Kv)
@@ -79,7 +73,7 @@ fn kv_block<'tokens, 'src: 'tokens>()
         })
 }
 
-/// `r2(binding, "key/format/{id}") paginated { ident }`
+/// `r2(binding, "key/format/{id}") [paginated] { ident }`
 fn r2_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2Block<'src>, Extra<'tokens, 'src>> {
     kw!(R2)
@@ -101,30 +95,26 @@ fn r2_block<'tokens, 'src: 'tokens>()
 
 pub fn model_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
-    let choice_sql = || {
+    // `column { ([tag]* ident: cidl_type)* }`
+    let column_block = kw!(Column).ignore_then(
+        tagged_typed_symbol()
+            .repeated()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map(ModelBlockKind::Column),
+    );
+
+    // `primary { typed_symbols... foreign(...) { ... } }`
+    let primary_block = kw!(Primary).ignore_then(
         choice((
             foreign_block().map(SqlBlockKind::Foreign),
             tagged_typed_symbol().map(SqlBlockKind::Column),
         ))
         .map_spanned(|k| k)
-    };
-
-    // `primary { typed_symbols... foreign(...) { ... } }`
-    let primary_block = kw!(Primary).ignore_then(
-        choice_sql()
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map(ModelBlockKind::Primary),
-    );
-
-    // `optional { foreign(...) { ... } ... }` — all contained foreigners are nullable
-    let optional_block = kw!(Optional).ignore_then(
-        choice_sql()
-            .repeated()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace))
-            .map(ModelBlockKind::Optional),
+        .repeated()
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .map(ModelBlockKind::Primary),
     );
 
     // `unique (field1, field2, ...)`
@@ -161,45 +151,23 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     };
 
     // `keyfield { ([tag]* ident: cidl_type)* }`
-    let keyfield_block = {
-        kw!(KeyField)
-            .ignore_then(
-                tagged_typed_symbol()
-                    .repeated()
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-            )
-            .map(ModelBlockKind::KeyField)
-    };
-
-    // `paginated { r2(...) { ... } kv(...) { ... } }`
-    let paginated_block = kw!(Paginated).ignore_then(
-        choice((
-            kv_block().map(PaginatedBlockKind::Kv),
-            r2_block().map(PaginatedBlockKind::R2),
-        ))
-        .map_spanned(|k| k)
-        .repeated()
-        .collect::<Vec<_>>()
-        .delimited_by(just(Token::LBrace), just(Token::RBrace))
-        .map(ModelBlockKind::Paginated),
-    );
-
-    let kv = kv_block().map(ModelBlockKind::Kv);
-    let r2 = r2_block().map(ModelBlockKind::R2);
-    let foreign = foreign_block().map(ModelBlockKind::Foreign);
-    let column = tagged_typed_symbol().map(ModelBlockKind::Column);
+    let keyfield_block = kw!(KeyField)
+        .ignore_then(
+            tagged_typed_symbol()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(ModelBlockKind::KeyField);
 
     let sub_blocks = choice((
-        foreign,
-        kv,
-        r2,
-        column,
+        foreign_block().map(ModelBlockKind::Foreign),
+        kv_block().map(ModelBlockKind::Kv),
+        r2_block().map(ModelBlockKind::R2),
+        column_block,
         nav_block,
         keyfield_block,
-        paginated_block,
         primary_block,
-        optional_block,
         unique_block,
     ))
     .boxed();

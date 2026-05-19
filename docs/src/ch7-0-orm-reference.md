@@ -27,7 +27,9 @@ model User {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 }
 
 source ByName for User {

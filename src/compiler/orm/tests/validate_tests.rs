@@ -356,7 +356,9 @@ fn objects_partials() {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
             }
         "#,
         );
@@ -382,7 +384,9 @@ fn objects_partials() {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
 
                 nav(Rider::horseId) {
                     riders
@@ -399,7 +403,9 @@ fn objects_partials() {
                     horseId
                 }
 
-                nickname: string
+                column {
+                    nickname: string
+                }
             }
         "#,
         );
@@ -431,7 +437,9 @@ fn objects_partials() {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
             }
         "#,
         );
@@ -1041,12 +1049,14 @@ fn validators_in_model() {
                 id: int
             }
 
-            [gt 0]
-            price: int
+            column {
+                [gt 0]
+                price: int
 
-            [minlen 3]
-            [maxlen 50]
-            name: string
+                [minlen 3]
+                [maxlen 50]
+                name: string
+            }
 
             kv(store, "product/{id}/meta") {
                 [regex /^[a-z0-9_]+$/]

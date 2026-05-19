@@ -55,7 +55,9 @@ fn no_records_returns_empty() {
                 id: int
             }
 
-            name: option<string>
+            column {
+                name: option<string>
+            }
 
             nav(Rider::horseId) {
                 riders
@@ -68,7 +70,9 @@ fn no_records_returns_empty() {
                 id: int
             }
 
-            nickname: option<string>
+            column {
+                nickname: option<string>
+            }
 
             foreign(Horse::id) {
                 horseId
@@ -95,7 +99,9 @@ fn flat() {
                 id: int
             }
 
-            name: option<string>
+            column {
+                name: option<string>
+            }
         }
     "#,
     );
@@ -127,7 +133,9 @@ async fn one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
+                column {
+                    name: option<string>
+                }
 
                 foreign(Rider::id) {
                     bestRiderId
@@ -143,7 +151,9 @@ async fn one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: option<string>
+                column {
+                    nickname: option<string>
+                }
             }
         "#,
         )
@@ -204,7 +214,9 @@ async fn one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
+                column {
+                    name: option<string>
+                }
 
                 nav(Rider::horseId) {
                     riders
@@ -217,7 +229,9 @@ async fn one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: option<string>
+                column {
+                    nickname: option<string>
+                }
 
                 foreign(Horse::id) {
                     horseId
@@ -281,7 +295,9 @@ async fn many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
+                column {
+                    name: option<string>
+                }
 
                 nav(Course::id) {
                     courses
@@ -294,7 +310,9 @@ async fn many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                title: option<string>
+                column {
+                    title: option<string>
+                }
 
                 nav(Student::id) {
                     students
@@ -358,7 +376,9 @@ fn composite_primary_key_deduplication() {
                 productId: int
             }
 
-            quantity: int
+            column {
+                quantity: int
+            }
         }
     "#,
     );

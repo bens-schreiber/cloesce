@@ -63,6 +63,7 @@ contextual_keywords! {
     Unique => "unique",
     Paginated => "paginated",
     KeyField => "keyfield",
+    Column => "column",
     For => "for",
     Include => "include",
 
@@ -299,12 +300,6 @@ pub struct NavigationBlock<'src> {
     pub nav: Spd<Symbol<'src>>,
 }
 
-#[derive(Clone)]
-pub enum ForeignQualifier {
-    Primary,
-    Optional,
-}
-
 pub struct ForeignBlockNav<'src> {
     pub symbol: Symbol<'src>,
 }
@@ -325,13 +320,7 @@ pub struct ForeignBlock<'src> {
     /// ```
     pub nav: Option<Spd<ForeignBlockNav<'src>>>,
 
-    pub qualifier: Option<ForeignQualifier>,
-}
-
-impl ForeignBlock<'_> {
-    pub fn is_optional(&self) -> bool {
-        matches!(self.qualifier, Some(ForeignQualifier::Optional))
-    }
+    pub is_optional: bool,
 }
 
 /// `kv(binding, "key/format/{id}") { name: type }`
@@ -368,13 +357,8 @@ pub enum SqlBlockKind<'src> {
     Foreign(ForeignBlock<'src>),
 }
 
-pub enum PaginatedBlockKind<'src> {
-    R2(R2Block<'src>),
-    Kv(KvBlock<'src>),
-}
-
 pub enum ModelBlockKind<'src> {
-    Column(Symbol<'src>),
+    Column(Vec<Symbol<'src>>),
     Foreign(ForeignBlock<'src>),
     Navigation(NavigationBlock<'src>),
     Kv(KvBlock<'src>),
@@ -382,8 +366,6 @@ pub enum ModelBlockKind<'src> {
     Primary(Vec<Spd<SqlBlockKind<'src>>>),
     KeyField(Vec<Symbol<'src>>),
     Unique(Vec<Symbol<'src>>),
-    Paginated(Vec<Spd<PaginatedBlockKind<'src>>>),
-    Optional(Vec<Spd<SqlBlockKind<'src>>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
@@ -393,12 +375,12 @@ impl<'src> ModelBlockKind<'src> {
     /// declaring new ones.
     pub fn symbols(&self) -> Vec<&Symbol<'src>> {
         match self {
-            ModelBlockKind::Column(symbol) => vec![symbol],
+            ModelBlockKind::Column(symbols) => symbols.iter().collect(),
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
             ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.inner],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
             ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
-            ModelBlockKind::Primary(blocks) | ModelBlockKind::Optional(blocks) => blocks
+            ModelBlockKind::Primary(blocks) => blocks
                 .iter()
                 .flat_map(|spd| match &spd.inner {
                     SqlBlockKind::Column(symbol) => vec![symbol],
@@ -407,13 +389,6 @@ impl<'src> ModelBlockKind<'src> {
                 .collect(),
             ModelBlockKind::KeyField(fields) => fields.iter().collect(),
             ModelBlockKind::Unique(_) => vec![],
-            ModelBlockKind::Paginated(blocks) => blocks
-                .iter()
-                .flat_map(|spd| match &spd.inner {
-                    PaginatedBlockKind::Kv(kv_block) => vec![&kv_block.field],
-                    PaginatedBlockKind::R2(r2_block) => vec![&r2_block.field],
-                })
-                .collect(),
         }
     }
 }
@@ -426,11 +401,11 @@ pub struct ModelBlock<'src> {
 }
 
 impl<'src> ModelBlock<'src> {
-    /// Iterate over all foreign blocks, be they top level or nested in primary/optional blocks
+    /// Iterate over all foreign blocks, be they top level or nested in primary blocks
     pub fn foreign_blocks(&self) -> impl Iterator<Item = &ForeignBlock<'src>> {
         self.blocks.iter().flat_map(|spd| match &spd.inner {
             ModelBlockKind::Foreign(foreign_block) => vec![foreign_block],
-            ModelBlockKind::Primary(blocks) | ModelBlockKind::Optional(blocks) => blocks
+            ModelBlockKind::Primary(blocks) => blocks
                 .iter()
                 .filter_map(|b| match &b.inner {
                     SqlBlockKind::Foreign(fb) => Some(fb),
@@ -449,12 +424,12 @@ impl<'src> ModelBlock<'src> {
         })
     }
 
-    /// Iterate over all SQL column blocks, be they top level or nested in primary/optional blocks
+    /// Iterate over all SQL column blocks, be they top level or nested in primary blocks
     pub fn sql_symbols(&self) -> impl Iterator<Item = &Symbol<'src>> {
         self.blocks.iter().flat_map(|spd| match &spd.inner {
-            ModelBlockKind::Column(symbol) => vec![symbol],
+            ModelBlockKind::Column(symbols) => symbols.iter().collect(),
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Primary(blocks) | ModelBlockKind::Optional(blocks) => blocks
+            ModelBlockKind::Primary(blocks) => blocks
                 .iter()
                 .filter_map(|b| match &b.inner {
                     SqlBlockKind::Column(symbol) => Some(symbol),

@@ -46,8 +46,10 @@ model D1BackedModel {
         keyParam: string
     }
     
-    someColumn: real
-    someOtherColumn: string
+    column {
+        someColumn: real
+        someOtherColumn: string
+    }
     
     r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
         r2Data

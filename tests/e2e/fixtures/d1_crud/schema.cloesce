@@ -11,7 +11,9 @@ model CrudHaver {
         id: int
     }
     
-    name: string
+    column {
+        name: string
+    }
 }
 
 api CrudHaver {

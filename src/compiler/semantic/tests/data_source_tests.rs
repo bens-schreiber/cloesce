@@ -330,7 +330,9 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             primary {
                 id: int
             }
-            color: string
+            column {
+                color: string
+            }
         }
 
         [use db]
@@ -338,7 +340,9 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             primary {
                 id: int
             }
-            breed: string
+            column {
+                breed: string
+            }
 
             foreign(Toy::id) {
                 toyId
@@ -351,7 +355,9 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
 
             foreign(Dog::id) {
                 dogId
@@ -437,7 +443,9 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
         }
 
         [use db]
@@ -546,7 +554,9 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
                 orderId: int
                 productId: int
             }
-            qty: int
+            column {
+                qty: int
+            }
         }
     "#,
     );
@@ -610,7 +620,9 @@ fn resolve_sql_params() {
             primary {
                 id: int
             }
-            price: int
+            column {
+                price: int
+            }
         }
 
         source ById for Item {
@@ -681,7 +693,9 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
             primary {
                 id: int
             }
-            title: string
+            column {
+                title: string
+            }
         }
 
         source Recent for Post {

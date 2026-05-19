@@ -32,7 +32,9 @@ async fn scalar_model(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
             }
         "#,
     );
@@ -317,7 +319,9 @@ async fn composite_one_to_one(db: SqlitePool) {
                     student_number: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
             }
 
             [use db]
@@ -334,7 +338,9 @@ async fn composite_one_to_one(db: SqlitePool) {
                     }
                 }
 
-                course: string
+                column {
+                    course: string
+                }
             }
         "#,
     );
@@ -393,7 +399,9 @@ async fn composite_one_to_many(db: SqlitePool) {
                     order_number: int
                 }
 
-                customer: string
+                column {
+                    customer: string
+                }
 
                 nav(OrderItem::region_id, OrderItem::order_number) {
                     items
@@ -411,7 +419,9 @@ async fn composite_one_to_many(db: SqlitePool) {
                     order_number
                 }
 
-                product: string
+                column {
+                    product: string
+                }
             }
         "#,
     );
@@ -478,7 +488,9 @@ async fn composite_many_to_many(db: SqlitePool) {
                     employee_id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
 
                 nav(Course::department_id, Course::course_code) {
                     courses
@@ -492,7 +504,9 @@ async fn composite_many_to_many(db: SqlitePool) {
                     course_code: int
                 }
 
-                title: string
+                column {
+                    title: string
+                }
 
                 nav(Teacher::school_id, Teacher::employee_id) {
                     teachers
@@ -558,8 +572,10 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
-                bio: option<string>
+                column {
+                    name: string
+                    bio: option<string>
+                }
 
                 nav(Match::horseId1) {
                     matches
@@ -632,7 +648,9 @@ async fn custom_from(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
             }
         "#,
     );
