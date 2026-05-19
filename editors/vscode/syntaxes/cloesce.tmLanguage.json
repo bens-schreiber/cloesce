@@ -126,7 +126,7 @@
     "structural-keyword": {
       "comment": "Block/sub-block keywords used by the parser",
       "name": "keyword.other.cloesce",
-      "match": "\\b(primary|optional|unique|foreign|nav|keyfield|paginated|include|for|crud|use|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
+      "match": "\\b(primary|optional|unique|foreign|nav|keyfield|column|paginated|include|for|crud|use|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
     },
     "binding-keyword": {
       "comment": "Storage binding kinds",

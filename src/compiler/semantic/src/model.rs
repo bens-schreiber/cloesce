@@ -5,8 +5,8 @@ use crate::{
     is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
-    ForeignBlock, ForeignQualifier, KvBlock, ModelBlock, ModelBlockKind, PaginatedBlockKind,
-    R2Block, Spd, SpdSlice, SqlBlockKind, Symbol, Tag,
+    ForeignBlock, KvBlock, ModelBlock, ModelBlockKind, R2Block, Spd, SpdSlice, SqlBlockKind,
+    Symbol, Tag,
 };
 use idl::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
@@ -147,7 +147,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     | ModelBlockKind::Foreign(_)
                     | ModelBlockKind::Primary(_)
                     | ModelBlockKind::Unique(_)
-                    | ModelBlockKind::Optional(_)
                     | ModelBlockKind::Navigation(_)
             )
         });
@@ -186,67 +185,31 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
         for block in self.model.blocks.inners() {
             match block {
-                ModelBlockKind::Column(symbol) => {
-                    self.column(ma, symbol, FieldQualifiers::default());
+                ModelBlockKind::Column(symbols) => {
+                    for symbol in symbols {
+                        self.column(ma, symbol, false);
+                    }
                 }
                 ModelBlockKind::Foreign(fk) => {
                     let binding = binding.unwrap().inner;
-                    self.foreign(ma, table, binding, fk, FieldQualifiers::default());
+                    self.foreign(ma, table, binding, fk, false);
                 }
                 ModelBlockKind::Primary(blocks) => {
                     let binding = binding.unwrap().inner;
-                    let qual = FieldQualifiers {
-                        is_primary: true,
-                        ..Default::default()
-                    };
 
                     for block in blocks {
                         match &block.inner {
                             SqlBlockKind::Column(symbol) => {
-                                self.column(ma, symbol, qual.clone());
+                                self.column(ma, symbol, true);
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding, foreign_block, qual.clone())
+                                self.foreign(ma, table, binding, foreign_block, true)
                             }
                         }
                     }
                 }
-                ModelBlockKind::Unique(blocks) => {
-                    let binding = binding.unwrap().inner;
-                    let qual = FieldQualifiers {
-                        unique_ids: vec![self.unique_seed],
-                        ..Default::default()
-                    };
-                    self.unique_seed += 1;
-
-                    for block in blocks {
-                        match &block.inner {
-                            SqlBlockKind::Column(symbol) => {
-                                self.column(ma, symbol, qual.clone());
-                            }
-                            SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding, foreign_block, qual.clone())
-                            }
-                        }
-                    }
-                }
-                ModelBlockKind::Optional(blocks) => {
-                    let binding = binding.unwrap().inner;
-                    let qual = FieldQualifiers {
-                        is_optional: true,
-                        ..Default::default()
-                    };
-
-                    for block in blocks {
-                        match &block.inner {
-                            SqlBlockKind::Column(symbol) => {
-                                self.column(ma, symbol, qual.clone());
-                            }
-                            SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding, foreign_block, qual.clone())
-                            }
-                        }
-                    }
+                ModelBlockKind::Unique(_) => {
+                    // Processed once all columns are built
                 }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
@@ -284,18 +247,12 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         });
                     }
                 }
-                ModelBlockKind::Paginated(blocks) => {
-                    for block in blocks {
-                        match &block.inner {
-                            PaginatedBlockKind::Kv(kv_block) => {
-                                self.kv_field(ma, table, kv_block);
-                            }
-                            PaginatedBlockKind::R2(r2_block) => {
-                                self.r2_field(ma, table, r2_block);
-                            }
-                        }
-                    }
-                }
+            }
+        }
+
+        for block in self.model.blocks.inners() {
+            if let ModelBlockKind::Unique(fields) = block {
+                self.unique_constraint(ma, fields);
             }
         }
 
@@ -322,14 +279,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
         symbol: &'p Symbol<'src>,
-        qual: FieldQualifiers,
+        is_primary: bool,
     ) {
-        self.has_defined_pk |= qual.is_primary;
-        let cidl_type = if qual.is_optional {
-            CidlType::nullable(symbol.cidl_type.clone())
-        } else {
-            symbol.cidl_type.clone()
-        };
+        self.has_defined_pk |= is_primary;
+        let cidl_type = symbol.cidl_type.clone();
 
         if !is_valid_sql_type(&cidl_type) {
             ma.sink
@@ -337,7 +290,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return;
         }
 
-        if qual.is_primary && cidl_type.is_nullable() {
+        if is_primary && cidl_type.is_nullable() {
             ma.sink
                 .push(SemanticError::NullablePrimaryKey { column: symbol });
             return;
@@ -366,14 +319,45 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 validators,
             },
             foreign_key_reference: None,
-            unique_ids: qual.unique_ids,
+            unique_ids: Vec::new(),
             composite_id: None,
         };
 
-        if qual.is_primary {
+        if is_primary {
             self.primary_columns.push(col);
         } else {
             self.columns.push(col);
+        }
+    }
+
+    fn unique_constraint(&mut self, ma: &mut ModelAnalysis<'src, 'p>, fields: &'p [Symbol<'src>]) {
+        let mut targets: Vec<usize> = Vec::new();
+        for field in fields {
+            if self
+                .primary_columns
+                .iter()
+                .any(|c| c.field.name == field.name)
+            {
+                // References to primary-key columns can just be
+                // dropped, since the PK is already unique.
+                continue;
+            }
+            match self.columns.iter().position(|c| c.field.name == field.name) {
+                Some(i) => targets.push(i),
+                None => ma
+                    .sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: field }),
+            }
+        }
+
+        if targets.is_empty() {
+            return;
+        }
+
+        let id = self.unique_seed;
+        self.unique_seed += 1;
+        for idx in targets {
+            self.columns[idx].unique_ids.push(id);
         }
     }
 
@@ -383,16 +367,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         table: &SymbolTable<'src, 'p>,
         binding: &'src str,
         fk: &'p ForeignBlock<'src>,
-        mut qual: FieldQualifiers,
+        is_primary: bool,
     ) {
-        // Add to qualifiers
-        qual.is_optional |= fk.is_optional();
-        qual.is_primary |= matches!(fk.qualifier, Some(ForeignQualifier::Primary));
-        if matches!(fk.qualifier, Some(ForeignQualifier::Unique)) {
-            qual.unique_ids.push(self.unique_seed);
-            self.unique_seed += 1;
-        }
-        self.has_defined_pk |= qual.is_primary;
+        self.has_defined_pk |= is_primary;
 
         // Check that the adjacent model exists
         let adj_model_sym = &fk.adj.first().unwrap().0;
@@ -453,7 +430,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         };
 
         for (field, (_, adj_field_sym)) in fk.fields.iter().zip(&fk.adj) {
-            if qual.is_primary && fk.is_optional() {
+            if is_primary && fk.is_optional {
                 ma.sink
                     .push(SemanticError::NullablePrimaryKey { column: field });
                 continue;
@@ -476,7 +453,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 });
             }
 
-            if !fk.is_optional() {
+            if !fk.is_optional {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                 // Dog must come before Person
                 ma.graph
@@ -494,7 +471,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 hash: 0,
                 field: ValidatedField {
                     name: field.name.into(),
-                    cidl_type: if fk.is_optional() {
+                    cidl_type: if fk.is_optional {
                         CidlType::nullable(adj_field_sym.cidl_type.clone())
                     } else {
                         adj_field_sym.cidl_type.clone()
@@ -505,11 +482,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     model_name: adj_model_sym.name,
                     column_name: adj_field_sym.name,
                 }),
-                unique_ids: qual.unique_ids.clone(),
+                unique_ids: Vec::new(),
                 composite_id,
             };
 
-            if qual.is_primary {
+            if is_primary {
                 self.primary_columns.push(col);
             } else {
                 self.columns.push(col);
@@ -850,13 +827,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
         Ok(parameters)
     }
-}
-
-#[derive(Default, Clone)]
-struct FieldQualifiers {
-    is_optional: bool,
-    is_primary: bool,
-    unique_ids: Vec<usize>,
 }
 
 /// Extracts braced variables from a format string.

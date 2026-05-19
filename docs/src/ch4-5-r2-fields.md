@@ -43,7 +43,7 @@ The `{id}` in the key is a placeholder that will be replaced with the actual val
 
 ## Paginated List Queries
 
-Cloesce supports paginated prefix list queries for R2 fields, using the same `paginated` block syntax as KV fields. This allows you to efficiently retrieve lists of objects stored in R2 with a common key prefix, without having to load all objects into memory at once.
+Cloesce supports paginated prefix list queries for R2 fields, using the same `paginated` modifier on the `r2` block as KV fields. This allows you to efficiently retrieve lists of objects stored in R2 with a common key prefix, without having to load all objects into memory at once.
 
 ```cloesce
 model Image {

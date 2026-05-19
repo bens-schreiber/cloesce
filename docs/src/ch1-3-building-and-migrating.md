@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`. 
+Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`.
 
 This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
 
@@ -10,7 +10,7 @@ This file specifies important settings for the Cloesce compiler, such as the pat
 {
   "src_paths": ["./src/schema"],
   "workers_url": "http://localhost:5000/api",
-  "wrangler_config_format": "jsonc", // or "toml"
+  "wrangler_config_format": "jsonc" // or "toml"
 }
 ```
 

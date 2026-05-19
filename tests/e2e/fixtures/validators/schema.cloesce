@@ -16,10 +16,12 @@ model Validator {
         id: int
     }
 
-    [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
-    [maxlen 255]
-    [minlen 5]
-    email: string
+    column {
+        [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
+        [maxlen 255]
+        [minlen 5]
+        email: string
+    }
 
     keyfield {
         [len 10]

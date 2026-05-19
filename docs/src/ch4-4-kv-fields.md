@@ -88,7 +88,9 @@ model User {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 
     kv (my_namespace, "user_settings/{id}") {
         theme: string
@@ -113,20 +115,6 @@ model Settings {
 ```
 
 Here, the `paginated` modifier on the `kv` block indicates that we want to retrieve all key-value pairs in the `my_namespace` namespace that have keys starting with "settings/". The results will be returned in a paginated format, allowing you to handle large datasets efficiently.
-
-Additionally, a block syntax is available:
-
-```cloesce
-model Settings {
-    paginated {
-        kv (my_namespace) {
-            allSettings: json
-        }
-
-        // ...
-    }
-}
-```
 
 ## Generated Types
 

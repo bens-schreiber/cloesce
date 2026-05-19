@@ -146,7 +146,9 @@ fn d1_model_column_fk_errors() {
                 id: option<int> // primary key cannot be nullable
             }
 
-            id: int // duplicate symbol
+            column {
+                id: int // duplicate symbol
+            }
 
             foreign (Post::invalid) {
                 doesntExist
@@ -641,7 +643,9 @@ fn kv_and_d1_coexist() {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
 
             kv(my_kv, "users/{id}") {
                 cached: json
@@ -677,7 +681,9 @@ fn api_errors() {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
         }
 
         // Unknown model reference
@@ -732,7 +738,9 @@ fn api_sets_media_types() {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
         }
 
         api User {
@@ -775,7 +783,9 @@ fn data_source_errors() {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
 
             kv(my_kv, "users/{id}") {
                 cached: json
@@ -795,7 +805,9 @@ fn data_source_errors() {
             primary {
                 id: int
             }
-            title: string
+            column {
+                title: string
+            }
 
             foreign(User::id) {
                 authorId
@@ -879,7 +891,9 @@ fn data_source_include_tree_kv_r2() {
             primary {
                 id: int
             }
-            name: string
+            column {
+                name: string
+            }
 
             kv(my_kv, "users/{id}") {
                 cached: json
@@ -1043,8 +1057,10 @@ fn fk_inherits_validators() {
                 id: int 
             }
 
-            [lt 100]
-            age: int
+            column {
+                [lt 100]
+                age: int
+            }
         }
 
         [use my_d1]
@@ -1106,10 +1122,12 @@ fn validator_errors() {
                 name: string
             }
 
-            [step 2.5]                // ValidatorInvalidArgument (float to step)
-            [len 3]                   // ValidatorInvalidForType (length on non-string)
-            [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
-            age: int
+            column {
+                [step 2.5]                // ValidatorInvalidArgument (float to step)
+                [len 3]                   // ValidatorInvalidForType (length on non-string)
+                [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
+                age: int
+            }
         }
         "#,
     );
@@ -1136,18 +1154,20 @@ fn validator_valid() {
         model User {
             primary { id: int }
 
-            [gt 0]
-            [gte 0]
-            [lt 200]
-            [lte 150]
-            [step 5]
-            age: int
+            column {
+                [gt 0]
+                [gte 0]
+                [lt 200]
+                [lte 150]
+                [step 5]
+                age: int
 
-            [minlen 1]
-            [maxlen 64]
-            [len 10]
-            [regex /^[a-z]+$/]
-            name: string
+                [minlen 1]
+                [maxlen 64]
+                [len 10]
+                [regex /^[a-z]+$/]
+                name: string
+            }
         }
 
         poo MyPoo {

@@ -11,7 +11,9 @@ model FailModel {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 }
 
 api FailModel {

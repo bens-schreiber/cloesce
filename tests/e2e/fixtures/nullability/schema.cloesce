@@ -10,8 +10,10 @@ model NullabilityChecks {
         id: int
     }
     
-    notNullableString: string
-    nullableString: option<string>
+    column {
+        notNullableString: string
+        nullableString: option<string>
+    }
 }
 
 api NullabilityChecks {

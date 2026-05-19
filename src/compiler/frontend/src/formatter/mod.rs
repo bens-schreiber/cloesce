@@ -22,9 +22,9 @@ use idl::{CidlType, CrudKind, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
-    ForeignBlock, ForeignBlockNav, ForeignQualifier, InjectBlock, Keyword, KvBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, PaginatedBlockKind, ParsedIncludeTree, PlainOldObjectBlock,
-    R2Block, ServiceBlock, Spd, SqlBlockKind, Symbol, Tag, fmt_cidl_type, lexer::CommentMap,
+    ForeignBlock, ForeignBlockNav, InjectBlock, Keyword, KvBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2Block, ServiceBlock, Spd,
+    SqlBlockKind, Symbol, Tag, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -488,27 +488,30 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
             Doc::text(keyword).then(ctx.block(inner, 2))
         }
 
+        fn symbol_block<'src>(
+            keyword: Keyword,
+            syms: &'src [Symbol<'src>],
+            ctx: &FmtCtx<'src>,
+        ) -> Doc<'src> {
+            let mut inner = Doc::nil();
+            for sym in syms {
+                inner = inner.then(ctx.sym_doc(sym, 2, false));
+            }
+            Doc::kw(keyword).then(ctx.block(inner, 2))
+        }
+
         match self {
-            ModelBlockKind::Column(sym) => ctx.sym_doc(sym, 1, true),
+            ModelBlockKind::Column(syms) => symbol_block(Keyword::Column, syms, ctx),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
             ModelBlockKind::Primary(blocks) => model_block(Keyword::Primary.as_str(), blocks, ctx),
-            ModelBlockKind::Unique(blocks) => model_block(Keyword::Unique.as_str(), blocks, ctx),
-            ModelBlockKind::Optional(blocks) => {
-                model_block(Keyword::Optional.as_str(), blocks, ctx)
-            }
-            ModelBlockKind::Paginated(blocks) => {
-                model_block(Keyword::Paginated.as_str(), blocks, ctx)
-            }
-            ModelBlockKind::KeyField(syms) => {
-                let mut inner = Doc::nil();
-                for sym in syms {
-                    inner = inner.then(ctx.sym_doc(sym, 2, false));
-                }
-                Doc::kw(Keyword::KeyField).then(ctx.block(inner, 2))
-            }
+            ModelBlockKind::Unique(fields) => Doc::kw(Keyword::Unique)
+                .then(Doc::text(" ("))
+                .then(comma_separated(fields, |sym| ctx.sym_doc(sym, 0, true)))
+                .then(Doc::text(")")),
+            ModelBlockKind::KeyField(syms) => symbol_block(Keyword::KeyField, syms, ctx),
         }
     }
 }
@@ -518,15 +521,6 @@ impl<'src> ToDoc<'src> for SqlBlockKind<'src> {
         match self {
             SqlBlockKind::Column(sym) => ctx.sym_doc(sym, 2, true),
             SqlBlockKind::Foreign(fb) => fb.to_doc(ctx),
-        }
-    }
-}
-
-impl<'src> ToDoc<'src> for PaginatedBlockKind<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        match self {
-            PaginatedBlockKind::R2(r2) => r2.to_doc(ctx),
-            PaginatedBlockKind::Kv(kv) => kv.to_doc(ctx),
         }
     }
 }
@@ -543,11 +537,10 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             .then(Doc::text(" ("))
             .then(adjs)
             .then(Doc::text(")"));
-        let qualifier = match &self.qualifier {
-            Some(ForeignQualifier::Primary) => Doc::text(" ").then(Doc::kw(Keyword::Primary)),
-            Some(ForeignQualifier::Optional) => Doc::text(" ").then(Doc::kw(Keyword::Optional)),
-            Some(ForeignQualifier::Unique) => Doc::text(" ").then(Doc::kw(Keyword::Unique)),
-            None => Doc::nil(),
+        let optional = if self.is_optional {
+            Doc::text(" ").then(Doc::kw(Keyword::Optional))
+        } else {
+            Doc::nil()
         };
 
         let mut inner = Doc::nil();
@@ -559,7 +552,7 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             inner = inner.then(ctx.spd_doc(nav, 2, false));
         }
 
-        doc.then(qualifier).then(ctx.block(inner, 2))
+        doc.then(optional).then(ctx.block(inner, 2))
     }
 }
 

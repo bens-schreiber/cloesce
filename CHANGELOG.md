@@ -8,6 +8,7 @@
 - `crud` tag for Models
 - `instance` tag for Data Source `get` method
 - `inject` tag for API methods to inject environment bindings or injected dependencies into the method.
+- `column` block
 
 ### Changed
 
@@ -20,6 +21,8 @@
 - Services no longer have fields, and are not instantiable. They cannot be injected.
 - `self` on a Service API method throws a semantic error.
 - Removed `env` as a type.
+- Removed `optional` and `paginated` blocks
+- `unique` now references existing fields instead of declaring new ones.
 
 ### Fixed
 

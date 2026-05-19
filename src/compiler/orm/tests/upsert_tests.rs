@@ -25,8 +25,10 @@ async fn upsert_scalar_model(db: SqlitePool) {
                 id: int
             }
 
-            name: string
-            age: int
+            column {
+                name: string
+                age: int
+            }
         }
     "#,
     );
@@ -68,7 +70,9 @@ async fn upsert_auto_increment(db: SqlitePool) {
                 id: int
             }
 
-            name: string
+            column {
+                name: string
+            }
         }
     "#,
     );
@@ -109,7 +113,9 @@ async fn upsert_one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
 
                 foreign(Rider::id) {
                     riderId
@@ -125,7 +131,9 @@ async fn upsert_one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: string
+                column {
+                    nickname: string
+                }
             }
         "#,
         )
@@ -178,7 +186,9 @@ async fn upsert_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
 
                 nav(Rider::horseId) {
                     riders
@@ -191,7 +201,9 @@ async fn upsert_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                nickname: string
+                column {
+                    nickname: string
+                }
 
                 foreign(Horse::id) {
                     horseId
@@ -247,7 +259,9 @@ async fn upsert_many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                name: string
+                column {
+                    name: string
+                }
 
                 nav(Course::id) {
                     courses
@@ -260,7 +274,9 @@ async fn upsert_many_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                title: string
+                column {
+                    title: string
+                }
 
                 nav(Student::id) {
                     students
@@ -314,7 +330,9 @@ async fn upsert_composite_pk(db: SqlitePool) {
                 productId: int
             }
 
-            quantity: int
+            column {
+                quantity: int
+            }
         }
     "#,
     );

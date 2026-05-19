@@ -19,8 +19,10 @@ model BlobHaver {
         id: int
     }
     
-    blob1: blob
-    blob2: blob
+    column {
+        blob1: blob
+        blob2: blob
+    }
 }
 
 api BlobHaver {

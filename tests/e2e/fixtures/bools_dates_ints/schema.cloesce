@@ -11,6 +11,8 @@ model Weather {
         id: int
     }
     
-    date: date
-    isRaining: bool
+    column {
+        date: date
+        isRaining: bool
+    }
 }

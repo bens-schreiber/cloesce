@@ -73,9 +73,6 @@ Foreign key fields inherit the type of the field they reference. In the above ex
 
 ### Optional Foreign Key
 
-> [!TIP]
-> The `optional` modifier can be used to wrap any number of columns or foreign blocks, modifying all of them to allow `NULL` values.
-
 To allow `NULL` values in a foreign key field, use the `optional` modifier:
 
 ```cloesce
@@ -84,13 +81,6 @@ model Person {
         id: int
     }
 
-    optional {
-        foreign (Dog::id) {
-            dogId
-        }
-    }
-
-    // Or, use the infix notation, which is equivalent:
     foreign (Dog::id) optional {
         dogId
     }
@@ -136,15 +126,6 @@ model Enrollment {
             courseId
         }
     }
-
-    // Or, equivalently, use the infix notation:
-    foreign (Student::id) primary {
-        studentId
-    }
-
-    foreign (Course::id) primary {
-        courseId
-    }
 }
 
 model Student {
@@ -162,7 +143,8 @@ model Course {
 
 ## Unique Constraint
 
-The `unique` block allows you to define unique constraints across any number of fields in a Model. It translates to the SQLite `UNIQUE` constraint.
+The `unique (field1, field2, ...)` declaration adds a unique constraint over one or more
+existing fields on a Model. It translates to the SQLite `UNIQUE` constraint. A field may participate in any number of unique constraints.
 
 ```cloesce
 model User {
@@ -170,29 +152,27 @@ model User {
         id: int
     }
 
-    unique {
+    column {
         email: string
-
-        foreign (Profile::id) {
-            profileId
-        }
-
-        // Infix form is also supported for foreign keys,
-        // even under a unique block
-        foreign (Dog::id) unique {
-            dogId
-        }
-    }
-
-    unique {
         username: string
     }
+
+    foreign (Profile::id) {
+        profileId
+    }
+
+    foreign (Dog::id) {
+        dogId
+    }
+
+    // The combination (email, profileId, dogId) must be unique.
+    unique (email, profileId, dogId)
+
+    // `username` must be unique on its own.
+    unique (username)
+
+    // `dogId` must also be unique on its own — a field can participate in
+    // multiple, independent unique constraints.
+    unique (dogId)
 }
 ```
-
-The above `User` Model has four unique constraints:
-
-1. The combination of `email`, `profileId`, and `dogId` must be unique across all rows in the `User` table.
-2. `dogId` must be unique across all rows in the `User` table.
-3. `username` must be unique across all rows in the `User` table.
-4. `id` is unique across all rows in the `User` table by virtue of being a primary key.

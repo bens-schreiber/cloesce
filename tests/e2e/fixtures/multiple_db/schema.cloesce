@@ -12,7 +12,9 @@ model DB1Model {
         id: int
     }
     
-    someColumn: string
+    column {
+        someColumn: string
+    }
 }
 
 [use db2]
@@ -22,5 +24,7 @@ model DB2Model {
         id: int
     }
     
-    someColumn: string
+    column {
+        someColumn: string
+    }
 }

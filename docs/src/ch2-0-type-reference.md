@@ -53,7 +53,9 @@ model User {
     primary {
         id: int
     }
-    name: string
+    column {
+        name: string
+    }
 }
 
 poo Profile {

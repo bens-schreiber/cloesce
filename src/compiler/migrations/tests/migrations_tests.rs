@@ -114,9 +114,11 @@ async fn migrate_models_scalars(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
-                age: int
-                address: string
+                column {
+                    name: option<string>
+                    age: int
+                    address: string
+                }
             }
         "#,
         );
@@ -417,9 +419,11 @@ async fn migrate_with_rebuild(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
-                age: int
-                address: string
+                column {
+                    name: option<string>
+                    age: int
+                    address: string
+                }
             }
         "#,
         );
@@ -447,9 +451,11 @@ async fn migrate_with_rebuild(db: SqlitePool) {
                     id: int
                 }
 
-                first_name: option<string>
-                age: string
-                favorite_color: string
+                column {
+                    first_name: option<string>
+                    age: string
+                    favorite_color: string
+                }
             }
         "#,
         );
@@ -500,9 +506,11 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     id: string
                 }
 
-                first_name: option<string>
-                age: string
-                favorite_color: string
+                column {
+                    first_name: option<string>
+                    age: string
+                    favorite_color: string
+                }
             }
         "#,
         );
@@ -551,9 +559,11 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     id: string
                 }
 
-                first_name: option<string>
-                age: string
-                favorite_color: string
+                column {
+                    first_name: option<string>
+                    age: string
+                    favorite_color: string
+                }
 
                 foreign(Dog::id) {
                     dog_id
@@ -595,16 +605,15 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
+                    column {
                         email: string
-                    }
-
-                    unique {
                         first_name: string
                         last_name: string
+                        age: int
                     }
 
-                    age: int
+                    unique (email)
+                    unique (first_name, last_name)
                 }
             "#,
             );
@@ -640,18 +649,16 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
+                    column {
                         email: string
-                    }
-
-                    unique {
                         first_name: string
                         last_name: string
-                    }
-
-                    unique {
                         age: int
                     }
+
+                    unique (email)
+                    unique (first_name, last_name)
+                    unique (age)
                 }
             "#,
             );
@@ -688,16 +695,15 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         id: int
                     }
 
-                    unique {
+                    column {
                         email: string
-                    }
-
-                    unique {
                         first_name: string
                         last_name: string
+                        age: int
                     }
 
-                    age: int
+                    unique (email)
+                    unique (first_name, last_name)
                 }
             "#,
             );
@@ -735,9 +741,11 @@ async fn migrate_with_rename(db: SqlitePool) {
                     id: int
                 }
 
-                name: option<string>
-                age: int
-                address: string
+                column {
+                    name: option<string>
+                    age: int
+                    address: string
+                }
             }
 
             [use db]
@@ -773,9 +781,11 @@ async fn migrate_with_rename(db: SqlitePool) {
                 id: int
             }
 
-            name: option<string>
-            age: int
-            address: string
+            column {
+                name: option<string>
+                age: int
+                address: string
+            }
         }
 
         [use db]
@@ -984,7 +994,9 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
                 userId: int
             }
 
-            name: string
+            column {
+                name: string
+            }
         }
 
         [use db]

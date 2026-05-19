@@ -43,7 +43,9 @@ model User {
         id: int
     }
 
-    name: string
+    column {
+        name: string
+    }
 }
 ```
 

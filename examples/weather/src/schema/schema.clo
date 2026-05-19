@@ -18,8 +18,10 @@ model WeatherReport {
         weatherEntries
     }
     
-    title: string
-    description: string
+    column {
+        title: string
+        description: string
+    }
 }
 
 [use db]
@@ -41,10 +43,12 @@ model Weather {
         photo
     }
     
-    dateTime: date
-    location: string
-    temperature: int
-    condition: string
+    column {
+        dateTime: date
+        location: string
+        temperature: int
+        condition: string
+    }
 }
 
 api Weather {
