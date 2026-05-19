@@ -18,7 +18,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 ureq = { version = "3.3.0", features = [
     "json",
-    "native-tls",
+    "rustls",
 ], default-features = false }
 
 [[bin]]
