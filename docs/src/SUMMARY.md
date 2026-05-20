@@ -23,5 +23,5 @@
   - [Dependency Injection](./ch6-3-dependency-injection.md)
   - [Runtime Validation](./ch6-4-runtime-validation.md)
   - [Plain Old Objects](./ch6-5-plain-old-objects.md)
-  - [Data-less Models](./ch6-6-services.md)
+  - [Services](./ch6-6-services.md)
 - [ORM Reference](./ch7-0-orm-reference.md)

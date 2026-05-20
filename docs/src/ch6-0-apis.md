@@ -8,4 +8,4 @@ This chapter covers how to:
 - Utilize generated [CRUD APIs](./ch6-2-crud-generation.md)
 - Inject [dependencies](./ch6-3-dependency-injection.md) into APIs
 - Validate API inputs with [Runtime Validation](./ch6-4-runtime-validation.md)
-- Define [Data-less Models](./ch6-6-services.md) and [Plain Old Objects](./ch6-5-plain-old-objects.md)
+- Define [Services](./ch6-6-services.md) and [Plain Old Objects](./ch6-5-plain-old-objects.md)
