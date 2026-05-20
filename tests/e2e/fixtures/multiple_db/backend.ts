@@ -33,7 +33,7 @@ export namespace DB1Model {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db1: Env["db1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db1: Env["db1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db1: Env["db1"] }, id: number) => env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id),
@@ -98,7 +98,7 @@ export namespace DB2Model {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db2: Env["db2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db2: Env["db2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db2: Env["db2"] }, id: number) => env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id),

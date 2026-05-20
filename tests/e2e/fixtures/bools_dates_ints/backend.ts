@@ -33,7 +33,7 @@ export namespace Weather {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),

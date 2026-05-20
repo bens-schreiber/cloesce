@@ -27,7 +27,7 @@ The `Source` namespace contains transpiled representations of each [Data Source]
         export const Default = {
             include: {"weatherEntries":{}},
 
-            async save(env, newModel: DeepPartial<WeatherReport>) {...},
+            async save(env, newModel: DeepPartial<WeatherReport.Self>) {...},
 
             getQuery: (env, id: number) => ...,
             async get(env, id: number) {...},

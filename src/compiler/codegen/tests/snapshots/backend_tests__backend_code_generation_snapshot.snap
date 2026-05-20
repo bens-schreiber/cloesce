@@ -81,7 +81,7 @@ export namespace HasSqlColumnTypes {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" = ?1`).bind(id),
@@ -146,7 +146,7 @@ export namespace ManyToManyModelA {
     export namespace Source {
         export const Default = {
             include: {"manyToManyNav":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"manyToManyNav":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ManyToManyModelA"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."right" AS "manyToManyNav.id" FROM "ManyToManyModelA" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelA"."id" = "ManyToManyModelAManyToManyModelB_2"."left" LEFT JOIN "ManyToManyModelB" AS "ManyToManyModelB_1" ON "ManyToManyModelAManyToManyModelB_2"."right" = "ManyToManyModelB_1"."id" WHERE "ManyToManyModelA"."id" = ?1`).bind(id),
@@ -211,7 +211,7 @@ export namespace ManyToManyModelB {
     export namespace Source {
         export const Default = {
             include: {"manyToManyNav":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"manyToManyNav":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ManyToManyModelB"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."left" AS "manyToManyNav.id" FROM "ManyToManyModelB" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelB"."id" = "ManyToManyModelAManyToManyModelB_2"."right" LEFT JOIN "ManyToManyModelA" AS "ManyToManyModelA_1" ON "ManyToManyModelAManyToManyModelB_2"."left" = "ManyToManyModelA_1"."id" WHERE "ManyToManyModelB"."id" = ?1`).bind(id),
@@ -284,7 +284,7 @@ export namespace ModelWithCompositePk {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, tenantId: string, rowId: number) => env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") = (?1, ?2)`).bind(tenantId, rowId),
@@ -375,7 +375,7 @@ export namespace ModelWithKv {
     export namespace Source {
         export const Default = {
             include: {"manyValues":{},"someValue":{},"streamValue":{}},
-            async save(env: { my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"manyValues":{},"someValue":{},"streamValue":{}});
             },
             async get(env: { my_kv: Env["my_kv"] }, id1: string, id2: string): Promise<ModelWithKv.Self | null> {
@@ -446,7 +446,7 @@ export namespace ModelWithR2 {
     export namespace Source {
         export const Default = {
             include: {"fileData":{},"manyFileDatas":{}},
-            async save(env: { my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"fileData":{},"manyFileDatas":{}});
             },
             async get(env: { my_r2: Env["my_r2"] }, id: string): Promise<ModelWithR2.Self | null> {
@@ -506,7 +506,7 @@ export namespace OneToManyModel {
     export namespace Source {
         export const Default = {
             include: {"oneToManyNav":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"oneToManyNav":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" = ?1`).bind(id),
@@ -585,7 +585,7 @@ export namespace ToyotaPrius {
     export namespace Source {
         export const Default = {
             include: {"metadata":{},"photoData":{}},
-            async save(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"metadata":{},"photoData":{}});
             },
             getQuery: (env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
@@ -599,7 +599,7 @@ export namespace ToyotaPrius {
         }
         export const WithKv = {
             include: {"metadata":{}},
-            async save(env: { db: Env["db"], my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"metadata":{}});
             },
             getQuery: (env: { db: Env["db"], my_kv: Env["my_kv"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
@@ -613,7 +613,7 @@ export namespace ToyotaPrius {
         }
         export const WithR2 = {
             include: {"photoData":{}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"photoData":{}});
             },
             getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
@@ -678,7 +678,7 @@ export namespace BasicModel {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" = ?1`).bind(id),
@@ -753,7 +753,7 @@ export namespace ModelWithCustomDs {
     export namespace Source {
         export const Custom = {
             include: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"oneToManyModel":{"oneToManyNav":{}}});
             },
             getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number, externalParam: string) => env.db.prepare(`SELECT * FROM ModelWithCustomDs WHERE id = ?1 AND name LIKE ?2`).bind(id, externalParam),
@@ -767,7 +767,7 @@ export namespace ModelWithCustomDs {
         }
         export const Default = {
             include: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"oneToManyModel":{"oneToManyNav":{}}});
             },
             getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id),
@@ -833,7 +833,7 @@ export namespace HasOneToOne {
     export namespace Source {
         export const Default = {
             include: {"oneToOneNav":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"oneToOneNav":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" = ?1`).bind(id),
@@ -899,7 +899,7 @@ export namespace ModelWithCruds {
     export namespace Source {
         export const ByName = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, name: string) => env.db.prepare(`SELECT * FROM ModelWithCruds WHERE name = ?1`).bind(name),
@@ -913,7 +913,7 @@ export namespace ModelWithCruds {
         }
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id),

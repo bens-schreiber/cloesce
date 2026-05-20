@@ -50,7 +50,7 @@ export namespace FailModel {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id),

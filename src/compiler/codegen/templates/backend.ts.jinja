@@ -138,7 +138,7 @@ export namespace {{ model.name }} {
 {%- for ds in model.data_sources.values() %}
         export const {{ ds.name }} = {
             include: {{ self.mapper.include_tree(&ds.tree) }},
-            async save(env: {{ env_type(self.model_bindings(model, Some(&ds.tree))) }}, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: {{ env_type(self.model_bindings(model, Some(&ds.tree))) }}, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {{ self.mapper.include_tree(&ds.tree) }});
             },
 {%- let ds_bindings = self.model_bindings(model, Some(&ds.tree)) %}

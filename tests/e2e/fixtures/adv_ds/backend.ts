@@ -39,7 +39,7 @@ export namespace Hamburger {
     export namespace Source {
         export const BurgersWithLettuceOrdered = {
             include: {"toppings":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"toppings":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`).bind(id),
@@ -53,7 +53,7 @@ export namespace Hamburger {
         }
         export const Default = {
             include: {"toppings":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"toppings":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`).bind(id),
@@ -67,7 +67,7 @@ export namespace Hamburger {
         }
         export const NoLettuce = {
             include: {"toppings":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"toppings":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] != 'LETTUCE' AND id = ?1 ORDER BY id`).bind(id),
@@ -81,7 +81,7 @@ export namespace Hamburger {
         }
         export const OnlyBacon = {
             include: {"toppings":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"toppings":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] = 'BACON' AND id = ?1 ORDER BY id`).bind(id),
@@ -147,7 +147,7 @@ export namespace Topping {
     export namespace Source {
         export const Default = {
             include: {"hamburger":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"hamburger":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id" WHERE "Topping"."id" = ?1`).bind(id),

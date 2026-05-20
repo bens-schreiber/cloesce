@@ -42,7 +42,7 @@ export namespace A {
     export namespace Source {
         export const Default = {
             include: {"b":{"a":{}}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"b":{"a":{}}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "A"."id" AS "id", "A"."bId" AS "bId", "B_1"."id" AS "b.id", "A_2"."id" AS "b.a.id", "A_2"."bId" AS "b.a.bId" FROM "A" LEFT JOIN "B" AS "B_1" ON "A"."bId" = "B_1"."id" LEFT JOIN "A" AS "A_2" ON "B_1"."id" = "A_2"."bId" WHERE "A"."id" = ?1`).bind(id),
@@ -56,7 +56,7 @@ export namespace A {
         }
         export const WithB = {
             include: {"b":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"b":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "A"."id" AS "id", "A"."bId" AS "bId", "B_1"."id" AS "b.id" FROM "A" LEFT JOIN "B" AS "B_1" ON "A"."bId" = "B_1"."id" WHERE "A"."id" = ?1`).bind(id),
@@ -70,7 +70,7 @@ export namespace A {
         }
         export const WithoutB = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "A"."id" AS "id", "A"."bId" AS "bId" FROM "A" WHERE "A"."id" = ?1`).bind(id),
@@ -138,7 +138,7 @@ export namespace B {
     export namespace Source {
         export const Default = {
             include: {"a":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"a":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "B"."id" AS "id", "A_1"."id" AS "a.id", "A_1"."bId" AS "a.bId" FROM "B" LEFT JOIN "A" AS "A_1" ON "B"."id" = "A_1"."bId" WHERE "B"."id" = ?1`).bind(id),
@@ -203,7 +203,7 @@ export namespace Course {
     export namespace Source {
         export const Default = {
             include: {"students":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"students":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "CourseStudent_2"."right" AS "students.id" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course"."id" = "CourseStudent_2"."left" LEFT JOIN "Student" AS "Student_1" ON "CourseStudent_2"."right" = "Student_1"."id" WHERE "Course"."id" = ?1`).bind(id),
@@ -277,7 +277,7 @@ export namespace Person {
     export namespace Source {
         export const Default = {
             include: {"dogs":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"dogs":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Person"."id" AS "id", "Dog_1"."id" AS "dogs.id", "Dog_1"."personId" AS "dogs.personId" FROM "Person" LEFT JOIN "Dog" AS "Dog_1" ON "Person"."id" = "Dog_1"."personId" WHERE "Person"."id" = ?1`).bind(id),
@@ -291,7 +291,7 @@ export namespace Person {
         }
         export const WithDogs = {
             include: {"dogs":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"dogs":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Person"."id" AS "id", "Dog_1"."id" AS "dogs.id", "Dog_1"."personId" AS "dogs.personId" FROM "Person" LEFT JOIN "Dog" AS "Dog_1" ON "Person"."id" = "Dog_1"."personId" WHERE "Person"."id" = ?1`).bind(id),
@@ -305,7 +305,7 @@ export namespace Person {
         }
         export const WithoutDogs = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Person"."id" AS "id" FROM "Person" WHERE "Person"."id" = ?1`).bind(id),
@@ -379,7 +379,7 @@ export namespace Student {
     export namespace Source {
         export const Default = {
             include: {"courses":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"courses":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" WHERE "Student"."id" = ?1`).bind(id),
@@ -393,7 +393,7 @@ export namespace Student {
         }
         export const None = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Student"."id" AS "id" FROM "Student" WHERE "Student"."id" = ?1`).bind(id),
@@ -407,7 +407,7 @@ export namespace Student {
         }
         export const WithCoursesStudentsCourses = {
             include: {"courses":{"students":{"courses":{}}}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"courses":{"students":{"courses":{}}}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id", "CourseStudent_4"."right" AS "courses.students.id", "CourseStudent_6"."left" AS "courses.students.courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Course_1"."id" = "CourseStudent_4"."left" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent_4"."right" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_6" ON "Student_3"."id" = "CourseStudent_6"."right" LEFT JOIN "Course" AS "Course_5" ON "CourseStudent_6"."left" = "Course_5"."id" WHERE "Student"."id" = ?1`).bind(id),
@@ -476,7 +476,7 @@ export namespace Dog {
     export namespace Source {
         export const Default = {
             include: {"person":{"dogs":{}}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"person":{"dogs":{}}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Dog"."id" AS "id", "Dog"."personId" AS "personId", "Person_1"."id" AS "person.id", "Dog_2"."id" AS "person.dogs.id", "Dog_2"."personId" AS "person.dogs.personId" FROM "Dog" LEFT JOIN "Person" AS "Person_1" ON "Dog"."personId" = "Person_1"."id" LEFT JOIN "Dog" AS "Dog_2" ON "Person_1"."id" = "Dog_2"."personId" WHERE "Dog"."id" = ?1`).bind(id),

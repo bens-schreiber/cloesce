@@ -42,7 +42,7 @@ export namespace Dog {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Dog"."id" AS "id", "Dog"."name" AS "name", "Dog"."age" AS "age" FROM "Dog" WHERE "Dog"."id" = ?1`).bind(id),

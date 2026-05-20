@@ -41,7 +41,7 @@ export namespace Foo {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: string) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`).bind(id),

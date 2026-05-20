@@ -35,7 +35,7 @@ export namespace CrudHaver {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "CrudHaver"."id" AS "id", "CrudHaver"."name" AS "name" FROM "CrudHaver" WHERE "CrudHaver"."id" = ?1`).bind(id),
@@ -102,7 +102,7 @@ export namespace Parent {
     export namespace Source {
         export const Default = {
             include: {"children":{},"favoriteChild":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"children":{},"favoriteChild":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
@@ -116,7 +116,7 @@ export namespace Parent {
         }
         export const WithChildren = {
             include: {"children":{},"favoriteChild":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"children":{},"favoriteChild":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
@@ -182,7 +182,7 @@ export namespace Child {
     export namespace Source {
         export const Default = {
             include: {"parent":{"children":{}}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"parent":{"children":{}}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Child"."id" AS "id", "Child"."parentId" AS "parentId", "Parent_1"."id" AS "parent.id", "Parent_1"."favoriteChildId" AS "parent.favoriteChildId", "Child_2"."id" AS "parent.children.id", "Child_2"."parentId" AS "parent.children.parentId" FROM "Child" LEFT JOIN "Parent" AS "Parent_1" ON "Child"."parentId" = "Parent_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent_1"."id" = "Child_2"."parentId" WHERE "Child"."id" = ?1`).bind(id),

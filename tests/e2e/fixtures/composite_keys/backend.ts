@@ -33,7 +33,7 @@ export namespace Course {
     export namespace Source {
         export const Default = {
             include: {"studentCourses":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"studentCourses":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" = ?1`).bind(id),
@@ -100,7 +100,7 @@ export namespace Student {
     export namespace Source {
         export const CoursesOrderedDescending = {
             include: {"studentCourses":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"studentCourses":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
@@ -114,7 +114,7 @@ export namespace Student {
         }
         export const Default = {
             include: {"studentCourses":{}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"studentCourses":{}});
             },
             getQuery: (env: { db: Env["db"] }, id: number, name: string) => env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name),
@@ -182,7 +182,7 @@ export namespace StudentCourse {
     export namespace Source {
         export const Default = {
             include: {},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),
@@ -196,7 +196,7 @@ export namespace StudentCourse {
         }
         export const WithStudentCourse = {
             include: {"course":{"studentCourses":{}},"student":{"studentCourses":{}}},
-            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"course":{"studentCourses":{}},"student":{"studentCourses":{}}});
             },
             getQuery: (env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number) => env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId),

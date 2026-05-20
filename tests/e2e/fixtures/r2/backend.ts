@@ -47,7 +47,7 @@ export namespace D1BackedModel {
     export namespace Source {
         export const Default = {
             include: {"r2Data":{}},
-            async save(env: { bucket1: Env["bucket1"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { bucket1: Env["bucket1"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"r2Data":{}});
             },
             getQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
@@ -137,7 +137,7 @@ export namespace PureR2Model {
     export namespace Source {
         export const Default = {
             include: {"allData":{},"data":{},"otherData":{}},
-            async save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"allData":{},"data":{},"otherData":{}});
             },
             async get(env: { bucket1: Env["bucket1"] }, id: string): Promise<PureR2Model.Self | null> {

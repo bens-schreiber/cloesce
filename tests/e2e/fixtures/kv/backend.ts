@@ -40,7 +40,7 @@ export namespace D1BackedModel {
     export namespace Source {
         export const Default = {
             include: {"kvData":{}},
-            async save(env: { db: Env["db"], namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { db: Env["db"], namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"kvData":{}});
             },
             getQuery: (env: { db: Env["db"], namespace: Env["namespace"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
@@ -111,7 +111,7 @@ export namespace PaginatedKVModel {
     export namespace Source {
         export const Default = {
             include: {"items":{}},
-            async save(env: { namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"items":{}});
             },
             async get(env: { namespace: Env["namespace"] }, id: string): Promise<PaginatedKVModel.Self | null> {
@@ -178,7 +178,7 @@ export namespace PureKVModel {
     export namespace Source {
         export const Default = {
             include: {"data":{},"otherData":{}},
-            async save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+            async save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"otherData":{}});
             },
             async get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: string): Promise<PureKVModel.Self | null> {
