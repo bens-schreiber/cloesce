@@ -2,6 +2,9 @@
 
 ### Added
 
+- Added `save` to each generated backend Data Source
+- Added `include` to the generated ORM `map` method
+
 ### Changed
 
 - Removed `service` syntax, opting for the "data-less model" pattern instead.
