@@ -85,7 +85,6 @@ export class PooAcceptYield {
       false
     );
   }
-
   static fromJson(data: any): PooAcceptYield {
     const __$res = Object.assign(new PooAcceptYield(), data);
     return __$res;

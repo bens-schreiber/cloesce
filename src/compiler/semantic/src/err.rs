@@ -207,8 +207,13 @@ pub enum SemanticError<'src, 'p> {
         symbol: &'p Symbol<'src>,
     },
 
-    ServiceMethodInstantiated {
+    ModelInstanceMethodWithNoData {
         method: &'p Symbol<'src>,
+    },
+
+    ModelDataSourceWithNoData {
+        model: &'p Symbol<'src>,
+        data_source: &'p Symbol<'src>,
     },
 }
 
@@ -713,12 +718,12 @@ fn display(
             let (path, range) = span_parts(&api.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "API block '{}' references an unknown model or service",
+                    "API block '{}' references an unknown model",
                     api.name
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("this model or service does not exist")
+                        .with_message("this model does not exist")
                         .with_color(Color::Red),
                 )
         }
@@ -846,21 +851,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::ServiceMethodInstantiated { method } => {
-            let (path, range) = span_parts(&method.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "service API method '{}' cannot declare `self`",
-                    method.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "services have no instance state; only static methods are allowed",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
         SemanticError::InstanceTagOnNonField { source, param, tag } => {
             let (s_path, s_range) = span_parts(&source.span, file_table);
             let (p_path, p_range) = span_parts(&param.span, file_table);
@@ -884,6 +874,43 @@ fn display(
                     Label::new((t_path, t_range))
                         .with_message("this tag is an instance tag")
                         .with_color(Color::Blue),
+                )
+        }
+        SemanticError::ModelInstanceMethodWithNoData { method } => {
+            let (path, range) = span_parts(&method.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "data-less model API method '{}' cannot declare `self`",
+                    method.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "data-less models have no instance state; only static methods are allowed",
+                        )
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ModelDataSourceWithNoData { model, data_source } => {
+            let (m_path, m_range) = span_parts(&model.span, file_table);
+            let (d_path, d_range) = span_parts(&data_source.span, file_table);
+            report!(d_path.clone(), d_range.clone())
+                .with_message(format!(
+                    "data-less model '{}' cannot declare a data source",
+                    model.name
+                ))
+                .with_label(
+                    Label::new((d_path, d_range))
+                        .with_message("data sources require D1-backed storage")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((m_path, m_range))
+                        .with_message(format!(
+                            "model '{}' has no data fields (no columns, KV, R2, or key fields)",
+                            model.name
+                        ))
+                        .with_color(Color::Yellow),
                 )
         }
     };

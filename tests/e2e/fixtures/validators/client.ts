@@ -168,7 +168,6 @@ export class Validator {
       true
     );
   }
-
   static fromJson(data: any): Validator {
     const __$res = Object.assign(new Validator(), data);
     if (__$res.data) __$res.data = Object.assign(new KValue(), __$res.data);

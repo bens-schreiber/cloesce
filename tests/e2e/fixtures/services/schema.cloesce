@@ -2,9 +2,7 @@ inject {
     InjectedThing
 }
 
-service {
-    FooService
-}
+model FooService {}
 
 api FooService {
     [inject InjectedThing]

@@ -111,11 +111,6 @@ export interface PlainOldObject {
   fields: ValidatedField[];
 }
 
-export interface Service {
-  name: string;
-  apis: ApiMethod[];
-}
-
 export interface IncludeTree {
   [key: string]: IncludeTree;
 }
@@ -160,7 +155,6 @@ export interface Cidl {
   wrangler_env?: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
-  services: Record<string, Service>;
   injects: string[];
 }
 

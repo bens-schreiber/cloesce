@@ -136,7 +136,6 @@ export class Hamburger {
       true
     );
   }
-
   static fromJson(data: any): Hamburger {
     const __$res = Object.assign(new Hamburger(), data);
     for (let i = 0; i < __$res.toppings?.length; i++) {
@@ -172,7 +171,6 @@ export class Topping {
       false
     );
   }
-
   static fromJson(data: any): Topping {
     const __$res = Object.assign(new Topping(), data);
     for (let i = 0; i < __$res.hamburger?.length; i++) {

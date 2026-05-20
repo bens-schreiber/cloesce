@@ -1,5 +1,5 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, Service, CrudKind, DataSource, ValidatedField } from "../cidl.js";
+import { Cidl, Model, ApiMethod, CrudKind, DataSource, ValidatedField } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -104,7 +104,7 @@ export class CloesceApp {
     return new CloesceApp();
   }
 
-  // Maps a model or service name to an instance containing the implementations of its API methods.
+  // Maps a model name to an instance containing the implementations of its API methods.
   // Additionally, contains injected dependencies, mapped to their instance.
   private apiRegistry: Map<string, unknown> = new Map();
 
@@ -131,7 +131,7 @@ export class CloesceApp {
   private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
 
   /**
-   * Registers middleware for a specific namespace (Model or Service)
+   * Registers middleware for a specific model namespace.
    *
    * Runs before request validation and method middleware.
    *
@@ -153,7 +153,7 @@ export class CloesceApp {
    *
    * Runs after namespace middleware and request validation.
    *
-   * @param key - The constructor function of the Model or Service.
+   * @param key - The constructor function of the Model.
    * @param method - The method name or CrudKind to register the middleware for.
    * @param m - The middleware function to register.
    */
@@ -289,15 +289,13 @@ export type ApiImplementation = (...args: unknown[]) => Promise<unknown> | unkno
 
 /** @internal */
 export type MatchedRoute = {
-  kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
   getParamValues: Record<string, unknown>;
   keyFields: Record<string, unknown>;
   impl: ApiImplementation;
   dataSource?: DataSource;
-  model?: Model;
-  service?: Service;
+  model: Model;
 };
 
 /**
@@ -328,40 +326,9 @@ function matchRoute(
   }
 
   // instantiated method route format: /{namespace}/{dataSourceGetParams}/{keyFields}/{method}
-  // static/service method route format: /{namespace}/{method}
+  // static method route format: /{namespace}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
-
-  const service = idl.services[namespace];
-  if (service) {
-    if (parts.length !== 2) {
-      return notFound(RouterError.UnknownRoute);
-    }
-
-    const method = service.apis.find((a) => a.name === methodName);
-    if (!method) {
-      return notFound(RouterError.UnknownRoute);
-    }
-
-    if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
-      return notFound(RouterError.UnmatchedHttpVerb);
-    }
-
-    const impl = registry.get(service.name)?.[method.name] as ApiImplementation | undefined;
-    if (!impl) {
-      return notImplemented();
-    }
-
-    return Either.right({
-      kind: "service",
-      namespace,
-      method,
-      impl,
-      getParamValues: {},
-      keyFields: {},
-      service,
-    });
-  }
 
   const model = idl.models[namespace];
   if (!model) {
@@ -376,6 +343,21 @@ function matchRoute(
     return notFound(RouterError.UnmatchedHttpVerb);
   }
 
+  let dataSource: DataSource | undefined;
+  let numGetParams = 0;
+  if (method.is_static) {
+    if (parts.length !== 2) {
+      return notFound(RouterError.UnknownRoute);
+    }
+  } else {
+    dataSource = model.data_sources[method.data_source!];
+    numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
+    const numKeyFields = model.key_fields.length;
+    if (parts.length !== 2 + numGetParams + numKeyFields) {
+      return notFound(RouterError.UnknownRoute);
+    }
+  }
+
   let impl =
     registry.get(model.name)?.[method.name] ??
     (crudRoute(model, method, env) as ApiImplementation | undefined);
@@ -384,12 +366,7 @@ function matchRoute(
   }
 
   if (method.is_static) {
-    if (parts.length !== 2) {
-      return notFound(RouterError.UnknownRoute);
-    }
-
     return Either.right({
-      kind: "model",
       namespace,
       method,
       impl,
@@ -399,29 +376,19 @@ function matchRoute(
     });
   }
 
-  // With N data source get params and M key fields, the id portion of the route
-  // should be N+M segments long, with the first N segments in the order of the data source get parameters
-  const dataSource = model.data_sources[method.data_source!];
-  const numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
-  const numKeyFields = model.key_fields.length;
-  if (parts.length !== 2 + numGetParams + numKeyFields) {
-    return notFound(RouterError.UnknownRoute);
-  }
-
   const getParamValues: Record<string, unknown> = {};
   for (let i = 0; i < numGetParams; i++) {
-    const param = dataSource.get!.parameters[i].parameter;
+    const param = dataSource!.get!.parameters[i].parameter;
     getParamValues[param.name] = parts[1 + i];
   }
 
   const keyFields: Record<string, unknown> = {};
-  for (let i = 0; i < numKeyFields; i++) {
+  for (let i = 0; i < model.key_fields.length; i++) {
     const field = model.key_fields[i];
     keyFields[field.name] = parts[1 + numGetParams + i];
   }
 
   return Either.right({
-    kind: "model",
     namespace,
     method,
     impl,
@@ -449,7 +416,7 @@ async function validateRequest(
     exit(400, c, `Invalid Request: ${reason}`);
 
   // Validate instantiated invocation
-  if (route.kind === "model" && !route.method.is_static) {
+  if (!route.method.is_static) {
     const model = route.model!;
 
     // All data source get parameters must be present and valid
@@ -578,7 +545,7 @@ async function validateRequest(
 }
 
 /**
- * Hydrates a model or service instance for method dispatch.
+ * Hydrates a model instance for method dispatch.
  * @returns 500 or the hydrated instance
  */
 async function hydrate(
@@ -586,7 +553,7 @@ async function hydrate(
   route: MatchedRoute,
   env: any,
 ): Promise<Either<HttpResult, any>> {
-  if (route.kind === "service" || route.method.is_static) {
+  if (route.method.is_static) {
     // No hydration necessary
     return Either.right(null);
   }
@@ -641,7 +608,7 @@ async function methodDispatch(
   params: Record<string, unknown>,
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const paramArray: any[] = route.kind === "model" && !route.method.is_static ? [obj] : [];
+  const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
   if (route.method.injected.length > 0) {
     paramArray.push(resolveInjectedArgs(di, env, route.method.injected));

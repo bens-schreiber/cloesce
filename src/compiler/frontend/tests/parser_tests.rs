@@ -255,14 +255,13 @@ fn inject_block() {
 }
 
 #[test]
-fn service_block() {
+fn api_block() {
     // Act
     let ast = lex_and_ast(
         r#"
-        service {
-            MyAppService
-            AnotherService
-        }
+        model MyAppService {}
+        model AnotherService {}
+
         api MyAppService {
             post createItem(
                 name: string,
@@ -276,17 +275,17 @@ fn service_block() {
         "#,
     );
 
-    // Assert: the single `service { ... }` block contains two service symbols
-    let services: Vec<_> = ast
+    // Assert
+    let dataless_models: Vec<_> = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
-            AstBlockKind::Service(s) => Some(s),
+            AstBlockKind::Model(m) if m.blocks.is_empty() => Some(m),
             _ => None,
         })
         .collect();
-    assert_eq!(services.len(), 1);
-    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
+    assert_eq!(dataless_models.len(), 2);
+    let names: Vec<_> = dataless_models.iter().map(|m| m.symbol.name).collect();
     assert_eq!(names, vec!["MyAppService", "AnotherService"]);
 
     let api_blocks: Vec<_> = ast
@@ -734,30 +733,4 @@ fn find_model<'a>(ast: &'a Ast<'a>, name: &str) -> &'a ModelBlock<'a> {
             _ => None,
         })
         .unwrap_or_else(|| panic!("{name} model to be present"))
-}
-
-#[test]
-fn service_block_supports_multiple_symbols() {
-    let ast = lex_and_ast(
-        r#"
-        service {
-            FooService
-            BarService
-            BazService
-        }
-        "#,
-    );
-
-    let services: Vec<_> = ast
-        .blocks
-        .iter()
-        .filter_map(|spd| match &spd.inner {
-            AstBlockKind::Service(s) => Some(s),
-            _ => None,
-        })
-        .collect();
-
-    assert_eq!(services.len(), 1);
-    let names: Vec<_> = services[0].symbols.iter().map(|s| s.name).collect();
-    assert_eq!(names, vec!["FooService", "BarService", "BazService"]);
 }

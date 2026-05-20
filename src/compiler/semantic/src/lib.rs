@@ -6,7 +6,7 @@
 //! a HIR that describes the full semantics of the program. This includes:
 //!
 //! - Resolving type references to produce fully resolved [CidlType]s
-//! - Tying APIs to their respective namespaces (models or services)
+//! - Tying APIs to their respective model namespaces
 //! - Validating that all symbols are uniquely defined and correctly used
 //! - Validating the Wrangler environment configuration (Cloudflares infrastructure bindings)
 //! - Various other semantic checks (see the [SemanticError] enum for details)
@@ -25,8 +25,7 @@ use frontend::{
     Symbol, Tag,
 };
 use idl::{
-    CidlType, CloesceIdl, Field, Number, PlainOldObject, Service, ValidatedField, Validator,
-    WranglerEnv,
+    CidlType, CloesceIdl, Field, Number, PlainOldObject, ValidatedField, Validator, WranglerEnv,
 };
 use indexmap::IndexMap;
 
@@ -73,18 +72,12 @@ impl<'src, 'p> SemanticAnalysis {
             }
         };
 
-        let mut services = Self::services(&table);
-
-        // Merge API methods into their respective namespaces
         for (namespace, apis) in api_map {
             if let Some(model) = models.get_mut(&namespace) {
                 model.apis.extend(apis);
-            } else if let Some(service) = services.get_mut(&namespace) {
-                service.apis.extend(apis);
             }
         }
 
-        // Merge data sources into their respective models
         for (model_name, ds) in data_source_map {
             if let Some(model) = models.get_mut(&model_name) {
                 model.data_sources.insert(ds.name, ds);
@@ -101,7 +94,6 @@ impl<'src, 'p> SemanticAnalysis {
             hash: 0,
             wrangler_env,
             models,
-            services,
             poos,
             injects,
         };
@@ -139,11 +131,8 @@ impl<'src, 'p> SemanticAnalysis {
         }
 
         if d1_bindings.is_empty() && r2_bindings.is_empty() && kv_bindings.is_empty() {
-            ensure!(
-                table.models.is_empty(),
-                sink,
-                SemanticError::MissingWranglerEnvBlock
-            );
+            let needs_env = table.models.values().any(|m| !m.blocks.is_empty());
+            ensure!(!needs_env, sink, SemanticError::MissingWranglerEnvBlock);
             return None;
         };
 
@@ -209,20 +198,6 @@ impl<'src, 'p> SemanticAnalysis {
 
         res
     }
-
-    fn services(table: &SymbolTable<'src, 'p>) -> IndexMap<&'src str, Service<'src>> {
-        let mut res = IndexMap::new();
-        for symbol in table.services.values() {
-            res.insert(
-                symbol.name,
-                Service {
-                    name: symbol.name,
-                    apis: Vec::new(),
-                },
-            );
-        }
-        res
-    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -272,7 +247,6 @@ struct SymbolTable<'src, 'p> {
     // Globals
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
-    services: BTreeMap<&'src str, &'p Symbol<'src>>,
     envs: Vec<&'p EnvBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
@@ -345,13 +319,6 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                                 name: field.name,
                             },
                         );
-                    }
-                }
-                AstBlockKind::Service(service_block) => {
-                    for symbol in &service_block.symbols {
-                        if insert_global(sink, symbol) {
-                            st.services.insert(symbol.name, symbol);
-                        }
                     }
                 }
                 AstBlockKind::Api(api_block) => {

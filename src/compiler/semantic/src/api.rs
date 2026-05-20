@@ -21,20 +21,13 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut result = Vec::new();
 
         for api_block in &table.apis {
-            // Validate the model reference
-            let namespace = match (
-                table.models.get(api_block.symbol.name),
-                table.services.get(api_block.symbol.name),
-            ) {
-                (Some(model), _) => model.symbol.name,
-                (_, Some(symbol)) => symbol.name,
-                _ => {
-                    self.sink.push(SemanticError::ApiUnknownNamespaceReference {
-                        api: &api_block.symbol,
-                    });
-                    continue;
-                }
+            let Some(model) = table.models.get(api_block.symbol.name) else {
+                self.sink.push(SemanticError::ApiUnknownNamespaceReference {
+                    api: &api_block.symbol,
+                });
+                continue;
             };
+            let namespace = model.symbol.name;
 
             let mut methods = Vec::new();
             for method in api_block.methods.inners() {
@@ -62,11 +55,16 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
-        if !is_static && table.services.contains_key(namespace) {
-            // Services have no instance state
-            self.sink.push(SemanticError::ServiceMethodInstantiated {
-                method: &method.symbol,
-            });
+        if !is_static
+            && table
+                .models
+                .get(namespace)
+                .is_some_and(|m| m.blocks.is_empty())
+        {
+            self.sink
+                .push(SemanticError::ModelInstanceMethodWithNoData {
+                    method: &method.symbol,
+                });
         }
 
         // Validate method-level tags (only `[inject ...]` is permitted here)

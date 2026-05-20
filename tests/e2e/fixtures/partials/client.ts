@@ -71,7 +71,6 @@ export class Dog {
       false
     );
   }
-
   static fromJson(data: any): Dog {
     const __$res = Object.assign(new Dog(), data);
     return __$res;

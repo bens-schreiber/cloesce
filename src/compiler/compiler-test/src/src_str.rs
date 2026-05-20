@@ -257,9 +257,7 @@ api ModelWithCustomDs {
     post instanceMethod([source Custom] self, input: string) -> string
 }
 
-service {
-    BasicService
-}
+model BasicService {}
 api BasicService {
     get downloadData() -> stream
     post instanceMethod(input: int) -> int

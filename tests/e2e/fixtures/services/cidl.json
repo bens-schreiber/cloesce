@@ -1,10 +1,17 @@
 {
-  "hash": 0,
+  "hash": 3048163358009312556,
   "wrangler_env": null,
-  "models": {},
-  "services": {
+  "models": {
     "FooService": {
+      "hash": 2742409012207128302,
       "name": "FooService",
+      "d1_binding": null,
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
       "apis": [
         {
           "name": "method",
@@ -19,7 +26,9 @@
             "InjectedThing"
           ]
         }
-      ]
+      ],
+      "data_sources": {},
+      "cruds": []
     }
   },
   "poos": {},

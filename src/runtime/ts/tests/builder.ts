@@ -11,18 +11,14 @@ import {
   DataSource,
   NavigationField,
   ApiMethod,
-  Service,
-  MediaType,
   CrudKind,
   KvField,
   R2Field,
 } from "../src/cidl";
 
-export function createIdl(args?: { models?: Model[]; services?: Service[] }): Cidl {
+export function createIdl(args?: { models?: Model[] }): Cidl {
   const modelsMap = Object.fromEntries(args?.models?.map((m) => [m.name, m]) ?? []);
-  const serviceMap = Object.fromEntries(args?.services?.map((s) => [s.name, s]) ?? []);
 
-  // NOTE: these won't always be empty in real usage
   for (const model of Object.values(modelsMap)) {
     model.data_sources["Default"] ??= {
       name: "Default",
@@ -33,7 +29,6 @@ export function createIdl(args?: { models?: Model[]; services?: Service[] }): Ci
 
   return {
     models: modelsMap,
-    services: serviceMap,
     poos: {},
     wrangler_env: {
       d1_bindings: ["d1"],
@@ -43,35 +38,6 @@ export function createIdl(args?: { models?: Model[]; services?: Service[] }): Ci
     },
     injects: [],
   };
-}
-
-abstract class ApiMethodBuilder {
-  protected apis: ApiMethod[] = [];
-
-  method(
-    name: string,
-    http_verb: HttpVerb,
-    is_static: boolean,
-    parameters: ValidatedField[],
-    return_type: CidlType,
-    return_media: MediaType = "Json",
-    parameters_media: MediaType = "Json",
-    data_source: string | null = null,
-    injected: string[] = [],
-  ): this {
-    this.apis.push({
-      name,
-      http_verb,
-      is_static,
-      parameters,
-      return_type,
-      return_media,
-      parameters_media,
-      data_source,
-      injected,
-    });
-    return this;
-  }
 }
 
 export class IncludeTreeBuilder {
@@ -283,26 +249,6 @@ export class ModelBuilder {
       apis: this.apis,
       data_sources: this.data_sources,
       cruds: this.cruds,
-    };
-  }
-}
-
-export class ServiceBuilder extends ApiMethodBuilder {
-  private name: string;
-
-  constructor(name: string) {
-    super();
-    this.name = name;
-  }
-
-  static service(name: string) {
-    return new ServiceBuilder(name);
-  }
-
-  build(): Service {
-    return {
-      name: this.name,
-      apis: this.apis,
     };
   }
 }

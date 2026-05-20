@@ -57,35 +57,6 @@ export class {{ poo.name }} {
 }
 {%- endfor %}
 
-{#- --- SERVICES --- #}
-{%- for (_key, service) in &idl.services %}
-export class {{ service.name }} {
-{%- for api in &service.apis %}
-  static async {{ api.name }}(
-{%- for param in &api.parameters %}
-    {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
-{%- endfor %}
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
-    const __$baseUrl = new URL("{{ worker_url }}/{{ service.name }}/{{ api.name }}");
-{%- if !self.is_get_request(&api.http_verb) %}
-    const __$payload: any = {};
-{%- endif %}
-
-{%- for param in &api.parameters %}
-{%- if self.is_get_request(&api.http_verb) %}
-    __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
-{%- else %}
-    __$payload["{{ param.name }}"] = {{ param.name }};
-{%- endif %}
-{%- endfor %}
-{{ fetch_call(api) }}
-{{ from_response(api) }}
-  }
-{%- endfor %}
-}
-{%- endfor %}
-
 {#- --- MODELS --- #}
 {%- for (_key, model) in &idl.models %}
 export class {{ model.name }} {
@@ -155,6 +126,7 @@ export class {{ model.name }} {
   }
 {%- endfor %}
 
+{%- if !model.is_dataless() %}
   static fromJson(data: any): {{ model.name }} {
     const __$res = Object.assign(new {{ model.name }}(), data);
 {%- for nav in &model.navigation_fields %}
@@ -195,6 +167,7 @@ export class {{ model.name }} {
 {%- endfor %}
     return __$res;
   }
+{%- endif %}
 }
 {%- endfor %}
 

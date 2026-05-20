@@ -128,7 +128,6 @@
       "cruds": []
     }
   },
-  "services": {},
   "poos": {
     "PooA": {
       "name": "PooA",

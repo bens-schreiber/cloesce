@@ -70,7 +70,6 @@ contextual_keywords! {
     // Block type
     Model => "model",
     Poo => "poo",
-    Service => "service",
     Source => "source",
     Env => "env",
     Inject => "inject",
@@ -441,10 +440,6 @@ impl<'src> ModelBlock<'src> {
     }
 }
 
-pub struct ServiceBlock<'src> {
-    pub symbols: Vec<Symbol<'src>>,
-}
-
 pub struct PlainOldObjectBlock<'src> {
     /// The symbol for the POO name, e.g. `MyPoo` in `poo MyPoo { ... }`
     pub symbol: Symbol<'src>,
@@ -477,7 +472,6 @@ pub enum AstBlockKind<'src> {
     Api(ApiBlock<'src>),
     DataSource(DataSourceBlock<'src>),
     Model(ModelBlock<'src>),
-    Service(ServiceBlock<'src>),
     PlainOldObject(PlainOldObjectBlock<'src>),
     Env(EnvBlock<'src>),
     Inject(InjectBlock<'src>),
