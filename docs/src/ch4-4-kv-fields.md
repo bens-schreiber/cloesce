@@ -16,7 +16,7 @@ Cloudflare KV has a simple toolset and API for storing and retrieving key-value 
 - Custom metadata on each key-value pair
 - 25MB value size limit
 
-Cloesce respects the design constraints of KV storage. For Models with only KV fields, the following features are not supported:
+Cloesce respects the design constraints of KV storage. For Models with only KV fields, the following features are **not** supported:
 
 - Relationships
 - Navigation fields

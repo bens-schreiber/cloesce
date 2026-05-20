@@ -1,10 +1,12 @@
 # Dependency Injection
 
-In Cloesce, any API method may optionally inject [Environment Bindings](./ch3-0-environment.md), or define custom `Inject` bindings. This allows you to easily access resources such as D1 databases, KV namespaces, R2 buckets, and more within your API implementations without needing a globally scoped environment object.
+Any API method may optionally inject [Environment Bindings](./ch3-0-environment.md), or define custom object bindings to inject.
+
+This allows you to easily access resources such as D1 databases, KV namespaces, R2 buckets, and more within your API implementations without needing a globally scoped environment object.
 
 ## Injecting Environment Bindings
 
-To inject an Environment Binding, simply add the `inject` tag to the API method and specify the name of the binding you want to inject:
+To inject an Environment Binding, add the `inject` tag to the API method and specify the name of the binding you want to inject:
 
 ```cloesce
 env {
@@ -56,20 +58,19 @@ inject {
 }
 
 // ... and then inject as usual:
-
 api Person {
     [inject YouTubeApi, OpenAiClient]
     get do_stuff(self) -> Person
 }
 ```
 
-Unlike Environment Bindings, these custom Inject bindings will require a custom implementation, such as:
+Unlike Environment Bindings, custom Injections require an explicit implementation:
 
 ```ts
 import * as clo from "@cloesce/backend.js";
 
 class YouTubeApi extends clo.YouTubeApi {
-  // You can add custom methods or properties here if needed
+  // Add custom methods or properties!
   constructor() {
     super();
   }
@@ -78,8 +79,7 @@ class YouTubeApi extends clo.YouTubeApi {
 export default {
   async fetch(request: Request, env: clo.Env): Promise<Response> {
     const app = await clo.cloesce();
-    const youTubeApi = new YouTubeApi();
-    app.register(youTubeApi);
+    app.register(new YouTubeApi());
 
     return await app.run(request, env);
   },

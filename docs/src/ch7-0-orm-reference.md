@@ -1,87 +1,113 @@
 # ORM Reference
 
-> [!CAUTION]
+> [!WARNING]
 > The ORM is subject to change as new features are added.
 
-During the hydration step of the Cloesce runtime, all of a [Model's](./ch4-0-models.md) data is fetched from its various defined sources ([D1](./ch4-1-d1-backed-model.md), [KV](./ch4-4-kv-fields.md), [R2](./ch4-5-r2-fields.md)) and combined into a single object instance. This unified object can then be used seamlessly within your application code.
+Cloesce is responsible for hydrating your Models with data from various sources, in the same manner a traditional ORM hydrates objects from data in a database.
 
-This functionality is exposed in the generated backend code, as well as the `cloesce` library's `Orm` class.
+Additionally, Cloesce aims to replace boilerplate [CRUD](./ch6-2-crud-generation.md) operations with simple `save`, `get`, and `list` methods on your Models.
+
+The internal tools that Cloesce uses to accomplish this are available for the developer to use as well, allowing you to write custom SQL queries while still leveraging the power of Cloesce's schema.
 
 ## Generated Backend ORM
 
-When you define a Model in Cloesce, three methods are generated for interacting with it: `get`, `list`, and `save`.
+Three namespaces are placed on every Model in the generated backend code:
 
-- `save`: Creates or updates a Model instance from a partial object, using some [Include Tree](./ch5-1-overview.md#include-trees) for guidance in nested relationships. Returns a fully hydrated instance.
+1. `Source`
+2. `Orm`
+3. `Key`
 
-- `get`: Retrieves a single instance. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Returns `null` if no matching row is found.
+### Source
 
-- `list`: Retrieves all instances. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Not compatible with Models that require key parameters for KV or R2 properties.
+The `Source` namespace contains transpiled representations of each [Data Source](./ch5-0-data-sources.md) defined for that Model. For example, the namespace for the model `WeatherReport`:
 
-While `save` is to be used in most scenarios, `get` and `list` are available for queries that require more complex application logic. For most cases, you can achieve the same result with a [custom Data Source](./ch5-2-custom-data-sources.md).
+```ts
+// ...types and impls omitted for brevity
+    export namespace Source {
+        export const Default = {
+            include: {"weatherEntries":{}},
 
-For example, given the following Cloesce Model:
+            getQuery: (env, id: number) => ...,
+            async get(env, id: number) {...},
+
+            listQuery: (env, lastSeen_id: number, limit: number) => ...,
+            async list(env, lastSeen_id: number, limit: number),
+        }
+    }
+```
+
+| Property / Method       | Description                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `include`               | The [Include Tree](./ch5-1-overview.md#include-trees) for this Data Source, which specifies all fields to be included when this Data Source is used.                      |
+| `get`                   | A method that retrieves a single instance of the Model using this Data Source, given the necessary parameters. May return `null` if no matching row is found.             |
+| `list`                  | A method that retrieves multiple instances of the Model using this Data Source, given the necessary parameters. Not available for Models that require key parameters.     |
+| `getQuery`, `listQuery` | Methods that return a `D1PreparedStatement` for the `get` and `list` operations, which can be used to fetch D1 properties in the same query as the base Model properties. |
+
+## Orm
+
+While the `Source` namespace contains methods for interacting with a Model according to the defined Data Sources, the `Orm` namespace contains lower level methods for hydrating and mapping Model instances.
+
+These methods are especially useful when you need to write custom queries but still want to leverage the schema and hydration capabilities of Cloesce.
+
+| Method    | Parameters                   | Description                                                                                                                                                                                                                                                              |
+| --------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `save`    | `env`, `instance`, `include` | Creates or updates a Model instance from a partial object, using some [dynamic Include Tree](./ch5-1-overview.md#include-trees) for guidance in nested relationships. Returns a fully hydrated instance.                                                                 |
+| `get`     | `env`, `query`               | Retrieves a single instance. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Returns `null` if no matching row is found.                                                                                                       |
+| `list`    | `env`, `query`               | Retrieves all instances. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Not compatible with Models that require key parameters for KV or R2 properties.                                                                       |
+| `select`  | `include`, `from`            | Generates a SQL `SELECT` statement with the necessary `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an [Include Tree](./ch5-1-overview.md#include-trees). Optionally, accepts a `from` string to wrap a subquery as the base table. |
+| `map`     | `result`                     | Takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.                                                       |
+| `hydrate` | `env`, `base`, `include`     | Takes some base object and fetches any KV or R2 properties to return a fully populated Model instance. Additionally, it instantiates objects like Dates and Blobs according to the Model definition.                                                                     |
+
+More information on how these methods work found in the [next section](#using-the-base-orm-methods).
+
+## Key
+
+The `Key` namespace contains methods to easily generate keys for KV and R2 fields based on the Model's schema. For example:
 
 ```cloesce
-model User {
-    primary {
-        id: int
-    }
+model Weather {
+    // ...
 
-    column {
-        name: string
+    r2 (bucket, "weather/photos/{id}.jpg") {
+        photo
     }
 }
 
-source ByName for User {
-    include { }
+```
 
-    sql get(name: string) {
-        "SELECT * FROM User WHERE name = $name"
+```ts
+export namespace Weather {
+  // ...
+  export namespace Key {
+    export function photo(id: number): string {
+      return `weather/photos/${id}.jpg`;
     }
-
-    sql list(lastName: string, limit: int) {
-        "SELECT * FROM User WHERE name > $lastName ORDER BY name LIMIT $limit"
-    }
+  }
 }
 ```
 
-The generated backend code will create a method `User.Source.ByName` with `get` and `list` functions that execute the defined SQL and return hydrated Model instances.
+## Using the base ORM Methods
 
-Always accessible is the [Default Data Source](./ch5-1-overview.md#default-data-source) (`User.Source.Default`), which provides basic `get` and `list` methods without any custom SQL.
+The methods in the `Orm` namespace are all available on the generated backend Model, but can also be used directly from the `Orm` class in the `cloesce` package.
 
-When implementing a Cloesce Model, these generated methods are placed directly on the Model:
-
-```ts
-const User = clo.User.impl({});
-
-User.Source.ByName.get(env, "Alice");
-User.Source.Default.get(env, 1);
-```
-
-## Advanced ORM Usage
-
-Internally, Cloesce uses the `CloesceOrm` class from the `cloesce` package to implement the generated methods described above. You may use it directly, or use the generated methods in the namespace of each backend Model, which are more convenient:
-
-```ts
-const User = clo.User.impl({});
-User.hydrate(env, base);
-User.map(result);
-User.select();
-```
+Each method in the `Orm` class has an inner implementation in Web Assembly.
 
 ### select
 
-`CloesceOrm.select` generates a SQL `SELECT` statement with the necessary `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an [Include Tree](./ch5-1-overview.md#include-trees).
+`Orm.select` generates a SQL `SELECT` statement with `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an [Include Tree](./ch5-1-overview.md#include-trees).
 
-For example, given the Model
+For example, given the Model's Boss, Person, Dog, and Cat, where Boss has many Persons, and Person has one Dog and one Cat:
 
 ```cloesce
+// ...
 model Boss {
     primary {
         id: int
     }
 
-    // ...
+    nav (Person::bossId) {
+        persons
+    }
 }
 
 source WithAll for Boss {
@@ -95,7 +121,7 @@ source WithAll for Boss {
 
 ```
 
-`CloesceOrm.select(Boss.Meta, null, Boss.Source.WithAll.include)` produces:
+`Orm.select(Boss.Meta, null, Boss.Source.WithAll.include)` produces:
 
 ```sql
 SELECT
@@ -115,20 +141,39 @@ LEFT JOIN "Cat" AS "Cat_3"
     ON "Person_1"."id" = "Cat_3"."personId"
 ```
 
-`select` can also take a `from` string to wrap a subquery as the base table:
+Note the specific column aliases in the `SELECT` statement. Not only are these valuable to the `map` method, but they can be used in tandem with a common table expression to simplify the process of writing custom SQL queries with complex relationships:
 
-```typescript
-CloesceOrm.select(
-  Boss.Meta,
-  "SELECT * FROM Boss WHERE name = 'Alice'",
-  Boss.Source.WithAll.include,
-);
+```sql
+WITH included AS (
+    -- Generated SQL from Orm.select goes here
+)
+SELECT * from included WHERE [persons.dogs.name] = 'Fido'
 ```
 
 ### map
 
-`CloesceOrm.map` takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.
+`Orm.map` takes the results of a D1 `SELECT` query and attempts to reconstruct the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.
+
+```ts
+const result = await env.DB.prepare(
+  `
+    WITH included AS (
+        -- Generated SQL from Orm.select goes here
+    )
+    SELECT * from included WHERE [persons.dogs.name] = 'Fido'
+`,
+).all();
+
+const mapped = Orm.map(Boss.Meta, result, Boss.Source.WithAll.include);
+```
+
+While these mapped objects are now full JavaScript objects with the correct relationships, they are not yet hydrated according to the Model definition. For example, if the Model has any KV or R2 fields, those properties will not yet be populated.
 
 ### hydrate
 
-`CloesceOrm.hydrate` takes a base set of Model instances (e.g. from `map`) and fetches any KV or R2 properties to return fully populated Model instances. Additionally, it instantiates objects like Dates and blobs according to the Model definition.
+`Orm.hydrate` takes some base object (e.g. from `map`) and fetches any KV or R2 properties to return a fully populated Model instance. Additionally, it instantiates objects like Dates and Blobs according to the Model definition.
+
+```ts
+const mapped = Orm.map(Boss.Meta, result, Boss.Source.WithAll.include);
+const hydrated = await Orm.hydrate(env, mapped, Boss.Source.WithAll.include);
+```

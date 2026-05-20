@@ -3,7 +3,7 @@
 > [!TIP]
 > All fields of a D1 backed Model must be [SQLite compatible types](./ch2-0-type-reference.md#sqlite-compatible-types).
 
-This chapter provides a reference for the D1 specific features of Cloesce Models that modify the SQL schema with constraints. Any Model that is backed by a D1 database (i.e., any Model that has a `[use DB_NAME]` tag) can use these features.
+This chapter provides a reference for the D1 specific features of Models.
 
 Note that the `[use]` tag may be omitted from the examples in this chapter for brevity.
 
@@ -18,6 +18,8 @@ model User {
     }
 }
 ```
+
+Note that by default, primary key fields are `NOT NULL`, `UNIQUE`, and `AUTOINCREMENT` (for integer fields).
 
 ### Composite Primary Key
 

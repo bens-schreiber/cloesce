@@ -2,22 +2,6 @@
 
 This section provides a reference for the types available in the Cloesce Schema Language. These types can be used to define your application's data [Models](./ch4-0-models.md), [APIs](./ch6-1-rest-apis.md), [Data Sources](./ch5-0-data-sources.md), and more.
 
-## SQLite Compatible Types
-
-Several areas of Cloesce require the use of only SQLite compatible types. The types include:
-
-| Type     | SQLite Type      |
-| -------- | ---------------- |
-| `string` | TEXT             |
-| `real`   | REAL             |
-| `int`    | INTEGER          |
-| `bool`   | INTEGER (0 or 1) |
-| `date`   | TEXT (ISO 8601)  |
-| `blob`   | BLOB             |
-| `json`   | TEXT (JSON)      |
-
-By default, all of these types are `NOT NULL` in the database. To allow `NULL` values, wrap the type in the `option` generic, e.g., `option<string>`, `option<int>`, etc.
-
 ## All Types
 
 ### Primitives
@@ -63,3 +47,17 @@ poo Profile {
     bio: string
 }
 ```
+
+## SQLite Compatible Types
+
+| Type     | SQLite Type      |
+| -------- | ---------------- |
+| `string` | TEXT             |
+| `real`   | REAL             |
+| `int`    | INTEGER          |
+| `bool`   | INTEGER (0 or 1) |
+| `date`   | TEXT (ISO 8601)  |
+| `blob`   | BLOB             |
+| `json`   | TEXT (JSON)      |
+
+By default, all of these types are `NOT NULL` in the database. To allow `NULL` values, wrap the type in the `option` generic.

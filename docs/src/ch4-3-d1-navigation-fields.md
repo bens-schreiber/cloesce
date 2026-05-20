@@ -1,9 +1,9 @@
 # D1 Navigation Fields
 
 > [!NOTE]
-> Navigation Fields are (currently) constrained to work within a single database. This means that if you have two separate D1 databases, you cannot define a navigation field that references a foreign key in the other database.
+> Navigation Fields can only work in the context of a single D1 database. If you have two separate D1 databases, you cannot create navigation fields that span across them.
 
-Simply defining [foreign key relationships](./ch4-2-d1-constraints.md#foreign-key) between your Models is often not enough. You also want to be able to easily access related data without having to write complex `JOIN` queries. This is where Navigation Fields come in.
+Defining [foreign key relationships](./ch4-2-d1-constraints.md#foreign-key) between your Models is often not enough. You also want to be able to easily access related data without having to write complex `JOIN` queries. This is where Navigation Fields come in.
 
 ## One-to-One Relationship
 
