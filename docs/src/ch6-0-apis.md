@@ -5,7 +5,7 @@ Defining the structure and source of your data with Models and Data Sources is o
 This chapter covers how to:
 
 - Define [REST APIs](./ch6-1-rest-apis.md)
-- Utilize generated [CRUD APIs](./ch6-2-crud-apis.md)
-- Inject dependencies into APIs
-- Validate API inputs with [Validators](./ch6-3-validators.md)
+- Utilize generated [CRUD APIs](./ch6-2-crud-generation.md)
+- Inject [dependencies](./ch6-3-dependency-injection.md) into APIs
+- Validate API inputs with [Runtime Validation](./ch6-4-runtime-validation.md)
 - Define [Services](./ch6-6-services.md) and [Plain Old Objects](./ch6-5-plain-old-objects.md)

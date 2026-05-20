@@ -40,7 +40,7 @@ source Default for Person {
 
 Each time Cloesce needs to hydrate an instance of a D1 backed Model, it requires a Data Source with a `get` method defined.
 
-If you do not define a `get` method, Cloesce will use a default get-by-id implementation.
+If you do not define a `get` method, Cloesce will use a default get-by-id implementation. Otherwise, you can define a custom `get` method on any Data Source:
 
 ```cloesce
 source ByName for Person {

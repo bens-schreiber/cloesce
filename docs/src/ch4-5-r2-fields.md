@@ -69,7 +69,7 @@ Since Cloesce does not fetch the actual value of an R2 field into the applicatio
 
 ### Frontend
 
-It is possible to serialize `r2object` type (or a Model field under the `r2` block).
+It is possible to serialize the `r2object` type (or a Model field under the `r2` block).
 
 Cloesce will send a subset of the full R2 `HEAD` response metadata back to the frontend, including the `key`, `version`, `size`, `etag`, `httpEtag`, `uploaded` timestamp, and any custom metadata defined on the R2 object. This allows you to work with R2 objects in the frontend without having to fetch the full object data.
 

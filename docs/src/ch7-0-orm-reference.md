@@ -19,7 +19,7 @@ Three namespaces are placed on every Model in the generated backend code:
 
 ### Source
 
-The `Source` namespace contains transpiled representations of each [Data Source](./ch5-0-data-sources.md) defined for that Model. For example, the namespace for the model `WeatherReport`:
+The `Source` namespace contains transpiled representations of each [Data Source](./ch5-0-data-sources.md) defined for that Model. For example, the namespace for the Model `WeatherReport`:
 
 ```ts
 // ...types and impls omitted for brevity
@@ -43,7 +43,7 @@ The `Source` namespace contains transpiled representations of each [Data Source]
 | `list`                  | A method that retrieves multiple instances of the Model using this Data Source, given the necessary parameters. Not available for Models that require key parameters.     |
 | `getQuery`, `listQuery` | Methods that return a `D1PreparedStatement` for the `get` and `list` operations, which can be used to fetch D1 properties in the same query as the base Model properties. |
 
-## Orm
+### Orm
 
 While the `Source` namespace contains methods for interacting with a Model according to the defined Data Sources, the `Orm` namespace contains lower level methods for hydrating and mapping Model instances.
 
@@ -58,9 +58,9 @@ These methods are especially useful when you need to write custom queries but st
 | `map`     | `result`                     | Takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.                                                       |
 | `hydrate` | `env`, `base`, `include`     | Takes some base object and fetches any KV or R2 properties to return a fully populated Model instance. Additionally, it instantiates objects like Dates and Blobs according to the Model definition.                                                                     |
 
-More information on how these methods work found in the [next section](#using-the-base-orm-methods).
+More information on how these methods work can be found in the [next section](#using-the-base-orm-methods).
 
-## Key
+### Key
 
 The `Key` namespace contains methods to easily generate keys for KV and R2 fields based on the Model's schema. For example:
 
@@ -86,17 +86,17 @@ export namespace Weather {
 }
 ```
 
-## Using the base ORM Methods
+## Using the Base ORM Methods
 
 The methods in the `Orm` namespace are all available on the generated backend Model, but can also be used directly from the `Orm` class in the `cloesce` package.
 
-Each method in the `Orm` class has an inner implementation in Web Assembly.
+Each method in the `Orm` class has an inner implementation in WebAssembly.
 
 ### select
 
 `Orm.select` generates a SQL `SELECT` statement with `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an [Include Tree](./ch5-1-overview.md#include-trees).
 
-For example, given the Model's Boss, Person, Dog, and Cat, where Boss has many Persons, and Person has one Dog and one Cat:
+For example, given the Models Boss, Person, Dog, and Cat, where Boss has many Persons, and Person has one Dog and one Cat:
 
 ```cloesce
 // ...
