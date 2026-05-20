@@ -28,7 +28,6 @@ export interface PooWithComposition {
     field2: BasicModel.Self;
 }
 export namespace BasicService {
-    export const Kind = "service" as const;
     export const Tag = "BasicService" as const;
 
     export interface Api {
@@ -51,7 +50,6 @@ export namespace BasicService {
     }
 }
 export namespace HasSqlColumnTypes {
-    export const Kind = "model" as const;
     export const Tag = "HasSqlColumnTypes" as const;
     export const Meta = cidl.models.HasSqlColumnTypes as any;
 
@@ -123,7 +121,6 @@ export namespace HasSqlColumnTypes {
     }
 }
 export namespace ManyToManyModelA {
-    export const Kind = "model" as const;
     export const Tag = "ManyToManyModelA" as const;
     export const Meta = cidl.models.ManyToManyModelA as any;
 
@@ -186,7 +183,6 @@ export namespace ManyToManyModelA {
     }
 }
 export namespace ManyToManyModelB {
-    export const Kind = "model" as const;
     export const Tag = "ManyToManyModelB" as const;
     export const Meta = cidl.models.ManyToManyModelB as any;
 
@@ -249,7 +245,6 @@ export namespace ManyToManyModelB {
     }
 }
 export namespace ModelWithCompositePk {
-    export const Kind = "model" as const;
     export const Tag = "ModelWithCompositePk" as const;
     export const Meta = cidl.models.ModelWithCompositePk as any;
 
@@ -320,7 +315,6 @@ export namespace ModelWithCompositePk {
     }
 }
 export namespace ModelWithKv {
-    export const Kind = "model" as const;
     export const Tag = "ModelWithKv" as const;
     export const Meta = cidl.models.ModelWithKv as any;
 
@@ -404,7 +398,6 @@ export namespace ModelWithKv {
     }
 }
 export namespace ModelWithR2 {
-    export const Kind = "model" as const;
     export const Tag = "ModelWithR2" as const;
     export const Meta = cidl.models.ModelWithR2 as any;
 
@@ -473,7 +466,6 @@ export namespace ModelWithR2 {
     }
 }
 export namespace OneToManyModel {
-    export const Kind = "model" as const;
     export const Tag = "OneToManyModel" as const;
     export const Meta = cidl.models.OneToManyModel as any;
 
@@ -536,7 +528,6 @@ export namespace OneToManyModel {
     }
 }
 export namespace ToyotaPrius {
-    export const Kind = "model" as const;
     export const Tag = "ToyotaPrius" as const;
     export const Meta = cidl.models.ToyotaPrius as any;
 
@@ -635,7 +626,6 @@ export namespace ToyotaPrius {
     }
 }
 export namespace BasicModel {
-    export const Kind = "model" as const;
     export const Tag = "BasicModel" as const;
     export const Meta = cidl.models.BasicModel as any;
 
@@ -698,7 +688,6 @@ export namespace BasicModel {
     }
 }
 export namespace ModelWithCustomDs {
-    export const Kind = "model" as const;
     export const Tag = "ModelWithCustomDs" as const;
     export const Meta = cidl.models.ModelWithCustomDs as any;
 
@@ -782,7 +771,6 @@ export namespace ModelWithCustomDs {
     }
 }
 export namespace HasOneToOne {
-    export const Kind = "model" as const;
     export const Tag = "HasOneToOne" as const;
     export const Meta = cidl.models.HasOneToOne as any;
 
@@ -846,7 +834,6 @@ export namespace HasOneToOne {
     }
 }
 export namespace ModelWithCruds {
-    export const Kind = "model" as const;
     export const Tag = "ModelWithCruds" as const;
     export const Meta = cidl.models.ModelWithCruds as any;
 
@@ -921,24 +908,15 @@ export namespace ModelWithCruds {
     }
 }
 
-function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] }>): NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] } & Impl;
-function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
 function _impl(namespace: any, implObj: any) {
-    if (namespace.Kind === "model") {
-        const model = { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm };
-        for (const key of Object.keys(implObj as object)) {
-            const fn = (model as any)[key];
-            if (typeof fn === "function") (model as any)[key] = fn.bind(model);
-        }
-        return model;
-    }
-
-    const service = { ...implObj, tag: namespace.Tag };
+    const base = namespace.Source
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
-        const fn = (service as any)[key];
-        if (typeof fn === "function") (service as any)[key] = fn.bind(service);
+        const fn = (base as any)[key];
+        if (typeof fn === "function") (base as any)[key] = fn.bind(base);
     }
-    return service;
+    return base;
 }
 
 import cidl from "./cidl.json" with { type: "json" };

@@ -1,5 +1,5 @@
 {
-  "hash": 10734415364405569210,
+  "hash": 16093517306524961070,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -292,11 +292,17 @@
         "Get",
         "List"
       ]
-    }
-  },
-  "services": {
+    },
     "UnregisteredService": {
+      "hash": 9964477462680799238,
       "name": "UnregisteredService",
+      "d1_binding": null,
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
       "apis": [
         {
           "name": "unregistered",
@@ -309,7 +315,9 @@
           "parameters": [],
           "injected": []
         }
-      ]
+      ],
+      "data_sources": {},
+      "cruds": []
     }
   },
   "poos": {},

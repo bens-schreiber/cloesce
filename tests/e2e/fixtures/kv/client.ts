@@ -73,7 +73,6 @@ export class D1BackedModel {
       true
     );
   }
-
   static fromJson(data: any): D1BackedModel {
     const __$res = Object.assign(new D1BackedModel(), data);
     if (__$res.kvData) __$res.kvData = Object.assign(new KValue(), __$res.kvData);
@@ -126,7 +125,6 @@ export class PaginatedKVModel {
       false
     );
   }
-
   static fromJson(data: any): PaginatedKVModel {
     const __$res = Object.assign(new PaginatedKVModel(), data);
     if (__$res.items?.results) {
@@ -184,7 +182,6 @@ export class PureKVModel {
       false
     );
   }
-
   static fromJson(data: any): PureKVModel {
     const __$res = Object.assign(new PureKVModel(), data);
     if (__$res.data) __$res.data = Object.assign(new KValue(), __$res.data);

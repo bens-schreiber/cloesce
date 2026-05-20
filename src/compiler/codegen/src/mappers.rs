@@ -41,7 +41,7 @@ impl TypeScriptMapper {
             return name.to_string();
         }
 
-        if idl.models.contains_key(name) || idl.services.contains_key(name) {
+        if idl.models.contains_key(name) {
             format!("{name}.Self")
         } else {
             name.to_string()

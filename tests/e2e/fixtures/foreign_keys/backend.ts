@@ -10,7 +10,6 @@ export interface Env {
     db: D1Database;
 }
 export namespace A {
-    export const Kind = "model" as const;
     export const Tag = "A" as const;
     export const Meta = cidl.models.A as any;
 
@@ -105,7 +104,6 @@ export namespace A {
     }
 }
 export namespace B {
-    export const Kind = "model" as const;
     export const Tag = "B" as const;
     export const Meta = cidl.models.B as any;
 
@@ -171,7 +169,6 @@ export namespace B {
     }
 }
 export namespace Course {
-    export const Kind = "model" as const;
     export const Tag = "Course" as const;
     export const Meta = cidl.models.Course as any;
 
@@ -234,7 +231,6 @@ export namespace Course {
     }
 }
 export namespace Person {
-    export const Kind = "model" as const;
     export const Tag = "Person" as const;
     export const Meta = cidl.models.Person as any;
 
@@ -328,7 +324,6 @@ export namespace Person {
     }
 }
 export namespace Student {
-    export const Kind = "model" as const;
     export const Tag = "Student" as const;
     export const Meta = cidl.models.Student as any;
 
@@ -422,7 +417,6 @@ export namespace Student {
     }
 }
 export namespace Dog {
-    export const Kind = "model" as const;
     export const Tag = "Dog" as const;
     export const Meta = cidl.models.Dog as any;
 
@@ -489,24 +483,15 @@ export namespace Dog {
     }
 }
 
-function _impl<NS extends { Kind: "model"; Meta: { name: string }; Source: any; _api: any; Orm: any; Key?: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl & ThisType<NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] }>): NS["Source"] & { tag: string; Key: NS["Key"]; Orm: NS["Orm"] } & Impl;
-function _impl<NS extends { Kind: "service"; Tag: string; _api: any }, Impl extends NS["_api"]>(namespace: NS, implObj: Impl): Impl & { tag: NS["Tag"] };
 function _impl(namespace: any, implObj: any) {
-    if (namespace.Kind === "model") {
-        const model = { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm };
-        for (const key of Object.keys(implObj as object)) {
-            const fn = (model as any)[key];
-            if (typeof fn === "function") (model as any)[key] = fn.bind(model);
-        }
-        return model;
-    }
-
-    const service = { ...implObj, tag: namespace.Tag };
+    const base = namespace.Source
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
-        const fn = (service as any)[key];
-        if (typeof fn === "function") (service as any)[key] = fn.bind(service);
+        const fn = (base as any)[key];
+        if (typeof fn === "function") (base as any)[key] = fn.bind(base);
     }
-    return service;
+    return base;
 }
 
 import cidl from "./cidl.json" with { type: "json" };

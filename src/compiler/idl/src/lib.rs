@@ -2,7 +2,7 @@
 //!
 //! # CIDL
 //!
-//! The CIDL represents the full structure of a Cloesce application, including models, services,
+//! The CIDL represents the full structure of a Cloesce application, including models
 //! and plain old objects. It is the final output of the compiler's semantic analysis phase to
 //! be consumed by the code generation phase.
 //!
@@ -446,6 +446,18 @@ impl Model<'_> {
         self.primary_columns.len() > 1
     }
 
+    /// A "data-less" model has no actual data stored on it, and serves
+    /// only as a namespace for APIs.
+    pub fn is_dataless(&self) -> bool {
+        self.d1_binding.is_none()
+            && self.primary_columns.is_empty()
+            && self.columns.is_empty()
+            && self.kv_fields.is_empty()
+            && self.r2_fields.is_empty()
+            && self.key_fields.is_empty()
+            && self.navigation_fields.is_empty()
+    }
+
     /// Returns all columns, including primary key columns, as a single list.
     /// The boolean indicates whether the column is a primary key column.
     pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'_>, bool)> {
@@ -454,15 +466,6 @@ impl Model<'_> {
             .map(|c| (c, false))
             .chain(self.primary_columns.iter().map(|c| (c, true)))
     }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Service<'src> {
-    #[serde(borrow)]
-    pub name: &'src str,
-
-    #[serde(borrow)]
-    pub apis: Vec<ApiMethod<'src>>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -502,9 +505,6 @@ pub struct CloesceIdl<'src> {
 
     #[serde(borrow)]
     pub models: IndexMap<&'src str, Model<'src>>,
-
-    #[serde(borrow)]
-    pub services: IndexMap<&'src str, Service<'src>>,
 
     #[serde(borrow)]
     pub poos: BTreeMap<&'src str, PlainOldObject<'src>>,

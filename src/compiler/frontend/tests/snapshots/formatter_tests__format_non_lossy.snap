@@ -1,6 +1,5 @@
 ---
 source: src/compiler/frontend/tests/formatter_tests.rs
-assertion_line: 49
 expression: formatted
 ---
 // Top level comment
@@ -272,9 +271,7 @@ api ModelWithCustomDs {
     post instanceMethod([source Custom] self, input: string) -> string
 }
 
-service {
-    BasicService
-}
+model BasicService {}
 api BasicService {
     get downloadData() -> stream
     post instanceMethod(input: int) -> int

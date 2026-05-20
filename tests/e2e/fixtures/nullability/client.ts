@@ -134,7 +134,6 @@ export class NullabilityChecks {
       true
     );
   }
-
   static fromJson(data: any): NullabilityChecks {
     const __$res = Object.assign(new NullabilityChecks(), data);
     return __$res;

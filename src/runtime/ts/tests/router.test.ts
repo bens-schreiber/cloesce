@@ -6,8 +6,8 @@ import {
   _cloesceInternal,
 } from "../src/router/router";
 import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
-import { ModelBuilder, ServiceBuilder, createIdl } from "./builder";
-import { Model, Service } from "../src/cidl";
+import { ModelBuilder, createIdl } from "./builder";
+import { Model } from "../src/cidl";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -18,7 +18,7 @@ function createRequest(url: string, method?: string, body?: any) {
 
 const mockImpl = vi.fn();
 
-function createRegistry(...namespaces: (Model | Service)[]) {
+function createRegistry(...namespaces: Model[]) {
   const map = new Map<string, any>();
   for (const ns of namespaces) {
     const methodMap: Record<string, any> = {};
@@ -139,7 +139,6 @@ describe("Match Route", () => {
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       model: idl.models["Model"],
       namespace: "Model",
-      kind: "model",
       impl: mockImpl,
     });
   });
@@ -172,7 +171,6 @@ describe("Match Route", () => {
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
-      kind: "model",
     });
   });
 
@@ -209,7 +207,6 @@ describe("Match Route", () => {
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
-      kind: "model",
     });
   });
 
@@ -253,61 +250,6 @@ describe("Match Route", () => {
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
-      kind: "model",
-    });
-  });
-
-  test("Matches static method on Service", () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const idl = createIdl({
-      services: [
-        ServiceBuilder.service("Service").method("method", "Post", true, [], "Void").build(),
-      ],
-    });
-    const env = mockWranglerEnv();
-    const registry = createRegistry(idl.services["Service"]);
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      getParamValues: {},
-      impl: mockImpl,
-      keyFields: {},
-      method: idl.services["Service"].apis.find((m) => m.name === "method"),
-      service: idl.services["Service"],
-      kind: "service",
-      namespace: "Service",
-    });
-  });
-
-  test("Matches instantiated method on Service", () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const idl = createIdl({
-      services: [
-        ServiceBuilder.service("Service").method("method", "Post", false, [], "Void").build(),
-      ],
-    });
-    const env = mockWranglerEnv();
-    const registry = createRegistry(idl.services["Service"]);
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      getParamValues: {},
-      impl: mockImpl,
-      keyFields: {},
-      method: idl.services["Service"].apis.find((m) => m.name === "method"),
-      service: idl.services["Service"],
-      kind: "service",
-      namespace: "Service",
     });
   });
 });
@@ -358,7 +300,6 @@ describe("Request Validation", () => {
       .build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       model,
       method: model.apis.find((m) => m.name === "method")!,
@@ -388,12 +329,12 @@ describe("Request Validation", () => {
     const model = ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "method")!,
       getParamValues: {},
       keyFields: {},
       impl: mockImpl,
+      model,
     };
 
     const wasmMock = {} as any;
@@ -453,12 +394,12 @@ describe("Method Dispatch", () => {
     const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => {},
       getParamValues: {},
       keyFields: {},
+      model,
     };
 
     // Act
@@ -476,12 +417,12 @@ describe("Method Dispatch", () => {
     const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => HttpResult.ok(123, "foo"),
       getParamValues: {},
       keyFields: {},
+      model,
     };
 
     // Act
@@ -501,12 +442,12 @@ describe("Method Dispatch", () => {
       .build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => "neigh",
       getParamValues: {},
       keyFields: {},
+      model,
     };
 
     // Act
@@ -524,7 +465,6 @@ describe("Method Dispatch", () => {
       .build();
 
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => {
@@ -532,6 +472,7 @@ describe("Method Dispatch", () => {
       },
       getParamValues: {},
       keyFields: {},
+      model,
     };
 
     const di = createDi();
@@ -558,7 +499,6 @@ describe("Method Dispatch", () => {
 
     const impl = vi.fn(() => undefined);
     const route: MatchedRoute = {
-      kind: "model",
       namespace: "Foo",
       method: {
         ...model.apis.find((m) => m.name === "testMethod")!,
@@ -567,6 +507,7 @@ describe("Method Dispatch", () => {
       impl,
       getParamValues: {},
       keyFields: {},
+      model,
     };
 
     // Act

@@ -1,5 +1,5 @@
 {
-  "hash": 4055048839320829329,
+  "hash": 586114424312205097,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -218,11 +218,17 @@
         "Get",
         "List"
       ]
-    }
-  },
-  "services": {
+    },
     "BlobService": {
+      "hash": 1852071612599625679,
       "name": "BlobService",
+      "d1_binding": null,
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
       "apis": [
         {
           "name": "incrementBlob",
@@ -241,7 +247,9 @@
           ],
           "injected": []
         }
-      ]
+      ],
+      "data_sources": {},
+      "cruds": []
     }
   },
   "poos": {},

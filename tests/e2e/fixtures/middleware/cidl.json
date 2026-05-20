@@ -125,7 +125,6 @@
       ]
     }
   },
-  "services": {},
   "poos": {},
   "injects": [
     "InjectedThing"

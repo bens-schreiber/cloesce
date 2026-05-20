@@ -53,7 +53,10 @@ fn with_env(src: &str) -> String {
 fn missing_wrangler_env_block() {
     // Arrange
     let src = r#"
-        model User {}
+        [use db]
+        model User {
+            primary { id: int }
+        }
     "#;
     let parse = lex_and_ast(src);
 
@@ -947,33 +950,6 @@ fn poo_errors() {
 }
 
 #[test]
-fn service_collects_api_blocks() {
-    // Arrange
-    let src = r#"
-        env { d1 { db } }
-        inject { YouTubeApi }
-        service { MyService }
-        api MyService {
-            [inject db, YouTubeApi]
-            post firstMethod() -> string
-        }
-
-        api MyService {
-            get secondMethod() -> string
-        }
-    "#;
-
-    // Act
-    let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-    let service = result.services.get("MyService").unwrap();
-    assert_eq!(service.apis.len(), 2);
-}
-
-#[test]
 fn poo_with_model_reference() {
     let src = r#"
         env {
@@ -1269,72 +1245,52 @@ fn inject_tag_dedupes_duplicates() {
 }
 
 #[test]
-fn service_block_with_multiple_symbols_resolves_each() {
+fn dataless_model_errors() {
     let src = r#"
         env { d1 { db } }
-
-        service {
-            FooService
-            BarService
-        }
-
-        api FooService {
-            get useBar() -> string
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    assert!(result.services.contains_key("FooService"));
-    assert!(result.services.contains_key("BarService"));
-}
-
-#[test]
-fn service_cannot_be_injected() {
-    let src = r#"
-        env { d1 { db } }
-
-        service {
-            FooService
-            BarService
-        }
-
-        api FooService {
-            [inject BarService]
-            get useBar() -> string
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
-    assert!(
-        errors
-            .iter()
-            .any(|e| matches!(e, SemanticError::UnresolvedSymbol { symbol } if symbol.name == "BarService")),
-        "expected UnresolvedSymbol error for service injection, got: {:#?}",
-        errors
-    );
-}
-
-#[test]
-fn service_method_instantiated_errors() {
-    let src = r#"
-        env { d1 { db } }
-        service { Foo }
+        model Foo {}
+        model Bar {}
 
         api Foo {
             get instanceLike(self) -> string
         }
+
+        api Bar {
+            post takesFoo(foo: Foo) -> string
+            get yieldsFoo() -> Foo
+            post takesPartialFoo(foo: partial<Foo>) -> string
+        }
+
+        poo Container {
+            inner: Foo
+        }
+
+        source FooSource for Foo {
+            include {}
+        }
     "#;
 
     let parse = lex_and_ast(src);
     let (_result, errors) = SemanticAnalysis::analyze(&parse);
 
-    assert_eq!(errors.len(), 1);
     let method = expect_err!(errors,
-        SemanticError::ServiceMethodInstantiated { method } => method
+        SemanticError::ModelInstanceMethodWithNoData { method } => method
     );
     assert_eq!(method.name, "instanceLike");
+
+    let data_source = expect_err!(errors,
+        SemanticError::ModelDataSourceWithNoData { data_source, .. } => data_source
+    );
+    assert_eq!(data_source.name, "FooSource");
+
+    let used_as_type_count = errors
+        .iter()
+        .filter(|e| {
+            matches!(
+                e,
+                SemanticError::ModelWithNoDataUsedAsType { model_name, .. } if *model_name == "Foo"
+            )
+        })
+        .count();
+    assert_eq!(used_as_type_count, 4);
 }

@@ -10,8 +10,8 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, ServiceBlock,
-    Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, Span, Spd,
+    Symbol, Tag,
 };
 
 /// Converts a [Keyword] to a `just` [Token] parser
@@ -99,7 +99,6 @@ fn parser<'tokens, 'src: 'tokens>()
         data_source::data_source_block(),
         env::env_block().map_spanned(|b| b),
         api::api_block().map_spanned(|b| b),
-        service_block().map_spanned(|b| b),
         poo_block().map_spanned(|b| b),
         inject_block().map_spanned(|b| b),
     ))
@@ -151,27 +150,6 @@ fn inject_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|symbols| AstBlockKind::Inject(InjectBlock { symbols }))
-}
-
-/// Parses a block of the form:
-///
-/// ```cloesce
-/// service {
-///     ident1
-///     ident2
-/// }
-/// ```
-fn service_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // service {}
-    kw!(Service)
-        .ignore_then(
-            symbol()
-                .repeated()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map(|symbols| AstBlockKind::Service(ServiceBlock { symbols }))
 }
 
 /// Parses any number of `[ ... ]` tags, returning them as a vector of spanned [Tag]s.

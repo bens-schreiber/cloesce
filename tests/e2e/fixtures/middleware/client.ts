@@ -61,7 +61,6 @@ export class Foo {
       false
     );
   }
-
   static fromJson(data: any): Foo {
     const __$res = Object.assign(new Foo(), data);
     return __$res;

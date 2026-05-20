@@ -4,7 +4,9 @@ export class FooService {
   static async method(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const __$baseUrl = new URL("http://localhost:5144/api/FooService/method");
+    const __$baseUrl = new URL(
+      `http://localhost:5144/api/FooService/method`
+    );
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",

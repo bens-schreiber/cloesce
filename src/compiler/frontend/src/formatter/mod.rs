@@ -23,8 +23,8 @@ use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
     ForeignBlock, ForeignBlockNav, InjectBlock, Keyword, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2Block, ServiceBlock, Spd,
-    SqlBlockKind, Symbol, Tag, fmt_cidl_type, lexer::CommentMap,
+    NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2Block, Spd, SqlBlockKind, Symbol,
+    Tag, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -400,7 +400,6 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
             AstBlockKind::Model(b) => b.to_doc(ctx),
             AstBlockKind::Api(b) => b.to_doc(ctx),
             AstBlockKind::DataSource(b) => b.to_doc(ctx),
-            AstBlockKind::Service(b) => b.to_doc(ctx),
             AstBlockKind::PlainOldObject(b) => b.to_doc(ctx),
             AstBlockKind::Env(b) => b.to_doc(ctx),
             AstBlockKind::Inject(b) => b.to_doc(ctx),
@@ -750,20 +749,6 @@ impl ParsedIncludeTree<'_> {
                 .then(ctx.block(subtree.to_doc_at(ctx, depth + 1), depth + 1));
         }
         doc
-    }
-}
-
-impl<'src> ToDoc<'src> for ServiceBlock<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        if self.symbols.is_empty() {
-            return Doc::kw(Keyword::Service).then(Doc::text(" {}"));
-        }
-
-        let mut inner = Doc::nil();
-        for symbol in &self.symbols {
-            inner = inner.then(ctx.sym_doc(symbol, 1, false));
-        }
-        Doc::kw(Keyword::Service).then(ctx.block(inner, 1))
     }
 }
 

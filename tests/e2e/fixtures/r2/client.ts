@@ -100,7 +100,6 @@ export class D1BackedModel {
       true
     );
   }
-
   static fromJson(data: any): D1BackedModel {
     const __$res = Object.assign(new D1BackedModel(), data);
     return __$res;
@@ -183,7 +182,6 @@ export class PureR2Model {
       false
     );
   }
-
   static fromJson(data: any): PureR2Model {
     const __$res = Object.assign(new PureR2Model(), data);
     if (__$res.allData?.results) {

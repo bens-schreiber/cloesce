@@ -1,3 +1,13 @@
+# [0.4.1] - 2026-5-20
+
+### Added
+
+### Changed
+
+- Removed `service` syntax, opting for the "data-less model" pattern instead.
+
+### Fixed
+
 # [0.4.0] - 2026-5-19
 
 ### Added
