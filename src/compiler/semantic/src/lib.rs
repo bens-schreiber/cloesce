@@ -465,6 +465,12 @@ fn resolve_cidl_type<'src, 'p>(
     match cidl_type {
         CidlType::UnresolvedReference { name } => {
             if let Some(sym) = table.models.get(name) {
+                if sym.blocks.is_empty() {
+                    return Err(SemanticError::ModelWithNoDataUsedAsType {
+                        usage: symbol,
+                        model_name: sym.symbol.name,
+                    });
+                }
                 return Ok(CidlType::Object {
                     name: sym.symbol.name,
                 });
@@ -479,10 +485,17 @@ fn resolve_cidl_type<'src, 'p>(
             Err(SemanticError::UnresolvedSymbol { symbol })
         }
         CidlType::Partial { object_name } => {
-            let valid =
-                table.models.contains_key(object_name) || table.poos.contains_key(object_name);
+            if let Some(sym) = table.models.get(object_name) {
+                if sym.blocks.is_empty() {
+                    return Err(SemanticError::ModelWithNoDataUsedAsType {
+                        usage: symbol,
+                        model_name: sym.symbol.name,
+                    });
+                }
+                return Ok(cidl_type.clone());
+            }
 
-            if !valid {
+            if !table.poos.contains_key(object_name) {
                 return Err(SemanticError::UnresolvedSymbol { symbol });
             }
             Ok(cidl_type.clone())

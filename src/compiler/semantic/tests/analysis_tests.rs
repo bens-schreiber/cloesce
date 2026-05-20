@@ -1245,22 +1245,52 @@ fn inject_tag_dedupes_duplicates() {
 }
 
 #[test]
-fn dataless_model_instance_method_errors() {
+fn dataless_model_errors() {
     let src = r#"
         env { d1 { db } }
         model Foo {}
+        model Bar {}
 
         api Foo {
             get instanceLike(self) -> string
+        }
+
+        api Bar {
+            post takesFoo(foo: Foo) -> string
+            get yieldsFoo() -> Foo
+            post takesPartialFoo(foo: partial<Foo>) -> string
+        }
+
+        poo Container {
+            inner: Foo
+        }
+
+        source FooSource for Foo {
+            include {}
         }
     "#;
 
     let parse = lex_and_ast(src);
     let (_result, errors) = SemanticAnalysis::analyze(&parse);
 
-    assert_eq!(errors.len(), 1);
     let method = expect_err!(errors,
         SemanticError::ModelInstanceMethodWithNoData { method } => method
     );
     assert_eq!(method.name, "instanceLike");
+
+    let data_source = expect_err!(errors,
+        SemanticError::ModelDataSourceWithNoData { data_source, .. } => data_source
+    );
+    assert_eq!(data_source.name, "FooSource");
+
+    let used_as_type_count = errors
+        .iter()
+        .filter(|e| {
+            matches!(
+                e,
+                SemanticError::ModelWithNoDataUsedAsType { model_name, .. } if *model_name == "Foo"
+            )
+        })
+        .count();
+    assert_eq!(used_as_type_count, 4);
 }

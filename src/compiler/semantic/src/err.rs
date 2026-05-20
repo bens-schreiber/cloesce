@@ -215,6 +215,11 @@ pub enum SemanticError<'src, 'p> {
         model: &'p Symbol<'src>,
         data_source: &'p Symbol<'src>,
     },
+
+    ModelWithNoDataUsedAsType {
+        usage: &'p Symbol<'src>,
+        model_name: &'src str,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -911,6 +916,21 @@ fn display(
                             model.name
                         ))
                         .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::ModelWithNoDataUsedAsType { usage, model_name } => {
+            let (path, range) = span_parts(&usage.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "data-less model '{}' cannot be used as a value type",
+                    model_name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "data-less models have no fields and cannot appear as API parameters, return types, or POO fields",
+                        )
+                        .with_color(Color::Red),
                 )
         }
     };
