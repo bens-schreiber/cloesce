@@ -49,6 +49,9 @@ export namespace PooAcceptYield {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "PooAcceptYield"."id" AS "id" FROM "PooAcceptYield" WHERE "PooAcceptYield"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<PooAcceptYield.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<PooAcceptYield.Self>(PooAcceptYield.Meta, PooAcceptYield.Source.Default.getQuery(env, id), PooAcceptYield.Source.Default.include, {  });
@@ -79,8 +82,8 @@ export namespace PooAcceptYield {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

@@ -43,6 +43,9 @@ export namespace Validator {
     export namespace Source {
         export const Default = {
             include: {"data":{}},
+            async save(env: { db: Env["db"], store: Env["store"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{}});
+            },
             getQuery: (env: { db: Env["db"], store: Env["store"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"], store: Env["store"] }, id: number, name: string): Promise<CloesceResult<Validator.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.Default.getQuery(env, id), Validator.Source.Default.include, { name });
@@ -54,6 +57,9 @@ export namespace Validator {
         }
         export const None = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number, name: string): Promise<CloesceResult<Validator.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.None.getQuery(env, id), Validator.Source.None.include, { name });
@@ -84,8 +90,8 @@ export namespace Validator {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"], store: Env["store"] }, base: DeepPartial<Self>, name: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

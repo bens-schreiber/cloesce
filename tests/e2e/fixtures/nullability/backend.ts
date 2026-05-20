@@ -53,6 +53,9 @@ export namespace NullabilityChecks {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "NullabilityChecks"."id" AS "id", "NullabilityChecks"."notNullableString" AS "notNullableString", "NullabilityChecks"."nullableString" AS "nullableString" FROM "NullabilityChecks" WHERE "NullabilityChecks"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<NullabilityChecks.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.Source.Default.getQuery(env, id), NullabilityChecks.Source.Default.include, {  });
@@ -83,8 +86,8 @@ export namespace NullabilityChecks {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

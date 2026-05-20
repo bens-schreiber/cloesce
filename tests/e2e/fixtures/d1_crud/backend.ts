@@ -35,6 +35,9 @@ export namespace CrudHaver {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "CrudHaver"."id" AS "id", "CrudHaver"."name" AS "name" FROM "CrudHaver" WHERE "CrudHaver"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<CrudHaver.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<CrudHaver.Self>(CrudHaver.Meta, CrudHaver.Source.Default.getQuery(env, id), CrudHaver.Source.Default.include, {  });
@@ -65,8 +68,8 @@ export namespace CrudHaver {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
@@ -99,6 +102,9 @@ export namespace Parent {
     export namespace Source {
         export const Default = {
             include: {"children":{},"favoriteChild":{}},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"children":{},"favoriteChild":{}});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Parent.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Parent.Self>(Parent.Meta, Parent.Source.Default.getQuery(env, id), Parent.Source.Default.include, {  });
@@ -110,6 +116,9 @@ export namespace Parent {
         }
         export const WithChildren = {
             include: {"children":{},"favoriteChild":{}},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"children":{},"favoriteChild":{}});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Parent"."id" AS "id", "Parent"."favoriteChildId" AS "favoriteChildId", "Child_1"."id" AS "favoriteChild.id", "Child_1"."parentId" AS "favoriteChild.parentId", "Child_2"."id" AS "children.id", "Child_2"."parentId" AS "children.parentId" FROM "Parent" LEFT JOIN "Child" AS "Child_1" ON "Parent"."favoriteChildId" = "Child_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent"."id" = "Child_2"."parentId" WHERE "Parent"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Parent.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Parent.Self>(Parent.Meta, Parent.Source.WithChildren.getQuery(env, id), Parent.Source.WithChildren.include, {  });
@@ -140,8 +149,8 @@ export namespace Parent {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
@@ -173,6 +182,9 @@ export namespace Child {
     export namespace Source {
         export const Default = {
             include: {"parent":{"children":{}}},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"parent":{"children":{}}});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Child"."id" AS "id", "Child"."parentId" AS "parentId", "Parent_1"."id" AS "parent.id", "Parent_1"."favoriteChildId" AS "parent.favoriteChildId", "Child_2"."id" AS "parent.children.id", "Child_2"."parentId" AS "parent.children.parentId" FROM "Child" LEFT JOIN "Parent" AS "Parent_1" ON "Child"."parentId" = "Parent_1"."id" LEFT JOIN "Child" AS "Child_2" ON "Parent_1"."id" = "Child_2"."parentId" WHERE "Child"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Child.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Child.Self>(Child.Meta, Child.Source.Default.getQuery(env, id), Child.Source.Default.include, {  });
@@ -203,8 +215,8 @@ export namespace Child {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

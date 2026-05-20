@@ -47,6 +47,9 @@ export namespace D1BackedModel {
     export namespace Source {
         export const Default = {
             include: {"r2Data":{}},
+            async save(env: { bucket1: Env["bucket1"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"r2Data":{}});
+            },
             getQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
             async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number, keyParam: string): Promise<CloesceResult<D1BackedModel.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include, { keyParam });
@@ -77,8 +80,8 @@ export namespace D1BackedModel {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { bucket1: Env["bucket1"], db: Env["db"] }, base: DeepPartial<Self>, keyParam: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
@@ -134,6 +137,9 @@ export namespace PureR2Model {
     export namespace Source {
         export const Default = {
             include: {"allData":{},"data":{},"otherData":{}},
+            async save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"allData":{},"data":{},"otherData":{}});
+            },
             async get(env: { bucket1: Env["bucket1"] }, id: string): Promise<PureR2Model.Self | null> {
                 return await CloesceOrm.fromEnv(env).get<PureR2Model.Self>(PureR2Model.Meta, null, PureR2Model.Source.Default.include, { id });
             },
@@ -159,8 +165,8 @@ export namespace PureR2Model {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, id: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
