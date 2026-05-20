@@ -42,6 +42,9 @@ export namespace BlobHaver {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "BlobHaver"."id" AS "id", "BlobHaver"."blob1" AS "blob1", "BlobHaver"."blob2" AS "blob2" FROM "BlobHaver" WHERE "BlobHaver"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<BlobHaver.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<BlobHaver.Self>(BlobHaver.Meta, BlobHaver.Source.Default.getQuery(env, id), BlobHaver.Source.Default.include, {  });
@@ -72,8 +75,8 @@ export namespace BlobHaver {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

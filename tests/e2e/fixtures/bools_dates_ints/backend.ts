@@ -33,6 +33,9 @@ export namespace Weather {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Weather.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.Source.Default.getQuery(env, id), Weather.Source.Default.include, {  });
@@ -63,8 +66,8 @@ export namespace Weather {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

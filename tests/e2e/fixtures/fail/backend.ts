@@ -50,6 +50,9 @@ export namespace FailModel {
     export namespace Source {
         export const Default = {
             include: {},
+            async save(env: { db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
+            },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<FailModel.Self | null>> {
                 return await CloesceOrm.fromEnv(env).get<FailModel.Self>(FailModel.Meta, FailModel.Source.Default.getQuery(env, id), FailModel.Source.Default.include, {  });
@@ -80,8 +83,8 @@ export namespace FailModel {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {

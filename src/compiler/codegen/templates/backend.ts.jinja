@@ -138,6 +138,9 @@ export namespace {{ model.name }} {
 {%- for ds in model.data_sources.values() %}
         export const {{ ds.name }} = {
             include: {{ self.mapper.include_tree(&ds.tree) }},
+            async save(env: {{ env_type(self.model_bindings(model, Some(&ds.tree))) }}, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {{ self.mapper.include_tree(&ds.tree) }});
+            },
 {%- let ds_bindings = self.model_bindings(model, Some(&ds.tree)) %}
 {%- if let Some(get) = &ds.get %}
             getQuery: (env: {{ env_type(ds_bindings) }}{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
@@ -180,8 +183,8 @@ export namespace {{ model.name }} {
             return CloesceOrm.select(Meta, from ?? null, include);
         }
 
-        export function map(result: D1Result): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, Source.Default.include);
+        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
         }
 
         export async function hydrate(env: {{ env_type(orm_bindings) }}, base: DeepPartial<Self>{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
