@@ -47,7 +47,7 @@ To prevent overfetching (and infinite loops), Cloesce will generate a Default Da
 
 To determine which fields to hydrate, Cloesce uses a construct called the _Include Tree_. An Include Tree is a recursive structure that represents the relationships between Models and their fields, and is used by Cloesce to determine how to fetch data for a given Model.
 
-For example, in the `Person` and `Dog` Models above, the Default Data Source's _Include Tree_ would join only the field `dogs` on `Person`, but on the `Dog` Model, it would join `owner`, and then finally `dogs`.
+For example, in the `Person` and `Dog` Models above, the Default Data Source's Include Tree would join only the field `dogs` on `Person`, but on the `Dog` Model, it would join `owner`, and then finally `dogs`.
 
 ```cloesce
 // Include Tree for Person

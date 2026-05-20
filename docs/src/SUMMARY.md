@@ -17,7 +17,7 @@
 - [Data Sources](./ch5-0-data-sources.md)
   - [Overview](./ch5-1-overview.md)
   - [Custom Data Sources](./ch5-2-custom-data-sources.md)
-- [APIs and Services](./ch6-0-apis-and-services.md)
+- [APIs](./ch6-0-apis.md)
   - [REST APIs](./ch6-1-rest-apis.md)
   - [CRUD Generation](./ch6-2-crud-generation.md)
   - [Dependency Injection](./ch6-3-dependency-injection.md)

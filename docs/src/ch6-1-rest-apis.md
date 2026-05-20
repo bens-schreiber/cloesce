@@ -2,7 +2,7 @@
 
 Cloesce Models are not just about [defining data](./ch4-0-models.md) and [how to hydrate it](./ch5-0-data-sources.md); they also allow you to define how that data can be accessed and manipulated through APIs.
 
-By defining an `api` block for a Model, you can specify REST endpoints that are generated as backend stubs and client methods, routed by the Cloesce runtime. This allows you to easily create a fully typed API layer for your application without having to write any boilerplate code.
+By defining an API for a Model, you can specify REST endpoints that are generated as backend stubs and client methods, routed by the Cloesce runtime.
 
 ## Defining an API
 
@@ -19,16 +19,22 @@ api Person {
     get by_id(id: int) -> Person
     post create(name: string) -> Person
     delete del(id: int)
+    put update(id: int, name: string) -> Person
+    patch update_name(id: int, name: string) -> Person
 }
 ```
 
-The above code defines an API for the `Person` Model with three endpoints:
+The above code defines an API for the `Person` Model:
 
-- `GET /Person/by_id` - Fetch a person by their ID
-- `POST /Person/create` - Create a new person with a name
-- `DELETE /Person/del` - Delete a person by their ID
+| Verb   | Route                 |
+| ------ | --------------------- |
+| GET    | `/Person/by_id`       |
+| POST   | `/Person/create`      |
+| DELETE | `/Person/del`         |
+| PUT    | `/Person/update`      |
+| PATCH  | `/Person/update_name` |
 
-All of the above methods are _static_, meaning they are called in the namespace of a Model rather than on an instance of a Model.
+All of the above methods are _static_, meaning they are called in the namespace of a Model, but do not need to hydrate an instance of that Model.
 
 ### Transpiled Code
 
@@ -89,7 +95,7 @@ api Person {
 }
 ```
 
-The above code defines an API method `GET /Person/:id/myself`, which can be implemented in TypeScript as follows:
+The above code defines an API method `GET /Person/:id/myself`, which can be implemented in TypeScript:
 
 ```ts
 import * as clo from "@cloesce/backend.js";

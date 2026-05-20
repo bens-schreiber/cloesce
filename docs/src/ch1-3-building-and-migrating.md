@@ -32,6 +32,9 @@ Any generated artifacts should not be modified directly or committed to source c
 
 ## Migrations
 
+> [!TIP]
+> Any change to a [D1 backed model](./ch4-1-d1-backed-model.md) should be accompanied by a new migration. This ensures that your D1 database schema stays in sync with your Cloesce Models.
+
 Cloesce supports any number of [D1](https://developers.cloudflare.com/d1/) databases in a single project. To generate SQL migration files for a specific D1 binding, run the following command:
 
 ```bash
