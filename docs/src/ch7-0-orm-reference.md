@@ -27,6 +27,8 @@ The `Source` namespace contains transpiled representations of each [Data Source]
         export const Default = {
             include: {"weatherEntries":{}},
 
+            async save(env, newModel: DeepPartial<WeatherReport>) {...},
+
             getQuery: (env, id: number) => ...,
             async get(env, id: number) {...},
 
@@ -39,6 +41,7 @@ The `Source` namespace contains transpiled representations of each [Data Source]
 | Property / Method       | Description                                                                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `include`               | The [Include Tree](./ch5-1-overview.md#include-trees) for this Data Source, which specifies all fields to be included when this Data Source is used.                      |
+| `save`                  | A method that creates or updates a Model instance from a partial object. Returns a fully hydrated instance.                                                               |
 | `get`                   | A method that retrieves a single instance of the Model using this Data Source, given the necessary parameters. May return `null` if no matching row is found.             |
 | `list`                  | A method that retrieves multiple instances of the Model using this Data Source, given the necessary parameters. Not available for Models that require key parameters.     |
 | `getQuery`, `listQuery` | Methods that return a `D1PreparedStatement` for the `get` and `list` operations, which can be used to fetch D1 properties in the same query as the base Model properties. |
@@ -55,7 +58,7 @@ These methods are especially useful when you need to write custom queries but st
 | `get`     | `env`, `query`               | Retrieves a single instance. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Returns `null` if no matching row is found.                                                                                                       |
 | `list`    | `env`, `query`               | Retrieves all instances. Optionally, accepts a `D1PreparedStatement` to fetch any D1 properties in the same query. Not compatible with Models that require key parameters for KV or R2 properties.                                                                       |
 | `select`  | `include`, `from`            | Generates a SQL `SELECT` statement with the necessary `LEFT JOIN`s and column aliases to retrieve all properties of a Model according to an [Include Tree](./ch5-1-overview.md#include-trees). Optionally, accepts a `from` string to wrap a subquery as the base table. |
-| `map`     | `result`                     | Takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.                                                       |
+| `map`     | `result`, `include`          | Takes the results of a `SELECT` query and reconstructs the object graph based on the column aliases. This is useful when you need to write custom SQL but still want to leverage the ORM's hydration capabilities.                                                       |
 | `hydrate` | `env`, `base`, `include`     | Takes some base object and fetches any KV or R2 properties to return a fully populated Model instance. Additionally, it instantiates objects like Dates and Blobs according to the Model definition.                                                                     |
 
 More information on how these methods work can be found in the [next section](#using-the-base-orm-methods).
