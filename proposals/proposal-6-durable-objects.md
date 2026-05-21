@@ -7,272 +7,297 @@
 
 ---
 
-## Summary
+# Summary
 
-This proposal adds first-class support for [Durable Objects](https://developers.cloudflare.com/durable-objects/) in Cloesce. Durable Objects unlock use cases that D1 alone cannot address: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections. The proposal covers how to declare DO bindings in the `env` schema, back Models and Services against a DO, define REST API methods that route through a DO, and generate both SQL and Wrangler migrations as DO classes evolve.
+This proposal adds first-class support for [Durable Objects](https://developers.cloudflare.com/durable-objects/) in Cloesce. Durable Objects unlock use cases that D1 alone cannot address: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections. The proposal covers how to declare DO bindings in the `env` schema, back a Model against a DO, route REST API methods through a DO, and generate both SQL and Wrangler migrations as DO classes evolve.
 
 ---
 
-## Motivation
+# Motivation
 
-Durable Objects are easily the most powerful and unique product on the Cloudflare Workers platform, but they are also the hardest to use correctly. Without framework support, a developer must manually wire up routing, state initialization, migrations, and the Worker-to-DO request handoff all before writing any application logic. This proposal aims to eliminate that boilerplate by integrating Durable Objects as first class citizens in Cloesce's schema and code generation.
+Durable Objects are easily the most powerful product on the Cloudflare Workers platform, but they are also the hardest to use correctly. Without framework support, a developer must manually wire up routing, state initialization, migrations, and the Worker-to-DO request handoff, all before writing any application logic. This proposal aims to eliminate that boilerplate by integrating Durable Objects as first-class citizens in Cloesce's schema and code generation.
 
-### The limits of D1
+## The limits of D1
 
 Cloesce currently supports D1 as its relational backend. D1 works well for many applications, but it has a fundamental architectural constraint: it is a single, globally shared database capped at 10 GB. This makes it a poor fit for applications where data is naturally partitioned by tenant, user, session, or resource (really, cases where you want the database to scale horizontally rather than vertically).
 
 Durable Objects offer a different model entirely. Instead of one large database, you get arbitrarily many small ones. Each DO instance has its own isolated SQLite database, its own KV store, and its own compute context. A multi-tenant SaaS application, for example, can give each organization its own DO instance, with full data isolation and no shared contention.
 
-### Strong consistency
+## Strong consistency
 
-D1 (and most distributed databases) provide eventual consistency. Durable Objects are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, counters, collaborative editing state, rate limiters, and similar workloads.
+D1 (and most distributed databases) provides eventual consistency. A value must be updated atomically to ensure a valid state. Transactions do not exist.
 
-### Real-time communication
+Durable Objects, on the other hand, are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, counters, collaborative editing state, rate limiters, and similar workloads.
 
-Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients. This is the foundation for features like live cursors, presence indicators, chat, and multiplayer state. Although web sockets will not be addressed in this proposal, it is the foundation for the next proposal that does.
+## Real-time communication
+
+Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients.
 
 ---
 
-## Goals and Non-Goals
+# Goals and Non-Goals
 
-### Goals
+## Goals
 
 - Define Durable Objects in the `env` schema declaration.
 - Enable a Model to be backed by a Durable Object.
 - Enable a Model to use a DO-based KV store for KV fields (instead of a KV bucket).
-- Enable a Service to be backed by a Durable Object.
 - Generate migrations for any SQL schema changes in a DO-backed Model.
 - Generate Wrangler configuration for migrating and deploying DOs.
 
-### Non-Goals
+## Non-Goals
 
-- Support for D1-backed models having relationships with DO-backed models (and vice versa).
-- Support for DOs having relationships with different DOs.
+- Support for D1-backed Models having foreign keys to DO-backed Models (and vice versa).
 - WebSocket RPC support (later!).
-- Optimizing the `save` method for DO-backed models (the `_cloesce_tmp` table is used to store primary keys mid-transaction, but since a DO has strong consistency, this can likely be optimized).
+- Optimizing the `save` method for DO-backed Models (the `$cloesce_tmp` table is used to store primary keys mid-transaction, but since a DO has strong consistency, this can likely be optimized).
 
 ---
 
-## Detailed Design
+# Design
 
-### Defining a Durable Object Binding
+## Defining a Durable Object Binding
 
-A Durable Object is defined in the `env` schema declaration, much like a D1 database or KV bucket:
+Unlike D1, KV, and R2 bindings, which represent global singleton resources, a DO binding can have any number of instances. Thus, a DO binding must include some way to define how its instances are identified.
+
+There are several common patterns for DO instance identification:
+
+1. **Raw DO ID**: Every DO has an underlying unique 64-character hex ID, which can be generated randomly.
+2. **Static ID**: Generated from some constant seed string.
+3. **Dynamic ID**: Generated from some combination of parameters determined at runtime.
+
+Cloesce needs to support all three of these patterns. Defining a DO binding in the schema will follow this pattern:
 
 ```cloesce
-env {
-    durable {
-        MyDurableObject
-        // other DOs...
+durable MyRawDo {
+    keyfield {
+        raw: doid
+    }
+
+    primary (raw)
+}
+
+durable MyStaticDo {
+    primary ("global_counter")
+}
+
+durable MyDynamicDo {
+    keyfield {
+        counter_id: string
+    }
+
+    primary (counter_id)
+    // string interpolation is available too: primary ("counter/{counter_id}")
+}
+```
+
+In the above example, three DO bindings are defined:
+
+| Durable Object | ID Type    | ID Source             | Parameters          | Instance Behavior                                                         |
+| -------------- | ---------- | --------------------- | ------------------- | ------------------------------------------------------------------------- |
+| `MyStaticDo`   | Static ID  | `global_counter`      | None                | Only one instance exists                                                  |
+| `MyDynamicDo`  | Dynamic ID | `counter_id` keyfield | `counter_id`        | Multiple instances can exist, each identified by a different `counter_id` |
+| `MyRawDo`      | Raw ID     | `raw` key             | `raw` (`doid` type) | Uses a raw Durable Object ID directly                                     |
+
+A new type, `doid`, will be introduced to represent a raw Durable Object ID. It is SQLite-compatible and runtime-validated to ensure it conforms to the expected format.
+
+### Environment Binding Syntax Changes
+
+Moving forward, we will remove the `env` block. Instead, all definitions will be at the top level of the schema. For example:
+
+```cloesce
+d1 {
+    my_db
+    my_other_db
+}
+
+kv {
+    my_bucket
+}
+
+durable MyDurableObject {
+    keyfield {
+        name: string
+    }
+
+    primary ("counter/{name}")
+}
+```
+
+## Durable Object Field
+
+Any Model may have a field that hydrates from a Durable Object, much like KV and R2 fields:
+
+```cloesce
+durable Counter {
+    keyfield {
+        id: int
+    }
+
+    primary ("counter/{id}")
+}
+
+model MyModel {
+    keyfield {
+        counter_id: int
+    }
+
+    durable (Counter, counter_id) {
+        counter
     }
 }
 ```
 
-Note the casing convention. Unlike other bindings, a DO binding must compile to both an `env` binding and a class name, typically PascalCase:
+When a durable field is declared, semantic analysis will ensure that each of its `primary` fields is satisfied in the definition.
 
-```toml
-[[durable_objects.bindings]]
-name = "MyDurableObject"        # binding
-class_name = "MyDurableObject"  # class name
-```
+During hydration, the `counter` field of `MyModel` will be hydrated with an instance of the Durable Object `Counter`. If the DO does not exist, the field will be hydrated with `null` instead.
 
-For the purposes of this proposal, the binding name and class name will be kept the same.
+Durable Object fields can be included in or excluded from a Data Source's Include Tree, but will always be hydrated in the Default Data Source.
 
-### Durable Object-Backed Model
+## Durable Object Backed Models
 
-A Model can be "backed by" a Durable Object in the same way it can be backed by a D1 database. The DO is the source of truth: for a Model instance to exist, it must exist on a Durable Object instance.
+A Model can be backed by a DO, much like you can back a Model against a D1 database.
+
+- If the backing DO is not found, then any attempt to hydrate an instance of that Model will return a 404.
+- A DO-backed Model will inherit all key fields of the backing DO.
+- If a SQL field is declared, then the DO will be initialized with a SQLite database, and that field will be stored in a table in that database.
+- KV fields on a DO-backed Model can use the DO's KV store.
+
+For example:
 
 ```cloesce
-[use MyDurableObject]
-model User {
-    primary {
-        id: uint
+durable CounterDo {
+    keyfield {
+        id: int
     }
 
-    kv (MyDurableObject, "user/{id}") {
-        data: json
-    }
-
-    nav (Post::author) {
-        posts
-    }
+    primary (id)
 }
 
-[use MyDurableObject]
+[use CounterDo]
+model Counter {
+    kv (self, "count") {
+        count: int
+    }
+}
+```
+
+The `self` keyword is used to indicate that the `count` field should be stored in the DO's KV store, rather than some global KV bucket.
+
+Because a Model must be serializable to the client and invokable remotely, all fields of the backing DO must exist as fields on the Model, so that Cloesce can locate the backing DO. The compiler will handle this implicitly during a post-semantic expansion step.
+
+### SQLite Usage
+
+A DO-backed Model that defines any SQL fields will exist as a SQLite table in the DO instance's database. For example:
+
+```cloesce
+durable Blog {
+    keyfield {
+        blogId: string
+    }
+
+    primary ("blog/{blogId}")
+}
+
+[use Blog]
 model Post {
     primary {
-        id: uint
+        id: int
     }
 
-    foreign (User::id) {
-        author
+    foreign (Comments::postId) {
+        comments
+    }
+}
+
+[use Blog]
+model Comment {
+    primary {
+        id: int
+    }
+
+    foreign (Post::id) {
+        post
     }
 }
 ```
 
-In the above code, the `User` model exists as a table in SQLite on a `MyDurableObject` instance. The `data` field is stored in the KV store of that same DO instance, with a key of `user/{id}`. Just like a D1-backed model, relationships can be defined between DO-backed models, provided they share the same backing DO.
+Here, both `Post` and `Comment` are backed by the `Blog` DO, and both will be stored as tables in the DO's SQLite database. The foreign key relationship between them is maintained as normal, but now all queries and mutations on those tables will execute within the context of the DO instance.
 
-### REST API Methods
+## REST API Methods
 
-Any Model backed by a DO can have REST methods defined within its `api` block:
+A DO-backed Model can define REST API methods just like any other Model. However, where those methods execute will be different: instead of executing within the context of a Worker, they will execute within the context of the DO instance that backs the Model.
 
-```cloesce
-[use MyDurableObject]
-model Weather {
-    ...
-}
-
-api Weather {
-    post helloWorld() -> string
-}
-```
-
-However, method execution must change. For a typical Model, the router follows this path within a Worker:
+The request flow for a Worker-based Model looks like this:
 
 ```
 Request
-    -> Worker -> Route -> Validation -> Hydrate -> Dispatch
+    -> Worker -> Route -> Validation -> Hydrate -> Dispatch -> Response
 ```
 
-A Worker route is registered like this:
-
-```ts
-export default {
-    async fetch(request: Request, env: clo.Env): Promise<Response> {
-        const app = (await clo.cloesce())
-            .register(Weather);
-        return await app.run(request, env);
-    }
-};
-```
-
-A Durable Object, however, does not exist within a Worker, it can only be *invoked* by one:
+For a DO-backed Model, the flow will look like this:
 
 ```
 Request
-    -> Worker -> Route -> Forward
+    -> Worker -> Route
         -> DO -> Route -> Validate -> Hydrate -> Dispatch
+    -> Response
 ```
 
-Since a DO operates independently of a Worker, it needs its own `fetch` method and its own app registration:
+To make this work, both the Worker and the DO will need their own Cloesce Router. To make their API contracts apparent to the developer, a new syntax will be introduced for registering implementations:
 
 ```ts
-export class MyDurableObject implements clo.MyDurableObject {
-    async fetch(request, env): Promise<Response> {
-        const app = (await clo.cloesce())
-            .register(...);
-        return await app.run(request, env);
-    }
-}
-
 export default {
-    async fetch(request: Request, env: clo.Env): Promise<Response> {
-        const app = (await clo.cloesce())
-            .register(...);
-        return await app.run(request, env);
-    }
+  async fetch(request: Request, env: clo.Env): Promise<Response> {
+    const app = await clo.cloesce({
+      MyWorkerModel: MyWorkerModelImpl,
+      // ...typed such that only Worker-based Models can be registered here
+    });
+    return await app.run(request, env);
+  },
 };
+
+export class MyDurableObject implements clo.MyDurableObject {
+  async fetch(request, env): Promise<Response> {
+    const app = await clo.cloesce({
+      MyDoBackedModel: MyDoBackedModelImpl,
+      // ...typed such that only DO-backed Models can be registered here
+    });
+    return await app.run(request, env);
+  }
+}
 ```
 
-### ORM
+### Registering Injected Instances
 
-Every Durable Object instance is identified by a unique ID. It can be generated randomly (a 64-character hex string) or deterministically from a seed string (using `env.MyDurableObject.idFromName("some-string")`).
+How can an injected dependency be shared between the Worker and the DO?
 
-There are two ways to access a DO instance:
+Any environment binding (D1, KV, DO, Vars) is by default shared between the Worker and DO, as Cloudflare populates the same `env` object for both. This means that if you have a DO binding, you can access it from the Worker and pass it to the DO as needed.
 
-1. From outside the DO, using `env.MyDurableObject.get(id)`, which returns a stub for sending requests to that instance.
-2. From inside the DO, using `this`, which provides direct access to the instance.
+However, an instance defined in an `inject` block is not shared by Cloudflare, as it is purely a construct of Cloesce. The solution will be to trace the usage of each injected instance:
 
-#### Backend API
+- If the instance is used in some DO-backed Model `D`, then that instance can be registered in the DO's router.
+- If the instance is used in some non-DO-backed Model `W`, then that instance can be registered in the Worker's router.
 
-A Model may exist on a DO, but it _is not_ the DO. The DO is just a database and compute environment that the Model uses. In this design, the DO instance and the Model instance are completely separate (no shared `this` context, no shared fields).
+If an injected instance is not used in any Model's API contract, then it cannot be registered in either router.
 
-For example, a DO-backed Model with an API can be defined like this:
+### Injecting a Durable Object Environment Binding
+
+Since a DO's binding is part of the environment, it can be injected like any other environment binding. However, this does not inject an instance of the DO itself, but rather the binding that allows you to interact with DO instances (e.g. to forward requests to them, or to fetch their state). For example:
 
 ```cloesce
-env {
-    durable {
-        MyDurableObject
-    }
-}
-
-[use MyDurableObject]
-model Foo {
-    ...
-}
-
-api Foo {
-    post id(e: env) -> string
+api MyModel {
+    [inject MyDurableObject]
+    get do_binding() -> string
 }
 ```
 
-Which will translate to:
+## Migrations
 
-```ts
-export interface Env {
-    MyDurableObject: DurableObjectNamespace;
-}
+A Durable Object can be migrated in two ways: changes to the DO class's underlying Wrangler configuration, and changes to the DO's SQLite schema.
 
-export abstract class MyDurableObject implements DurableObject<Env> {
-    abstract fetch(request: Request, env: Env): Promise<Response>;
-}
+### SQL
 
-export namespace Foo {
-    // ...
-    type InstanceEnv = Env & { $do: MyDurableObject };
-
-    export interface Api {
-        id(e: InstanceEnv, ...): ApiResult<string>;
-    }
-
-    export namespace Orm {
-        async function get(env: InstanceEnv, ...);
-        async function get(env: Env, $do: string | DurableObjectId, ...);
-    }
-}
-```
-
-The columns of `Foo` will never include `$do`, as that is a property of the backing DO instance, not the Model itself. Instead, to access that instance, you must pass `env` to the method — `env` includes a `$do` property identifying the DO instance on which the Model instance exists. Intentionally: `env` is not `self`.
-
-#### Client API
-
-Similar to the backend, any client method will need to specify how to locate the DO instance:
-
-```ts
-// given some Foo model with PK `id` that is backed by MyDurableObject...
-class Foo {
-    $do: string; // the DO id
-    id: number;
-    // other fields...
-
-    static async $get($do: string, id: number) {...}
-    static async $list($do: string, lastSeen_id: number, limit: number) {...}
-    static async $save($do: string, data: DeepPartial<Foo>) {...}
-
-    // has a saved $do
-    async myMethod() {}
-}
-```
-
-A DO-backed Service will behave similarly, with an additional DO ID parameter for each method:
-
-```ts
-// given some FooService that is backed by MyDurableObject...
-class FooService {
-    constructor (public $do: string) {}
-    async myMethod() {...}
-}
-```
-
-Previously, Services had entirely static methods. If backed by a DO, they must now be instantiated with a DO ID.
-
-### Migrations
-
-#### SQL
-
-Since a DO-backed Model uses SQLite for relational storage, the same migration algorithm as a D1-backed Model applies. However, instead of running migrations via the Wrangler CLI, a Durable Object must run its own migrations on startup, per instance.
-
-This means migrations for a DO will not be purely SQL: they will include HLL code to handle the migration logic.
+SQL migrations cannot be applied to a DO via a Wrangler CLI command (unlike a D1 database). This means that migrations for a DO cannot be purely SQL: they must transpile to HLL code that runs on the DO instance itself, which applies the necessary SQL changes to the DO's SQLite database.
 
 An example migration:
 
@@ -291,7 +316,7 @@ export default {
 }
 ```
 
-Cloesce will provide a migration runner on each DO along the lines of:
+Cloesce will provide a migration runner on each DO, along the lines of:
 
 ```ts
 type Migration = {
@@ -301,6 +326,9 @@ type Migration = {
 }
 
 export abstract class MyDurableObject implements DurableObject<Env> {
+    // ... keyfields
+    // ... methods to get a DO instance by id
+
     protected async migrate(ctx: DurableObjectState, migrations: Migration[]) {
         ctx.blockConcurrencyWhile(async () => {
             // Check this DO's KV storage for each migration to see if it has been run before.
@@ -339,7 +367,7 @@ class MyDurableObject implements clo.MyDurableObject {
 }
 ```
 
-#### Durable Objects
+### Wrangler
 
 A Durable Object class can evolve in four ways:
 
@@ -370,24 +398,15 @@ tag = "v4"
 deleted_classes = ["OrgDO"]
 ```
 
-Since Cloesce can track changes between migrations, whenever a DO is migrated (`cloesce migrate --binding MyDurableObject Name`), Cloesce can determine which of the above four operations is being performed and generate the appropriate Wrangler configuration. This command will also invoke any pending SQL migrations.
-
 ---
 
-## Implementation
+# Implementation
 
-The implementation of this proposal will require changes across the full stack of Cloesce, but will not introduce any breaking changes to the public API. The main areas of work include:
-1. Schema parsing and semantic analysis of Durable Object bindings
-2. Backend code generation for new Durable Object backed Models and Services, including their API methods
-3. Client code generation for DO-backed Models and Services
-4. A new template for DO migrations (in TS)
-5. A new Wrangler migrations component that can check for DO changes
-6. Updating the Cloesce Router to forward requests to DOs when necessary, as well as hydrating DO-backed Models with the correct instance ID from `env`
+The implementation for this proposal will be significant, broken down into the following phases:
 
-### Passing Durable Object IDs between Worker, DO and Client
-
-DO instances are identified by their IDs, however we do not integrate them directly into the schema of a Model or Service as a field (though it may appear that way on the client).
-
-To pass the DO ID between HTTP requests, from the client to the server the convention will follow: `/api/foo/:doId/method`. This is true for both DO-backed Models and Services.
-
-When a Durable Object is used in the mix of any Cloesce response, the Router will attach a `X-Cloesce-DO-ID` header to the response, which the client can read and use for subsequent requests. Durable Object IDs are not something that have any particular security implications, so there is no harm in exposing them to the client.
+1. Define Durable Object bindings, with basic Wrangler configuration generation.
+2. Add Durable Object fields to the schema, and hydrate them in the runtime ORM.
+3. APIs execute in DO instances for DO-backed Models.
+4. KV fields can use the DO's KV store.
+5. SQL migrations for DO-backed Models.
+6. Wrangler migrations.
