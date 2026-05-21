@@ -57,70 +57,22 @@ Because a DO instance is a persistent, long-lived object (not a stateless functi
 
 ## Defining a Durable Object Binding
 
-Unlike D1, KV, and R2 bindings, which represent global singleton resources, a DO binding can have any number of instances. Thus, a DO binding must include some way to define how its instances are identified.
-
-There are several common patterns for DO instance identification:
-
-1. **Raw DO ID**: Every DO has an underlying unique 64-character hex ID, which can be generated randomly.
-2. **Static ID**: Generated from some constant seed string.
-3. **Dynamic ID**: Generated from some combination of parameters determined at runtime.
-
-Cloesce needs to support all three of these patterns. Defining a DO binding in the schema will follow this pattern:
+A durable object can be defined in the `env` block just like D1, KV and R2 bindings:
 
 ```cloesce
-durable MyRawDo {
-    keyfield {
-        raw: doid
+env {
+    durable {
+        Counter
     }
-
-    primary (raw)
-}
-
-durable MyStaticDo {
-    primary ("global_counter")
-}
-
-durable MyDynamicDo {
-    keyfield {
-        counter_id: string
-    }
-
-    primary (counter_id)
-    // string interpolation is available too: primary ("counter/{counter_id}")
 }
 ```
 
-In the above example, three DO bindings are defined:
+The above code defines a Durable Object called Counter. Note the choice of casing convention being PascalCase, whereas other bindings are typically in camel case or snake case. This is because Counter is not just a binding, but a class will generate to represent that Durable Object.
 
-| Durable Object | ID Type    | ID Source             | Parameters          | Instance Behavior                                                         |
-| -------------- | ---------- | --------------------- | ------------------- | ------------------------------------------------------------------------- |
-| `MyStaticDo`   | Static ID  | `global_counter`      | None                | Only one instance exists                                                  |
-| `MyDynamicDo`  | Dynamic ID | `counter_id` keyfield | `counter_id`        | Multiple instances can exist, each identified by a different `counter_id` |
-| `MyRawDo`      | Raw ID     | `raw` key             | `raw` (`doid` type) | Uses a raw Durable Object ID directly                                     |
-
-A new type, `doid`, will be introduced to represent a raw Durable Object ID. It is SQLite-compatible and runtime-validated to ensure it conforms to the expected format.
-
-### Environment Binding Syntax Changes
-
-Moving forward, we will remove the `env` block. Instead, all definitions will be at the top level of the schema. For example:
-
-```cloesce
-d1 {
-    my_db
-    my_other_db
-}
-
-kv {
-    my_bucket
-}
-
-durable MyDurableObject {
-    keyfield {
-        name: string
-    }
-
-    primary ("counter/{name}")
-}
+```toml
+[[durable_objects.bindings]]
+name = "Counter"        # binding
+class_name = "Counter"  # class name
 ```
 
 ## Durable Object Field
@@ -128,28 +80,24 @@ durable MyDurableObject {
 Any Model may have a field that hydrates from a Durable Object, much like KV and R2 fields:
 
 ```cloesce
-durable Counter {
-    keyfield {
-        id: int
+env {
+    durable {
+        Counter
     }
-
-    primary ("counter/{id}")
 }
 
-model MyModel {
+model User {
     keyfield {
-        counter_id: int
+        user_id: int
     }
 
-    durable (Counter, counter_id) {
+    durable (Counter, "counter/{user_id}") {
         counter
     }
 }
 ```
 
-When a durable field is declared, semantic analysis will ensure that each of its `primary` fields is satisfied in the definition.
-
-During hydration, the `counter` field of `MyModel` will be hydrated with an instance of the Durable Object `Counter`. If the DO does not exist, the field will be hydrated with `null` instead.
+During hydration, the `counter` field of `User` will be hydrated with an instance of the Durable Object `Counter`. If the DO does not exist, the field will be hydrated with `null` instead.
 
 Durable Object fields can be included in or excluded from a Data Source's Include Tree, but will always be hydrated in the Default Data Source.
 
@@ -158,48 +106,56 @@ Durable Object fields can be included in or excluded from a Data Source's Includ
 A Model can be backed by a DO, much like you can back a Model against a D1 database.
 
 - If the backing DO is not found, then any attempt to hydrate an instance of that Model will return a 404.
-- A DO-backed Model will inherit all key fields of the backing DO.
 - If a SQL field is declared, then the DO will be initialized with a SQLite database, and that field will be stored in a table in that database.
 - KV fields on a DO-backed Model can use the DO's KV store.
 
 For example:
 
 ```cloesce
-durable CounterDo {
-    keyfield {
-        id: int
+env {
+    durable {
+        Counter
     }
-
-    primary (id)
 }
 
-[use CounterDo]
-model Counter {
+[use Counter]
+model GlobalCounter {
+    durable (self, "global") {
+        state
+    }
+
     kv (self, "count") {
         count: int
     }
 }
 ```
 
-The `self` keyword is used to indicate that the `count` field should be stored in the DO's KV store, rather than some global KV bucket.
+Two new properties are introduced in the above code:
 
-Because a Model must be serializable to the client and invokable remotely, all fields of the backing DO must exist as fields on the Model, so that Cloesce can locate the backing DO. The compiler will handle this implicitly during a post-semantic expansion step.
+1. A durable field using `self` **MUST** be defined on the Model that is backed by the DO. This is how Cloesce knows how to locate the backing DO instance when hydrating an instance of the Model.
+2. A KV field using `self` can be defined on a DO-backed Model, and will use the DO's KV store, rather than a global KV bucket.
 
 ### SQLite Usage
 
 A DO-backed Model that defines any SQL fields will exist as a SQLite table in the DO instance's database. For example:
 
 ```cloesce
-durable Blog {
-    keyfield {
-        blogId: string
+env {
+    durable {
+        Blog
     }
-
-    primary ("blog/{blogId}")
 }
 
 [use Blog]
 model Post {
+    keyfield {
+        blog_id: int
+    }
+
+    durable (self, "blog/{blog_id}") {
+        state
+    }
+
     primary {
         id: int
     }
@@ -211,6 +167,14 @@ model Post {
 
 [use Blog]
 model Comment {
+    keyfield {
+        blog_id: int
+    }
+
+    durable (self, "blog/{blog_id}") {
+        state
+    }
+
     primary {
         id: int
     }
