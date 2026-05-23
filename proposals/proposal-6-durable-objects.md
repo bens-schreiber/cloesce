@@ -9,7 +9,11 @@
 
 # Summary
 
-This proposal adds first-class support for [Durable Objects](https://developers.cloudflare.com/durable-objects/) in Cloesce. Durable Objects unlock use cases that D1 alone cannot address: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
+This proposal brings [Durable Objects](https://developers.cloudflare.com/durable-objects/) into Cloesce as first-class citizens. DOs open up a whole class of use cases that D1 just can't reach on its own: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
+
+The gist: a new `durable` binding in the schema, the ability to back a Model with a DO (so the Model gets to play with that instance's storage and SQLite database), automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
+
+Additionally, a handful of older schema constructs (`keyfield`, the `env` block, the `paginated` infix keyword, the `use` tag) are getting retired in favor of bindings that own their own key and value structure, plus a new `for` keyword for pinning a Model to its backing store.
 
 ---
 
