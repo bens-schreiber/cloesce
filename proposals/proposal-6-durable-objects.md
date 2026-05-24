@@ -196,7 +196,7 @@ To declare a Durable Object binding, a new `durable` block will be added to the 
 
 ```cloesce
 durable CounterDo {
-    primary {
+    shard {
         id: string
     }
 
@@ -212,21 +212,21 @@ durable CounterDo {
 
 A Durable Object binding is similar to KV, where it can define its own key and value fields. These are stored within the DO's instance storage.
 
-Under the `primary` block, the DO can define a key structure for generating DO IDs. This allows a DO to be sharded by a specific key. Cloesce will generate a DO ID using fields from `primary`, which can be composite or omitted entirely.
+Under the `shard` block, the DO can define a key structure for generating DO IDs. This allows a DO to be sharded by a specific key. Cloesce will generate a DO ID using fields from `shard`, which can be composite or omitted entirely.
 
-The pattern for seeding a DO ID will follow `BINDING` followed by the `/` delimited concatenation of all primary fields. For example, the previous `CounterDo` would generate a DO ID like `CounterDo/{id}`.
+The pattern for seeding a DO ID will follow `BINDING` followed by the `/` delimited concatenation of all shard fields. For example, the previous `CounterDo` would generate a DO ID like `CounterDo/{id}`.
 
 ## Backing a Model with a Durable Object
 
 To "back" a Model with a Durable Object means that the Model exists within the context of a DO instance, and has access to the DO instance's storage and SQLite database. This also means that in order to hydrate an instance of the Model, we must obtain an instance of the DO.
 
-By default, every value defined under the DO binding's `primary` block will exist as a field on that Model, prefixed with a `$`. Additionally, a Model that is backed by a DO can access all of the DO's storage fields by referencing them in the schema with the `kv` syntax.
+By default, every value defined under the DO binding's `shard` block will exist as a field on that Model, prefixed with a `$`. Additionally, a Model that is backed by a DO can access all of the DO's storage fields by referencing them in the schema with the `kv` syntax.
 
 For example:
 
 ```cloesce
 durable CounterDo {
-    primary {
+    shard {
         id: string
     }
 
@@ -250,7 +250,7 @@ A Model backed by a Durable Object can also represent a SQLite table in the DO i
 
 ```cloesce
 durable BlogDo {
-    primary {
+    shard {
         id: string
     }
 }
@@ -317,7 +317,7 @@ Static methods on a Model backed by a DO will be routed to the DO instance, and 
 
 ```cloesce
 durable BlogDo {
-    primary {
+    shard {
         id: string
     }
 }
@@ -399,7 +399,7 @@ For Cloesce's purposes, this is problematic. Any API method can create an entire
 
 For a DO that is global, this is not a problem, because sharding is not necessary. However, for a sharded DO, some business logic must be put in place to prevent the creation of DO instances with invalid IDs.
 
-This will be solved with middleware that runs before the request is forwarded to the DO instance, and accepts the same parameters as the DO's `primary` block.
+This will be solved with middleware that runs before the request is forwarded to the DO instance, and accepts the same parameters as the DO's `shard` block.
 
 A new middleware system for Cloesce will be proposed in a separate proposal.
 
