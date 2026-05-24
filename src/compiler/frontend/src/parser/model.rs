@@ -1,8 +1,8 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, ForeignBlock, ForeignBlockNav, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, R2Block, Spd, SqlBlockKind, Symbol,
+    AstBlockKind, ForeignBlock, ForeignBlockNav, KvFieldBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, R2FieldBlock, Spd, SqlBlockKind, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
@@ -53,43 +53,49 @@ fn foreign_block<'tokens, 'src: 'tokens>()
         })
 }
 
-/// `kv (binding, "key/format/{id}") [paginated] { ident: cidl_type }`
-fn kv_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvBlock<'src>, Extra<'tokens, 'src>> {
+/// `kv Binding::field(arg1, arg2, ...) { localField }`
+fn kv_field_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvFieldBlock<'src>, Extra<'tokens, 'src>> {
     kw!(Kv)
-        .ignore_then(
+        .ignore_then(symbol())
+        .then_ignore(just(Token::DoubleColon))
+        .then(symbol())
+        .then(
             symbol()
-                .then_ignore(just(Token::Comma))
-                .then(select! { Token::StringLit(value) => value })
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(kw!(Paginated).or_not())
-        .then(tagged_typed_symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map(|(((env_binding, key_format), paginated), field)| KvBlock {
-            env_binding,
-            key_format,
+        .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .map(|(((binding, binding_field), args), field)| KvFieldBlock {
+            binding,
+            binding_field,
+            args,
             field,
-            is_paginated: paginated.is_some(),
         })
 }
 
-/// `r2(binding, "key/format/{id}") [paginated] { ident }`
-fn r2_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2Block<'src>, Extra<'tokens, 'src>> {
+/// `r2 Binding::field(arg1, arg2, ...) { localField }`
+fn r2_field_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2FieldBlock<'src>, Extra<'tokens, 'src>> {
     kw!(R2)
-        .ignore_then(
+        .ignore_then(symbol())
+        .then_ignore(just(Token::DoubleColon))
+        .then(symbol())
+        .then(
             symbol()
-                .then_ignore(just(Token::Comma))
-                .then(select! { Token::StringLit(value) => value })
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(kw!(Paginated).or_not())
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map(|(((env_binding, key_format), paginated), field)| R2Block {
-            env_binding,
-            key_format,
+        .map(|(((binding, binding_field), args), field)| R2FieldBlock {
+            binding,
+            binding_field,
+            args,
             field,
-            is_paginated: paginated.is_some(),
         })
 }
 
@@ -150,23 +156,12 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
     };
 
-    // `keyfield { ([tag]* ident: cidl_type)* }`
-    let keyfield_block = kw!(KeyField)
-        .ignore_then(
-            tagged_typed_symbol()
-                .repeated()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
-        .map(ModelBlockKind::KeyField);
-
     let sub_blocks = choice((
         foreign_block().map(ModelBlockKind::Foreign),
-        kv_block().map(ModelBlockKind::Kv),
-        r2_block().map(ModelBlockKind::R2),
+        kv_field_block().map(ModelBlockKind::Kv),
+        r2_field_block().map(ModelBlockKind::R2),
         column_block,
         nav_block,
-        keyfield_block,
         primary_block,
         unique_block,
     ))
@@ -175,6 +170,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     let model_body = tags()
         .then_ignore(kw!(Model))
         .then(symbol())
+        .then(kw!(For).ignore_then(symbol()).or_not())
         .then(
             sub_blocks
                 .map_spanned(|k| k)
@@ -182,8 +178,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((tags, symbol), blocks)| ModelBlock {
+        .map(|(((tags, symbol), backing_binding), blocks)| ModelBlock {
             symbol: Symbol { tags, ..symbol },
+            backing_binding,
             blocks,
         });
 

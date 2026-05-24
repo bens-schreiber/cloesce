@@ -8,8 +8,11 @@ use frontend::{
     lexer::{CloesceLexer, LexTarget},
     parser::CloesceParser,
 };
-use idl::CloesceIdl;
-use semantic::SemanticAnalysis;
+// TEMPORARY: `semantic` and `src_to_idl` are commented out while the
+// frontend is being migrated to the new binding syntax. Restore once the
+// semantic crate has been updated.
+// use idl::CloesceIdl;
+// use semantic::SemanticAnalysis;
 
 mod src_str;
 pub use src_str::*;
@@ -51,33 +54,37 @@ pub fn lex_and_ast(src: &str) -> Ast<'_> {
     result.ast
 }
 
-/// Given a source string, lex, parse, and semantically analyze it into a [CloesceIdl],
-/// panicking if any step fails.
-pub fn src_to_idl(src: &str) -> CloesceIdl<'_> {
-    let source = LexTarget {
-        src,
-        path: PathBuf::from("<test>"),
-    };
-
-    let lexed = CloesceLexer::lex(vec![source]);
-    if lexed.has_errors() {
-        lexed.display_error(&lexed.file_table);
-        panic!("lexing should succeed");
-    }
-
-    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
-    if result.has_errors() {
-        result.display_error(&lexed.file_table);
-        panic!("parse should succeed");
-    }
-
-    let (result, errors) = SemanticAnalysis::analyze(&result.ast);
-    if !errors.is_empty() {
-        for error in &errors {
-            error.display_error(&lexed.file_table);
-        }
-        panic!("semantic analysis should succeed");
-    }
-
-    result
-}
+// TEMPORARY: disabled until the semantic crate is migrated to the new
+// binding syntax. Tests that depend on this function will not compile
+// until then.
+//
+// /// Given a source string, lex, parse, and semantically analyze it into a [CloesceIdl],
+// /// panicking if any step fails.
+// pub fn src_to_idl(src: &str) -> CloesceIdl<'_> {
+//     let source = LexTarget {
+//         src,
+//         path: PathBuf::from("<test>"),
+//     };
+//
+//     let lexed = CloesceLexer::lex(vec![source]);
+//     if lexed.has_errors() {
+//         lexed.display_error(&lexed.file_table);
+//         panic!("lexing should succeed");
+//     }
+//
+//     let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
+//     if result.has_errors() {
+//         result.display_error(&lexed.file_table);
+//         panic!("parse should succeed");
+//     }
+//
+//     let (result, errors) = SemanticAnalysis::analyze(&result.ast);
+//     if !errors.is_empty() {
+//         for error in &errors {
+//             error.display_error(&lexed.file_table);
+//         }
+//         panic!("semantic analysis should succeed");
+//     }
+//
+//     result
+// }

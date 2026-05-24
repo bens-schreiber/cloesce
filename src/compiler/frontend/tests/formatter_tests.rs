@@ -76,20 +76,16 @@ fn comments_retained() {
     // Arrange
     let src = r#"
     // 0
-    env {
+    d1 {
         //1
-        d1 { 
-            //2
-            db 
-            //A
-        }//3
-        //B
-    }
+        db
+        //A
+    } //3
+    //B
 
     //4
-    [use db] //5
     //6
-    model BasicModel { //C
+    model BasicModel for db { //C
         //7
         primary { //D
             // gt above

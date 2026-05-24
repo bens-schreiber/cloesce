@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, Ast, AstBlockKind, EnvBindingBlockKind, ForeignBlock, Keyword, ModelBlock,
-    ModelBlockKind, Spd, SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, Keyword, ModelBlock, ModelBlockKind, Spd,
+    SqlBlockKind, Symbol, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -14,81 +14,102 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
 }
 
 #[test]
-fn env_block() {
+fn top_level_bindings() {
     // Act
     let ast = lex_and_ast(
         r#"
+        d1 {
+            db
+            db2
+        }
 
-        env {
-            d1 { db db2 }
-            r2 { assets }
-            kv { cache }
-
-            vars {
-                api_url: string
-                max_retries: int
-                threshold: real
-                created_at: date
-                payload: json
-                enabled: bool
+        r2 Assets {
+            asset(id: int) {
+                "assets/{id}"
             }
+        }
+
+        kv Cache {
+            entry(id: string) -> json {
+                "cache/{id}"
+            }
+
+            page() -> paginated<json> {
+                "cache/"
+            }
+        }
+
+        vars {
+            api_url: string
+            max_retries: int
+            threshold: real
+            created_at: date
+            payload: json
+            enabled: bool
         }
         "#,
     );
 
-    // Assert
-    let env_blocks = ast
+    // d1
+    let d1_bindings = ast
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            AstBlockKind::Env(blocks) => Some(blocks),
+            AstBlockKind::D1Binding(b) => Some(b.bindings.iter().map(|s| s.name).collect::<Vec<_>>()),
             _ => None,
         })
-        .expect("env block to be present");
-
-    let d1_bindings = env_blocks
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner.kind {
-            EnvBindingBlockKind::D1 => {
-                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
-            }
-            _ => None,
-        })
-        .expect("d1 block to be present");
+        .expect("d1 binding block to be present");
     assert_eq!(d1_bindings, vec!["db", "db2"]);
 
-    let r2_bindings = env_blocks
+    // r2
+    let r2 = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.inner.kind {
-            EnvBindingBlockKind::R2 => {
-                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
-            }
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::R2Binding(b) => Some(b),
             _ => None,
         })
-        .expect("r2 block to be present");
-    assert_eq!(r2_bindings, vec!["assets"]);
+        .expect("r2 binding block to be present");
+    assert_eq!(r2.symbol.name, "Assets");
+    assert_eq!(r2.fields.len(), 1);
+    let asset = &r2.fields[0].inner;
+    assert_eq!(asset.symbol.name, "asset");
+    assert_eq!(asset.key_format, "assets/{id}");
+    assert_eq!(asset.params.len(), 1);
+    assert_eq!(asset.params[0].name, "id");
+    assert_eq!(asset.params[0].cidl_type, CidlType::Int);
 
-    let kv_bindings = env_blocks
+    // kv
+    let kv = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.inner.kind {
-            EnvBindingBlockKind::Kv => {
-                Some(spd.inner.symbols.iter().map(|s| s.name).collect::<Vec<_>>())
-            }
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::KvBinding(b) => Some(b),
             _ => None,
         })
-        .expect("kv block to be present");
-    assert_eq!(kv_bindings, vec!["cache"]);
+        .expect("kv binding block to be present");
+    assert_eq!(kv.symbol.name, "Cache");
+    assert_eq!(kv.fields.len(), 2);
 
-    let vars = env_blocks
+    let entry = &kv.fields[0].inner;
+    assert_eq!(entry.symbol.name, "entry");
+    assert_eq!(entry.symbol.cidl_type, CidlType::Json);
+    assert_eq!(entry.key_format, "cache/{id}");
+    assert_eq!(entry.params.len(), 1);
+
+    let page = &kv.fields[1].inner;
+    assert_eq!(page.symbol.name, "page");
+    assert_eq!(page.symbol.cidl_type, CidlType::paginated(CidlType::Json));
+    assert_eq!(page.key_format, "cache/");
+    assert!(page.params.is_empty());
+
+    // vars
+    let vars = ast
         .blocks
         .iter()
-        .find_map(|spd| match &spd.inner.kind {
-            EnvBindingBlockKind::Var => Some(
-                spd.inner
-                    .symbols
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::Vars(v) => Some(
+                v.vars
                     .iter()
                     .map(|s| (s.name, &s.cidl_type))
                     .collect::<Vec<_>>(),
@@ -318,7 +339,7 @@ fn api_block() {
         .unwrap();
     assert!(matches!(create.inner.http_verb, HttpVerb::Post));
     assert_eq!(create.inner.parameters.len(), 2);
-    assert_eq!(create.inner.return_type, CidlType::String);
+    assert_eq!(create.inner.symbol.cidl_type, CidlType::String);
 
     let list_block = api_blocks
         .iter()
@@ -336,10 +357,8 @@ fn api_block() {
 fn model_primary_unique_optional_foreign() {
     let ast = lex_and_ast(
         r#"
-        [use d1_db]
-        [use d2_db]
         [crud get, save, list]
-        model M {
+        model M for d1_db {
             column {
                 score: real
                 a: int
@@ -368,16 +387,10 @@ fn model_primary_unique_optional_foreign() {
 
     let m = find_model(&ast, "M");
 
-    let env_bindings = m
-        .symbol
-        .tags
-        .iter()
-        .filter_map(|t| match &t.inner {
-            Tag::Use { binding } => Some(binding.inner),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(env_bindings, vec!["d1_db", "d2_db"]);
+    assert_eq!(
+        m.backing_binding.as_ref().map(|s| s.name),
+        Some("d1_db")
+    );
 
     let cruds: Vec<CrudKind> = m
         .symbol
@@ -545,111 +558,104 @@ fn model_navigation() {
 }
 
 #[test]
-fn model_kv_r2_paginated() {
+fn kv_r2_bindings_fields() {
     let ast = lex_and_ast(
         r#"
-        [crud get, save, list]
-        model Cache {
-            kv(ns_a, "data/{id}") { value: json }
-            kv(ns_b, "list/{cursor}") paginated { page: json }
-            r2(bucket_a, "photos/{id}.jpg") { photo }
-            r2(bucket_b, "thumbs/{cursor}") paginated { thumb }
+        kv NsA {
+            value(id: int) -> json {
+                "data/{id}"
+            }
+        }
+
+        kv NsB {
+            page(cursor: string) -> paginated<json> {
+                "list/{cursor}"
+            }
+        }
+
+        r2 BucketA {
+            photo(id: int) {
+                "photos/{id}.jpg"
+            }
+        }
+
+        r2 BucketB {
+            thumb(cursor: string) {
+                "thumbs/{cursor}"
+            }
         }
 
         [crud get, save, list]
-        model PureKv {
-            keyfield {
-                key: string
-                secondary: int
+        model Cache {
+            primary {
+                id: int
             }
-            kv(kv_ns, "entry/{key}/{secondary}") paginated { entry: json }
+
+            column {
+                cursor: string
+            }
+
+            kv NsA::value(id) { value }
+            kv NsB::page(cursor) { page }
+            r2 BucketA::photo(id) { photo }
+            r2 BucketB::thumb(cursor) { thumb }
         }
         "#,
     );
 
     let m = find_model(&ast, "Cache");
 
-    let kv_a = m
+    let kv_value = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_a" => Some(kv),
+            ModelBlockKind::Kv(kv) if kv.field.name == "value" => Some(kv),
             _ => None,
         })
         .unwrap();
+    assert_eq!(kv_value.binding.name, "NsA");
+    assert_eq!(kv_value.binding_field.name, "value");
     assert_eq!(
-        (kv_a.key_format, kv_a.field.name, kv_a.is_paginated),
-        ("data/{id}", "value", false)
+        kv_value.args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["id"]
     );
 
-    let kv_b = m
+    let kv_page = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Kv(kv) if kv.env_binding.name == "ns_b" => Some(kv),
+            ModelBlockKind::Kv(kv) if kv.field.name == "page" => Some(kv),
             _ => None,
         })
         .unwrap();
+    assert_eq!(kv_page.binding.name, "NsB");
+    assert_eq!(kv_page.binding_field.name, "page");
+
+    let r2_photo = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::R2(r2) if r2.field.name == "photo" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(r2_photo.binding.name, "BucketA");
+    assert_eq!(r2_photo.binding_field.name, "photo");
     assert_eq!(
-        (kv_b.key_format, kv_b.field.name, kv_b.is_paginated),
-        ("list/{cursor}", "page", true)
+        r2_photo.args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["id"]
     );
 
-    let r2_a = m
+    let r2_thumb = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_a" => Some(r2),
+            ModelBlockKind::R2(r2) if r2.field.name == "thumb" => Some(r2),
             _ => None,
         })
         .unwrap();
-    assert_eq!(
-        (r2_a.key_format, r2_a.field.name, r2_a.is_paginated),
-        ("photos/{id}.jpg", "photo", false)
-    );
-
-    let r2_b = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::R2(r2) if r2.env_binding.name == "bucket_b" => Some(r2),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (r2_b.key_format, r2_b.field.name, r2_b.is_paginated),
-        ("thumbs/{cursor}", "thumb", true)
-    );
-
-    let kv_model = find_model(&ast, "PureKv");
-
-    let keyfields: Vec<&str> = kv_model
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::KeyField(fields) => Some(fields.iter().map(|s| s.name).collect()),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(keyfields, vec!["key", "secondary"]);
-
-    let kv_entry = kv_model
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Kv(kv) if kv.env_binding.name == "kv_ns" => Some(kv),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(
-        (
-            kv_entry.key_format,
-            kv_entry.field.name,
-            kv_entry.field.cidl_type.clone(),
-            kv_entry.is_paginated,
-        ),
-        ("entry/{key}/{secondary}", "entry", CidlType::Json, true)
-    );
+    assert_eq!(r2_thumb.binding.name, "BucketB");
+    assert_eq!(r2_thumb.binding_field.name, "thumb");
 }
 
 #[test]

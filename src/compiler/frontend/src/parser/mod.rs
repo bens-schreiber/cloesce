@@ -97,7 +97,10 @@ fn parser<'tokens, 'src: 'tokens>()
     choice((
         model::model_block(),
         data_source::data_source_block(),
-        env::env_block().map_spanned(|b| b),
+        env::d1_binding_block().map_spanned(|b| b),
+        env::kv_binding_block().map_spanned(|b| b),
+        env::r2_binding_block().map_spanned(|b| b),
+        env::vars_block().map_spanned(|b| b),
         api::api_block().map_spanned(|b| b),
         poo_block().map_spanned(|b| b),
         inject_block().map_spanned(|b| b),
@@ -177,13 +180,6 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|(name, argument)| Tag::Validator { name, argument });
 
-    // [use binding]
-    let use_tag = just(Token::LBracket)
-        .then(kw!(Use))
-        .ignore_then(select! { Token::Ident(name) => name }.map_spanned(|name| name))
-        .then_ignore(just(Token::RBracket))
-        .map(|binding| Tag::Use { binding });
-
     // [crud get|list|save, get|list|save, ...]
     let crud_tag = just(Token::LBracket)
         .then(kw!(Crud))
@@ -234,7 +230,6 @@ fn tags<'tokens, 'src: 'tokens>()
 
     choice((
         validator,
-        use_tag,
         crud_tag,
         inject_tag,
         internal_tag,

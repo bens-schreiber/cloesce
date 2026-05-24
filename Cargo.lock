@@ -350,7 +350,6 @@ version = "0.0.0"
 dependencies = [
  "frontend",
  "idl",
- "semantic",
 ]
 
 [[package]]
