@@ -1,11 +1,10 @@
-use crate::EnvBindingKind;
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
-    ForeignBlock, KvBlock, ModelBlock, ModelBlockKind, R2Block, Spd, SpdSlice, SqlBlockKind,
+    ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, R2FieldBlock, SpdSlice, SqlBlockKind,
     Symbol, Tag,
 };
 use idl::{
@@ -13,8 +12,8 @@ use idl::{
     NavigationFieldKind, R2Field, ValidatedField,
 };
 use indexmap::IndexMap;
+use std::collections::BTreeMap;
 use std::collections::HashSet;
-use std::{collections::BTreeMap, vec};
 
 #[derive(Default)]
 pub struct ModelAnalysis<'src, 'p> {
@@ -34,7 +33,6 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             // Validate tags
             let mut dedup_cruds = HashSet::new();
             let mut cruds = Vec::new();
-            let mut env_bindings = Vec::new();
             for tag in &model_block.symbol.tags {
                 match &tag.inner {
                     Tag::Crud { kinds } => {
@@ -44,7 +42,6 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                             }
                         }
                     }
-                    Tag::Use { binding } => env_bindings.push(binding),
                     _ => self.sink.push(SemanticError::TagInvalidInContext {
                         tag,
                         symbol: &model_block.symbol,
@@ -53,7 +50,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             }
 
             let builder = ModelBuilder::new(model_block);
-            let Some(mut model) = builder.build(&mut self, env_bindings, table) else {
+            let Some(mut model) = builder.build(&mut self, table) else {
                 continue;
             };
 
@@ -61,7 +58,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             for crud in &cruds {
                 // List requires a D1 binding
                 ensure!(
-                    !matches!(crud.inner, CrudKind::List) || model.d1_binding.is_some(),
+                    !matches!(crud.inner, CrudKind::List) || model.backing_binding.is_some(),
                     self.sink,
                     SemanticError::UnsupportedCrudOperation {
                         model: &model_block.symbol,
@@ -106,7 +103,6 @@ struct ModelBuilder<'src, 'p> {
     navigation_fields: Vec<NavigationField<'src>>,
     kv_fields: Vec<KvField<'src>>,
     r2_fields: Vec<R2Field<'src>>,
-    key_fields: Vec<ValidatedField<'src>>,
 }
 
 impl<'src, 'p> ModelBuilder<'src, 'p> {
@@ -124,7 +120,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             navigation_fields: Vec::new(),
             kv_fields: Vec::new(),
             r2_fields: Vec::new(),
-            key_fields: Vec::new(),
         }
     }
 }
@@ -133,7 +128,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     fn build(
         mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
-        env_bindings: Vec<&'p Spd<&'src str>>,
         table: &SymbolTable<'src, 'p>,
     ) -> Option<Model<'src>> {
         ma.graph.entry(self.name).or_default();
@@ -151,34 +145,27 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             )
         });
 
-        let binding = if has_sql_blocks || !env_bindings.is_empty() {
-            if env_bindings.is_empty() {
+        let binding = if has_sql_blocks || self.model.backing_binding.is_some() {
+            let Some(binding_sym) = self.model.backing_binding.as_ref() else {
                 ma.sink
                     .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });
                 return None;
-            }
+            };
 
-            if env_bindings.len() > 1 {
-                ma.sink.push(SemanticError::D1ModelMultipleD1Bindings {
-                    model: self.symbol,
-                    bindings: env_bindings,
-                });
-                return None;
-            }
-
-            let binding = env_bindings[0];
-            if !table.local.contains_key(&LocalSymbolKind::EnvBinding {
-                kind: EnvBindingKind::D1,
-                name: binding.inner,
-            }) {
+            let is_valid_d1 = table
+                .d1_bindings
+                .iter()
+                .flat_map(|b| b.bindings.iter())
+                .any(|s| s.name == binding_sym.name);
+            if !is_valid_d1 {
                 ma.sink.push(SemanticError::D1ModelInvalidD1Binding {
                     model: self.symbol,
-                    binding,
+                    binding: binding_sym,
                 });
                 return None;
             };
 
-            Some(binding)
+            Some(binding_sym)
         } else {
             None
         };
@@ -191,11 +178,11 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     }
                 }
                 ModelBlockKind::Foreign(fk) => {
-                    let binding = binding.unwrap().inner;
-                    self.foreign(ma, table, binding, fk, false);
+                    let binding_name = binding.unwrap().name;
+                    self.foreign(ma, table, binding_name, fk, false);
                 }
                 ModelBlockKind::Primary(blocks) => {
-                    let binding = binding.unwrap().inner;
+                    let binding_name = binding.unwrap().name;
 
                     for block in blocks {
                         match &block.inner {
@@ -203,7 +190,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                                 self.column(ma, symbol, true);
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding, foreign_block, true)
+                                self.foreign(ma, table, binding_name, foreign_block, true)
                             }
                         }
                     }
@@ -213,7 +200,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
-                    binding.unwrap().inner,
+                    binding.unwrap().name,
                     &navigation_block.adj,
                     &navigation_block.nav.inner,
                     false,
@@ -224,28 +211,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::R2(r2_block) => {
                     self.r2_field(ma, table, r2_block);
-                }
-                ModelBlockKind::KeyField(fields) => {
-                    for field in fields {
-                        if !is_valid_sql_type(&field.cidl_type) {
-                            ma.sink.push(SemanticError::KeyFieldInvalidType { field });
-                            continue;
-                        }
-
-                        let validators = match resolve_validator_tags(field) {
-                            Ok(v) => v,
-                            Err(errs) => {
-                                ma.sink.extend(errs);
-                                Vec::new()
-                            }
-                        };
-
-                        self.key_fields.push(ValidatedField {
-                            name: field.name.into(),
-                            cidl_type: field.cidl_type.clone(),
-                            validators,
-                        });
-                    }
                 }
             }
         }
@@ -262,15 +227,15 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return None;
         }
 
+        let binding_name = binding.map(|b| b.name);
         Some(Model {
             name: self.name,
-            d1_binding: binding.map(|b| b.inner),
+            backing_binding: binding_name,
             primary_columns: self.primary_columns,
             columns: self.columns,
             kv_fields: self.kv_fields,
             r2_fields: self.r2_fields,
             navigation_fields: self.navigation_fields,
-            key_fields: self.key_fields,
             ..Default::default()
         })
     }
@@ -389,8 +354,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
 
         // Must belong to the same database
-        let adj_binding = model_use_binding(adj_model_block);
-        if adj_binding.map(|s| s.inner) != Some(binding) {
+        let adj_binding = adj_model_block.backing_binding.as_ref();
+        if adj_binding.map(|s| s.name) != Some(binding) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
                     model: self.symbol,
@@ -543,8 +508,8 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
 
         // Must belong to the same database
-        let adj_binding = model_use_binding(adj_model_block);
-        if adj_binding.map(|s| s.inner) != Some(binding) {
+        let adj_binding = adj_model_block.backing_binding.as_ref();
+        if adj_binding.map(|s| s.name) != Some(binding) {
             ma.sink
                 .push(SemanticError::NavigationReferencesDifferentDatabase { field });
             return;
@@ -653,18 +618,45 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
-        kv: &'p KvBlock<'src>,
+        kv: &'p KvFieldBlock<'src>,
     ) {
-        let binding_name =
-            Self::validate_binding(&mut ma.sink, table, &kv.env_binding, EnvBindingKind::Kv);
-
-        let Ok(format_parameters) =
-            Self::validate_key_format(&mut ma.sink, self.model, &kv.field, kv.key_format)
-        else {
+        // Resolve binding
+        let Some(binding) = table.kv_bindings.get(kv.binding.name) else {
+            ma.sink.push(SemanticError::KvInvalidBinding {
+                binding: &kv.binding,
+            });
             return;
         };
 
-        let mut resolved_type = match resolve_cidl_type(&kv.field, &kv.field.cidl_type, table) {
+        // Resolve binding field
+        let Some(bf_spd) = binding
+            .fields
+            .iter()
+            .find(|spd| spd.inner.symbol.name == kv.binding_field.name)
+        else {
+            ma.sink.push(SemanticError::UnresolvedSymbol {
+                symbol: &kv.binding_field,
+            });
+            return;
+        };
+        let bf = &bf_spd.inner;
+
+        // Argument count must match the binding field's param count
+        if kv.args.len() != bf.params.len() {
+            ma.sink.push(SemanticError::ArgCountMismatch {
+                field: &kv.field,
+                expected: bf.params.len(),
+                got: kv.args.len(),
+            });
+            return;
+        }
+
+        // Each arg must reference a model field whose type matches the binding param's type
+        if !self.validate_binding_args(ma, table, &kv.field, &kv.args, &bf.params) {
+            return;
+        }
+
+        let resolved_type = match resolve_cidl_type(&bf.symbol, &bf.symbol.cidl_type, table) {
             Ok(t) => t,
             Err(err) => {
                 ma.sink.push(err);
@@ -672,39 +664,15 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         };
 
-        // Validate tags
-        for tag in &kv.field.tags {
-            if !matches!(tag.inner, Tag::Validator { .. }) {
-                ma.sink.push(SemanticError::TagInvalidInContext {
-                    tag,
-                    symbol: &kv.field,
-                });
-            }
-        }
-        let validators = match resolve_validator_tags(&kv.field) {
-            Ok(v) => v,
-            Err(errs) => {
-                ma.sink.extend(errs);
-                Vec::new()
-            }
-        };
-
-        resolved_type = CidlType::KvObject(Box::new(resolved_type));
-
-        if kv.is_paginated {
-            resolved_type = CidlType::paginated(resolved_type)
-        }
-
         self.kv_fields.push(KvField {
             field: ValidatedField {
                 name: kv.field.name.into(),
                 cidl_type: resolved_type,
-                validators,
+                validators: Vec::new(),
             },
-            format: kv.key_format,
-            binding: binding_name.unwrap_or_default(),
-            format_parameters,
-            list_prefix: kv.is_paginated,
+            binding: binding.symbol.name,
+            binding_field: bf.symbol.name,
+            args: kv.args.iter().map(|s| s.name).collect(),
         });
     }
 
@@ -712,160 +680,104 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
-        r2: &'p R2Block<'src>,
+        r2: &'p R2FieldBlock<'src>,
     ) {
-        let binding_name =
-            Self::validate_binding(&mut ma.sink, table, &r2.env_binding, EnvBindingKind::R2);
-
-        let Ok(format_parameters) =
-            Self::validate_key_format(&mut ma.sink, self.model, &r2.field, r2.key_format)
-        else {
+        // Resolve binding
+        let Some(binding) = table.r2_bindings.get(r2.binding.name) else {
+            ma.sink.push(SemanticError::R2InvalidBinding {
+                binding: &r2.binding,
+            });
             return;
         };
+
+        // Resolve binding field
+        let Some(bf_spd) = binding
+            .fields
+            .iter()
+            .find(|spd| spd.inner.symbol.name == r2.binding_field.name)
+        else {
+            ma.sink.push(SemanticError::UnresolvedSymbol {
+                symbol: &r2.binding_field,
+            });
+            return;
+        };
+        let bf = &bf_spd.inner;
+
+        if r2.args.len() != bf.params.len() {
+            ma.sink.push(SemanticError::ArgCountMismatch {
+                field: &r2.field,
+                expected: bf.params.len(),
+                got: r2.args.len(),
+            });
+            return;
+        }
+
+        if !self.validate_binding_args(ma, table, &r2.field, &r2.args, &bf.params) {
+            return;
+        }
 
         self.r2_fields.push(R2Field {
             field: Field {
                 name: r2.field.name.into(),
-                cidl_type: if r2.is_paginated {
-                    CidlType::paginated(CidlType::R2Object)
-                } else {
-                    CidlType::R2Object
-                },
+                cidl_type: CidlType::R2Object,
             },
-            format: r2.key_format,
-            binding: binding_name.unwrap_or_default(),
-            format_parameters,
-            list_prefix: r2.is_paginated,
+            binding: binding.symbol.name,
+            binding_field: bf.symbol.name,
+            args: r2.args.iter().map(|s| s.name).collect(),
         });
     }
 
-    /// Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
-    ///
-    /// Returns the binding name if valid, otherwise pushes an error and returns None.
-    fn validate_binding(
-        sink: &mut ErrorSink<'src, 'p>,
+    /// Validates a binding reference's argument list against the binding field's params.
+    /// Each arg must be a model field whose type matches the corresponding param.
+    fn validate_binding_args(
+        &self,
+        ma: &mut ModelAnalysis<'src, 'p>,
         table: &SymbolTable<'src, 'p>,
-        env_binding: &'p Symbol<'src>,
-        expected: EnvBindingKind,
-    ) -> Option<&'src str> {
-        if let Some(binding_sym) = table.local.get(&LocalSymbolKind::EnvBinding {
-            kind: expected.clone(),
-            name: env_binding.name,
-        }) {
-            return Some(binding_sym.name);
-        }
-
-        let err = match expected {
-            EnvBindingKind::Kv => SemanticError::KvInvalidBinding {
-                binding: env_binding,
-            },
-            EnvBindingKind::R2 => SemanticError::R2InvalidBinding {
-                binding: env_binding,
-            },
-            _ => SemanticError::UnresolvedSymbol {
-                symbol: env_binding,
-            },
-        };
-        sink.push(err);
-        None
-    }
-
-    /// Extracts variables from a formatted string, then validates that they
-    /// correspond to fields on the model that are of valid SQLite types or are key_fields.
-    ///
-    /// Returns the parameters to create a key format.
-    fn validate_key_format(
-        sink: &mut ErrorSink<'src, 'p>,
-        model_block: &'p ModelBlock<'src>,
-        field: &'p Symbol<'src>,
-        format: &'src str,
-    ) -> Result<Vec<Field<'src>>, ()> {
-        let vars = match extract_braced(format) {
-            Ok(vars) => vars,
-            Err(reason) => {
-                sink.push(SemanticError::KvR2InvalidKeyFormat { field, reason });
-                return Err(());
-            }
-        };
-
-        let key_field_names: Vec<&'src str> = model_block
-            .blocks
-            .inners()
-            .flat_map(|b| match b {
-                ModelBlockKind::KeyField(fields) => {
-                    fields.iter().map(|f| f.name).collect::<Vec<_>>()
+        local_field: &'p Symbol<'src>,
+        args: &'p [Symbol<'src>],
+        params: &'p [Symbol<'src>],
+    ) -> bool {
+        let mut ok = true;
+        for (arg, param) in args.iter().zip(params.iter()) {
+            // Arg must exist on the model
+            let arg_sym = match table.local.get(&LocalSymbolKind::ModelField {
+                model: self.name,
+                name: arg.name,
+            }) {
+                Some(s) => *s,
+                None => {
+                    ma.sink
+                        .push(SemanticError::UnresolvedSymbol { symbol: arg });
+                    ok = false;
+                    continue;
                 }
-                _ => vec![],
-            })
-            .collect();
+            };
 
-        let mut parameters = vec![];
-        for var in vars {
-            let column = model_block
-                .sql_symbols()
-                .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
-            let is_key_field = key_field_names.contains(&var);
-
-            match (column, is_key_field) {
-                (Some(col), _) => parameters.push(Field {
-                    name: col.name.into(),
-                    cidl_type: col.cidl_type.clone(),
-                }),
-                (None, true) => parameters.push(Field {
-                    name: var.into(),
-                    cidl_type: CidlType::String,
-                }),
-                (None, false) => {
-                    sink.push(SemanticError::KvR2UnknownKeyVariable {
-                        field,
-                        variable: var,
-                    });
-                    return Err(());
+            let resolved_param = match resolve_cidl_type(param, &param.cidl_type, table) {
+                Ok(t) => t,
+                Err(_) => {
+                    // Already reported during binding processing
+                    ok = false;
+                    continue;
                 }
+            };
+            let resolved_arg = match resolve_cidl_type(arg_sym, &arg_sym.cidl_type, table) {
+                Ok(t) => t,
+                Err(err) => {
+                    ma.sink.push(err);
+                    ok = false;
+                    continue;
+                }
+            };
+
+            if resolved_arg != resolved_param {
+                ma.sink.push(SemanticError::ArgTypeMismatch {
+                    field: local_field,
+                    arg,
+                });
+                ok = false;
             }
         }
-
-        Ok(parameters)
+        ok
     }
-}
-
-/// Extracts braced variables from a format string.
-/// e.g, "users/{userId}/posts/{postId}" => ["userId", "postId"].
-///
-/// Returns an error string if the format string is invalid.
-fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
-    let mut out = Vec::new();
-    let mut current = None;
-    let chars = s.char_indices().peekable();
-    for (i, c) in chars {
-        match (current.is_some(), c) {
-            (false, '{') => {
-                current = Some(i + 1);
-            }
-            (true, '{') => {
-                return Err("nested brace in key".to_string());
-            }
-            (true, '}') => {
-                let start_idx = current.take().unwrap();
-                out.push(&s[start_idx..i]);
-            }
-            (true, _) => {}
-            _ => {}
-        }
-    }
-    if current.is_some() {
-        return Err("unclosed brace in key".to_string());
-    }
-    Ok(out)
-}
-
-/// Returns the first `use` tag binding on a model block, if it exists.
-fn model_use_binding<'p, 'src>(model_block: &'p ModelBlock<'src>) -> Option<&'p Spd<&'src str>> {
-    model_block.symbol.tags.iter().find_map(|tag| {
-        if let Tag::Use { binding } = &tag.inner {
-            Some(binding)
-        } else {
-            None
-        }
-    })
 }

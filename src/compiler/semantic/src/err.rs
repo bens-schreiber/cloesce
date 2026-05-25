@@ -30,12 +30,7 @@ pub enum SemanticError<'src, 'p> {
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
         model: &'p Symbol<'src>,
-        binding: &'p Spd<&'src str>,
-    },
-
-    D1ModelMultipleD1Bindings {
-        model: &'p Symbol<'src>,
-        bindings: Vec<&'p Spd<&'src str>>,
+        binding: &'p Symbol<'src>,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
@@ -63,7 +58,7 @@ pub enum SemanticError<'src, 'p> {
     ForeignKeyReferencesDifferentDatabase {
         model: &'p Symbol<'src>,
         fk_model: &'p Symbol<'src>,
-        fk_binding: Option<&'p Spd<&'src str>>,
+        fk_binding: Option<&'p Symbol<'src>>,
     },
 
     // A foreign key references a field that is not a valid SQLite type
@@ -102,8 +97,17 @@ pub enum SemanticError<'src, 'p> {
         cycle: Vec<&'src str>,
     },
 
-    KeyFieldInvalidType {
+    /// A model's KV/R2 reference supplies a different number of args than the binding field's params.
+    ArgCountMismatch {
         field: &'p Symbol<'src>,
+        expected: usize,
+        got: usize,
+    },
+
+    /// A model's KV/R2 reference supplies an arg whose type does not match the binding param's type.
+    ArgTypeMismatch {
+        field: &'p Symbol<'src>,
+        arg: &'p Symbol<'src>,
     },
 
     /// A KV tag references an env binding that is not a KV namespace
@@ -344,12 +348,12 @@ fn display(
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
             report!(binding_path.clone(), binding_range.clone())
                 .with_message(format!(
-                    "'{}' is not a valid D1 binding in the env block",
-                    binding.inner
+                    "'{}' is not a valid D1 binding",
+                    binding.name
                 ))
                 .with_label(
                     Label::new((binding_path, binding_range))
-                        .with_message("this binding is not defined in the env block")
+                        .with_message("this binding is not declared as a top-level `d1` binding")
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -357,28 +361,6 @@ fn display(
                         .with_message(format!("required by model '{}'", model.name))
                         .with_color(Color::Yellow),
                 )
-        }
-        SemanticError::D1ModelMultipleD1Bindings { model, bindings } => {
-            let (model_path, model_range) = span_parts(&model.span, file_table);
-            let mut report = report!(model_path.clone(), model_range.clone())
-                .with_message(format!(
-                    "model '{}' specifies multiple D1 bindings",
-                    model.name,
-                ))
-                .with_label(
-                    Label::new((model_path, model_range))
-                        .with_message("a model may only have one `[use]` binding")
-                        .with_color(Color::Yellow),
-                );
-            for binding in bindings {
-                let (b_path, b_range) = span_parts(&binding.span, file_table);
-                report = report.with_label(
-                    Label::new((b_path, b_range))
-                        .with_message(format!("binding '{}' specified here", binding.inner))
-                        .with_color(Color::Red),
-                );
-            }
-            report
         }
         SemanticError::D1ModelMissingPrimaryKey { model } => {
             let (path, range) = span_parts(&model.span, file_table);
@@ -455,10 +437,10 @@ fn display(
                 .with_label(
                     Label::new((fk_path, fk_range))
                         .with_message(match fk_binding {
-                            Some(spd) => {
+                            Some(sym) => {
                                 format!(
                                     "model '{}' belongs to binding '{}'",
-                                    fk_model.name, spd.inner
+                                    fk_model.name, sym.name
                                 )
                             }
                             None => format!("model '{}' has no D1 binding", fk_model.name),
@@ -615,6 +597,44 @@ fn display(
                     Label::new((path, range))
                         .with_message(reason.as_str())
                         .with_color(Color::Red),
+                )
+        }
+        SemanticError::ArgCountMismatch {
+            field,
+            expected,
+            got,
+        } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "binding reference '{}' has the wrong number of arguments",
+                    field.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!(
+                            "expected {expected} arg(s) to match the binding field's params, got {got}"
+                        ))
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ArgTypeMismatch { field, arg } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            let (arg_path, arg_range) = span_parts(&arg.span, file_table);
+            report!(arg_path.clone(), arg_range.clone())
+                .with_message(format!(
+                    "binding reference arg '{}' does not match the binding param's type",
+                    arg.name
+                ))
+                .with_label(
+                    Label::new((arg_path, arg_range))
+                        .with_message("type mismatch with the binding param")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!("on binding reference '{}'", field.name))
+                        .with_color(Color::Yellow),
                 )
         }
         SemanticError::PlainOldObjectInvalidFieldType { field } => {
@@ -839,21 +859,6 @@ fn display(
                     Label::new((path, range))
                         .with_message("applied to this symbol")
                         .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::KeyFieldInvalidType { field } => {
-            let (path, range) = span_parts(&field.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "key field '{}' has a type that is not a valid SQLite type",
-                    field.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "key fields must be a valid SQLite type (string, int, real, date, json, bool, or blob)"
-                        )
-                        .with_color(Color::Red),
                 )
         }
         SemanticError::InstanceTagOnNonField { source, param, tag } => {

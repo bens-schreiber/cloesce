@@ -20,13 +20,11 @@
 //! Some errors may cause a certain structure to be escaped or treated as if it were not present, but will be reported in the final error list.
 
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, DataSourceBlock,
-    EnvBindingBlockKind, EnvBlock, InjectBlock, ModelBlock, PlainOldObjectBlock, Spd, SpdSlice,
-    Symbol, Tag,
+    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock,
+    DataSourceBlock, InjectBlock, KvBindingBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock,
+    Spd, SpdSlice, Symbol, Tag, VarsBlock,
 };
-use idl::{
-    CidlType, CloesceIdl, Field, Number, PlainOldObject, ValidatedField, Validator, WranglerEnv,
-};
+use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -35,6 +33,7 @@ use crate::{
     api::ApiAnalysis,
     crud::CrudExpansion,
     data_source::{DataSourceAnalysis, DataSourceExpansion},
+    env::build_wrangler_env,
     err::{BatchResult, ErrorSink, SemanticError},
     model::ModelAnalysis,
 };
@@ -42,6 +41,7 @@ use crate::{
 mod api;
 mod crud;
 mod data_source;
+mod env;
 pub mod err;
 mod model;
 
@@ -51,7 +51,7 @@ impl<'src, 'p> SemanticAnalysis {
         let mut sink = ErrorSink::new();
         let table = SymbolTable::from_ast(ast, &mut sink);
 
-        let wrangler_env = Self::wrangler(&table, &mut sink);
+        let wrangler_env = build_wrangler_env(&table, &mut sink);
 
         let mut models = match ModelAnalysis::default().analyze(&table) {
             Ok(models) => models,
@@ -107,41 +107,6 @@ impl<'src, 'p> SemanticAnalysis {
         idl.set_merkle_hash();
 
         (idl, vec![])
-    }
-
-    fn wrangler(
-        table: &SymbolTable<'src, 'p>,
-        sink: &mut ErrorSink<'src, 'p>,
-    ) -> Option<WranglerEnv<'src>> {
-        let mut d1_bindings = Vec::new();
-        let mut r2_bindings = Vec::new();
-        let mut kv_bindings = Vec::new();
-        let mut vars = Vec::new();
-
-        for block in table.envs.iter().flat_map(|e| e.blocks.inners()) {
-            match block.kind {
-                EnvBindingBlockKind::D1 => d1_bindings.extend(block.symbols.iter().map(|s| s.name)),
-                EnvBindingBlockKind::R2 => r2_bindings.extend(block.symbols.iter().map(|s| s.name)),
-                EnvBindingBlockKind::Kv => kv_bindings.extend(block.symbols.iter().map(|s| s.name)),
-                EnvBindingBlockKind::Var => vars.extend(block.symbols.iter().map(|s| Field {
-                    name: s.name.into(),
-                    cidl_type: s.cidl_type.clone(),
-                })),
-            }
-        }
-
-        if d1_bindings.is_empty() && r2_bindings.is_empty() && kv_bindings.is_empty() {
-            let needs_env = table.models.values().any(|m| !m.blocks.is_empty());
-            ensure!(!needs_env, sink, SemanticError::MissingWranglerEnvBlock);
-            return None;
-        };
-
-        Some(WranglerEnv {
-            d1_bindings,
-            r2_bindings,
-            kv_bindings,
-            vars,
-        })
     }
 
     fn poos(
@@ -200,20 +165,8 @@ impl<'src, 'p> SemanticAnalysis {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-enum EnvBindingKind {
-    D1,
-    R2,
-    Kv,
-}
-
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum LocalSymbolKind<'src> {
-    EnvVar(&'src str),
-    EnvBinding {
-        kind: EnvBindingKind,
-        name: &'src str,
-    },
     ModelField {
         model: &'src str,
         name: &'src str,
@@ -247,7 +200,10 @@ struct SymbolTable<'src, 'p> {
     // Globals
     models: BTreeMap<&'src str, &'p ModelBlock<'src>>,
     poos: BTreeMap<&'src str, &'p PlainOldObjectBlock<'src>>,
-    envs: Vec<&'p EnvBlock<'src>>,
+    d1_bindings: Vec<&'p D1BindingBlock<'src>>,
+    kv_bindings: BTreeMap<&'src str, &'p KvBindingBlock<'src>>,
+    r2_bindings: BTreeMap<&'src str, &'p R2BindingBlock<'src>>,
+    vars_blocks: Vec<&'p VarsBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
     data_sources: Vec<&'p DataSourceBlock<'src>>,
@@ -382,62 +338,26 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         }
                     }
                 }
-                AstBlockKind::Env(env_blocks) => {
-                    st.envs.push(env_blocks);
-                    for env_block in &env_blocks.blocks {
-                        match &env_block.inner.kind {
-                            EnvBindingBlockKind::D1 => {
-                                for symbol in &env_block.inner.symbols {
-                                    if insert_local(
-                                        sink,
-                                        symbol,
-                                        LocalSymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::D1,
-                                            name: symbol.name,
-                                        },
-                                    ) {
-                                        insert_global(sink, symbol);
-                                    }
-                                }
-                            }
-                            EnvBindingBlockKind::R2 => {
-                                for symbol in &env_block.inner.symbols {
-                                    if insert_local(
-                                        sink,
-                                        symbol,
-                                        LocalSymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::R2,
-                                            name: symbol.name,
-                                        },
-                                    ) {
-                                        insert_global(sink, symbol);
-                                    }
-                                }
-                            }
-                            EnvBindingBlockKind::Kv => {
-                                for symbol in &env_block.inner.symbols {
-                                    if insert_local(
-                                        sink,
-                                        symbol,
-                                        LocalSymbolKind::EnvBinding {
-                                            kind: EnvBindingKind::Kv,
-                                            name: symbol.name,
-                                        },
-                                    ) {
-                                        insert_global(sink, symbol);
-                                    }
-                                }
-                            }
-                            EnvBindingBlockKind::Var => {
-                                for symbol in &env_block.inner.symbols {
-                                    insert_local(
-                                        sink,
-                                        symbol,
-                                        LocalSymbolKind::EnvVar(symbol.name),
-                                    );
-                                }
-                            }
-                        }
+                AstBlockKind::D1Binding(block) => {
+                    st.d1_bindings.push(block);
+                    for symbol in &block.bindings {
+                        insert_global(sink, symbol);
+                    }
+                }
+                AstBlockKind::KvBinding(block) => {
+                    if insert_global(sink, &block.symbol) {
+                        st.kv_bindings.insert(block.symbol.name, block);
+                    }
+                }
+                AstBlockKind::R2Binding(block) => {
+                    if insert_global(sink, &block.symbol) {
+                        st.r2_bindings.insert(block.symbol.name, block);
+                    }
+                }
+                AstBlockKind::Vars(block) => {
+                    st.vars_blocks.push(block);
+                    for symbol in &block.vars {
+                        insert_global(sink, symbol);
                     }
                 }
                 AstBlockKind::Inject(inject_block) => {

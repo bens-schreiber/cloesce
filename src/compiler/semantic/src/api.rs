@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 use crate::{
-    EnvBindingKind, LocalSymbolKind, SymbolTable, ensure,
+    LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
 };
@@ -110,16 +110,18 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             for binding in bindings {
                 let name = binding.name;
 
-                let is_env_binding = [EnvBindingKind::D1, EnvBindingKind::Kv, EnvBindingKind::R2]
+                let is_d1 = table
+                    .d1_bindings
                     .iter()
-                    .any(|kind| {
-                        table.local.contains_key(&LocalSymbolKind::EnvBinding {
-                            kind: kind.clone(),
-                            name,
-                        })
-                    });
-
-                let is_env_var = table.local.contains_key(&LocalSymbolKind::EnvVar(name));
+                    .flat_map(|b| b.bindings.iter())
+                    .any(|s| s.name == name);
+                let is_kv = table.kv_bindings.contains_key(name);
+                let is_r2 = table.r2_bindings.contains_key(name);
+                let is_env_var = table
+                    .vars_blocks
+                    .iter()
+                    .flat_map(|v| v.vars.iter())
+                    .any(|s| s.name == name);
 
                 let is_inject_block_symbol = table
                     .injects
@@ -127,7 +129,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                     .flat_map(|i| i.symbols.iter())
                     .any(|s| s.name == name);
 
-                if !is_env_binding && !is_env_var && !is_inject_block_symbol {
+                if !is_d1 && !is_kv && !is_r2 && !is_env_var && !is_inject_block_symbol {
                     self.sink
                         .push(SemanticError::UnresolvedSymbol { symbol: binding });
                     continue;
@@ -153,13 +155,14 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             method: &method.symbol,
         };
 
-        let resolved_type = match resolve_cidl_type(&method.symbol, &method.return_type, table) {
-            Ok(t) => t,
-            Err(e) => {
-                self.sink.push(e);
-                return (CidlType::Void, MediaType::Json);
-            }
-        };
+        let resolved_type =
+            match resolve_cidl_type(&method.symbol, &method.symbol.cidl_type, table) {
+                Ok(t) => t,
+                Err(e) => {
+                    self.sink.push(e);
+                    return (CidlType::Void, MediaType::Json);
+                }
+            };
 
         let return_media = match resolved_type.root_type() {
             CidlType::Stream => MediaType::Octet,
@@ -169,7 +172,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         if matches!(resolved_type.root_type(), CidlType::Stream) {
             // Stream is only valid as a return type if it's the root type
             ensure!(
-                matches!(method.return_type, CidlType::Stream),
+                matches!(method.symbol.cidl_type, CidlType::Stream),
                 self.sink,
                 err.clone()
             );

@@ -37,10 +37,28 @@ macro_rules! count_errs {
 fn with_env(src: &str) -> String {
     format!(
         r#"
-        env {{
-            d1 {{ my_d1 }}
-            kv {{ my_kv }}
-            r2 {{ my_r2 }}
+        d1 {{
+            my_d1
+        }}
+
+        kv my_kv {{
+            cached(id: int) -> json {{
+                "users/{{id}}"
+            }}
+
+            items(field: string) -> json {{
+                "items/{{field}}"
+            }}
+        }}
+
+        r2 my_r2 {{
+            avatar(id: int) {{
+                "avatars/{{id}}"
+            }}
+
+            obj(field: string) {{
+                "assets/{{field}}"
+            }}
         }}
 
         {}
@@ -53,8 +71,7 @@ fn with_env(src: &str) -> String {
 fn missing_wrangler_env_block() {
     // Arrange
     let src = r#"
-        [use db]
-        model User {
+        model User for db {
             primary { id: int }
         }
     "#;
@@ -71,13 +88,11 @@ fn missing_wrangler_env_block() {
 fn wrangler_duplicate_symbol() {
     // Arrange
     let src = r#"
-        env {
-            d1 {
-                my_d1
-            }
-            d1 {
-                my_d1 // duplicate symbol
-            }
+        d1 {
+            my_d1
+        }
+        d1 {
+            my_d1 // duplicate symbol
         }
     "#;
     let parse = lex_and_ast(src);
@@ -98,18 +113,15 @@ fn d1_model_basic_errors() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             // missing primary key
         }
 
-        [use other_d1] // unresolved, not in spec
-        model Post {}
+        model Post for other_d1 {} // unresolved, not in spec
 
         // missing binding
         model Comment {
             primary { id: int }
-            
         }
     "#,
     );
@@ -136,15 +148,12 @@ fn d1_model_basic_errors() {
 fn d1_model_column_fk_errors() {
     // Arrange
     let src = r#"
-        env {
-            d1 { 
-                my_d1 
-                other_d1
-            }
+        d1 {
+            my_d1
+            other_d1
         }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: option<int> // primary key cannot be nullable
             }
@@ -183,18 +192,16 @@ fn d1_model_column_fk_errors() {
 
             foreign (Post::id, Post::id) {
                 inconsistentFieldAdjacency
-            } 
+            }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
             }
         }
 
-        [use other_d1]
-        model OtherD1Model {
+        model OtherD1Model for other_d1 {
             primary {
                 id: int
             }
@@ -268,15 +275,12 @@ fn d1_model_column_fk_errors() {
 fn d1_model_nav_errors() {
     // Arrange
     let src = r#"
-        env {
-            d1 {
-                my_d1
-                other_d1
-            }
+        d1 {
+            my_d1
+            other_d1
         }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -294,8 +298,7 @@ fn d1_model_nav_errors() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
             }
@@ -309,8 +312,7 @@ fn d1_model_nav_errors() {
             }
         }
 
-        [use other_d1]
-        model DifferentDatabaseModel {
+        model DifferentDatabaseModel for other_d1 {
             primary {
                 id: int
             }
@@ -349,8 +351,7 @@ fn d1_model_nav_one_to_one() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Person {
+        model Person for my_d1 {
             primary {
                 id: int
             }
@@ -361,8 +362,7 @@ fn d1_model_nav_one_to_one() {
             }
         }
 
-        [use my_d1]
-        model Horse {
+        model Horse for my_d1 {
             primary {
                 id: int
             }
@@ -401,8 +401,7 @@ fn d1_model_nav_one_to_many() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Author {
+        model Author for my_d1 {
             primary { id: int }
 
             nav (Post::authorId) {
@@ -410,8 +409,7 @@ fn d1_model_nav_one_to_many() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary { id: int }
 
             foreign (Author::id) {
@@ -449,8 +447,7 @@ fn d1_model_nav_many_to_many() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Student {
+        model Student for my_d1 {
             primary { id: int }
 
             nav (Course::id) {
@@ -458,8 +455,7 @@ fn d1_model_nav_many_to_many() {
             }
         }
 
-        [use my_d1]
-        model Course {
+        model Course for my_d1 {
             primary { id: int }
 
             nav (Student::id) {
@@ -492,8 +488,7 @@ fn d1_model_cyclical_relationship_error() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model A {
+        model A for my_d1 {
             primary { id: int }
 
             foreign (B::id) {
@@ -502,8 +497,7 @@ fn d1_model_cyclical_relationship_error() {
             }
         }
 
-        [use my_d1]
-        model B {
+        model B for my_d1 {
             primary { id: int }
 
             foreign (C::id) {
@@ -512,8 +506,7 @@ fn d1_model_cyclical_relationship_error() {
             }
         }
 
-        [use my_d1]
-        model C {
+        model C for my_d1 {
             primary { id: int }
 
             foreign (A::id) {
@@ -545,8 +538,7 @@ fn d1_model_nullability_prevents_cycle() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model A {
+        model A for my_d1 {
             primary { id: int }
 
             foreign (B::id) optional {
@@ -555,8 +547,7 @@ fn d1_model_nullability_prevents_cycle() {
             }
         }
 
-        [use my_d1]
-        model B {
+        model B for my_d1 {
             primary { id: int }
 
             foreign (C::id) optional {
@@ -565,8 +556,7 @@ fn d1_model_nullability_prevents_cycle() {
             }
         }
 
-        [use my_d1]
-        model C {
+        model C for my_d1 {
             primary { id: int }
 
             foreign (A::id) optional {
@@ -590,23 +580,14 @@ fn kv_r2_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        model Foo {
-            keyfield { field: string }
-            kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
-                foo: json
-            }
+        model Foo for my_d1 {
+            primary { field: string }
 
-            r2(my_kv, "assets/{field}") { // invalid binding type (my_kv is a KV, not R2)
-                obj
-            }
+            // invalid binding type (my_d1 is a D1, not KV)
+            kv my_d1::items(field) { foo }
 
-            kv(my_kv, "items/{field}/{nonexistent}") { // unknown variable in format
-                cached: json
-            }
-
-            r2(my_r2, "assets/{field") { // invalid format, unclosed brace
-                obj2
-            }
+            // invalid binding type (my_kv is a KV, not R2)
+            r2 my_kv::items(field) { obj }
         }
         "#,
     );
@@ -616,8 +597,6 @@ fn kv_r2_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 4);
-
     let binding = expect_err!(errors,
         SemanticError::KvInvalidBinding { binding, ..} => binding.name
     );
@@ -627,13 +606,72 @@ fn kv_r2_errors() {
         SemanticError::R2InvalidBinding { binding, .. } => binding.name
     );
     assert_eq!(binding, "my_kv");
+}
 
-    let variable = expect_err!(errors,
-        SemanticError::KvR2UnknownKeyVariable { variable, .. } => *variable
+#[test]
+fn binding_key_format_unknown_param() {
+    // A `{var}` in a binding field's key format must correspond to a declared
+    // param on that field. Otherwise we should get KvR2UnknownKeyVariable.
+    let src = r#"
+        kv UserMeta {
+            meta(id: int) -> json {
+                "metadata/{id}/{bogus}"
+            }
+        }
+
+        r2 UserAvatars {
+            avatar(id: int) {
+                "avatars/{ghost}.jpg"
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    let unknowns: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::KvR2UnknownKeyVariable { variable, .. } => Some(*variable),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        unknowns.contains(&"bogus"),
+        "expected 'bogus' to be flagged, got: {:?}",
+        unknowns
     );
-    assert_eq!(variable, "nonexistent");
+    assert!(
+        unknowns.contains(&"ghost"),
+        "expected 'ghost' to be flagged, got: {:?}",
+        unknowns
+    );
+}
 
-    expect_err!(errors, SemanticError::KvR2InvalidKeyFormat { .. });
+#[test]
+fn binding_key_format_invalid_syntax() {
+    // Malformed key format (unclosed/nested brace) should produce KvR2InvalidKeyFormat.
+    let src = r#"
+        kv NsA {
+            entry(id: int) -> json {
+                "entry/{id"
+            }
+        }
+
+        r2 NsB {
+            obj(id: int) {
+                "obj/{{id}"
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    assert_eq!(
+        count_errs!(errors, SemanticError::KvR2InvalidKeyFormat { .. }),
+        2,
+        "expected two invalid-key-format errors, got: {:#?}",
+        errors
+    );
 }
 
 #[test]
@@ -641,8 +679,7 @@ fn kv_and_d1_coexist() {
     // A model can have both D1 and KV/R2 properties
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -650,8 +687,8 @@ fn kv_and_d1_coexist() {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv my_kv::cached(id) {
+                cached
             }
         }
         "#,
@@ -664,14 +701,19 @@ fn kv_and_d1_coexist() {
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
     let user = result.models.get("User").unwrap();
-    assert!(user.d1_binding.is_some());
+    assert!(user.backing_binding.is_some());
     assert_eq!(user.kv_fields.len(), 1);
-    assert_eq!(user.columns.len(), 1,);
-    assert_eq!(user.kv_fields[0].format_parameters[0].name, "id");
-    assert_eq!(
-        user.kv_fields[0].format_parameters[0].cidl_type,
-        CidlType::Int
-    );
+    assert_eq!(user.columns.len(), 1);
+    assert_eq!(user.kv_fields[0].binding, "my_kv");
+    assert_eq!(user.kv_fields[0].binding_field, "cached");
+    assert_eq!(user.kv_fields[0].args, vec!["id"]);
+
+    // The binding field's params live in the wrangler env, not on the model.
+    let env = result.wrangler_env.as_ref().unwrap();
+    let kv = env.kv_bindings.iter().find(|b| b.name == "my_kv").unwrap();
+    let cached = kv.fields.iter().find(|f| f.name == "cached").unwrap();
+    assert_eq!(cached.params[0].name, "id");
+    assert_eq!(cached.params[0].cidl_type, CidlType::Int);
 }
 
 #[test]
@@ -679,8 +721,7 @@ fn api_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -736,8 +777,7 @@ fn api_sets_media_types() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -781,8 +821,7 @@ fn data_source_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -790,11 +829,11 @@ fn data_source_errors() {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv my_kv::cached(id) {
+                cached
             }
 
-            r2(my_r2, "avatars/{id}") {
+            r2 my_r2::avatar(id) {
                 avatar
             }
 
@@ -803,8 +842,7 @@ fn data_source_errors() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
             }
@@ -889,8 +927,7 @@ fn data_source_include_tree_kv_r2() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -898,19 +935,19 @@ fn data_source_include_tree_kv_r2() {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv my_kv::cached(id) {
+                cached
             }
 
-            r2(my_r2, "avatars/{id}") {
+            r2 my_r2::avatar(id) {
                 avatar
             }
         }
 
         source WithKvR2 for User {
-            include { 
-                cached 
-                avatar 
+            include {
+                cached
+                avatar
             }
         }
     "#,
@@ -952,12 +989,9 @@ fn poo_errors() {
 #[test]
 fn poo_with_model_reference() {
     let src = r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model BasicModel {
+        model BasicModel for db {
             primary {
                 id: int
             }
@@ -981,12 +1015,9 @@ fn poo_with_model_reference() {
 fn cidl_types_resolve() {
     // Arrange
     let src = r#"
-        env {
-            d1 { my_d1 }
-        }
+        d1 { my_d1 }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -1026,11 +1057,10 @@ fn fk_inherits_validators() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
-            primary { 
+        model User for my_d1 {
+            primary {
                 [gt 0]
-                id: int 
+                id: int
             }
 
             column {
@@ -1039,8 +1069,7 @@ fn fk_inherits_validators() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary { id: int }
 
             foreign (User::id) {
@@ -1089,16 +1118,13 @@ fn validator_errors() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary { id: int }
 
-            keyfield {
-                [len 3.14]            // ValidatorInvalidArgument (wrong literal kind)
-                name: string
-            }
-
             column {
+                [len 3.14]                // ValidatorInvalidArgument (wrong literal kind)
+                name: string
+
                 [step 2.5]                // ValidatorInvalidArgument (float to step)
                 [len 3]                   // ValidatorInvalidForType (length on non-string)
                 [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
@@ -1126,8 +1152,7 @@ fn validator_valid() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary { id: int }
 
             column {
@@ -1177,16 +1202,19 @@ fn validator_valid() {
 #[test]
 fn inject_tag_populates_api_method_injected() {
     let src = r#"
-        env {
-            d1 { db }
-            kv { cache }
-            vars { API_KEY: string }
+        d1 { db }
+
+        kv cache {
+            entry(id: int) -> json {
+                "entry/{id}"
+            }
         }
+
+        vars { API_KEY: string }
 
         inject { YouTubeApi }
 
-        [use db]
-        model M {
+        model M for db {
             primary { id: int }
         }
 
@@ -1216,10 +1244,9 @@ fn inject_tag_populates_api_method_injected() {
 #[test]
 fn inject_tag_dedupes_duplicates() {
     let src = r#"
-        env { d1 { db } }
+        d1 { db }
 
-        [use db]
-        model M {
+        model M for db {
             primary { id: int }
         }
 
@@ -1247,7 +1274,8 @@ fn inject_tag_dedupes_duplicates() {
 #[test]
 fn dataless_model_errors() {
     let src = r#"
-        env { d1 { db } }
+        d1 { db }
+
         model Foo {}
         model Bar {}
 

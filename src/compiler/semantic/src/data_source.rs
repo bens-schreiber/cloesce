@@ -150,7 +150,6 @@ impl<'src, 'p> DataSourceAnalysis {
                                     .primary_columns
                                     .iter()
                                     .any(|pk| pk.field.name == p.name)
-                                && !model.key_fields.iter().any(|k| k.name == p.name)
                             {
                                 sink.push(SemanticError::InstanceTagOnNonField {
                                     tag,
@@ -480,7 +479,7 @@ impl<'src> DataSourceExpansion {
         let pending = idl
             .models
             .values()
-            .filter(|m| m.has_d1())
+            .filter(|m| m.backing_binding.is_some())
             .map(|model| {
                 let defaults = model
                     .data_sources

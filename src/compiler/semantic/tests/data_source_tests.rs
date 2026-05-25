@@ -12,21 +12,27 @@ async fn default_data_sources(db: SqlitePool) {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { kv_namespace }
-            r2 { r2_namespace }
+        d1 { db }
+
+        kv kv_namespace {
+            userCache(id: int) -> json {
+                "{id}"
+            }
         }
 
-        [use db]
-        model Profile {
+        r2 r2_namespace {
+            userDocuments(id: int) {
+                "{id}"
+            }
+        }
+
+        model Profile for db {
             primary {
                 id: int
             }
         }
 
-        [use db]
-        model Role {
+        model Role for db {
             primary {
                 id: int
             }
@@ -36,8 +42,7 @@ async fn default_data_sources(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Order {
+        model Order for db {
             primary {
                 id: int
             }
@@ -47,8 +52,7 @@ async fn default_data_sources(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model User {
+        model User for db {
             primary {
                 id: int
             }
@@ -66,11 +70,11 @@ async fn default_data_sources(db: SqlitePool) {
                 roles
             }
 
-            kv(kv_namespace, "{id}") {
-                userCache: json
+            kv kv_namespace::userCache(id) {
+                userCache
             }
 
-            r2(r2_namespace, "{id}") {
+            r2 r2_namespace::userDocuments(id) {
                 userDocuments
             }
         }
@@ -165,24 +169,26 @@ fn default_data_source_methods() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { my_kv }
+        d1 { db }
+
+        kv my_kv {
+            cached(tag: string) -> json {
+                "{tag}"
+            }
         }
 
-        [use db]
         [crud get, list]
-        model Item {
+        model Item for db {
             primary {
                 id: int
             }
 
-            keyfield {
+            column {
                 tag: string
             }
 
-            kv(my_kv, "{tag}") {
-                cached: json
+            kv my_kv::cached(tag) {
+                cached
             }
         }
 
@@ -217,12 +223,9 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Grade {
+                model Grade for db {
             primary {
                 id: int
             }
@@ -232,8 +235,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Teacher {
+                model Teacher for db {
             primary {
                 id: int
             }
@@ -243,8 +245,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Student {
+                model Student for db {
             primary {
                 id: int
             }
@@ -321,12 +322,9 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Toy {
+                model Toy for db {
             primary {
                 id: int
             }
@@ -335,8 +333,7 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Dog {
+                model Dog for db {
             primary {
                 id: int
             }
@@ -350,8 +347,7 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Owner {
+                model Owner for db {
             primary {
                 id: int
             }
@@ -434,12 +430,9 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Team {
+                model Team for db {
             primary {
                 id: int
             }
@@ -448,8 +441,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Department {
+                model Department for db {
             primary {
                 id: int
             }
@@ -460,8 +452,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Company {
+                model Company for db {
             primary {
                 id: int
             }
@@ -544,12 +535,9 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model OrderItem {
+                model OrderItem for db {
             primary {
                 orderId: int
                 productId: int
@@ -611,12 +599,9 @@ fn resolve_sql_params() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Item {
+                model Item for db {
             primary {
                 id: int
             }
@@ -684,12 +669,9 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Post {
+                model Post for db {
             primary {
                 id: int
             }
@@ -743,12 +725,9 @@ fn api_method_defaults_to_default_data_source() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Item {
+                model Item for db {
             primary {
                 id: int
             }

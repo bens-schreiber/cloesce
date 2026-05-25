@@ -13,13 +13,10 @@ fn adds_crud_methods_to_models() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
         [crud get, save, list]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int
@@ -54,25 +51,27 @@ fn crud_key_params() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { my_kv }
+        d1 { db }
+
+        kv my_kv {
+            cached(category: string, subcategory: string) -> json {
+                "{category}/{subcategory}"
+            }
         }
 
-        [use db]
         [crud get]
-        model Product {
+        model Product for db {
             primary {
                 id: int
             }
 
-            keyfield {
+            column {
                 category: string
                 subcategory: string
             }
 
-            kv(my_kv, "{category}/{subcategory}") {
-                cached: json
+            kv my_kv::cached(category, subcategory) {
+                cached
             }
         }
     "#,
@@ -82,17 +81,18 @@ fn crud_key_params() {
     let product = idl.models.get("Product").unwrap();
     let get_method = find_method(product, "$get").unwrap();
 
-    let category_param = get_method.parameters.iter().find(|p| p.name == "category");
-    assert!(category_param.is_some(), "Should have category key param");
+    // CRUD `$get` only takes the primary key params; category/subcategory are
+    // now columns on the model (not keyfield params), so they do not appear
+    // on `$get` directly.
+    let id_param = get_method.parameters.iter().find(|p| p.name == "id");
+    assert!(id_param.is_some(), "Should have id primary key param");
 
-    let subcategory_param = get_method
-        .parameters
-        .iter()
-        .find(|p| p.name == "subcategory");
-    assert!(
-        subcategory_param.is_some(),
-        "Should have subcategory key param"
-    );
+    // The KV binding reference should be present and reference the binding fields.
+    assert_eq!(product.kv_fields.len(), 1);
+    let kv = &product.kv_fields[0];
+    assert_eq!(kv.binding, "my_kv");
+    assert_eq!(kv.binding_field, "cached");
+    assert_eq!(kv.args, vec!["category", "subcategory"]);
 }
 
 #[test]
@@ -100,13 +100,10 @@ fn crud_methods_namespace_sources_inherit_validators() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
         [crud get, list]
-        model Product {
+        model Product for db {
             primary {
                 [gt 0]
                 id: int

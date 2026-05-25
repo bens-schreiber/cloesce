@@ -5,9 +5,7 @@ edition = "2024"
 [dependencies]
 idl = { path = "../idl" }
 frontend = { path = "../frontend" }
-# TEMPORARY: `semantic` is removed while the frontend is being migrated to
-# the new binding syntax. Restore once the semantic crate has been updated.
-# semantic = { path = "../semantic" }
+semantic = { path = "../semantic" }
 
 [lib]
 doctest = false

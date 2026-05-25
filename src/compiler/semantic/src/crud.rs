@@ -53,7 +53,6 @@ impl CrudExpansion {
                         .map(|g| g.parameters.iter().map(|p| &p.parameter).cloned().collect())
                         .unwrap_or_else(Vec::new)
                         .into_iter()
-                        .chain(model.key_fields.iter().cloned())
                         .collect();
 
                     ApiMethod {

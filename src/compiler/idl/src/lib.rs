@@ -322,33 +322,37 @@ pub struct KvField<'src> {
     #[serde(borrow)]
     pub field: ValidatedField<'src>,
 
-    #[serde(borrow)]
-    pub format: &'src str,
-
-    #[serde(borrow)]
-    pub format_parameters: Vec<Field<'src>>,
-
+    /// The KV binding being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub list_prefix: bool,
+    /// The field on the KV binding being referenced.
+    #[serde(borrow)]
+    pub binding_field: &'src str,
+
+    /// Names of Model fields supplied as arguments to the binding field's key format.
+    #[serde(borrow)]
+    pub args: Vec<&'src str>,
 }
 
+/// A reference on a Model to a field on an R2 binding.
 #[derive(Deserialize, Serialize)]
 pub struct R2Field<'src> {
+    /// The local field on the Model (always of type `r2object`).
     #[serde(borrow)]
     pub field: Field<'src>,
 
-    #[serde(borrow)]
-    pub format: &'src str,
-
-    #[serde(borrow)]
-    pub format_parameters: Vec<Field<'src>>,
-
+    /// The R2 binding being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub list_prefix: bool,
+    /// The field on the R2 binding being referenced.
+    #[serde(borrow)]
+    pub binding_field: &'src str,
+
+    /// Names of Model fields supplied as arguments to the binding field's key format.
+    #[serde(borrow)]
+    pub args: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize, PartialEq)]
@@ -395,9 +399,6 @@ pub struct Model<'src> {
     pub name: &'src str,
 
     #[serde(borrow)]
-    pub d1_binding: Option<&'src str>,
-
-    #[serde(borrow)]
     pub primary_columns: Vec<Column<'src>>,
 
     #[serde(borrow)]
@@ -413,7 +414,7 @@ pub struct Model<'src> {
     pub navigation_fields: Vec<NavigationField<'src>>,
 
     #[serde(borrow)]
-    pub key_fields: Vec<ValidatedField<'src>>,
+    pub backing_binding: Option<&'src str>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
@@ -425,10 +426,6 @@ pub struct Model<'src> {
 }
 
 impl Model<'_> {
-    pub fn has_d1(&self) -> bool {
-        self.d1_binding.is_some()
-    }
-
     pub fn has_kv(&self) -> bool {
         !self.kv_fields.is_empty()
     }
@@ -449,12 +446,11 @@ impl Model<'_> {
     /// A "data-less" model has no actual data stored on it, and serves
     /// only as a namespace for APIs.
     pub fn is_dataless(&self) -> bool {
-        self.d1_binding.is_none()
+        self.backing_binding.is_none()
             && self.primary_columns.is_empty()
             && self.columns.is_empty()
             && self.kv_fields.is_empty()
             && self.r2_fields.is_empty()
-            && self.key_fields.is_empty()
             && self.navigation_fields.is_empty()
     }
 
@@ -478,15 +474,64 @@ pub struct PlainOldObject<'src> {
 }
 
 #[derive(Deserialize, Serialize)]
+pub struct KvBindingField<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub cidl_type: CidlType<'src>,
+
+    /// Parameters required to construct a key for this field.
+    #[serde(borrow)]
+    pub params: Vec<ValidatedField<'src>>,
+
+    /// The key format string (e.g. `"metadata/{id}"`).
+    #[serde(borrow)]
+    pub key_format: &'src str,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct KvBinding<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub fields: Vec<KvBindingField<'src>>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct R2BindingField<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    /// Parameters required to construct a key for this field.
+    #[serde(borrow)]
+    pub params: Vec<ValidatedField<'src>>,
+
+    /// The key format string (e.g. `"key/{id}"`).
+    #[serde(borrow)]
+    pub key_format: &'src str,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct R2Binding<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub fields: Vec<R2BindingField<'src>>,
+}
+
+#[derive(Deserialize, Serialize)]
 pub struct WranglerEnv<'src> {
     #[serde(borrow)]
     pub d1_bindings: Vec<&'src str>,
 
     #[serde(borrow)]
-    pub kv_bindings: Vec<&'src str>,
+    pub kv_bindings: Vec<KvBinding<'src>>,
 
     #[serde(borrow)]
-    pub r2_bindings: Vec<&'src str>,
+    pub r2_bindings: Vec<R2Binding<'src>>,
 
     #[serde(borrow)]
     pub vars: Vec<Field<'src>>,
@@ -531,7 +576,7 @@ impl CloesceIdl<'_> {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
-            model.d1_binding.hash(&mut model_h);
+            model.backing_binding.hash(&mut model_h);
 
             for pk in model.primary_columns.iter_mut() {
                 let pk_col_h = {
