@@ -120,7 +120,6 @@ export class {{ model.name }} {
   }
 {%- endfor %}
 
-{%- if !model.is_dataless() %}
   static fromJson(data: any): {{ model.name }} {
     const __$res = Object.assign(new {{ model.name }}(), data);
 {%- for nav in &model.navigation_fields %}
@@ -161,7 +160,6 @@ export class {{ model.name }} {
 {%- endfor %}
     return __$res;
   }
-{%- endif %}
 }
 {%- endfor %}
 

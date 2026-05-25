@@ -136,7 +136,7 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
         CidlType::Stream => Keyword::TStream.as_str().into(),
         CidlType::Json => Keyword::TJson.as_str().into(),
         CidlType::R2Object => Keyword::TR2Object.as_str().into(),
-        CidlType::Object { name } | CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Object { name } => name.to_string(),
         CidlType::Partial { object_name } => {
             format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
         }
@@ -319,7 +319,7 @@ pub struct KvFieldBlock<'src> {
     pub binding: Symbol<'src>,
 
     /// The field on the KV binding being referenced
-    pub binding_field: Symbol<'src>,
+    pub binding_template: Symbol<'src>,
 
     /// The model fields to be passed as arguments to the binding's field
     pub args: Vec<Symbol<'src>>,
@@ -333,7 +333,7 @@ pub struct R2FieldBlock<'src> {
     pub binding: Symbol<'src>,
 
     /// The field on the R2 binding being referenced
-    pub binding_field: Symbol<'src>,
+    pub binding_template: Symbol<'src>,
 
     /// The model fields to be passed as arguments to the binding's field
     pub args: Vec<Symbol<'src>>,
@@ -447,7 +447,7 @@ pub struct VarsBlock<'src> {
     pub vars: Vec<Symbol<'src>>,
 }
 
-pub struct KvBindingField<'src> {
+pub struct KvBindingTemplate<'src> {
     /// The symbol naming the field
     ///
     /// The [CidlType] of this symbol represents the return type of the binding field.
@@ -464,10 +464,10 @@ pub struct KvBindingBlock<'src> {
     /// The binding name, e.g. `UserMetadata`.
     pub symbol: Symbol<'src>,
 
-    pub fields: Vec<Spd<KvBindingField<'src>>>,
+    pub templates: Vec<Spd<KvBindingTemplate<'src>>>,
 }
 
-pub struct R2BindingField<'src> {
+pub struct R2BindingTemplate<'src> {
     /// The symbol naming the field
     pub symbol: Symbol<'src>,
 
@@ -485,7 +485,7 @@ pub struct R2BindingBlock<'src> {
     /// The binding name, e.g. `UserAvatars`.
     pub symbol: Symbol<'src>,
 
-    pub fields: Vec<Spd<R2BindingField<'src>>>,
+    pub templates: Vec<Spd<R2BindingTemplate<'src>>>,
 }
 
 pub struct InjectBlock<'src> {

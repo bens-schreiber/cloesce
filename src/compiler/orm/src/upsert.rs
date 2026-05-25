@@ -169,18 +169,8 @@ impl<'a> UpsertModel<'a> {
             };
             let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
 
-            // Look up the binding field's key format in the wrangler env.
-            let key_format = self
-                .idl
-                .wrangler_env
-                .as_ref()
-                .and_then(|env| env.kv_bindings.iter().find(|b| b.name == kv.binding))
-                .and_then(|b| b.fields.iter().find(|f| f.name == kv.binding_field))
-                .map(|f| f.key_format)
-                .unwrap_or("");
-
             let (key, placeholders_remain) =
-                key_format_interpolation(key_format, &new_model, model)?;
+                key_format_interpolation(&kv.key_format, &new_model, model)?;
 
             if placeholders_remain {
                 let path_parts: Vec<String> = path.split('.').skip(1).map(String::from).collect();

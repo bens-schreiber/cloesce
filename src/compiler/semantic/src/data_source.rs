@@ -51,14 +51,6 @@ impl<'src, 'p> DataSourceAnalysis {
                 continue;
             };
 
-            if model.is_dataless() {
-                sink.push(SemanticError::ModelDataSourceWithNoData {
-                    model: model_sym,
-                    data_source: &ds.symbol,
-                });
-                continue;
-            }
-
             // Validate include tree via BFS
             let mut q = VecDeque::new();
             q.push_back((&ds.tree, model));
@@ -456,7 +448,9 @@ impl<'src> DataSourceExpansion {
             let models_to_process = idl
                 .models
                 .iter()
-                .filter(|(_, model)| !model.is_dataless() && model.default_data_source().is_none())
+                .filter(|(_, model)| {
+                    model.backing_binding.is_some() && model.default_data_source().is_none()
+                })
                 .map(|(_, model)| model.name)
                 .collect::<Vec<&str>>();
 

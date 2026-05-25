@@ -417,135 +417,131 @@ impl WranglerDefault {
         );
 
         // Ensure all bindings referenced in the WranglerEnv exist in the spec
-        if let Some(env) = &idl.wrangler_env {
-            for d1 in &env.d1_bindings {
-                let db = spec
-                    .d1_databases
-                    .iter_mut()
-                    .find(|db| db.binding.as_deref() == Some(d1));
+        for d1 in &idl.wrangler_env.d1_bindings {
+            let db = spec
+                .d1_databases
+                .iter_mut()
+                .find(|db| db.binding.as_deref() == Some(d1));
 
-                match db {
-                    Some(db) => {
-                        if db.database_id.is_none() {
-                            db.database_id = Some(format!("replace_with_{}_id", d1));
-                            tracing::warn!(
-                                "D1 Database with binding {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
-                                d1
-                            );
-                        }
-                        if db.database_name.is_none() {
-                            db.database_name = Some(format!("replace_with_{}_name", d1));
-                            tracing::warn!(
-                                "D1 Database with binding {} is missing a name. See https://developers.cloudflare.com/d1/get-started/",
-                                d1
-                            );
-                        }
-                        if db.migrations_dir.is_none() {
-                            db.migrations_dir = Some(format!("{}/{}", default_migrations_path, d1));
-                            tracing::warn!(
-                                "D1 Database with binding {} is missing a migrations_dir. Defaulting to {}/{}",
-                                d1,
-                                default_migrations_path,
-                                d1
-                            );
-                        }
-                    }
-                    None => {
-                        spec.d1_databases.push(D1Database {
-                            binding: Some(d1.to_string()),
-                            database_name: Some(format!("replace_with_{}_name", d1)),
-                            database_id: Some(format!("replace_with_{}_id", d1)),
-                            migrations_dir: Some(format!("{}/{}", default_migrations_path, d1)),
-                        });
-
+            match db {
+                Some(db) => {
+                    if db.database_id.is_none() {
+                        db.database_id = Some(format!("replace_with_{}_id", d1));
                         tracing::warn!(
-                            "D1 Database with binding {} was missing, added a default. See https://developers.cloudflare.com/d1/get-started/",
+                            "D1 Database with binding {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
+                            d1
+                        );
+                    }
+                    if db.database_name.is_none() {
+                        db.database_name = Some(format!("replace_with_{}_name", d1));
+                        tracing::warn!(
+                            "D1 Database with binding {} is missing a name. See https://developers.cloudflare.com/d1/get-started/",
+                            d1
+                        );
+                    }
+                    if db.migrations_dir.is_none() {
+                        db.migrations_dir = Some(format!("{}/{}", default_migrations_path, d1));
+                        tracing::warn!(
+                            "D1 Database with binding {} is missing a migrations_dir. Defaulting to {}/{}",
+                            d1,
+                            default_migrations_path,
                             d1
                         );
                     }
                 }
+                None => {
+                    spec.d1_databases.push(D1Database {
+                        binding: Some(d1.to_string()),
+                        database_name: Some(format!("replace_with_{}_name", d1)),
+                        database_id: Some(format!("replace_with_{}_id", d1)),
+                        migrations_dir: Some(format!("{}/{}", default_migrations_path, d1)),
+                    });
+
+                    tracing::warn!(
+                        "D1 Database with binding {} was missing, added a default. See https://developers.cloudflare.com/d1/get-started/",
+                        d1
+                    );
+                }
             }
+        }
 
-            for kv_binding in &env.kv_bindings {
-                let name = kv_binding.name;
-                let kv = spec
-                    .kv_namespaces
-                    .iter_mut()
-                    .find(|ns| ns.binding.as_deref() == Some(name));
+        for kv_binding in &idl.wrangler_env.kv_bindings {
+            let name = kv_binding.name;
+            let kv = spec
+                .kv_namespaces
+                .iter_mut()
+                .find(|ns| ns.binding.as_deref() == Some(name));
 
-                match kv {
-                    Some(ns) => {
-                        if ns.id.is_none() {
-                            ns.id = Some(format!("replace_with_{}_id", name));
-                            tracing::warn!(
-                                "KV Namespace with binding {} is missing an id. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
-                                name
-                            );
-                        }
-                    }
-                    None => {
-                        spec.kv_namespaces.push(KVNamespace {
-                            binding: Some(name.to_string()),
-                            id: Some(format!("replace_with_{}_id", name)),
-                        });
-
+            match kv {
+                Some(ns) => {
+                    if ns.id.is_none() {
+                        ns.id = Some(format!("replace_with_{}_id", name));
                         tracing::warn!(
-                            "KV Namespace with binding {} was missing, added a default. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
+                            "KV Namespace with binding {} is missing an id. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
                             name
                         );
                     }
                 }
+                None => {
+                    spec.kv_namespaces.push(KVNamespace {
+                        binding: Some(name.to_string()),
+                        id: Some(format!("replace_with_{}_id", name)),
+                    });
+
+                    tracing::warn!(
+                        "KV Namespace with binding {} was missing, added a default. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
+                        name
+                    );
+                }
             }
+        }
 
-            for r2_binding in &env.r2_bindings {
-                let name = r2_binding.name;
-                let r2 = spec
-                    .r2_buckets
-                    .iter_mut()
-                    .find(|bucket| bucket.binding.as_deref() == Some(name));
+        for r2_binding in &idl.wrangler_env.r2_bindings {
+            let name = r2_binding.name;
+            let r2 = spec
+                .r2_buckets
+                .iter_mut()
+                .find(|bucket| bucket.binding.as_deref() == Some(name));
 
-                match r2 {
-                    Some(bucket) => {
-                        if bucket.bucket_name.is_none() {
-                            bucket.bucket_name = Some(format!("replace-with-{}-name", name));
-                            tracing::warn!(
-                                "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
-                                name
-                            );
-                        }
-                    }
-                    None => {
-                        spec.r2_buckets.push(idl::R2Bucket {
-                            binding: Some(name.to_string()),
-                            bucket_name: Some(format!("replace-with-{}-name", name)),
-                        });
-
+            match r2 {
+                Some(bucket) => {
+                    if bucket.bucket_name.is_none() {
+                        bucket.bucket_name = Some(format!("replace-with-{}-name", name));
                         tracing::warn!(
-                            "R2 Bucket with binding {} was missing, added a default. See https://developers.cloudflare.com/r2/get-started/",
+                            "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
                             name
                         );
                     }
+                }
+                None => {
+                    spec.r2_buckets.push(idl::R2Bucket {
+                        binding: Some(name.to_string()),
+                        bucket_name: Some(format!("replace-with-{}-name", name)),
+                    });
+
+                    tracing::warn!(
+                        "R2 Bucket with binding {} was missing, added a default. See https://developers.cloudflare.com/r2/get-started/",
+                        name
+                    );
                 }
             }
         }
 
         // Generate default vars from the IDL's WranglerEnv
-        if let Some(env) = &idl.wrangler_env {
-            for var in &env.vars {
-                spec.vars.entry(var.name.to_string()).or_insert_with(|| {
-                    let default = match var.cidl_type {
-                        CidlType::String => "default_string",
-                        CidlType::Int | CidlType::Real => "0",
-                        CidlType::Boolean => "false",
-                        _ => "default_value",
-                    };
-                    tracing::warn!(
-                        "Added missing Wrangler var {} with a default value",
-                        var.name
-                    );
-                    default.into()
-                });
-            }
+        for var in &idl.wrangler_env.vars {
+            spec.vars.entry(var.name.to_string()).or_insert_with(|| {
+                let default = match var.cidl_type {
+                    CidlType::String => "default_string",
+                    CidlType::Int | CidlType::Real => "0",
+                    CidlType::Boolean => "false",
+                    _ => "default_value",
+                };
+                tracing::warn!(
+                    "Added missing Wrangler var {} with a default value",
+                    var.name
+                );
+                default.into()
+            });
         }
     }
 }

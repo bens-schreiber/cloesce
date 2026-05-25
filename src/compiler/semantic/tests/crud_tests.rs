@@ -47,55 +47,6 @@ fn adds_crud_methods_to_models() {
 }
 
 #[test]
-fn crud_key_params() {
-    // Act
-    let idl = src_to_idl(
-        r#"
-        d1 { db }
-
-        kv my_kv {
-            cached(category: string, subcategory: string) -> json {
-                "{category}/{subcategory}"
-            }
-        }
-
-        [crud get]
-        model Product for db {
-            primary {
-                id: int
-            }
-
-            column {
-                category: string
-                subcategory: string
-            }
-
-            kv my_kv::cached(category, subcategory) {
-                cached
-            }
-        }
-    "#,
-    );
-
-    // Assert
-    let product = idl.models.get("Product").unwrap();
-    let get_method = find_method(product, "$get").unwrap();
-
-    // CRUD `$get` only takes the primary key params; category/subcategory are
-    // now columns on the model (not keyfield params), so they do not appear
-    // on `$get` directly.
-    let id_param = get_method.parameters.iter().find(|p| p.name == "id");
-    assert!(id_param.is_some(), "Should have id primary key param");
-
-    // The KV binding reference should be present and reference the binding fields.
-    assert_eq!(product.kv_fields.len(), 1);
-    let kv = &product.kv_fields[0];
-    assert_eq!(kv.binding, "my_kv");
-    assert_eq!(kv.binding_field, "cached");
-    assert_eq!(kv.args, vec!["category", "subcategory"]);
-}
-
-#[test]
 fn crud_methods_namespace_sources_inherit_validators() {
     // Act
     let idl = src_to_idl(

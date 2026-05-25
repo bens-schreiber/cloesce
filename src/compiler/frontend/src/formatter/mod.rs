@@ -22,9 +22,10 @@ use idl::{CidlType, CrudKind, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, ForeignBlock, ForeignBlockNav,
-    InjectBlock, Keyword, KvBindingBlock, KvBindingField, KvFieldBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingField,
-    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
+    InjectBlock, Keyword, KvBindingBlock, KvBindingTemplate, KvFieldBlock, ModelBlock,
+    ModelBlockKind, NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock,
+    R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type,
+    lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -584,7 +585,7 @@ impl<'src> ToDoc<'src> for KvFieldBlock<'src> {
             .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.binding, 0, true))
             .then(Doc::text("::"))
-            .then(ctx.sym_doc(&self.binding_field, 0, true))
+            .then(ctx.sym_doc(&self.binding_template, 0, true))
             .then(Doc::text("("))
             .then(args)
             .then(Doc::text(")"))
@@ -599,7 +600,7 @@ impl<'src> ToDoc<'src> for R2FieldBlock<'src> {
             .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.binding, 0, true))
             .then(Doc::text("::"))
-            .then(ctx.sym_doc(&self.binding_field, 0, true))
+            .then(ctx.sym_doc(&self.binding_template, 0, true))
             .then(Doc::text("("))
             .then(args)
             .then(Doc::text(")"))
@@ -794,7 +795,7 @@ impl<'src> ToDoc<'src> for VarsBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for KvBindingField<'src> {
+impl<'src> ToDoc<'src> for KvBindingTemplate<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
         let key_format = Doc::hardline(2)
@@ -813,18 +814,18 @@ impl<'src> ToDoc<'src> for KvBindingField<'src> {
 impl<'src> ToDoc<'src> for KvBindingBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let doc = ctx.top_decl_doc(&self.symbol, Keyword::Kv);
-        if self.fields.is_empty() {
+        if self.templates.is_empty() {
             return doc.then(Doc::text(" {}"));
         }
         let mut inner = Doc::nil();
-        for spd in &self.fields {
+        for spd in &self.templates {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
         doc.then(ctx.block(inner, 1))
     }
 }
 
-impl<'src> ToDoc<'src> for R2BindingField<'src> {
+impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
         let paginated = if self.is_paginated {
@@ -848,11 +849,11 @@ impl<'src> ToDoc<'src> for R2BindingField<'src> {
 impl<'src> ToDoc<'src> for R2BindingBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let doc = ctx.top_decl_doc(&self.symbol, Keyword::R2);
-        if self.fields.is_empty() {
+        if self.templates.is_empty() {
             return doc.then(Doc::text(" {}"));
         }
         let mut inner = Doc::nil();
-        for spd in &self.fields {
+        for spd in &self.templates {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
         doc.then(ctx.block(inner, 1))

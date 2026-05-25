@@ -70,7 +70,7 @@ fn kv_field_block<'tokens, 'src: 'tokens>()
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((binding, binding_field), args), field)| KvFieldBlock {
             binding,
-            binding_field,
+            binding_template: binding_field,
             args,
             field,
         })
@@ -93,7 +93,7 @@ fn r2_field_block<'tokens, 'src: 'tokens>()
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((binding, binding_field), args), field)| R2FieldBlock {
             binding,
-            binding_field,
+            binding_template: binding_field,
             args,
             field,
         })

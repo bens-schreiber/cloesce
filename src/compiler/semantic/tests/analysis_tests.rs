@@ -68,23 +68,6 @@ fn with_env(src: &str) -> String {
 }
 
 #[test]
-fn missing_wrangler_env_block() {
-    // Arrange
-    let src = r#"
-        model User for db {
-            primary { id: int }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
-
-    // Assert
-    expect_err!(errors, SemanticError::MissingWranglerEnvBlock);
-}
-
-#[test]
 fn wrangler_duplicate_symbol() {
     // Arrange
     let src = r#"
@@ -597,21 +580,17 @@ fn kv_r2_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    let binding = expect_err!(errors,
-        SemanticError::KvInvalidBinding { binding, ..} => binding.name
+    assert_eq!(
+        count_errs!(errors, SemanticError::UnresolvedSymbol { .. }),
+        2,
+        "expected two unresolved symbol errors, got: {:#?}",
+        errors
     );
-    assert_eq!(binding, "my_d1");
-
-    let binding = expect_err!(errors,
-        SemanticError::R2InvalidBinding { binding, .. } => binding.name
-    );
-    assert_eq!(binding, "my_kv");
 }
 
 #[test]
 fn binding_key_format_unknown_param() {
-    // A `{var}` in a binding field's key format must correspond to a declared
-    // param on that field. Otherwise we should get KvR2UnknownKeyVariable.
+    // Arrange
     let src = r#"
         kv UserMeta {
             meta(id: int) -> json {
@@ -625,16 +604,19 @@ fn binding_key_format_unknown_param() {
             }
         }
     "#;
+
+    // Act
     let parse = lex_and_ast(src);
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
-    let unknowns: Vec<&str> = errors
+    // Assert
+    let unknowns = errors
         .iter()
         .filter_map(|e| match e {
-            SemanticError::KvR2UnknownKeyVariable { variable, .. } => Some(*variable),
+            SemanticError::TemplateUnknownVariable { variable, .. } => Some(*variable),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(
         unknowns.contains(&"bogus"),
         "expected 'bogus' to be flagged, got: {:?}",
@@ -649,25 +631,28 @@ fn binding_key_format_unknown_param() {
 
 #[test]
 fn binding_key_format_invalid_syntax() {
-    // Malformed key format (unclosed/nested brace) should produce KvR2InvalidKeyFormat.
+    // Arrange
     let src = r#"
         kv NsA {
             entry(id: int) -> json {
-                "entry/{id"
+                "entry/{id" // missing closing brace
             }
         }
 
         r2 NsB {
             obj(id: int) {
-                "obj/{{id}"
+                "obj/{{id}" // nested braces not allowed
             }
         }
     "#;
+
+    // Act
     let parse = lex_and_ast(src);
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
+    // Assert
     assert_eq!(
-        count_errs!(errors, SemanticError::KvR2InvalidKeyFormat { .. }),
+        count_errs!(errors, SemanticError::TemplateInvalidFormat { .. }),
         2,
         "expected two invalid-key-format errors, got: {:#?}",
         errors
@@ -675,24 +660,44 @@ fn binding_key_format_invalid_syntax() {
 }
 
 #[test]
-fn kv_and_d1_coexist() {
-    // A model can have both D1 and KV/R2 properties
-    let src = &with_env(
-        r#"
+fn kv_r2_templates_inherit_validators_update_key_format() {
+    // Arrange
+    let src = r#"
+        d1 {
+            my_d1
+        }
+
+        kv MyKv {
+            [gt 10]
+            value([step 5] foo: int) -> int {
+                "users/{foo}"
+            }
+        }
+
+        r2 MyR2 {
+            obj([len 5] bar: string, [gt 0] baz: int) {
+                "objects/{bar}/{baz}"
+            }
+        }
+
         model User for my_d1 {
             primary {
-                id: int
+                userId: int
             }
             column {
                 name: string
             }
 
-            kv my_kv::cached(id) {
+            kv MyKv::value(userId) {
                 cached
             }
+
+            r2 MyR2::obj(name, userId) {
+                avatar
+            }
         }
-        "#,
-    );
+        "#;
+
     let parse = lex_and_ast(src);
 
     // Act
@@ -701,19 +706,48 @@ fn kv_and_d1_coexist() {
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
     let user = result.models.get("User").unwrap();
-    assert!(user.backing_binding.is_some());
-    assert_eq!(user.kv_fields.len(), 1);
-    assert_eq!(user.columns.len(), 1);
-    assert_eq!(user.kv_fields[0].binding, "my_kv");
-    assert_eq!(user.kv_fields[0].binding_field, "cached");
-    assert_eq!(user.kv_fields[0].args, vec!["id"]);
 
-    // The binding field's params live in the wrangler env, not on the model.
-    let env = result.wrangler_env.as_ref().unwrap();
-    let kv = env.kv_bindings.iter().find(|b| b.name == "my_kv").unwrap();
-    let cached = kv.fields.iter().find(|f| f.name == "cached").unwrap();
-    assert_eq!(cached.params[0].name, "id");
-    assert_eq!(cached.params[0].cidl_type, CidlType::Int);
+    assert_eq!(user.kv_fields.len(), 1);
+    assert_eq!(user.kv_fields[0].binding, "MyKv");
+    let kv_binding = &user.kv_fields[0];
+    assert_eq!(kv_binding.field.name, "cached");
+    assert_eq!(
+        kv_binding.field.cidl_type,
+        CidlType::KvObject(Box::new(CidlType::Int))
+    );
+    assert_eq!(kv_binding.field.validators.len(), 1);
+    assert!(matches!(
+        kv_binding.field.validators[0],
+        Validator::GreaterThan(Number::Int(10))
+    ));
+    assert_eq!(kv_binding.key_format, "users/{userId}");
+
+    assert_eq!(user.r2_fields.len(), 1);
+    assert_eq!(user.r2_fields[0].binding, "MyR2");
+    let r2_binding = &user.r2_fields[0];
+    assert_eq!(r2_binding.field.name, "avatar");
+    assert_eq!(r2_binding.field.cidl_type, CidlType::R2Object);
+    assert_eq!(r2_binding.key_format, "objects/{name}/{userId}");
+
+    let id_col = user
+        .primary_columns
+        .iter()
+        .find(|c| c.field.name == "userId")
+        .unwrap();
+    assert_eq!(id_col.field.validators.len(), 2);
+    assert!(matches!(id_col.field.validators[0], Validator::Step(5)));
+    assert!(matches!(
+        id_col.field.validators[1],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let name_col = user
+        .columns
+        .iter()
+        .find(|c| c.field.name == "name")
+        .unwrap();
+    assert_eq!(name_col.field.validators.len(), 1);
+    assert!(matches!(name_col.field.validators[0], Validator::Length(5)));
 }
 
 #[test]
@@ -1242,7 +1276,7 @@ fn inject_tag_populates_api_method_injected() {
 }
 
 #[test]
-fn inject_tag_dedupes_duplicates() {
+fn inject_tag_dedupes() {
     let src = r#"
         d1 { db }
 
@@ -1269,56 +1303,4 @@ fn inject_tag_dedupes_duplicates() {
         .find(|a| a.name == "dup")
         .unwrap();
     assert_eq!(api.injected, vec!["db"]);
-}
-
-#[test]
-fn dataless_model_errors() {
-    let src = r#"
-        d1 { db }
-
-        model Foo {}
-        model Bar {}
-
-        api Foo {
-            get instanceLike(self) -> string
-        }
-
-        api Bar {
-            post takesFoo(foo: Foo) -> string
-            get yieldsFoo() -> Foo
-            post takesPartialFoo(foo: partial<Foo>) -> string
-        }
-
-        poo Container {
-            inner: Foo
-        }
-
-        source FooSource for Foo {
-            include {}
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
-
-    let method = expect_err!(errors,
-        SemanticError::ModelInstanceMethodWithNoData { method } => method
-    );
-    assert_eq!(method.name, "instanceLike");
-
-    let data_source = expect_err!(errors,
-        SemanticError::ModelDataSourceWithNoData { data_source, .. } => data_source
-    );
-    assert_eq!(data_source.name, "FooSource");
-
-    let used_as_type_count = errors
-        .iter()
-        .filter(|e| {
-            matches!(
-                e,
-                SemanticError::ModelWithNoDataUsedAsType { model_name, .. } if *model_name == "Foo"
-            )
-        })
-        .count();
-    assert_eq!(used_as_type_count, 4);
 }

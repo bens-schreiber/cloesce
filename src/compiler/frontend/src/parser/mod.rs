@@ -318,9 +318,7 @@ fn cidl_type<'tokens, 'src: 'tokens>()
             Keyword::GPaginated => Ok(CidlType::paginated(inner)),
             Keyword::GKvObject => Ok(CidlType::KvObject(Box::new(inner))),
             Keyword::GPartial => match inner {
-                CidlType::UnresolvedReference { name } => {
-                    Ok(CidlType::Partial { object_name: name })
-                }
+                CidlType::Object { name } => Ok(CidlType::Partial { object_name: name }),
                 _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
             },
             _ => unreachable!(
@@ -328,8 +326,9 @@ fn cidl_type<'tokens, 'src: 'tokens>()
             ),
         });
 
-        let unresolved_type = select! { Token::Ident(name) => name }
-            .map(|name: &str| CidlType::UnresolvedReference { name });
+        // If unresolved, assume its an object
+        let unresolved_type =
+            select! { Token::Ident(name) => name }.map(|name: &str| CidlType::Object { name });
 
         choice((generic, primitive_keyword, unresolved_type)).boxed()
     })

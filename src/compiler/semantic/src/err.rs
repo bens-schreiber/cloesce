@@ -19,9 +19,6 @@ pub enum SemanticError<'src, 'p> {
         symbol: &'p Symbol<'src>,
     },
 
-    /// A model relies on a Wrangler environment block that is not defined within the project.
-    MissingWranglerEnvBlock,
-
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
     D1ModelMissingD1Binding {
         model: &'p Symbol<'src>,
@@ -110,24 +107,15 @@ pub enum SemanticError<'src, 'p> {
         arg: &'p Symbol<'src>,
     },
 
-    /// A KV tag references an env binding that is not a KV namespace
-    KvInvalidBinding {
-        binding: &'p Symbol<'src>,
-    },
-
-    /// An R2 tag references an env binding that is not an R2 bucket
-    R2InvalidBinding {
-        binding: &'p Symbol<'src>,
-    },
-
-    /// A KV/R2 key format string references a variable that is not a field or key param on the model
-    KvR2UnknownKeyVariable {
+    /// A template format string references a variable that is not in the
+    /// parameter list
+    TemplateUnknownVariable {
         field: &'p Symbol<'src>,
         variable: &'src str,
     },
 
-    /// A KV/R2 key format string has invalid syntax (e.g. nested or unclosed braces)
-    KvR2InvalidKeyFormat {
+    /// A template format string has invalid syntax (e.g. nested or unclosed braces)
+    TemplateInvalidFormat {
         field: &'p Symbol<'src>,
         reason: String,
     },
@@ -209,20 +197,6 @@ pub enum SemanticError<'src, 'p> {
     TagInvalidInContext {
         tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
-    },
-
-    ModelInstanceMethodWithNoData {
-        method: &'p Symbol<'src>,
-    },
-
-    ModelDataSourceWithNoData {
-        model: &'p Symbol<'src>,
-        data_source: &'p Symbol<'src>,
-    },
-
-    ModelWithNoDataUsedAsType {
-        usage: &'p Symbol<'src>,
-        model_name: &'src str,
     },
 }
 
@@ -326,10 +300,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::MissingWranglerEnvBlock => {
-            eprintln!("error: project has models but no `env` block is defined");
-            return;
-        }
         SemanticError::D1ModelMissingD1Binding { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
@@ -396,7 +366,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("remove the `?` from this column's type")
+                        .with_message("remove the `option` from this column's type")
                         .with_color(Color::Red),
                 )
         }
@@ -544,52 +514,24 @@ fn display(
             );
             return;
         }
-        SemanticError::KvInvalidBinding { binding } => {
-            let (path, range) = span_parts(&binding.span, file_table);
+        SemanticError::TemplateUnknownVariable { field, variable } => {
+            let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "'{}' is not a valid KV namespace binding",
-                    binding.name
+                    "template format references unknown variable '${variable}'"
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "this binding does not refer to a KV namespace in the env block",
+                            "this variable is not declared as a parameter in the template",
                         )
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::R2InvalidBinding { binding } => {
-            let (path, range) = span_parts(&binding.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "'{}' is not a valid R2 bucket binding",
-                    binding.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "this binding does not refer to an R2 bucket in the env block",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::KvR2UnknownKeyVariable { field, variable } => {
+        SemanticError::TemplateInvalidFormat { field, reason } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "key format references unknown variable '${variable}'"
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("this variable is not a field or key param on the model")
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::KvR2InvalidKeyFormat { field, reason } => {
-            let (path, range) = span_parts(&field.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message("invalid key format string")
+                .with_message("invalid template format string")
                 .with_label(
                     Label::new((path, range))
                         .with_message(reason.as_str())
@@ -881,58 +823,6 @@ fn display(
                     Label::new((t_path, t_range))
                         .with_message("this tag is an instance tag")
                         .with_color(Color::Blue),
-                )
-        }
-        SemanticError::ModelInstanceMethodWithNoData { method } => {
-            let (path, range) = span_parts(&method.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "data-less model API method '{}' cannot declare `self`",
-                    method.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "data-less models have no instance state; only static methods are allowed",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::ModelDataSourceWithNoData { model, data_source } => {
-            let (m_path, m_range) = span_parts(&model.span, file_table);
-            let (d_path, d_range) = span_parts(&data_source.span, file_table);
-            report!(d_path.clone(), d_range.clone())
-                .with_message(format!(
-                    "data-less model '{}' cannot declare a data source",
-                    model.name
-                ))
-                .with_label(
-                    Label::new((d_path, d_range))
-                        .with_message("data sources require D1-backed storage")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((m_path, m_range))
-                        .with_message(format!(
-                            "model '{}' has no data fields (no columns, KV, R2, or key fields)",
-                            model.name
-                        ))
-                        .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::ModelWithNoDataUsedAsType { usage, model_name } => {
-            let (path, range) = span_parts(&usage.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "data-less model '{}' cannot be used as a value type",
-                    model_name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "data-less models have no fields and cannot appear as API parameters, return types, or POO fields",
-                        )
-                        .with_color(Color::Red),
                 )
         }
     };

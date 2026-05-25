@@ -53,7 +53,7 @@ impl<'src, 'p> SemanticAnalysis {
 
         let wrangler_env = build_wrangler_env(&table, &mut sink);
 
-        let mut models = match ModelAnalysis::default().analyze(&table) {
+        let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
             Ok(models) => models,
             Err(errs) => {
                 sink.extend(errs);
@@ -167,6 +167,15 @@ impl<'src, 'p> SemanticAnalysis {
 
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum LocalSymbolKind<'src> {
+    BindingTemplate {
+        binding: &'src str,
+        name: &'src str,
+    },
+    BindingTemplateParam {
+        binding: &'src str,
+        template: &'src str,
+        name: &'src str,
+    },
     ModelField {
         model: &'src str,
         name: &'src str,
@@ -347,11 +356,57 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::KvBinding(block) => {
                     if insert_global(sink, &block.symbol) {
                         st.kv_bindings.insert(block.symbol.name, block);
+
+                        for field in block.templates.inners() {
+                            insert_local(
+                                sink,
+                                &field.symbol,
+                                LocalSymbolKind::BindingTemplate {
+                                    binding: block.symbol.name,
+                                    name: field.symbol.name,
+                                },
+                            );
+
+                            for param in &field.params {
+                                insert_local(
+                                    sink,
+                                    param,
+                                    LocalSymbolKind::BindingTemplateParam {
+                                        binding: block.symbol.name,
+                                        template: field.symbol.name,
+                                        name: param.name,
+                                    },
+                                );
+                            }
+                        }
                     }
                 }
                 AstBlockKind::R2Binding(block) => {
                     if insert_global(sink, &block.symbol) {
                         st.r2_bindings.insert(block.symbol.name, block);
+
+                        for field in block.templates.inners() {
+                            insert_local(
+                                sink,
+                                &field.symbol,
+                                LocalSymbolKind::BindingTemplate {
+                                    binding: block.symbol.name,
+                                    name: field.symbol.name,
+                                },
+                            );
+
+                            for param in &field.params {
+                                insert_local(
+                                    sink,
+                                    param,
+                                    LocalSymbolKind::BindingTemplateParam {
+                                        binding: block.symbol.name,
+                                        template: field.symbol.name,
+                                        name: param.name,
+                                    },
+                                );
+                            }
+                        }
                     }
                 }
                 AstBlockKind::Vars(block) => {
@@ -373,8 +428,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
     }
 }
 
-/// Converts a [CidlType::UnresolvedReference] to a resolved type of [CidlType::Object] or [CidlType::Inject]
-/// if possible, recursively. Also validates references inside of generic types.
+/// Resolves references inside of [CidlType::Object] and [CidlType::Partial] to ensure they point to a valid model or POO.
 ///
 /// Returns an error if the type cannot be resolved or is invalid.
 fn resolve_cidl_type<'src, 'p>(
@@ -383,42 +437,17 @@ fn resolve_cidl_type<'src, 'p>(
     table: &SymbolTable<'src, 'p>,
 ) -> Result<CidlType<'src>, SemanticError<'src, 'p>> {
     match cidl_type {
-        CidlType::UnresolvedReference { name } => {
-            if let Some(sym) = table.models.get(name) {
-                if sym.blocks.is_empty() {
-                    return Err(SemanticError::ModelWithNoDataUsedAsType {
-                        usage: symbol,
-                        model_name: sym.symbol.name,
-                    });
-                }
-                return Ok(CidlType::Object {
-                    name: sym.symbol.name,
-                });
+        CidlType::Object { name } => {
+            if table.models.contains_key(name) || table.poos.contains_key(name) {
+                return Ok(cidl_type.clone());
             }
-
-            if let Some(sym) = table.poos.get(name) {
-                return Ok(CidlType::Object {
-                    name: sym.symbol.name,
-                });
-            }
-
             Err(SemanticError::UnresolvedSymbol { symbol })
         }
         CidlType::Partial { object_name } => {
-            if let Some(sym) = table.models.get(object_name) {
-                if sym.blocks.is_empty() {
-                    return Err(SemanticError::ModelWithNoDataUsedAsType {
-                        usage: symbol,
-                        model_name: sym.symbol.name,
-                    });
-                }
+            if table.models.contains_key(object_name) || table.poos.contains_key(object_name) {
                 return Ok(cidl_type.clone());
             }
-
-            if !table.poos.contains_key(object_name) {
-                return Err(SemanticError::UnresolvedSymbol { symbol });
-            }
-            Ok(cidl_type.clone())
+            Err(SemanticError::UnresolvedSymbol { symbol })
         }
         CidlType::Nullable(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;

@@ -1,28 +1,23 @@
-use frontend::Symbol;
-use idl::{
-    Field, KvBinding, KvBindingField, R2Binding, R2BindingField, ValidatedField, WranglerEnv,
-};
+use frontend::{SpdSlice, Symbol};
+use idl::{Binding, BindingTemplate, CidlType, Field, ValidatedField, WranglerEnv};
 
 use crate::{
-    SymbolTable, ensure,
+    SymbolTable,
     err::{ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
 };
 
 /// Builds the [WranglerEnv] from the symbol table, resolving and validating
-/// KV/R2 binding fields and their parameters along the way.
-///
-/// Returns [None] if there is nothing to put in the env block and no models
-/// require one.
+/// KV/R2 binding templates and their parameters along the way.
 pub fn build_wrangler_env<'src, 'p>(
     table: &SymbolTable<'src, 'p>,
     sink: &mut ErrorSink<'src, 'p>,
-) -> Option<WranglerEnv<'src>> {
-    let d1_bindings: Vec<&'src str> = table
+) -> WranglerEnv<'src> {
+    let d1_bindings = table
         .d1_bindings
         .iter()
         .flat_map(|b| b.bindings.iter().map(|s| s.name))
-        .collect();
+        .collect::<Vec<_>>();
 
     let vars = table
         .vars_blocks
@@ -36,68 +31,91 @@ pub fn build_wrangler_env<'src, 'p>(
 
     let mut kv_bindings = Vec::new();
     for block in table.kv_bindings.values() {
-        let mut fields = Vec::new();
-        for spd in &block.fields {
-            let bf = &spd.inner;
-
-            let resolved_type = match resolve_cidl_type(&bf.symbol, &bf.symbol.cidl_type, table) {
-                Ok(t) => t,
-                Err(err) => {
-                    sink.push(err);
-                    continue;
-                }
+        let mut templates = Vec::new();
+        for bf in block.templates.inners() {
+            let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+                continue;
             };
 
-            let params = resolve_binding_params(&bf.params, table, sink);
-            validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink);
+            // KV templates always return `KvObject<T>`
+            // (or `paginated<KvObject<T>>` if the template is paginated).
+            field.cidl_type = match &field.cidl_type {
+                CidlType::Paginated(inner) => {
+                    CidlType::paginated(CidlType::KvObject(inner.clone()))
+                }
+                other => CidlType::KvObject(Box::new(other.clone())),
+            };
 
-            fields.push(KvBindingField {
-                name: bf.symbol.name,
-                cidl_type: resolved_type,
-                params,
+            let params = bf
+                .params
+                .iter()
+                .filter_map(|p| validate_symbol(p, sink, table))
+                .collect::<Vec<_>>();
+
+            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
+                || params.len() != bf.params.len()
+            {
+                continue;
+            }
+
+            templates.push(BindingTemplate {
+                field,
                 key_format: bf.key_format,
+                params,
             });
         }
 
-        kv_bindings.push(KvBinding {
+        kv_bindings.push(Binding {
             name: block.symbol.name,
-            fields,
+            templates,
         });
     }
 
     let mut r2_bindings = Vec::new();
     for block in table.r2_bindings.values() {
-        let mut fields = Vec::new();
-        for spd in &block.fields {
-            let bf = &spd.inner;
-            let params = resolve_binding_params(&bf.params, table, sink);
-            validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink);
-            fields.push(R2BindingField {
-                name: bf.symbol.name,
-                params,
+        let mut templates = Vec::new();
+        for bf in block.templates.inners() {
+            let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+                continue;
+            };
+
+            // R2 templates always return `R2Object` (or `paginated<R2Object>` if the template is paginated).
+            field.cidl_type = if bf.is_paginated {
+                CidlType::Paginated(Box::new(CidlType::R2Object))
+            } else {
+                CidlType::R2Object
+            };
+
+            let params = bf
+                .params
+                .iter()
+                .filter_map(|p| validate_symbol(p, sink, table))
+                .collect::<Vec<_>>();
+
+            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
+                || params.len() != bf.params.len()
+            {
+                continue;
+            }
+            templates.push(BindingTemplate {
+                field,
                 key_format: bf.key_format,
-                is_paginated: bf.is_paginated,
+                params,
             });
         }
-        r2_bindings.push(R2Binding {
+
+        r2_bindings.push(Binding {
             name: block.symbol.name,
-            fields,
+            templates,
         });
     }
 
-    if d1_bindings.is_empty() && kv_bindings.is_empty() && r2_bindings.is_empty() && vars.is_empty()
-    {
-        let needs_env = table.models.values().any(|m| !m.blocks.is_empty());
-        ensure!(!needs_env, sink, SemanticError::MissingWranglerEnvBlock);
-        return None;
-    };
-
-    Some(WranglerEnv {
+    WranglerEnv {
         d1_bindings,
         r2_bindings,
         kv_bindings,
         vars,
-    })
+    }
 }
 
 /// Validates that every `{var}` referenced in a binding field's key format
@@ -109,23 +127,26 @@ fn validate_key_format<'src, 'p>(
     key_format: &'src str,
     params: &'p [Symbol<'src>],
     sink: &mut ErrorSink<'src, 'p>,
-) {
+) -> bool {
     let vars = match extract_braced(key_format) {
         Ok(v) => v,
         Err(reason) => {
-            sink.push(SemanticError::KvR2InvalidKeyFormat { field, reason });
-            return;
+            sink.push(SemanticError::TemplateInvalidFormat { field, reason });
+            return false;
         }
     };
 
     for var in vars {
         if !params.iter().any(|p| p.name == var) {
-            sink.push(SemanticError::KvR2UnknownKeyVariable {
+            sink.push(SemanticError::TemplateUnknownVariable {
                 field,
                 variable: var,
             });
+            return false;
         }
     }
+
+    true
 }
 
 /// Extracts braced variables from a format string.
@@ -154,35 +175,30 @@ fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
     Ok(out)
 }
 
-/// Resolves a binding field's parameter symbols into [ValidatedField]s.
-fn resolve_binding_params<'src, 'p>(
-    params: &'p [Symbol<'src>],
-    table: &SymbolTable<'src, 'p>,
+fn validate_symbol<'src, 'p>(
+    symbol: &'p Symbol<'src>,
     sink: &mut ErrorSink<'src, 'p>,
-) -> Vec<ValidatedField<'src>> {
-    let mut out = Vec::new();
-    for param in params {
-        let resolved = match resolve_cidl_type(param, &param.cidl_type, table) {
-            Ok(t) => t,
-            Err(err) => {
-                sink.push(err);
-                continue;
-            }
-        };
+    table: &SymbolTable<'src, 'p>,
+) -> Option<ValidatedField<'src>> {
+    let cidl_type = match resolve_cidl_type(symbol, &symbol.cidl_type, table) {
+        Ok(t) => t,
+        Err(err) => {
+            sink.push(err);
+            return None;
+        }
+    };
 
-        let validators = match resolve_validator_tags(param) {
-            Ok(v) => v,
-            Err(errs) => {
-                sink.extend(errs);
-                Vec::new()
-            }
-        };
+    let validators = match resolve_validator_tags(symbol) {
+        Ok(tags) => tags,
+        Err(errs) => {
+            sink.extend(errs);
+            return None;
+        }
+    };
 
-        out.push(ValidatedField {
-            name: param.name.into(),
-            cidl_type: resolved,
-            validators,
-        });
-    }
-    out
+    Some(ValidatedField {
+        name: symbol.name.into(),
+        cidl_type,
+        validators,
+    })
 }

@@ -75,12 +75,6 @@ pub enum CidlType<'src> {
     /// A Cloudflare Workers KV object (GET value response)
     #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
-
-    /// A reference to an object or injected type that is not yet resolved by semantic analysis.
-    UnresolvedReference {
-        #[serde(borrow)]
-        name: &'src str,
-    },
 }
 
 impl<'src> CidlType<'src> {
@@ -319,40 +313,25 @@ pub struct DataSource<'src> {
 
 #[derive(Deserialize, Serialize)]
 pub struct KvField<'src> {
-    #[serde(borrow)]
     pub field: ValidatedField<'src>,
 
-    /// The KV binding being referenced.
+    /// The KV namespace being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    /// The field on the KV binding being referenced.
-    #[serde(borrow)]
-    pub binding_field: &'src str,
-
-    /// Names of Model fields supplied as arguments to the binding field's key format.
-    #[serde(borrow)]
-    pub args: Vec<&'src str>,
+    pub key_format: String,
 }
 
-/// A reference on a Model to a field on an R2 binding.
 #[derive(Deserialize, Serialize)]
 pub struct R2Field<'src> {
-    /// The local field on the Model (always of type `r2object`).
     #[serde(borrow)]
     pub field: Field<'src>,
 
-    /// The R2 binding being referenced.
+    /// The R2 bucket being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    /// The field on the R2 binding being referenced.
-    #[serde(borrow)]
-    pub binding_field: &'src str,
-
-    /// Names of Model fields supplied as arguments to the binding field's key format.
-    #[serde(borrow)]
-    pub args: Vec<&'src str>,
+    pub key_format: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq)]
@@ -443,17 +422,6 @@ impl Model<'_> {
         self.primary_columns.len() > 1
     }
 
-    /// A "data-less" model has no actual data stored on it, and serves
-    /// only as a namespace for APIs.
-    pub fn is_dataless(&self) -> bool {
-        self.backing_binding.is_none()
-            && self.primary_columns.is_empty()
-            && self.columns.is_empty()
-            && self.kv_fields.is_empty()
-            && self.r2_fields.is_empty()
-            && self.navigation_fields.is_empty()
-    }
-
     /// Returns all columns, including primary key columns, as a single list.
     /// The boolean indicates whether the column is a primary key column.
     pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'_>, bool)> {
@@ -473,68 +441,37 @@ pub struct PlainOldObject<'src> {
     pub fields: Vec<ValidatedField<'src>>,
 }
 
+/// Some field within a KV or R2 binding
+/// which represents a function to create keys for the binding
 #[derive(Deserialize, Serialize)]
-pub struct KvBindingField<'src> {
+pub struct BindingTemplate<'src> {
     #[serde(borrow)]
-    pub name: &'src str,
+    pub field: ValidatedField<'src>,
 
-    #[serde(borrow)]
-    pub cidl_type: CidlType<'src>,
-
-    /// Parameters required to construct a key for this field.
     #[serde(borrow)]
     pub params: Vec<ValidatedField<'src>>,
 
-    /// The key format string (e.g. `"metadata/{id}"`).
     #[serde(borrow)]
     pub key_format: &'src str,
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct KvBinding<'src> {
-    #[serde(borrow)]
+pub struct Binding<'src> {
     pub name: &'src str,
-
-    #[serde(borrow)]
-    pub fields: Vec<KvBindingField<'src>>,
+    pub templates: Vec<BindingTemplate<'src>>,
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct R2BindingField<'src> {
-    #[serde(borrow)]
-    pub name: &'src str,
-
-    /// Parameters required to construct a key for this field.
-    #[serde(borrow)]
-    pub params: Vec<ValidatedField<'src>>,
-
-    /// The key format string (e.g. `"key/{id}"`).
-    #[serde(borrow)]
-    pub key_format: &'src str,
-
-    /// If true, the field returns a `Paginated<R2Object>`
-    pub is_paginated: bool,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct R2Binding<'src> {
-    #[serde(borrow)]
-    pub name: &'src str,
-
-    #[serde(borrow)]
-    pub fields: Vec<R2BindingField<'src>>,
-}
-
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct WranglerEnv<'src> {
+    /// Contains each d1 binding name
     #[serde(borrow)]
     pub d1_bindings: Vec<&'src str>,
 
     #[serde(borrow)]
-    pub kv_bindings: Vec<KvBinding<'src>>,
+    pub kv_bindings: Vec<Binding<'src>>,
 
     #[serde(borrow)]
-    pub r2_bindings: Vec<R2Binding<'src>>,
+    pub r2_bindings: Vec<Binding<'src>>,
 
     #[serde(borrow)]
     pub vars: Vec<Field<'src>>,
@@ -549,7 +486,7 @@ pub struct CloesceIdl<'src> {
     pub hash: u64,
 
     #[serde(borrow)]
-    pub wrangler_env: Option<WranglerEnv<'src>>,
+    pub wrangler_env: WranglerEnv<'src>,
 
     #[serde(borrow)]
     pub models: IndexMap<&'src str, Model<'src>>,

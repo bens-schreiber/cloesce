@@ -73,8 +73,8 @@ fn top_level_bindings() {
         })
         .expect("r2 binding block to be present");
     assert_eq!(r2.symbol.name, "Assets");
-    assert_eq!(r2.fields.len(), 1);
-    let asset = &r2.fields[0].inner;
+    assert_eq!(r2.templates.len(), 1);
+    let asset = &r2.templates[0].inner;
     assert_eq!(asset.symbol.name, "asset");
     assert_eq!(asset.key_format, "assets/{id}");
     assert_eq!(asset.params.len(), 1);
@@ -91,15 +91,15 @@ fn top_level_bindings() {
         })
         .expect("kv binding block to be present");
     assert_eq!(kv.symbol.name, "Cache");
-    assert_eq!(kv.fields.len(), 2);
+    assert_eq!(kv.templates.len(), 2);
 
-    let entry = &kv.fields[0].inner;
+    let entry = &kv.templates[0].inner;
     assert_eq!(entry.symbol.name, "entry");
     assert_eq!(entry.symbol.cidl_type, CidlType::Json);
     assert_eq!(entry.key_format, "cache/{id}");
     assert_eq!(entry.params.len(), 1);
 
-    let page = &kv.fields[1].inner;
+    let page = &kv.templates[1].inner;
     assert_eq!(page.symbol.name, "page");
     assert_eq!(page.symbol.cidl_type, CidlType::paginated(CidlType::Json));
     assert_eq!(page.key_format, "cache/");
@@ -207,14 +207,12 @@ fn poo_block() {
             ("active", CidlType::Boolean),
             ("balance", CidlType::Real),
             ("created", CidlType::DateIso),
-            ("address", CidlType::UnresolvedReference { name: "Address" }),
+            ("address", CidlType::Object { name: "Address" }),
             ("tags", CidlType::array(CidlType::String)),
             ("metadata", CidlType::nullable(CidlType::Json)),
             (
                 "optional_items",
-                CidlType::nullable(CidlType::array(CidlType::UnresolvedReference {
-                    name: "Item",
-                }))
+                CidlType::nullable(CidlType::array(CidlType::Object { name: "Item" }))
             ),
             (
                 "nullable_arrays",
@@ -613,7 +611,7 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(kv_value.binding.name, "NsA");
-    assert_eq!(kv_value.binding_field.name, "value");
+    assert_eq!(kv_value.binding_template.name, "value");
     assert_eq!(
         kv_value.args.iter().map(|s| s.name).collect::<Vec<_>>(),
         vec!["id"]
@@ -628,7 +626,7 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(kv_page.binding.name, "NsB");
-    assert_eq!(kv_page.binding_field.name, "page");
+    assert_eq!(kv_page.binding_template.name, "page");
 
     let r2_photo = m
         .blocks
@@ -639,7 +637,7 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(r2_photo.binding.name, "BucketA");
-    assert_eq!(r2_photo.binding_field.name, "photo");
+    assert_eq!(r2_photo.binding_template.name, "photo");
     assert_eq!(
         r2_photo.args.iter().map(|s| s.name).collect::<Vec<_>>(),
         vec!["id"]
@@ -654,7 +652,7 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(r2_thumb.binding.name, "BucketB");
-    assert_eq!(r2_thumb.binding_field.name, "thumb");
+    assert_eq!(r2_thumb.binding_template.name, "thumb");
 }
 
 #[test]

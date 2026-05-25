@@ -4,7 +4,7 @@ d1 {
 
 kv store {
     [maxlen 500]
-    data(email: string) -> string {
+    data([regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/] email: string) -> string {
         "some_crap/{email}"
     }
 }
@@ -17,7 +17,6 @@ model Validator for db {
     }
 
     column {
-        [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
         [maxlen 255]
         [minlen 5]
         email: string

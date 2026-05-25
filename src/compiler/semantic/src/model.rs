@@ -1,28 +1,37 @@
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
+    is_valid_sql_type, kahns, resolve_validator_tags,
 };
 use frontend::{
     ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, R2FieldBlock, SpdSlice, SqlBlockKind,
     Symbol, Tag,
 };
 use idl::{
-    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField, Model, NavigationField,
-    NavigationFieldKind, R2Field, ValidatedField,
+    Binding, BindingTemplate, CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField,
+    Model, NavigationField, NavigationFieldKind, R2Field, ValidatedField, WranglerEnv,
 };
 use indexmap::IndexMap;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
-#[derive(Default)]
-pub struct ModelAnalysis<'src, 'p> {
+pub struct ModelAnalysis<'src, 'p, 'sem> {
+    env: &'sem WranglerEnv<'src>,
     sink: ErrorSink<'src, 'p>,
     in_degree: BTreeMap<&'src str, usize>,
     graph: BTreeMap<&'src str, Vec<&'src str>>,
 }
 
-impl<'src, 'p> ModelAnalysis<'src, 'p> {
+impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
+    pub fn new(env: &'sem WranglerEnv<'src>) -> Self {
+        Self {
+            env,
+            sink: ErrorSink::new(),
+            in_degree: BTreeMap::new(),
+            graph: BTreeMap::new(),
+        }
+    }
+
     pub fn analyze(
         mut self,
         table: &SymbolTable<'src, 'p>,
@@ -124,10 +133,10 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
     }
 }
 
-impl<'src, 'p> ModelBuilder<'src, 'p> {
+impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
     fn build(
         mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
     ) -> Option<Model<'src>> {
         ma.graph.entry(self.name).or_default();
@@ -195,9 +204,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Unique(_) => {
-                    // Processed once all columns are built
-                }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
                     binding.unwrap().name,
@@ -206,18 +212,18 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
                     false,
                     table,
                 ),
-                ModelBlockKind::Kv(kv_block) => {
-                    self.kv_field(ma, table, kv_block);
-                }
-                ModelBlockKind::R2(r2_block) => {
-                    self.r2_field(ma, table, r2_block);
+                ModelBlockKind::Unique(_) | ModelBlockKind::Kv(_) | ModelBlockKind::R2(_) => {
+                    // Processed once all columns are built
                 }
             }
         }
 
         for block in self.model.blocks.inners() {
-            if let ModelBlockKind::Unique(fields) = block {
-                self.unique_constraint(ma, fields);
+            match block {
+                ModelBlockKind::Unique(fields) => self.unique_constraint(ma, fields),
+                ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv),
+                ModelBlockKind::R2(r2) => self.r2_field(ma, table, r2),
+                _ => {}
             }
         }
 
@@ -242,7 +248,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
     fn column(
         &mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         symbol: &'p Symbol<'src>,
         is_primary: bool,
     ) {
@@ -295,40 +301,9 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         }
     }
 
-    fn unique_constraint(&mut self, ma: &mut ModelAnalysis<'src, 'p>, fields: &'p [Symbol<'src>]) {
-        let mut targets: Vec<usize> = Vec::new();
-        for field in fields {
-            if self
-                .primary_columns
-                .iter()
-                .any(|c| c.field.name == field.name)
-            {
-                // References to primary-key columns can just be
-                // dropped, since the PK is already unique.
-                continue;
-            }
-            match self.columns.iter().position(|c| c.field.name == field.name) {
-                Some(i) => targets.push(i),
-                None => ma
-                    .sink
-                    .push(SemanticError::UnresolvedSymbol { symbol: field }),
-            }
-        }
-
-        if targets.is_empty() {
-            return;
-        }
-
-        let id = self.unique_seed;
-        self.unique_seed += 1;
-        for idx in targets {
-            self.columns[idx].unique_ids.push(id);
-        }
-    }
-
     fn foreign(
         &mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
         binding: &'src str,
         fk: &'p ForeignBlock<'src>,
@@ -465,7 +440,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
 
     fn nav(
         &mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         binding: &'src str,
         adj: &'p [(Symbol<'src>, Symbol<'src>)],
         field: &'p Symbol<'src>,
@@ -614,183 +589,206 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
         })
     }
 
+    // NOTE: Ran after all columns are processed
+    fn unique_constraint(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
+        fields: &'p [Symbol<'src>],
+    ) {
+        let mut targets: Vec<usize> = Vec::new();
+        for field in fields {
+            if self
+                .primary_columns
+                .iter()
+                .any(|c| c.field.name == field.name)
+            {
+                // References to primary-key columns can just be
+                // dropped, since the PK is already unique.
+                continue;
+            }
+            match self.columns.iter().position(|c| c.field.name == field.name) {
+                Some(i) => targets.push(i),
+                None => ma
+                    .sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: field }),
+            }
+        }
+
+        if targets.is_empty() {
+            return;
+        }
+
+        let id = self.unique_seed;
+        self.unique_seed += 1;
+        for idx in targets {
+            self.columns[idx].unique_ids.push(id);
+        }
+    }
+
+    /// NOTE: Ran after all columns are processed
     fn kv_field(
         &mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
         kv: &'p KvFieldBlock<'src>,
     ) {
-        // Resolve binding
-        let Some(binding) = table.kv_bindings.get(kv.binding.name) else {
-            ma.sink.push(SemanticError::KvInvalidBinding {
-                binding: &kv.binding,
-            });
-            return;
-        };
-
-        // Resolve binding field
-        let Some(bf_spd) = binding
-            .fields
-            .iter()
-            .find(|spd| spd.inner.symbol.name == kv.binding_field.name)
-        else {
+        if !table.kv_bindings.contains_key(&kv.binding.name) {
             ma.sink.push(SemanticError::UnresolvedSymbol {
-                symbol: &kv.binding_field,
-            });
-            return;
-        };
-        let bf = &bf_spd.inner;
-
-        // Argument count must match the binding field's param count
-        if kv.args.len() != bf.params.len() {
-            ma.sink.push(SemanticError::ArgCountMismatch {
-                field: &kv.field,
-                expected: bf.params.len(),
-                got: kv.args.len(),
+                symbol: &kv.binding,
             });
             return;
         }
 
-        // Each arg must reference a model field whose type matches the binding param's type
-        if !self.validate_binding_args(ma, table, &kv.field, &kv.args, &bf.params) {
+        let Some((template, key_format)) = self.resolve_binding_ref(
+            ma,
+            table,
+            ma.env.kv_bindings.as_slice(),
+            &kv.binding,
+            &kv.binding_template,
+            &kv.args,
+            &kv.field,
+        ) else {
             return;
-        }
-
-        let resolved_type = match resolve_cidl_type(&bf.symbol, &bf.symbol.cidl_type, table) {
-            Ok(t) => t,
-            Err(err) => {
-                ma.sink.push(err);
-                return;
-            }
-        };
-
-        // A KV ref on a Model is a `KvObject<T>` (or, if the binding returns a
-        // `paginated<T>`, a `paginated<KvObject<T>>`).
-        let local_type = match resolved_type {
-            CidlType::Paginated(inner) => CidlType::paginated(CidlType::KvObject(inner)),
-            other => CidlType::KvObject(Box::new(other)),
         };
 
         self.kv_fields.push(KvField {
             field: ValidatedField {
                 name: kv.field.name.into(),
-                cidl_type: local_type,
-                validators: Vec::new(),
+                cidl_type: template.field.cidl_type.clone(),
+                validators: template.field.validators.clone(),
             },
-            binding: binding.symbol.name,
-            binding_field: bf.symbol.name,
-            args: kv.args.iter().map(|s| s.name).collect(),
+            binding: kv.binding.name,
+            key_format,
         });
     }
 
+    /// NOTE: Ran after all columns are processed
     fn r2_field(
         &mut self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
         r2: &'p R2FieldBlock<'src>,
     ) {
-        // Resolve binding
-        let Some(binding) = table.r2_bindings.get(r2.binding.name) else {
-            ma.sink.push(SemanticError::R2InvalidBinding {
-                binding: &r2.binding,
-            });
-            return;
-        };
-
-        // Resolve binding field
-        let Some(bf_spd) = binding
-            .fields
-            .iter()
-            .find(|spd| spd.inner.symbol.name == r2.binding_field.name)
-        else {
+        if !table.r2_bindings.contains_key(&r2.binding.name) {
             ma.sink.push(SemanticError::UnresolvedSymbol {
-                symbol: &r2.binding_field,
-            });
-            return;
-        };
-        let bf = &bf_spd.inner;
-
-        if r2.args.len() != bf.params.len() {
-            ma.sink.push(SemanticError::ArgCountMismatch {
-                field: &r2.field,
-                expected: bf.params.len(),
-                got: r2.args.len(),
+                symbol: &r2.binding,
             });
             return;
         }
 
-        if !self.validate_binding_args(ma, table, &r2.field, &r2.args, &bf.params) {
+        let Some((template, key_format)) = self.resolve_binding_ref(
+            ma,
+            table,
+            &ma.env.r2_bindings,
+            &r2.binding,
+            &r2.binding_template,
+            &r2.args,
+            &r2.field,
+        ) else {
             return;
-        }
-
-        let local_type = if bf.is_paginated {
-            CidlType::paginated(CidlType::R2Object)
-        } else {
-            CidlType::R2Object
         };
 
         self.r2_fields.push(R2Field {
             field: Field {
                 name: r2.field.name.into(),
-                cidl_type: local_type,
+                cidl_type: template.field.cidl_type.clone(),
             },
-            binding: binding.symbol.name,
-            binding_field: bf.symbol.name,
-            args: r2.args.iter().map(|s| s.name).collect(),
+            binding: r2.binding.name,
+            key_format,
         });
     }
 
-    /// Validates a binding reference's argument list against the binding field's params.
-    /// Each arg must be a model field whose type matches the corresponding param.
-    fn validate_binding_args(
-        &self,
-        ma: &mut ModelAnalysis<'src, 'p>,
+    /// Resolves a KV/R2 binding reference against the wrangler env and validates
+    /// its args against the binding template's params.
+    ///
+    /// On success, returns the resolved binding template and the key format with
+    /// the binding template's param placeholders replaced by the model's field
+    /// names.
+    ///
+    /// Extends each referenced column with the validators
+    /// declared on the corresponding binding template param.
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn resolve_binding_ref(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
-        local_field: &'p Symbol<'src>,
+        bindings: &'sem [Binding<'src>],
+        binding_sym: &'p Symbol<'src>,
+        template_sym: &'p Symbol<'src>,
         args: &'p [Symbol<'src>],
-        params: &'p [Symbol<'src>],
-    ) -> bool {
-        let mut ok = true;
-        for (arg, param) in args.iter().zip(params.iter()) {
-            // Arg must exist on the model
-            let arg_sym = match table.local.get(&LocalSymbolKind::ModelField {
+        field: &'p Symbol<'src>,
+    ) -> Option<(&'sem BindingTemplate<'src>, String)> {
+        if !table.local.contains_key(&LocalSymbolKind::BindingTemplate {
+            binding: binding_sym.name,
+            name: template_sym.name,
+        }) {
+            ma.sink.push(SemanticError::UnresolvedSymbol {
+                symbol: template_sym,
+            });
+            return None;
+        }
+
+        let Some(wrangler_binding) = bindings.iter().find(|b| b.name == binding_sym.name) else {
+            // The binding is invalid but the error has already been sunk during env validation
+            return None;
+        };
+
+        let Some(wrangler_binding_template) = wrangler_binding
+            .templates
+            .iter()
+            .find(|f| f.field.name == template_sym.name)
+        else {
+            // The binding is invalid but the error has already been sunk during env validation
+            return None;
+        };
+
+        if args.len() != wrangler_binding_template.params.len() {
+            ma.sink.push(SemanticError::ArgCountMismatch {
+                field,
+                expected: wrangler_binding_template.params.len(),
+                got: args.len(),
+            });
+            return None;
+        }
+
+        // Each arg must reference a field on this model of the same type as
+        // the corresponding binding template param.
+        let mut key_format = wrangler_binding_template.key_format.to_string();
+        for (arg, param) in args.iter().zip(&wrangler_binding_template.params) {
+            if !table.local.contains_key(&LocalSymbolKind::ModelField {
                 model: self.name,
                 name: arg.name,
             }) {
-                Some(s) => *s,
-                None => {
-                    ma.sink
-                        .push(SemanticError::UnresolvedSymbol { symbol: arg });
-                    ok = false;
-                    continue;
-                }
-            };
-
-            let resolved_param = match resolve_cidl_type(param, &param.cidl_type, table) {
-                Ok(t) => t,
-                Err(_) => {
-                    // Already reported during binding processing
-                    ok = false;
-                    continue;
-                }
-            };
-            let resolved_arg = match resolve_cidl_type(arg_sym, &arg_sym.cidl_type, table) {
-                Ok(t) => t,
-                Err(err) => {
-                    ma.sink.push(err);
-                    ok = false;
-                    continue;
-                }
-            };
-
-            if resolved_arg != resolved_param {
-                ma.sink.push(SemanticError::ArgTypeMismatch {
-                    field: local_field,
-                    arg,
-                });
-                ok = false;
+                ma.sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: arg });
+                return None;
             }
+
+            let Some(column) = self
+                .primary_columns
+                .iter_mut()
+                .chain(&mut self.columns)
+                .find(|f| f.field.name == arg.name)
+            else {
+                // The referenced symbol exists on the model but is not a column.
+                ma.sink.push(SemanticError::ArgTypeMismatch { field, arg });
+                return None;
+            };
+
+            if column.field.cidl_type != param.cidl_type {
+                ma.sink.push(SemanticError::ArgTypeMismatch { field, arg });
+                return None;
+            }
+
+            // Inherit validators from the binding template param onto the model's column
+            column.field.validators.extend(param.validators.clone());
+
+            // Replace the `{param}` placeholder with `{arg}`
+            key_format =
+                key_format.replace(&format!("{{{}}}", param.name), &format!("{{{}}}", arg.name));
         }
-        ok
+
+        Some((wrangler_binding_template, key_format))
     }
 }
