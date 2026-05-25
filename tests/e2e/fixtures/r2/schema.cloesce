@@ -3,11 +3,11 @@ d1 {
 }
 
 r2 bucket1 {
-    data(id: string) {
+    data(id: int) {
         "path/to/data/{id}"
     }
 
-    otherData(id: string) {
+    otherData(id: int) {
         "path/to/other/{id}"
     }
 

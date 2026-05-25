@@ -12,7 +12,6 @@
     "Course": {
       "hash": 3886618121582101491,
       "name": "Course",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -64,7 +63,7 @@
           }
         }
       ],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "$get",
@@ -194,7 +193,6 @@
     "Student": {
       "hash": 9911641945952268111,
       "name": "Student",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -258,7 +256,7 @@
           }
         }
       ],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "$get_CoursesOrderedDescending",
@@ -538,7 +536,6 @@
     "StudentCourse": {
       "hash": 5636406891270849129,
       "name": "StudentCourse",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 13925186158847468726,
@@ -627,7 +624,7 @@
           }
         }
       ],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "$get",

@@ -12,7 +12,6 @@
     "Foo": {
       "hash": 2057975560306353780,
       "name": "Foo",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 4616061733383249414,
@@ -30,7 +29,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "blockedMethod",

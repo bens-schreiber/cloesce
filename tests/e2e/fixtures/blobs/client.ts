@@ -134,6 +134,7 @@ export class BlobHaver {
       true
     );
   }
+
   static fromJson(data: any): BlobHaver {
     const __$res = Object.assign(new BlobHaver(), data);
     __$res.blob1 = b64ToU8(__$res.blob1);
@@ -164,6 +165,11 @@ export class BlobService {
       Uint8Array,
       false
     );
+  }
+
+  static fromJson(data: any): BlobService {
+    const __$res = Object.assign(new BlobService(), data);
+    return __$res;
   }
 }
 function dsKey(args: object): string {

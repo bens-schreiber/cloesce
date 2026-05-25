@@ -6,7 +6,9 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
-export interface Env {}
+
+export interface Env {
+}
 export abstract class InjectedThing {
     readonly tag = "InjectedThing";
 }
@@ -29,7 +31,7 @@ export namespace FooService {
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

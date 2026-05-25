@@ -617,7 +617,7 @@ pub struct MigrationsModel<'src> {
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub d1_binding: Option<String>,
+    pub backing_binding: Option<String>,
 
     #[serde(borrow)]
     pub primary_columns: Vec<Column<'src>>,

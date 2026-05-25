@@ -3,8 +3,7 @@
 export class Validator {
   id: number;
   email: string;
-  name: string;
-  data: KValue<string>;
+  someData: KValue<string>;
   async someMethod(
     id: number,
     name: string,
@@ -12,7 +11,6 @@ export class Validator {
   ): Promise<HttpResult<void>> {
     const __$id = [
       encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.name)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/${__$id}/someMethod`
@@ -82,14 +80,12 @@ export class Validator {
   }
   static async $get(
     id: number,
-    name: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$get`
     );
     __$baseUrl.searchParams.append("id", String(id));
-    __$baseUrl.searchParams.append("name", String(name));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -104,14 +100,12 @@ export class Validator {
   }
   static async $get_None(
     id: number,
-    name: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Validator>> {
     const __$baseUrl = new URL(
       `http://localhost:5038/api/Validator/$get_None`
     );
     __$baseUrl.searchParams.append("id", String(id));
-    __$baseUrl.searchParams.append("name", String(name));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -168,9 +162,10 @@ export class Validator {
       true
     );
   }
+
   static fromJson(data: any): Validator {
     const __$res = Object.assign(new Validator(), data);
-    if (__$res.data) __$res.data = Object.assign(new KValue(), __$res.data);
+    if (__$res.someData) __$res.someData = Object.assign(new KValue(), __$res.someData);
     return __$res;
   }
 }

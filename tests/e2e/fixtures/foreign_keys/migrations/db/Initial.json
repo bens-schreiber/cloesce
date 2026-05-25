@@ -4,7 +4,7 @@
     "A": {
       "hash": 13694065073971378326,
       "name": "A",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -61,7 +61,7 @@
     "B": {
       "hash": 5976713688952143785,
       "name": "B",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -103,7 +103,7 @@
     "Course": {
       "hash": 16444759045496253105,
       "name": "Course",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -139,7 +139,7 @@
     "Person": {
       "hash": 823242336505793948,
       "name": "Person",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -181,7 +181,7 @@
     "Student": {
       "hash": 7328299033105353133,
       "name": "Student",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -217,7 +217,7 @@
     "Dog": {
       "hash": 8677285544175970002,
       "name": "Dog",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,

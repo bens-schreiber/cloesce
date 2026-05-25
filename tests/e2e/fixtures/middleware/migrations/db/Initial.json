@@ -4,7 +4,7 @@
     "Foo": {
       "hash": 2057975560306353780,
       "name": "Foo",
-      "d1_binding": "db",
+      "backing_binding": "db",
       "primary_columns": [
         {
           "hash": 4616061733383249414,

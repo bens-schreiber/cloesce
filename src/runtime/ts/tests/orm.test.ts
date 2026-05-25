@@ -221,12 +221,12 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .kvField("config/{id}", "namespace1", "config", false, "Json")
-      .kvField("config/{id}", "namespace1", "configStream", false, "Stream")
-      .kvField("config", "namespace1", "configList", true, "Json")
-      .kvField("emptyConfig", "namespace1", "emptyConfig", false, "Json")
-      .r2Field("images/{id}", "bucket1", "image", false)
-      .r2Field("images", "bucket1", "imageList", true)
+      .kvField("config/{id}", "namespace1", "config", "Json")
+      .kvField("config/{id}", "namespace1", "configStream", "Stream")
+      .kvField("config", "namespace1", "configList", { Paginated: "Json" })
+      .kvField("emptyConfig", "namespace1", "emptyConfig", "Json")
+      .r2Field("images/{id}", "bucket1", "image")
+      .r2Field("images", "bucket1", "imageList", { Paginated: "R2Object" })
       .r2Field("emptyImage", "bucket1", "emptyImage", false)
       .build();
 
@@ -386,7 +386,7 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("CursorModel")
       .idPk()
-      .kvField("cursor-test", "namespace1", "configList", true, "Json")
+      .kvField("cursor-test", "namespace1", "configList", { Paginated: "Json" })
       .build();
 
     const mf = new Miniflare({

@@ -13,7 +13,6 @@
     "DB1Model": {
       "hash": 7341731061861978357,
       "name": "DB1Model",
-      "d1_binding": "db1",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -43,7 +42,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": "db1",
       "apis": [
         {
           "name": "$get",
@@ -173,7 +172,6 @@
     "DB2Model": {
       "hash": 122024037709630579,
       "name": "DB2Model",
-      "d1_binding": "db2",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -203,7 +201,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": "db2",
       "apis": [
         {
           "name": "$get",

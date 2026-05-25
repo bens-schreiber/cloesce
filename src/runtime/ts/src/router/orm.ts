@@ -83,7 +83,7 @@ export class Orm {
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
-    if (!meta.d1_binding) {
+    if (!meta.backing_binding) {
       return "";
     }
 
@@ -201,8 +201,8 @@ export class Orm {
     });
 
     // If there are any SQL queries to execute, collect them as [D1PreparedStatement]s
-    const db: D1Database | undefined = meta.d1_binding
-      ? (this.env as any)[meta.d1_binding]
+    const db: D1Database | undefined = meta.backing_binding
+      ? (this.env as any)[meta.backing_binding]
       : undefined;
     const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
@@ -319,7 +319,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T | null>> {
-    if (!query || !meta.d1_binding) {
+    if (!query || !meta.backing_binding) {
       // No query provided, hydrate any non-SQL fields
       return await this.hydrate(meta, {}, includeTree);
     }
@@ -347,7 +347,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query || !meta.d1_binding) {
+    if (!query || !meta.backing_binding) {
       return { value: [], errors: [] };
     }
 
@@ -471,9 +471,10 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     }
 
     for (const kv of modelMeta.kv_fields) {
-      const key = resolveKey(kv.format, value);
+      const key = resolveKey(kv.key_format, value);
+      const isPaginated = typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        if (kv.list_prefix) {
+        if (isPaginated) {
           value[kv.field.name] = {
             results: [],
             cursor: null,
@@ -484,16 +485,17 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       }
       const namespace: KVNamespace = args.env[kv.binding]!;
       args.promises.push(
-        kv.list_prefix
+        isPaginated
           ? hydrateKVList(namespace, key, kv, value)
           : hydrateKVSingle(namespace, key, kv, value),
       );
     }
 
     for (const r2 of modelMeta.r2_fields) {
-      const key = resolveKey(r2.format, value);
+      const key = resolveKey(r2.key_format, value);
+      const isPaginated = typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        if (r2.list_prefix) {
+        if (isPaginated) {
           value[r2.field.name] = {
             results: [],
             cursor: null,
@@ -504,7 +506,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       }
       const bucket: R2Bucket = args.env[r2.binding]!;
       args.promises.push(
-        r2.list_prefix
+        isPaginated
           ? CloesceError.catchGeneric(async () => {
               const list = await bucket.list({ prefix: key });
               const results = await Promise.all(list.objects.map((obj) => bucket.get(obj.key)));
@@ -545,7 +547,12 @@ function hydrateKVList(
     const cursor = !res.list_complete ? (res.cursor ?? null) : null;
     const complete = res.list_complete || !cursor;
 
-    if (kv.field.cidl_type === "Stream") {
+    const inner =
+      typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
+        ? kv.field.cidl_type.Paginated
+        : kv.field.cidl_type;
+
+    if (inner === "Stream") {
       const results = await Promise.all(
         res.keys.map(
           async (k: any) =>

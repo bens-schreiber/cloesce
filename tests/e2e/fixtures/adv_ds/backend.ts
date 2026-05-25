@@ -6,6 +6,7 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db: D1Database;
 }
@@ -19,9 +20,6 @@ export namespace Hamburger {
         toppings: Topping.Self[];
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
         noLettuceToppings(
             self: Hamburger.Self,
@@ -32,7 +30,7 @@ export namespace Hamburger {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(Hamburger, implObj);
     }
 
@@ -44,7 +42,7 @@ export namespace Hamburger {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Hamburger.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.BurgersWithLettuceOrdered.getQuery(env, id), Hamburger.Source.BurgersWithLettuceOrdered.include, {  });
+                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.BurgersWithLettuceOrdered.getQuery(env, id), Hamburger.Source.BurgersWithLettuceOrdered.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastId: number, limit: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] = 'LETTUCE' AND id > ?1 ORDER BY id LIMIT ?2`).bind(lastId, limit),
             async list(env: { db: Env["db"] }, lastId: number, limit: number): Promise<CloesceResult<Hamburger.Self[]>> {
@@ -58,7 +56,7 @@ export namespace Hamburger {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Hamburger.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.Default.getQuery(env, id), Hamburger.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.Default.getQuery(env, id), Hamburger.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Hamburger.Self[]>> {
@@ -72,7 +70,7 @@ export namespace Hamburger {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] != 'LETTUCE' AND id = ?1 ORDER BY id`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Hamburger.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.NoLettuce.getQuery(env, id), Hamburger.Source.NoLettuce.include, {  });
+                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.NoLettuce.getQuery(env, id), Hamburger.Source.NoLettuce.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Hamburger.Self[]>> {
@@ -86,7 +84,7 @@ export namespace Hamburger {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] = 'BACON' AND id = ?1 ORDER BY id`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Hamburger.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.OnlyBacon.getQuery(env, id), Hamburger.Source.OnlyBacon.include, {  });
+                return await CloesceOrm.fromEnv(env).get<Hamburger.Self>(Hamburger.Meta, Hamburger.Source.OnlyBacon.getQuery(env, id), Hamburger.Source.OnlyBacon.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Hamburger.Self[]>> {
@@ -119,7 +117,7 @@ export namespace Hamburger {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -133,14 +131,11 @@ export namespace Topping {
         hamburger: Hamburger.Self[];
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(Topping, implObj);
     }
 
@@ -152,7 +147,7 @@ export namespace Topping {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id" WHERE "Topping"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Topping.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Topping.Self>(Topping.Meta, Topping.Source.Default.getQuery(env, id), Topping.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<Topping.Self>(Topping.Meta, Topping.Source.Default.getQuery(env, id), Topping.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id" WHERE "Topping"."id" > ?1 ORDER BY "Topping"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Topping.Self[]>> {
@@ -185,14 +180,14 @@ export namespace Topping {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

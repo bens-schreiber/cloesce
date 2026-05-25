@@ -12,7 +12,6 @@
     "CrudHaver": {
       "hash": 3221090397089686579,
       "name": "CrudHaver",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -42,7 +41,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "notCrud",
@@ -183,7 +182,6 @@
     "Parent": {
       "hash": 1579048073847534623,
       "name": "Parent",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -259,7 +257,7 @@
           }
         }
       ],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -505,7 +503,6 @@
     "Child": {
       "hash": 5516230628474069556,
       "name": "Child",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -558,7 +555,7 @@
           }
         }
       ],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [],
       "data_sources": {
         "Default": {

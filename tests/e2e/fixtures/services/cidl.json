@@ -1,17 +1,21 @@
 {
   "hash": 3048163358009312556,
-  "wrangler_env": null,
+  "wrangler_env": {
+    "d1_bindings": [],
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": []
+  },
   "models": {
     "FooService": {
       "hash": 2742409012207128302,
       "name": "FooService",
-      "d1_binding": null,
       "primary_columns": [],
       "columns": [],
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": null,
       "apis": [
         {
           "name": "method",

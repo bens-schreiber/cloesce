@@ -47,6 +47,7 @@ export class Weather {
       false
     );
   }
+
   static fromJson(data: any): Weather {
     const __$res = Object.assign(new Weather(), data);
     return __$res;

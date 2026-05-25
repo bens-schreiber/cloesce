@@ -4,15 +4,14 @@ export class D1BackedModel {
   id: number;
   someColumn: number;
   someOtherColumn: string;
-  keyParam: string;
-  r2Data: R2Object;
+  someData: R2Object;
+  someOtherData: R2Object;
   async uploadData(
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const __$id = [
       encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.keyParam)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/${__$id}/uploadData`
@@ -33,16 +32,40 @@ export class D1BackedModel {
       false
     );
   }
+  async uploadOtherData(
+    data: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const __$id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/D1BackedModel/${__$id}/uploadOtherData`
+    );
+    const __$payload: any = {};
+    __$payload["data"] = data;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
   static async $get(
     id: number,
-    keyParam: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$get`
     );
     __$baseUrl.searchParams.append("id", String(id));
-    __$baseUrl.searchParams.append("keyParam", String(keyParam));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -100,95 +123,9 @@ export class D1BackedModel {
       true
     );
   }
+
   static fromJson(data: any): D1BackedModel {
     const __$res = Object.assign(new D1BackedModel(), data);
-    return __$res;
-  }
-}
-export class PureR2Model {
-  id: string;
-  data: R2Object;
-  otherData: R2Object;
-  allData: Paginated<R2Object>;
-  async uploadData(
-    data: Uint8Array,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const __$id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__$id}/uploadData`
-    );
-    const __$payload: any = {};
-    __$payload["data"] = data;
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __$payload),
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  async uploadOtherData(
-    data: Uint8Array,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const __$id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__$id}/uploadOtherData`
-    );
-    const __$payload: any = {};
-    __$payload["data"] = data;
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __$payload),
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  static async $get(
-    id: string,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureR2Model>> {
-    const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/$get`
-    );
-    __$baseUrl.searchParams.append("id", String(id));
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      PureR2Model,
-      false
-    );
-  }
-  static fromJson(data: any): PureR2Model {
-    const __$res = Object.assign(new PureR2Model(), data);
-    if (__$res.allData?.results) {
-      for (let i = 0; i < __$res.allData.results.length; i++) {
-        __$res.allData.results[i] = Object.assign(new R2Object(), __$res.allData.results[i]);
-      }
-    }
     return __$res;
   }
 }

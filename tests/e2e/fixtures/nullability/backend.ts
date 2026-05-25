@@ -6,6 +6,7 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db: D1Database;
 }
@@ -17,9 +18,6 @@ export namespace NullabilityChecks {
         id: number;
         notNullableString: string;
         nullableString: string | null;
-    }
-
-    export namespace Key {
     }
 
     export interface Api {
@@ -46,7 +44,7 @@ export namespace NullabilityChecks {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(NullabilityChecks, implObj);
     }
 
@@ -58,7 +56,7 @@ export namespace NullabilityChecks {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "NullabilityChecks"."id" AS "id", "NullabilityChecks"."notNullableString" AS "notNullableString", "NullabilityChecks"."nullableString" AS "nullableString" FROM "NullabilityChecks" WHERE "NullabilityChecks"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<NullabilityChecks.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.Source.Default.getQuery(env, id), NullabilityChecks.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<NullabilityChecks.Self>(NullabilityChecks.Meta, NullabilityChecks.Source.Default.getQuery(env, id), NullabilityChecks.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "NullabilityChecks"."id" AS "id", "NullabilityChecks"."notNullableString" AS "notNullableString", "NullabilityChecks"."nullableString" AS "nullableString" FROM "NullabilityChecks" WHERE "NullabilityChecks"."id" > ?1 ORDER BY "NullabilityChecks"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<NullabilityChecks.Self[]>> {
@@ -91,14 +89,14 @@ export namespace NullabilityChecks {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

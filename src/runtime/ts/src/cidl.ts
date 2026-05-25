@@ -64,18 +64,14 @@ export interface NavigationField {
 
 export interface KvField {
   field: ValidatedField;
-  format: string;
-  format_parameters: Field[];
   binding: string;
-  list_prefix: boolean;
+  key_format: string;
 }
 
 export interface R2Field {
   field: Field;
-  format: string;
-  format_parameters: Field[];
   binding: string;
-  list_prefix: boolean;
+  key_format: string;
 }
 
 export type MediaType = "Json" | "Octet";
@@ -94,7 +90,7 @@ export interface ApiMethod {
 
 export interface Model {
   name: string;
-  d1_binding: string | null;
+  backing_binding: string | null;
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
@@ -145,8 +141,8 @@ export interface DataSource {
 
 export interface WranglerEnv {
   d1_bindings: string[];
-  kv_bindings: string[];
-  r2_bindings: string[];
+  kv_bindings: unknown[];
+  r2_bindings: unknown[];
   vars: Field[];
 }
 

@@ -5,7 +5,36 @@
       "db"
     ],
     "kv_bindings": [
-      "store"
+      {
+        "name": "store",
+        "templates": [
+          {
+            "field": {
+              "name": "data",
+              "cidl_type": {
+                "KvObject": "String"
+              },
+              "validators": [
+                {
+                  "MaxLength": 500
+                }
+              ]
+            },
+            "params": [
+              {
+                "name": "email",
+                "cidl_type": "String",
+                "validators": [
+                  {
+                    "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  }
+                ]
+              }
+            ],
+            "key_format": "some_crap/{email}"
+          }
+        ]
+      }
     ],
     "r2_bindings": [],
     "vars": []
@@ -14,7 +43,6 @@
     "Validator": {
       "hash": 1908438877902929966,
       "name": "Validator",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -42,13 +70,13 @@
             "cidl_type": "String",
             "validators": [
               {
-                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-              },
-              {
                 "MaxLength": 255
               },
               {
                 "MinLength": 5
+              },
+              {
+                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
               }
             ]
           },
@@ -60,7 +88,7 @@
       "kv_fields": [
         {
           "field": {
-            "name": "data",
+            "name": "someData",
             "cidl_type": {
               "KvObject": "String"
             },
@@ -70,34 +98,13 @@
               }
             ]
           },
-          "format": "some_crap/{email}/{name}",
-          "format_parameters": [
-            {
-              "name": "email",
-              "cidl_type": "String"
-            },
-            {
-              "name": "name",
-              "cidl_type": "String"
-            }
-          ],
           "binding": "store",
-          "list_prefix": false
+          "key_format": "some_crap/{email}"
         }
       ],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [
-        {
-          "name": "name",
-          "cidl_type": "String",
-          "validators": [
-            {
-              "Length": 10
-            }
-          ]
-        }
-      ],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "someMethod",
@@ -204,15 +211,6 @@
                   }
                 }
               ]
-            },
-            {
-              "name": "name",
-              "cidl_type": "String",
-              "validators": [
-                {
-                  "Length": 10
-                }
-              ]
             }
           ],
           "injected": []
@@ -238,15 +236,6 @@
                   "LessThan": {
                     "Int": 100
                   }
-                }
-              ]
-            },
-            {
-              "name": "name",
-              "cidl_type": "String",
-              "validators": [
-                {
-                  "Length": 10
                 }
               ]
             }

@@ -6,9 +6,15 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db: D1Database;
     store: KVNamespace;
+}
+export class store {
+    static data(email: string): string {
+        return `some_crap/${email}`;
+    }
 }
 export namespace Validator {
     export const Tag = "Validator" as const;
@@ -16,15 +22,8 @@ export namespace Validator {
 
     export interface Self {
         id: number;
-        name: string;
         email: string;
-        data: KValue<string>;
-    }
-
-    export namespace Key {
-        export function data(email: string,name: string,): string {
-            return `some_crap/${email}/${name}`;
-        }
+        someData: KValue<string>;
     }
 
     export interface Api {
@@ -36,19 +35,19 @@ export namespace Validator {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(Validator, implObj);
     }
 
     export namespace Source {
         export const Default = {
-            include: {"data":{}},
+            include: {"someData":{}},
             async save(env: { db: Env["db"], store: Env["store"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{}});
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"someData":{}});
             },
             getQuery: (env: { db: Env["db"], store: Env["store"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], store: Env["store"] }, id: number, name: string): Promise<CloesceResult<Validator.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.Default.getQuery(env, id), Validator.Source.Default.include, { name });
+            async get(env: { db: Env["db"], store: Env["store"] }, id: number): Promise<CloesceResult<Validator.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.Default.getQuery(env, id), Validator.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"], store: Env["store"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"], store: Env["store"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Validator.Self[]>> {
@@ -61,8 +60,8 @@ export namespace Validator {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {});
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"] }, id: number, name: string): Promise<CloesceResult<Validator.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.None.getQuery(env, id), Validator.Source.None.include, { name });
+            async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Validator.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.None.getQuery(env, id), Validator.Source.None.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Validator.Self[]>> {
@@ -76,9 +75,9 @@ export namespace Validator {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { name?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
         export async function list(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Validator.Self[]>> {
@@ -94,15 +93,15 @@ export namespace Validator {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"], store: Env["store"] }, base: DeepPartial<Self>, name: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { name }, include);
+        export async function hydrate(env: { db: Env["db"], store: Env["store"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

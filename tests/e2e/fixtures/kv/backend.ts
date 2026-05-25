@@ -6,95 +6,36 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db: D1Database;
     namespace: KVNamespace;
     otherNamespace: KVNamespace;
 }
-export namespace D1BackedModel {
-    export const Tag = "D1BackedModel" as const;
-    export const Meta = cidl.models.D1BackedModel as any;
+export class namespace {
+    static data(id: number): string {
+        return `path/to/data/${id}`;
+    }
+    static paginatedData(): string {
+        return `path/to/data/`;
+    }
+}
+export class otherNamespace {
+    static otherData(id: number): string {
+        return `path/to/other/${id}`;
+    }
+}
+export namespace ModelWithKv {
+    export const Tag = "ModelWithKv" as const;
+    export const Meta = cidl.models.ModelWithKv as any;
 
     export interface Self {
         id: number;
-        keyParam: string;
         someColumn: number;
         someOtherColumn: string;
-        kvData: KValue<unknown>;
-    }
-
-    export namespace Key {
-        export function kvData(id: number,keyParam: string,someColumn: number,someOtherColumn: string,): string {
-            return `d1Backed/${id}/${keyParam}/${someColumn}/${someOtherColumn}`;
-        }
-    }
-
-    export interface Api {
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
-        return _impl(D1BackedModel, implObj);
-    }
-
-    export namespace Source {
-        export const Default = {
-            include: {"kvData":{}},
-            async save(env: { db: Env["db"], namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"kvData":{}});
-            },
-            getQuery: (env: { db: Env["db"], namespace: Env["namespace"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], namespace: Env["namespace"] }, id: number, keyParam: string): Promise<CloesceResult<D1BackedModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include, { keyParam });
-            },
-            listQuery: (env: { db: Env["db"], namespace: Env["namespace"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], namespace: Env["namespace"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<D1BackedModel.Self[]>> {
-                return await CloesceOrm.fromEnv(env).list<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.listQuery(env, lastSeen_id, limit), D1BackedModel.Source.Default.include);
-            },
-        }
-    }
-
-    export namespace Orm {
-        export async function save(env: { db: Env["db"], namespace: Env["namespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-        }
-
-        export async function get(env: { db: Env["db"], namespace: Env["namespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { keyParam?: string } }): Promise<CloesceResult<Self | null>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
-        }
-
-        export async function list(env: { db: Env["db"], namespace: Env["namespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-        }
-
-        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
-            return CloesceOrm.select(Meta, from ?? null, include);
-        }
-
-        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, include);
-        }
-
-        export async function hydrate(env: { db: Env["db"], namespace: Env["namespace"] }, base: DeepPartial<Self>, keyParam: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { keyParam }, include);
-        }
-    }
-}
-export namespace PaginatedKVModel {
-    export const Tag = "PaginatedKVModel" as const;
-    export const Meta = cidl.models.PaginatedKVModel as any;
-
-    export interface Self {
-        id: string;
-        items: Paginated<KValue<unknown>>;
-    }
-
-    export namespace Key {
-        export function items(): string {
-            return `paginated/items/`;
-        }
+        someData: KValue<unknown>;
+        someOtherData: KValue<string>;
+        paginatedItems: Paginated<KValue<unknown>>;
     }
 
     export interface Api {
@@ -104,33 +45,38 @@ export namespace PaginatedKVModel {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
-        return _impl(PaginatedKVModel, implObj);
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
+        return _impl(ModelWithKv, implObj);
     }
 
     export namespace Source {
         export const Default = {
-            include: {"items":{}},
-            async save(env: { namespace: Env["namespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"items":{}});
+            include: {"paginatedItems":{},"someData":{},"someOtherData":{}},
+            async save(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"paginatedItems":{},"someData":{},"someOtherData":{}});
             },
-            async get(env: { namespace: Env["namespace"] }, id: string): Promise<PaginatedKVModel.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<PaginatedKVModel.Self>(PaginatedKVModel.Meta, null, PaginatedKVModel.Source.Default.include, { id });
+            getQuery: (env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number) => env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" = ?1`).bind(id),
+            async get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number): Promise<CloesceResult<ModelWithKv.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.getQuery(env, id), ModelWithKv.Source.Default.include, {});
+            },
+            listQuery: (env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" > ?1 ORDER BY "ModelWithKv"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithKv.Self[]>> {
+                return await CloesceOrm.fromEnv(env).list<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.listQuery(env, lastSeen_id, limit), ModelWithKv.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: { namespace: Env["namespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { namespace: Env["namespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: { namespace: Env["namespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<PaginatedKVModel.Self[]>> {
+        export async function list(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -143,82 +89,15 @@ export namespace PaginatedKVModel {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { namespace: Env["namespace"] }, base: DeepPartial<Self>, id: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { id }, include);
-        }
-    }
-}
-export namespace PureKVModel {
-    export const Tag = "PureKVModel" as const;
-    export const Meta = cidl.models.PureKVModel as any;
-
-    export interface Self {
-        id: string;
-        data: KValue<unknown>;
-        otherData: KValue<string>;
-    }
-
-    export namespace Key {
-        export function data(id: string,): string {
-            return `path/to/data/${id}`;
-        }
-        export function otherData(id: string,): string {
-            return `path/to/other/${id}`;
-        }
-    }
-
-    export interface Api {
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
-        return _impl(PureKVModel, implObj);
-    }
-
-    export namespace Source {
-        export const Default = {
-            include: {"data":{},"otherData":{}},
-            async save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"otherData":{}});
-            },
-            async get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: string): Promise<PureKVModel.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<PureKVModel.Self>(PureKVModel.Meta, null, PureKVModel.Source.Default.include, { id });
-            },
-        }
-    }
-
-    export namespace Orm {
-        export async function save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-        }
-
-        export async function get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<CloesceResult<Self | null>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
-        }
-
-        export async function list(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<PureKVModel.Self[]>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-        }
-
-        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
-            return CloesceOrm.select(Meta, from ?? null, include);
-        }
-
-        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, include);
-        }
-
-        export async function hydrate(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, id: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { id }, include);
+        export async function hydrate(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];
@@ -228,9 +107,7 @@ function _impl(namespace: any, implObj: any) {
 }
 
 import cidl from "./cidl.json" with { type: "json" };
-(cidl.models.D1BackedModel.data_sources["Default"] as any).gen = D1BackedModel.Source.Default;
-(cidl.models.PaginatedKVModel.data_sources["Default"] as any).gen = PaginatedKVModel.Source.Default;
-(cidl.models.PureKVModel.data_sources["Default"] as any).gen = PureKVModel.Source.Default;
+(cidl.models.ModelWithKv.data_sources["Default"] as any).gen = ModelWithKv.Source.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "http://localhost:5416/api")

@@ -6,6 +6,7 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db1: D1Database;
     db2: D1Database;
@@ -19,14 +20,11 @@ export namespace DB1Model {
         someColumn: string;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(DB1Model, implObj);
     }
 
@@ -38,7 +36,7 @@ export namespace DB1Model {
             },
             getQuery: (env: { db1: Env["db1"] }, id: number) => env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id),
             async get(env: { db1: Env["db1"] }, id: number): Promise<CloesceResult<DB1Model.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<DB1Model.Self>(DB1Model.Meta, DB1Model.Source.Default.getQuery(env, id), DB1Model.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<DB1Model.Self>(DB1Model.Meta, DB1Model.Source.Default.getQuery(env, id), DB1Model.Source.Default.include, {});
             },
             listQuery: (env: { db1: Env["db1"] }, lastSeen_id: number, limit: number) => env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" > ?1 ORDER BY "DB1Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db1: Env["db1"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<DB1Model.Self[]>> {
@@ -71,7 +69,7 @@ export namespace DB1Model {
         }
 
         export async function hydrate(env: { db1: Env["db1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -84,14 +82,11 @@ export namespace DB2Model {
         someColumn: string;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(DB2Model, implObj);
     }
 
@@ -103,7 +98,7 @@ export namespace DB2Model {
             },
             getQuery: (env: { db2: Env["db2"] }, id: number) => env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id),
             async get(env: { db2: Env["db2"] }, id: number): Promise<CloesceResult<DB2Model.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<DB2Model.Self>(DB2Model.Meta, DB2Model.Source.Default.getQuery(env, id), DB2Model.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<DB2Model.Self>(DB2Model.Meta, DB2Model.Source.Default.getQuery(env, id), DB2Model.Source.Default.include, {});
             },
             listQuery: (env: { db2: Env["db2"] }, lastSeen_id: number, limit: number) => env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" > ?1 ORDER BY "DB2Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db2: Env["db2"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<DB2Model.Self[]>> {
@@ -136,14 +131,14 @@ export namespace DB2Model {
         }
 
         export async function hydrate(env: { db2: Env["db2"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

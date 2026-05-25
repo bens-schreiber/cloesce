@@ -6,10 +6,21 @@ export type CfReadableStream = ReadableStream;
 export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
+
 export interface Env {
     db: D1Database;
     bucket1: R2Bucket;
-    bucket2: R2Bucket;
+}
+export class bucket1 {
+    static data(id: number): string {
+        return `path/to/data/${id}`;
+    }
+    static otherData(id: number): string {
+        return `path/to/other/${id}`;
+    }
+    static allData(): string {
+        return `path/`;
+    }
 }
 export namespace D1BackedModel {
     export const Tag = "D1BackedModel" as const;
@@ -17,16 +28,10 @@ export namespace D1BackedModel {
 
     export interface Self {
         id: number;
-        keyParam: string;
         someColumn: number;
         someOtherColumn: string;
-        r2Data: R2ObjectBody;
-    }
-
-    export namespace Key {
-        export function r2Data(id: number,keyParam: string,someColumn: number,someOtherColumn: string,): string {
-            return `d1Backed/${id}/${keyParam}/${someColumn}/${someOtherColumn}`;
-        }
+        someData: R2ObjectBody;
+        someOtherData: R2ObjectBody;
     }
 
     export interface Api {
@@ -37,22 +42,29 @@ export namespace D1BackedModel {
             },
             data: CfReadableStream,
         ): ApiResult<void>;
+        uploadOtherData(
+            self: D1BackedModel.Self,
+            env: {
+                bucket1: Env["bucket1"],
+            },
+            data: CfReadableStream,
+        ): ApiResult<void>;
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(D1BackedModel, implObj);
     }
 
     export namespace Source {
         export const Default = {
-            include: {"r2Data":{}},
+            include: {"someData":{},"someOtherData":{}},
             async save(env: { bucket1: Env["bucket1"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"r2Data":{}});
+                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"someData":{},"someOtherData":{}});
             },
             getQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
-            async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number, keyParam: string): Promise<CloesceResult<D1BackedModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include, { keyParam });
+            async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number): Promise<CloesceResult<D1BackedModel.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include, {});
             },
             listQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { bucket1: Env["bucket1"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<D1BackedModel.Self[]>> {
@@ -66,9 +78,9 @@ export namespace D1BackedModel {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { keyParam?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
         export async function list(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
@@ -84,100 +96,15 @@ export namespace D1BackedModel {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { bucket1: Env["bucket1"], db: Env["db"] }, base: DeepPartial<Self>, keyParam: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { keyParam }, include);
-        }
-    }
-}
-export namespace PureR2Model {
-    export const Tag = "PureR2Model" as const;
-    export const Meta = cidl.models.PureR2Model as any;
-
-    export interface Self {
-        id: string;
-        data: R2ObjectBody;
-        otherData: R2ObjectBody;
-        allData: Paginated<R2ObjectBody>;
-    }
-
-    export namespace Key {
-        export function data(id: string,): string {
-            return `path/to/data/${id}`;
-        }
-        export function otherData(id: string,): string {
-            return `path/to/other/${id}`;
-        }
-        export function allData(): string {
-            return `path/`;
-        }
-    }
-
-    export interface Api {
-        uploadData(
-            self: PureR2Model.Self,
-            env: {
-                bucket1: Env["bucket1"],
-            },
-            data: CfReadableStream,
-        ): ApiResult<void>;
-        uploadOtherData(
-            self: PureR2Model.Self,
-            env: {
-                bucket1: Env["bucket1"],
-            },
-            data: CfReadableStream,
-        ): ApiResult<void>;
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
-        return _impl(PureR2Model, implObj);
-    }
-
-    export namespace Source {
-        export const Default = {
-            include: {"allData":{},"data":{},"otherData":{}},
-            async save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
-                return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"allData":{},"data":{},"otherData":{}});
-            },
-            async get(env: { bucket1: Env["bucket1"] }, id: string): Promise<PureR2Model.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<PureR2Model.Self>(PureR2Model.Meta, null, PureR2Model.Source.Default.include, { id });
-            },
-        }
-    }
-
-    export namespace Orm {
-        export async function save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
-        }
-
-        export async function get(env: { bucket1: Env["bucket1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<CloesceResult<Self | null>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
-        }
-
-        export async function list(env: { bucket1: Env["bucket1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<PureR2Model.Self[]>> {
-            args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
-        }
-
-        export function select(include: IncludeTree<Self> = Source.Default.include, from?: string): string {
-            return CloesceOrm.select(Meta, from ?? null, include);
-        }
-
-        export function map(result: D1Result, include: IncludeTree<Self> = Source.Default.include): Self[] {
-            return CloesceOrm.map<Self>(Meta, result, include);
-        }
-
-        export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, id: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { id }, include);
+        export async function hydrate(env: { bucket1: Env["bucket1"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];
@@ -188,7 +115,6 @@ function _impl(namespace: any, implObj: any) {
 
 import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.D1BackedModel.data_sources["Default"] as any).gen = D1BackedModel.Source.Default;
-(cidl.models.PureR2Model.data_sources["Default"] as any).gen = PureR2Model.Source.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "http://localhost:5538/api")

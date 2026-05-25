@@ -27,6 +27,12 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
   }
 
   return {
+    wrangler_env: {
+      d1_bindings: [],
+      kv_bindings: [],
+      r2_bindings: [],
+      vars: [],
+    },
     models: modelsMap,
     poos: {},
     injects: [],
@@ -58,7 +64,7 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private d1_binding: string | null = null;
+  private backing_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
@@ -78,12 +84,12 @@ export class ModelBuilder {
   }
 
   d1(binding: string): this {
-    this.d1_binding = binding;
+    this.backing_binding = binding;
     return this;
   }
 
   defaultDb(): this {
-    this.d1_binding = "d1";
+    this.backing_binding = "d1";
     return this;
   }
 
@@ -123,37 +129,29 @@ export class ModelBuilder {
   }
 
   kvField(
-    format: string,
+    key_format: string,
     binding: string,
     name: string,
-    list_prefix: boolean,
     cidl_type: CidlType,
-    format_parameters: Field[] = [],
   ): this {
     this.kv_fields.push({
       field: { name, cidl_type, validators: [] },
-      format,
-      format_parameters,
+      key_format,
       binding,
-      list_prefix,
     });
     return this;
   }
 
   r2Field(
-    format: string,
+    key_format: string,
     binding: string,
     name: string,
-    list_prefix: boolean,
     cidl_type: CidlType = "R2Object",
-    format_parameters: Field[] = [],
   ): this {
     this.r2_fields.push({
       field: { name, cidl_type },
-      format,
-      format_parameters,
+      key_format,
       binding,
-      list_prefix,
     });
     return this;
   }
@@ -226,7 +224,7 @@ export class ModelBuilder {
 
     return {
       name: this.name,
-      d1_binding: this.d1_binding,
+      backing_binding: this.backing_binding,
       primary_columns,
       columns: mutableColumns,
       navigation_fields: this.navigation_fields,

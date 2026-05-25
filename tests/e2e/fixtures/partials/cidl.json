@@ -12,7 +12,6 @@
     "Dog": {
       "hash": 16625692680497709233,
       "name": "Dog",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -53,7 +52,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "backing_binding": "db",
       "apis": [
         {
           "name": "create",
