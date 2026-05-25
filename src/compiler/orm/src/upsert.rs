@@ -92,7 +92,7 @@ impl<'a> UpsertModel<'a> {
         )?;
 
         let model = idl.models.get(model_name).expect("Model to exist");
-        if model.has_d1() {
+        if model.backing_binding.is_some() {
             // Final select to return the upserted model
             let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
@@ -169,8 +169,18 @@ impl<'a> UpsertModel<'a> {
             };
             let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
 
+            // Look up the binding field's key format in the wrangler env.
+            let key_format = self
+                .idl
+                .wrangler_env
+                .as_ref()
+                .and_then(|env| env.kv_bindings.iter().find(|b| b.name == kv.binding))
+                .and_then(|b| b.fields.iter().find(|f| f.name == kv.binding_field))
+                .map(|f| f.key_format)
+                .unwrap_or("");
+
             let (key, placeholders_remain) =
-                key_format_interpolation(kv.format, &new_model, model)?;
+                key_format_interpolation(key_format, &new_model, model)?;
 
             if placeholders_remain {
                 let path_parts: Vec<String> = path.split('.').skip(1).map(String::from).collect();
@@ -191,7 +201,7 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        if !model.has_d1() {
+        if !model.backing_binding.is_some() {
             return Ok(());
         }
 
@@ -737,12 +747,11 @@ fn key_format_interpolation(
             continue;
         };
 
-        // Field is a column, primary key, or key field
+        // Field is a column or primary key on the model.
         let field_meta = meta
             .all_columns()
             .find(|(col, _)| col.field.name == param_name)
             .map(|(col, _)| &col.field)
-            .or_else(|| meta.key_fields.iter().find(|kf| kf.name == param_name))
             // guaranteed to exist by semantic analysis
             .unwrap();
 

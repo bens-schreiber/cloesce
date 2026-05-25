@@ -664,10 +664,17 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             }
         };
 
+        // A KV ref on a Model is a `KvObject<T>` (or, if the binding returns a
+        // `paginated<T>`, a `paginated<KvObject<T>>`).
+        let local_type = match resolved_type {
+            CidlType::Paginated(inner) => CidlType::paginated(CidlType::KvObject(inner)),
+            other => CidlType::KvObject(Box::new(other)),
+        };
+
         self.kv_fields.push(KvField {
             field: ValidatedField {
                 name: kv.field.name.into(),
-                cidl_type: resolved_type,
+                cidl_type: local_type,
                 validators: Vec::new(),
             },
             binding: binding.symbol.name,

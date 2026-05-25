@@ -22,12 +22,9 @@ async fn scalar_model(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -68,12 +65,9 @@ async fn one_to_one(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -86,8 +80,7 @@ async fn one_to_one(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -125,12 +118,9 @@ async fn one_to_one(db: SqlitePool) {
 async fn one_to_many(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -140,8 +130,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Cat {
+            model Cat for db {
                 primary {
                     id: int
                 }
@@ -151,8 +140,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -170,8 +158,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Boss {
+            model Boss for db {
                 primary {
                     id: int
                 }
@@ -244,12 +231,9 @@ async fn many_to_many(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     id: int
                 }
@@ -259,8 +243,7 @@ async fn many_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     id: int
                 }
@@ -308,12 +291,9 @@ async fn composite_one_to_one(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     school_id: int
                     student_number: int
@@ -324,8 +304,7 @@ async fn composite_one_to_one(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Enrollment {
+            model Enrollment for db {
                 primary {
                     id: int
                 }
@@ -388,12 +367,9 @@ async fn composite_one_to_many(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Order {
+            model Order for db {
                 primary {
                     region_id: int
                     order_number: int
@@ -408,8 +384,7 @@ async fn composite_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model OrderItem {
+            model OrderItem for db {
                 primary {
                     id: int
                 }
@@ -477,12 +452,9 @@ async fn composite_many_to_many(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Teacher {
+            model Teacher for db {
                 primary {
                     school_id: int
                     employee_id: int
@@ -497,8 +469,7 @@ async fn composite_many_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     department_id: int
                     course_code: int
@@ -562,12 +533,9 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -582,8 +550,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Match {
+            model Match for db {
                 primary {
                     id: int
                 }
@@ -638,12 +605,9 @@ async fn custom_from(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }

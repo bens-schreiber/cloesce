@@ -15,12 +15,9 @@ fn include(val: serde_json::Value) -> Option<Map<String, Value>> {
 async fn upsert_scalar_model(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -60,12 +57,9 @@ async fn upsert_scalar_model(db: SqlitePool) {
 async fn upsert_auto_increment(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -103,12 +97,9 @@ async fn upsert_one_to_one(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -125,8 +116,7 @@ async fn upsert_one_to_one(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -176,12 +166,9 @@ async fn upsert_one_to_many(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -195,8 +182,7 @@ async fn upsert_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -249,12 +235,9 @@ async fn upsert_many_to_many(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     id: int
                 }
@@ -268,8 +251,7 @@ async fn upsert_many_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     id: int
                 }
@@ -319,12 +301,9 @@ async fn upsert_many_to_many(db: SqlitePool) {
 async fn upsert_composite_pk(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int

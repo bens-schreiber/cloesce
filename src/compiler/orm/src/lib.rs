@@ -3,12 +3,8 @@ use serde_json::Value;
 
 pub mod map;
 pub mod select;
-// TEMPORARY: `upsert` and `validate` reference Model/KvField fields that were
-// removed in the durable-objects refactor (e.g. `KvField.format`, `Model.key_fields`).
-// They will be rewired once we move past the semantic phase. Commenting out so
-// `semantic` (which only needs `select`) can compile.
-// pub mod upsert;
-// pub mod validate;
+pub mod upsert;
+pub mod validate;
 
 pub fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)

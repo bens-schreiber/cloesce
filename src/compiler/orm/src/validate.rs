@@ -239,15 +239,6 @@ pub fn validate_cidl_type(
             let obj = value.as_object_mut().unwrap();
             let model = idl.models.get(name).unwrap();
 
-            for field in &model.key_fields {
-                let field_value = obj.remove(field.name.as_ref());
-                let res = validate_cidl_type(field, field_value, idl, is_partial)?;
-
-                if let Some(res) = res {
-                    new_obj.insert(field.name.to_string(), res);
-                }
-            }
-
             for (col, _) in model.all_columns() {
                 let col_value = obj.remove(col.field.name.as_ref());
                 let res = validate_cidl_type(&col.field, col_value, idl, is_partial)?;
