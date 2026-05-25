@@ -55,7 +55,6 @@ describe("Validator Tests", () => {
     const res = await Validator.$save({
       id: 50,
       email: "test@example.com",
-      name: "short",
     });
     expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
     expect(res.status).toBe(400);
@@ -66,8 +65,7 @@ describe("Validator Tests", () => {
     const res = await Validator.$save({
       id: 50,
       email: "test@example.com",
-      name: "testuser",
-      data: {
+      someData: {
         raw: longValue,
       },
     });
@@ -80,8 +78,7 @@ describe("Validator Tests", () => {
     const res = await Validator.$save({
       id: 50,
       email: "test@example.com",
-      name: "testuser12",
-      data: {
+      someData: {
         raw: "valid data",
       },
     });

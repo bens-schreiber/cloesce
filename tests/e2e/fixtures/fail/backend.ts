@@ -53,7 +53,7 @@ export namespace FailModel {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<FailModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<FailModel.Self>(FailModel.Meta, FailModel.Source.Default.getQuery(env, id), FailModel.Source.Default.include, {});
+                return await CloesceOrm.fromEnv(env).get<FailModel.Self>(FailModel.Meta, FailModel.Source.Default.getQuery(env, id), FailModel.Source.Default.include);
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" > ?1 ORDER BY "FailModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<FailModel.Self[]>> {
@@ -69,7 +69,7 @@ export namespace FailModel {
 
         export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
         export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<FailModel.Self[]>> {
@@ -86,7 +86,7 @@ export namespace FailModel {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }

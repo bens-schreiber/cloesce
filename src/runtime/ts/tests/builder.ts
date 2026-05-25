@@ -128,12 +128,7 @@ export class ModelBuilder {
     return this.pk("id", "Int");
   }
 
-  kvField(
-    key_format: string,
-    binding: string,
-    name: string,
-    cidl_type: CidlType,
-  ): this {
+  kvField(key_format: string, binding: string, name: string, cidl_type: CidlType): this {
     this.kv_fields.push({
       field: { name, cidl_type, validators: [] },
       key_format,

@@ -111,6 +111,15 @@ export class HttpResult<T = unknown> {
   }
 
   toResponse(): Response {
+    if (!this.mediaType || !this.ok) {
+      // Errors are always text.
+      this.headers.set("Content-Type", "text/plain");
+      return new Response(this.message, {
+        status: this.status,
+        headers: this.headers,
+      });
+    }
+
     let body: BodyInit;
     switch (this.mediaType) {
       case "Json": {
@@ -148,14 +157,6 @@ export class HttpResult<T = unknown> {
         // Assume proper BodyInit
         body = this.data as BodyInit;
         break;
-      }
-      case undefined: {
-        // Errors are always text.
-        this.headers.set("Content-Type", "text/plain");
-        return new Response(this.message, {
-          status: this.status,
-          headers: this.headers,
-        });
       }
     }
 

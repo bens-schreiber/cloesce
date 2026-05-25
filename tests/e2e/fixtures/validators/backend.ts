@@ -47,7 +47,7 @@ export namespace Validator {
             },
             getQuery: (env: { db: Env["db"], store: Env["store"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"], store: Env["store"] }, id: number): Promise<CloesceResult<Validator.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.Default.getQuery(env, id), Validator.Source.Default.include, {});
+                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.Default.getQuery(env, id), Validator.Source.Default.include);
             },
             listQuery: (env: { db: Env["db"], store: Env["store"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"], store: Env["store"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Validator.Self[]>> {
@@ -61,7 +61,7 @@ export namespace Validator {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Validator.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.None.getQuery(env, id), Validator.Source.None.include, {});
+                return await CloesceOrm.fromEnv(env).get<Validator.Self>(Validator.Meta, Validator.Source.None.getQuery(env, id), Validator.Source.None.include);
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Validator.Self[]>> {
@@ -77,7 +77,7 @@ export namespace Validator {
 
         export async function get(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
         export async function list(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Validator.Self[]>> {
@@ -94,7 +94,7 @@ export namespace Validator {
         }
 
         export async function hydrate(env: { db: Env["db"], store: Env["store"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }

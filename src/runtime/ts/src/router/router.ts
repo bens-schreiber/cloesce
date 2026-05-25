@@ -415,6 +415,10 @@ async function validateRequest(
           `Missing get parameter ${param.parameter.name} for instantiated method.`,
         );
       }
+
+      const res = validateField(param.parameter, route.getParamValues[param.parameter.name]);
+      if (res.isLeft()) return Either.left(res.unwrapLeft());
+      route.getParamValues[param.parameter.name] = res.unwrap();
     }
   }
 

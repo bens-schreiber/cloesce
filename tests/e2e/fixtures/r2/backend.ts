@@ -64,7 +64,7 @@ export namespace D1BackedModel {
             },
             getQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id),
             async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number): Promise<CloesceResult<D1BackedModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include, {});
+                return await CloesceOrm.fromEnv(env).get<D1BackedModel.Self>(D1BackedModel.Meta, D1BackedModel.Source.Default.getQuery(env, id), D1BackedModel.Source.Default.include);
             },
             listQuery: (env: { bucket1: Env["bucket1"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { bucket1: Env["bucket1"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<D1BackedModel.Self[]>> {
@@ -80,7 +80,7 @@ export namespace D1BackedModel {
 
         export async function get(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
         export async function list(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
@@ -97,7 +97,7 @@ export namespace D1BackedModel {
         }
 
         export async function hydrate(env: { bucket1: Env["bucket1"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }

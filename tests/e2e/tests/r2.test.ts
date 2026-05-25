@@ -1,6 +1,6 @@
 import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PureR2Model, D1BackedModel } from "../fixtures/r2/client";
+import { D1BackedModel } from "../fixtures/r2/client";
 import config from "../fixtures/r2/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -13,49 +13,11 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("Pure R2 Model", () => {
-  it("uploads data", async () => {
-    const model = Object.assign(new PureR2Model(), {
-      id: "test-id-1",
-    });
-
-    const res = await model.uploadData(new TextEncoder().encode("Hello, R2!"));
-
-    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
-  });
-
-  it("uploads other data", async () => {
-    const model = Object.assign(new PureR2Model(), {
-      id: "test-id-1",
-    });
-
-    const res = await model.uploadOtherData(new TextEncoder().encode("Hello, R2!"));
-
-    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
-  });
-
-  it("retrieves head", async () => {
-    const res = await PureR2Model.$get("test-id-1");
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-    expect(res.data).toBeDefined();
-    expect(res.data?.id).toBe("test-id-1");
-
-    expect(res.data?.data.key).toBe("path/to/data/test-id-1");
-    expect(res.data?.otherData.key).toBe("path/to/other/test-id-1");
-    expect(res.data?.allData.results.length).toBe(2);
-
-    expect(res.data?.allData.results.map((obj) => obj.key).sort()).toEqual([
-      "path/to/data/test-id-1",
-      "path/to/other/test-id-1",
-    ]);
-  });
-});
-
 describe("D1 Backed Model", () => {
   let model: D1BackedModel;
-  it("uploads d1", async () => {
+  it("saves model", async () => {
     const res = await D1BackedModel.$save({
-      keyParam: "key-param-1",
+      id: 1,
       someColumn: 42,
       someOtherColumn: "foo",
     });
@@ -69,13 +31,18 @@ describe("D1 Backed Model", () => {
     expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
   });
 
+  it("uploads r2 other data", async () => {
+    const res = await model.uploadOtherData(new TextEncoder().encode("Other R2 Data"));
+    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
+  });
+
   it("retrieves full model", async () => {
-    const res = await D1BackedModel.$get(model.id, model.keyParam);
+    const res = await D1BackedModel.$get(model.id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(model.id);
-    expect(res.data?.keyParam).toBe(model.keyParam);
-    expect(res.data?.r2Data.key).toBe("d1Backed/1/key-param-1/42/foo");
+    expect(res.data?.someData?.key).toBe(`path/to/data/${model.id}`);
+    expect(res.data?.someOtherData?.key).toBe(`path/to/other/${model.id}`);
   });
 
   it("lists models", async () => {
@@ -85,6 +52,5 @@ describe("D1 Backed Model", () => {
 
     const found = res.data!.find((m) => m.id === model.id)!;
     expect(found).toBeDefined();
-    expect(found.r2Data).toBeUndefined(); // model takes a keyparam and thus cannot list R2 components
   });
 });

@@ -36,7 +36,7 @@ export namespace Weather {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<Weather.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.Source.Default.getQuery(env, id), Weather.Source.Default.include, {});
+                return await CloesceOrm.fromEnv(env).get<Weather.Self>(Weather.Meta, Weather.Source.Default.getQuery(env, id), Weather.Source.Default.include);
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<Weather.Self[]>> {
@@ -52,7 +52,7 @@ export namespace Weather {
 
         export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
         export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Weather.Self[]>> {
@@ -69,7 +69,7 @@ export namespace Weather {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }

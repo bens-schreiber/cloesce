@@ -472,7 +472,8 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
 
     for (const kv of modelMeta.kv_fields) {
       const key = resolveKey(kv.key_format, value);
-      const isPaginated = typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
+      const isPaginated =
+        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
         if (isPaginated) {
           value[kv.field.name] = {
@@ -493,7 +494,8 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
 
     for (const r2 of modelMeta.r2_fields) {
       const key = resolveKey(r2.key_format, value);
-      const isPaginated = typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
+      const isPaginated =
+        typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
         if (isPaginated) {
           value[r2.field.name] = {

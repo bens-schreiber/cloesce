@@ -17,6 +17,9 @@ model Validator for db {
     }
 
     column {
+        // because store::data(email) is used,
+        // the validator will be inherited and placed on
+        // the email field
         [maxlen 255]
         [minlen 5]
         email: string

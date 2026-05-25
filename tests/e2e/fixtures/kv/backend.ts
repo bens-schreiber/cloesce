@@ -57,7 +57,7 @@ export namespace ModelWithKv {
             },
             getQuery: (env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number) => env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number): Promise<CloesceResult<ModelWithKv.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.getQuery(env, id), ModelWithKv.Source.Default.include, {});
+                return await CloesceOrm.fromEnv(env).get<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.getQuery(env, id), ModelWithKv.Source.Default.include);
             },
             listQuery: (env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" > ?1 ORDER BY "ModelWithKv"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithKv.Self[]>> {
@@ -73,7 +73,7 @@ export namespace ModelWithKv {
 
         export async function get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
         export async function list(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
@@ -90,7 +90,7 @@ export namespace ModelWithKv {
         }
 
         export async function hydrate(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }

@@ -152,7 +152,13 @@ impl<'a> UpsertModel<'a> {
 
         // KV objects
         for kv in &model.kv_fields {
-            // TODO: Lists?
+            // TODO: Paginated KV fields represent a listing over a prefix; they are
+            // read-only and cannot be written via upsert.
+            if matches!(kv.field.cidl_type, CidlType::Paginated(_)) {
+                new_model.remove(kv.field.name.as_ref());
+                continue;
+            }
+
             let Some(Value::Object(mut kv_object)) = new_model.remove(kv.field.name.as_ref())
             else {
                 fail!(OrmErrorKind::TypeMismatch {
