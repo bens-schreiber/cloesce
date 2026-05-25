@@ -9,7 +9,11 @@ pub trait LanguageTypeMapper {
 
     /// Converts a format string to the target languages string interpolation syntax,
     /// using the provided parameter names to identify placeholders.
-    fn interpolate_format(&self, format: &str, param_names: &[&str]) -> String;
+    fn interpolate_format<'src>(
+        &self,
+        format: &str,
+        param_names: impl Iterator<Item = &'src str>,
+    ) -> String;
 
     /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
@@ -87,8 +91,12 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn interpolate_format(&self, format: &str, param_names: &[&str]) -> String {
-        let result = param_names.iter().fold(format.to_string(), |acc, name| {
+    fn interpolate_format<'src>(
+        &self,
+        format: &str,
+        param_names: impl Iterator<Item = &'src str>,
+    ) -> String {
+        let result = param_names.fold(format.to_string(), |acc, name| {
             acc.replace(&format!("{{{name}}}"), &format!("${{{name}}}"))
         });
         format!("`{result}`")

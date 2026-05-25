@@ -314,8 +314,6 @@ pub struct ForeignBlock<'src> {
     pub is_optional: bool,
 }
 
-/// A reference to a KV binding's field on a Model:
-/// `kv BindingName::bindingField(modelField1, ...) { localFieldName }`
 pub struct KvFieldBlock<'src> {
     /// The KV binding name (e.g. `UserMetadata`)
     pub binding: Symbol<'src>,
@@ -330,8 +328,6 @@ pub struct KvFieldBlock<'src> {
     pub field: Symbol<'src>,
 }
 
-/// A reference to an R2 binding's field on a Model:
-/// `r2 BindingName::bindingField(modelField1, ...) { localFieldName }`
 pub struct R2FieldBlock<'src> {
     /// The R2 binding name
     pub binding: Symbol<'src>,

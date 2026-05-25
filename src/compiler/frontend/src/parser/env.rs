@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 
 use crate::{
     AstBlockKind, D1BindingBlock, KvBindingBlock, KvBindingField, R2BindingBlock, R2BindingField,
-    VarsBlock,
+    Symbol, VarsBlock,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol},
 };
@@ -78,7 +78,7 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
         )
         .map_spanned(
             |(((sym, params), return_type), key_format)| KvBindingField {
-                symbol: crate::Symbol {
+                symbol: Symbol {
                     cidl_type: return_type,
                     ..sym
                 },

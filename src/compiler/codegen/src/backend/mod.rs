@@ -26,11 +26,9 @@ impl<'src> BackendTemplate<'src> {
         !self.idl.injects.contains(&name)
     }
 
-    /// Format a binding field's `key_format` into a JS template literal,
-    /// using the field's declared param names as placeholders.
     fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {
-        let names: Vec<&str> = params.iter().map(|p| p.name.as_ref()).collect();
-        self.mapper.interpolate_format(format, &names)
+        let names = params.iter().map(|p| p.name.as_ref());
+        self.mapper.interpolate_format(format, names)
     }
 
     /// Wrangler bindings a model's method may touch.
