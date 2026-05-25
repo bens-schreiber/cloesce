@@ -78,13 +78,12 @@ async function get(
 ): Promise<HttpResult<unknown>> {
   const dataSource = meta.data_sources[dataSourceRef];
 
-  // Method parameters for $get_<DS> are: [...DS.get.parameters, ...model.key_fields]
+  // Method parameters for $get_<DS> are DS.get.parameters
   // (in this exact order, see semantic/src/crud.rs)
   const numGetParams = dataSource.get?.parameters.length ?? 0;
   const dataSourceArgs = args.slice(0, numGetParams);
-  const keyArgs = args.slice(numGetParams, numGetParams + meta.key_fields.length);
 
-  const res = await dataSource.gen.get(env, ...dataSourceArgs, ...keyArgs);
+  const res = await dataSource.gen.get(env, ...dataSourceArgs);
 
   if (res.errors.length > 0) {
     return HttpResult.fail(400, CloesceError.displayErrors(res as CloesceResult<never>));

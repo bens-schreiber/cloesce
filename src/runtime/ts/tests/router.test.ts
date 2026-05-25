@@ -132,10 +132,8 @@ describe("Match Route", () => {
     const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
-    expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       getParamValues: {},
-      keyFields: {},
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       model: idl.models["Model"],
       namespace: "Model",
@@ -162,60 +160,19 @@ describe("Match Route", () => {
     const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
-    expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
       getParamValues: { id: "0" },
       impl: mockImpl,
-      keyFields: {},
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
     });
   });
 
-  test("Matches instantiated method with key params", () => {
+  test("Matches instantiated method with composite primary key", () => {
     // Arrange
-    const request = createRequest("http://foo.com/api/Model/0/value1/value2/method", "POST");
-    const idl = createIdl({
-      models: [
-        ModelBuilder.model("Model")
-          .idPk()
-          .method("method", "Post", [], "Void", "ds")
-          .dataSource("ds", {}, [{ name: "id", cidl_type: "Int" }])
-          .keyField("key1")
-          .keyField("key2")
-          .build(),
-      ],
-    });
-    const env = mockWranglerEnv();
-    const registry = createRegistry(idl.models["Model"]);
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      dataSource: idl.models["Model"].data_sources["ds"],
-      impl: mockImpl,
-      getParamValues: { id: "0" },
-      keyFields: {
-        key1: "value1",
-        key2: "value2",
-      },
-      model: idl.models["Model"],
-      method: idl.models["Model"].apis.find((m) => m.name === "method"),
-      namespace: "Model",
-    });
-  });
-
-  test("Matches instantiated method with composite primary key and key fields", () => {
-    // Arrange
-    const request = createRequest(
-      "http://foo.com/api/Model/acme/user123/value1/value2/method",
-      "POST",
-    );
+    const request = createRequest("http://foo.com/api/Model/acme/user123/method", "POST");
     const idl = createIdl({
       models: [
         ModelBuilder.model("Model")
@@ -226,8 +183,6 @@ describe("Match Route", () => {
             { name: "orgId", cidl_type: "String" },
             { name: "userId", cidl_type: "String" },
           ])
-          .keyField("key1")
-          .keyField("key2")
           .build(),
       ],
     });
@@ -238,15 +193,10 @@ describe("Match Route", () => {
     const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
 
     // Assert
-    expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
       impl: mockImpl,
       getParamValues: { orgId: "acme", userId: "user123" },
-      keyFields: {
-        key1: "value1",
-        key2: "value2",
-      },
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
@@ -304,7 +254,6 @@ describe("Request Validation", () => {
       model,
       method: model.apis.find((m) => m.name === "method")!,
       getParamValues: {},
-      keyFields: {},
       dataSource: model.data_sources["ds"],
       impl: mockImpl,
     };
@@ -332,7 +281,6 @@ describe("Request Validation", () => {
       namespace: "Foo",
       method: model.apis.find((m) => m.name === "method")!,
       getParamValues: {},
-      keyFields: {},
       impl: mockImpl,
       model,
     };
@@ -398,7 +346,6 @@ describe("Method Dispatch", () => {
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => {},
       getParamValues: {},
-      keyFields: {},
       model,
     };
 
@@ -421,7 +368,6 @@ describe("Method Dispatch", () => {
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => HttpResult.ok(123, "foo"),
       getParamValues: {},
-      keyFields: {},
       model,
     };
 
@@ -446,7 +392,6 @@ describe("Method Dispatch", () => {
       method: model.apis.find((m) => m.name === "testMethod")!,
       impl: () => "neigh",
       getParamValues: {},
-      keyFields: {},
       model,
     };
 
@@ -471,7 +416,6 @@ describe("Method Dispatch", () => {
         throw new Error("boom");
       },
       getParamValues: {},
-      keyFields: {},
       model,
     };
 
@@ -494,7 +438,7 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", "Post", [{ name: "name", cidl_type: "String", validators: [] }], "Void")
+      .method("testMethod", "Post", [{ name: "name", cidl_type: "String" }], "Void")
       .build();
 
     const impl = vi.fn(() => undefined);
@@ -506,7 +450,6 @@ describe("Method Dispatch", () => {
       },
       impl,
       getParamValues: {},
-      keyFields: {},
       model,
     };
 

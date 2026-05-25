@@ -34,10 +34,6 @@ export class Either<L, R> {
     return !this.inner.ok;
   }
 
-  isRight(): this is Either<never, R> {
-    return this.inner.ok;
-  }
-
   unwrap(): R {
     if (!this.inner.ok) {
       throw new Error("Tried to unwrap a Left value");
@@ -50,14 +46,6 @@ export class Either<L, R> {
       throw new Error("Tried to unwrapLeft a Right value");
     }
     return this.inner.left;
-  }
-
-  map<B>(fn: (val: R) => B): Either<L, B> {
-    return this.inner.ok ? Either.right(fn(this.inner.right)) : Either.left(this.inner.left);
-  }
-
-  mapLeft<B>(fn: (val: L) => B): Either<B, R> {
-    return this.inner.ok ? Either.right(this.inner.right) : Either.left(fn(this.inner.left));
   }
 }
 

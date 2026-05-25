@@ -1,5 +1,5 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, CrudKind, DataSource, ValidatedField } from "../cidl.js";
+import { Cidl, Model, ApiMethod, CrudKind, DataSource, Field } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -292,7 +292,6 @@ export type MatchedRoute = {
   namespace: string;
   method: ApiMethod;
   getParamValues: Record<string, unknown>;
-  keyFields: Record<string, unknown>;
   impl: ApiImplementation;
   dataSource?: DataSource;
   model: Model;
@@ -325,7 +324,7 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // instantiated method route format: /{namespace}/{dataSourceGetParams}/{keyFields}/{method}
+  // instantiated method route format: /{namespace}/{dataSourceGetParams}/method}
   // static method route format: /{namespace}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
@@ -352,8 +351,7 @@ function matchRoute(
   } else {
     dataSource = model.data_sources[method.data_source!];
     numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
-    const numKeyFields = model.key_fields.length;
-    if (parts.length !== 2 + numGetParams + numKeyFields) {
+    if (parts.length !== 2 + numGetParams) {
       return notFound(RouterError.UnknownRoute);
     }
   }
@@ -371,7 +369,6 @@ function matchRoute(
       method,
       impl,
       getParamValues: {},
-      keyFields: {},
       model,
     });
   }
@@ -382,18 +379,11 @@ function matchRoute(
     getParamValues[param.name] = parts[1 + i];
   }
 
-  const keyFields: Record<string, unknown> = {};
-  for (let i = 0; i < model.key_fields.length; i++) {
-    const field = model.key_fields[i];
-    keyFields[field.name] = parts[1 + numGetParams + i];
-  }
-
   return Either.right({
     namespace,
     method,
     impl,
     getParamValues,
-    keyFields,
     dataSource,
     model,
   });
@@ -417,23 +407,15 @@ async function validateRequest(
 
   // Validate instantiated invocation
   if (!route.method.is_static) {
-    const model = route.model!;
-
-    // All data source get parameters must be present and valid
-    const dsErr = validateIds(
-      (route.dataSource?.get?.parameters ?? []).map((p) => p.parameter),
-      route.getParamValues,
-      RouterError.InstantiatedMethodMissingGetParam,
-    );
-    if (dsErr) return Either.left(dsErr);
-
-    // All key fields must be present and valid
-    const keyErr = validateIds(
-      model.key_fields,
-      route.keyFields,
-      RouterError.InstantiatedMethodMissingKeyParam,
-    );
-    if (keyErr) return Either.left(keyErr);
+    const getParams = route.dataSource?.get?.parameters ?? [];
+    for (const param of getParams) {
+      if (!route.getParamValues[param.parameter.name]) {
+        return invalidRequest(
+          RouterError.InstantiatedMethodMissingGetParam,
+          `Missing get parameter ${param.parameter.name} for instantiated method.`,
+        );
+      }
+    }
   }
 
   const requiredParams = route.method.parameters;
@@ -489,7 +471,6 @@ async function validateRequest(
     const hydrated = hydrateType(validatedRaw, p.cidl_type, {
       idl: idl,
       includeTree: null,
-      keyFields: {},
       env,
       promises: [],
     });
@@ -498,7 +479,7 @@ async function validateRequest(
 
   return Either.right(params);
 
-  function validateField(field: ValidatedField, value: unknown): Either<HttpResult, unknown> {
+  function validateField(field: Field, value: unknown): Either<HttpResult, unknown> {
     // Path/query values arrive as raw strings; try JSON-parsing so int/bool/null reach
     // validate_type as their declared type. Falls back to the raw string when the
     // value is a plain string (e.g. for `string`-typed fields).
@@ -525,22 +506,6 @@ async function validateRequest(
       );
     }
     return Either.right(JSON.parse(validateRes.unwrap()));
-  }
-
-  function validateIds(
-    fields: ValidatedField[],
-    bag: Record<string, unknown>,
-    missingErr: RouterError,
-  ): HttpResult | null {
-    for (const field of fields) {
-      if (!(field.name in bag)) {
-        return invalidRequest(missingErr, `Missing ${field.name}`).unwrapLeft();
-      }
-      const res = validateField(field, bag[field.name]);
-      if (res.isLeft()) return res.unwrapLeft();
-      bag[field.name] = res.unwrap();
-    }
-    return null;
   }
 }
 
@@ -571,11 +536,7 @@ async function hydrate(
     );
 
   try {
-    let result = await dataSource.gen.get(
-      env,
-      ...Object.values(route.getParamValues),
-      ...Object.values(route.keyFields),
-    );
+    let result = await dataSource.gen.get(env, ...Object.values(route.getParamValues));
 
     if (result.errors.length > 0) {
       return hydrationFailed(CloesceError.displayErrors(result as CloesceResult<never>));

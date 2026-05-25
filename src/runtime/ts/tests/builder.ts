@@ -3,7 +3,6 @@ import {
   Cidl,
   IncludeTree,
   Field,
-  ValidatedField,
   HttpVerb,
   CidlType,
   NavigationFieldKind,
@@ -30,12 +29,6 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
   return {
     models: modelsMap,
     poos: {},
-    wrangler_env: {
-      d1_bindings: ["d1"],
-      kv_bindings: [],
-      r2_bindings: [],
-      vars: [],
-    },
     injects: [],
   };
 }
@@ -70,7 +63,6 @@ export class ModelBuilder {
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
   private navigation_fields: NavigationField[] = [];
-  private key_fields: ValidatedField[] = [];
   private kv_fields: KvField[] = [];
   private r2_fields: R2Field[] = [];
   private apis: ApiMethod[] = [];
@@ -130,11 +122,6 @@ export class ModelBuilder {
     return this.pk("id", "Int");
   }
 
-  keyField(name: string): this {
-    this.key_fields.push({ name, cidl_type: "String", validators: [] });
-    return this;
-  }
-
   kvField(
     format: string,
     binding: string,
@@ -174,7 +161,7 @@ export class ModelBuilder {
   method(
     name: string,
     http_verb: HttpVerb,
-    parameters: ValidatedField[],
+    parameters: Field[],
     return_type: CidlType,
     data_source: string | null = null,
   ): this {
@@ -182,7 +169,7 @@ export class ModelBuilder {
       name,
       http_verb,
       is_static: data_source === null,
-      parameters,
+      parameters: parameters.map((p) => ({ ...p, validators: [] })),
       return_type,
       return_media: "Json",
       parameters_media: "Json",
@@ -243,7 +230,6 @@ export class ModelBuilder {
       primary_columns,
       columns: mutableColumns,
       navigation_fields: this.navigation_fields,
-      key_fields: this.key_fields,
       kv_fields: this.kv_fields,
       r2_fields: this.r2_fields,
       apis: this.apis,

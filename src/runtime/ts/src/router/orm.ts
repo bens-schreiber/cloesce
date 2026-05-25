@@ -16,7 +16,6 @@ import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
-  keyFields: Record<string, unknown>;
   env: any;
   promises: Promise<CloesceResult<void>>[];
 };
@@ -113,7 +112,6 @@ export class Orm {
   async hydrate<T extends object>(
     meta: Model,
     base: any,
-    keyFields: Record<string, unknown>,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T>> {
     base ??= {};
@@ -127,7 +125,6 @@ export class Orm {
     const hydrated = hydrateType(base, modelCidlType, {
       idl,
       includeTree,
-      keyFields,
       env,
       promises,
     });
@@ -241,13 +238,6 @@ export class Orm {
     while (q.length > 0) {
       const { model: currentModel, meta: currentMeta, tree: currentTree } = q.shift()!;
 
-      // Key fields
-      for (const field of currentMeta.key_fields) {
-        if (currentModel[field.name] === undefined) {
-          currentModel[field.name] = (newModel as any)[field.name];
-        }
-      }
-
       // Navigation properties
       for (const navProp of currentMeta.navigation_fields) {
         const nestedTree = currentTree[navProp.field.name];
@@ -294,7 +284,7 @@ export class Orm {
           );
         }
 
-        const key = resolveKey(upload.key, current, {});
+        const key = resolveKey(upload.key, current);
         if (!key) {
           throw new InternalError(
             `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
@@ -315,7 +305,7 @@ export class Orm {
     }
 
     // Hydrate and return the upserted model
-    return await this.hydrate(meta, base, {}, includeTree);
+    return await this.hydrate(meta, base, includeTree);
   }
 
   /**
@@ -328,11 +318,10 @@ export class Orm {
     meta: Model,
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
-    keyFields: Record<string, unknown>,
   ): Promise<CloesceResult<T | null>> {
     if (!query || !meta.d1_binding) {
       // No query provided, hydrate any non-SQL fields
-      return await this.hydrate(meta, {}, keyFields, includeTree);
+      return await this.hydrate(meta, {}, includeTree);
     }
 
     const res = await query.run();
@@ -344,7 +333,7 @@ export class Orm {
     if (!mapped) {
       return { value: null, errors: [] };
     }
-    return await this.hydrate(meta, mapped, keyFields, includeTree);
+    return await this.hydrate(meta, mapped, includeTree);
   }
 
   /**
@@ -369,7 +358,7 @@ export class Orm {
 
     const results = Orm.map(meta, rows, includeTree);
     const hydratedResults = await Promise.all(
-      results.map((modelJson) => this.hydrate<T>(meta, modelJson, {}, includeTree)),
+      results.map((modelJson) => this.hydrate<T>(meta, modelJson, includeTree)),
     );
 
     const errors = hydratedResults.flatMap((r) => r.errors);
@@ -384,14 +373,10 @@ export class Orm {
 /**
  * @returns null if any parameter could not be resolved
  */
-function resolveKey(
-  format: string,
-  current: any,
-  keyFields: Record<string, unknown>,
-): string | null {
+function resolveKey(format: string, current: any): string | null {
   try {
     return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-      const paramValue = keyFields[paramName] ?? current[paramName];
+      const paramValue = current[paramName];
       if (paramValue === undefined) throw null;
       return String(paramValue);
     });
@@ -485,14 +470,8 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       if (res) value[nav.field.name] = res;
     }
 
-    for (const field of modelMeta.key_fields) {
-      const raw = args.keyFields[field.name] ?? value[field.name];
-      const hydrated = hydrateType(raw, field.cidl_type, args);
-      value[field.name] = hydrated !== undefined ? hydrated : raw;
-    }
-
     for (const kv of modelMeta.kv_fields) {
-      const key = resolveKey(kv.format, value, args.keyFields);
+      const key = resolveKey(kv.format, value);
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
         if (kv.list_prefix) {
           value[kv.field.name] = {
@@ -512,7 +491,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     }
 
     for (const r2 of modelMeta.r2_fields) {
-      const key = resolveKey(r2.format, value, args.keyFields);
+      const key = resolveKey(r2.format, value);
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
         if (r2.list_prefix) {
           value[r2.field.name] = {

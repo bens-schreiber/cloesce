@@ -98,7 +98,6 @@ export interface Model {
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
-  key_fields: ValidatedField[];
   kv_fields: KvField[];
   r2_fields: R2Field[];
   apis: ApiMethod[];

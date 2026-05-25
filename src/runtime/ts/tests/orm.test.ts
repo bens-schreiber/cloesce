@@ -10,7 +10,6 @@ function createHydrateArgs() {
   return {
     idl: { models: {}, poos: {} } as Cidl,
     includeTree: null,
-    keyFields: {},
     env: {},
     promises: [],
   };
@@ -222,23 +221,17 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .keyField("configId")
-      .kvField("config/{configId}", "namespace1", "config", false, "Json")
-      .kvField("config/{configId}", "namespace1", "configStream", false, "Stream")
+      .kvField("config/{id}", "namespace1", "config", false, "Json")
+      .kvField("config/{id}", "namespace1", "configStream", false, "Stream")
       .kvField("config", "namespace1", "configList", true, "Json")
       .kvField("emptyConfig", "namespace1", "emptyConfig", false, "Json")
-      .keyField("imageId")
-      .r2Field("images/{imageId}", "bucket1", "image", false)
+      .r2Field("images/{id}", "bucket1", "image", false)
       .r2Field("images", "bucket1", "imageList", true)
       .r2Field("emptyImage", "bucket1", "emptyImage", false)
       .build();
 
-    const configId = "some-config-id";
-    const imageId = "some-image-id";
     const base = {
       id: 1,
-      configId,
-      imageId,
     };
 
     const mf = new Miniflare({
@@ -256,8 +249,8 @@ describe("ORM Hydrate Tests", () => {
 
     const namespace1 = await mf.getKVNamespace("namespace1");
     const baseConfigKV = {
-      key: `config/${configId}`,
-      value: { setting: `${configId} value` },
+      key: `config/${base.id}`,
+      value: { setting: `${base.id} value` },
       metadata: { createdAt: Date.now() },
     };
     const otherConfigItem = {
@@ -271,8 +264,8 @@ describe("ORM Hydrate Tests", () => {
 
     const bucket1 = await mf.getR2Bucket("bucket1");
     const baseImageObject = {
-      key: `images/${imageId}`,
-      body: `image data for ${imageId}`,
+      key: `images/${base.id}`,
+      body: `image data for ${base.id}`,
     };
     const otherImageObject = {
       key: `images/0`,
@@ -299,7 +292,6 @@ describe("ORM Hydrate Tests", () => {
         {
           idl,
           includeTree: {},
-          keyFields: { configId, imageId },
           env,
           promises,
         },
@@ -339,7 +331,6 @@ describe("ORM Hydrate Tests", () => {
             imageList: {},
             emptyImage: {},
           },
-          keyFields: { configId, imageId },
           env,
           promises,
         },
@@ -426,7 +417,6 @@ describe("ORM Hydrate Tests", () => {
       {
         idl,
         includeTree: { configList: {} },
-        keyFields: {},
         env: { namespace1 },
         promises,
       },
