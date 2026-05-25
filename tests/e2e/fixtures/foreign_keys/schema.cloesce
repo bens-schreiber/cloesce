@@ -1,12 +1,10 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
+
 // #region OneToOne
-[use db]
 [crud save, get]
-model B {
+model B for db {
     primary {
         id: int
     }
@@ -20,9 +18,8 @@ api B {
     post testMethod(self)
 }
 
-[use db]
 [crud save, get]
-model A {
+model A for db{
     primary {
         id: int
     }
@@ -53,9 +50,8 @@ api A {
 }
 // #endregion
 // #region OneToMany
-[use db]
 [crud save, get]
-model Person {
+model Person for db {
     primary {
         id: int
     }
@@ -81,9 +77,8 @@ api Person {
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
-[use db]
 [crud save]
-model Dog {
+model Dog for db {
     primary {
         id: int
     }
@@ -102,9 +97,8 @@ api Dog {
 }
 // #endregion
 // #region ManyToMany
-[use db]
 [crud save, get]
-model Student {
+model Student for db {
     primary {
         id: int
     }
@@ -134,9 +128,8 @@ api Student {
     get none([source None] self) -> Student
 }
 
-[use db]
 [crud save]
-model Course {
+model Course for db {
     primary {
         id: int
     }
@@ -144,4 +137,5 @@ model Course {
     nav (Student::id) {
         students
     }
-}// #endregion
+}
+// #endregion

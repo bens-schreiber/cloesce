@@ -1,11 +1,8 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
-model NullabilityChecks {
+model NullabilityChecks for db {
     primary {
         id: int
     }

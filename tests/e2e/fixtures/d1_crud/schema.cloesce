@@ -1,12 +1,9 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
 [crud save, get, list]
-model CrudHaver {
+model CrudHaver for db {
     primary {
         id: int
     }
@@ -20,9 +17,8 @@ api CrudHaver {
     post notCrud(self)
 }
 
-[use db]
 [crud save, get, list]
-model Parent {
+model Parent for db {
     primary {
         id: int
     }
@@ -46,8 +42,7 @@ source WithChildren for Parent {
     }
 }
 
-[use db]
-model Child {
+model Child for db {
     primary {
         id: int
     }

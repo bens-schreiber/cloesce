@@ -1,7 +1,5 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
 model BlobService {}
@@ -10,9 +8,8 @@ api BlobService {
     post incrementBlob(b: blob) -> blob
 }
 
-[use db]
 [crud save, get, list]
-model BlobHaver {
+model BlobHaver for db {
     primary {
         id: int
     }

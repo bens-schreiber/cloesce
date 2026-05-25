@@ -1,41 +1,39 @@
-env {
-    d1 {
-        db
+d1 {
+    db
+}
+
+kv namespace {
+    data(id: int) -> json {
+        "path/to/data/{id}"
     }
-    kv {
-        namespace
-        otherNamespace
+
+    paginatedData() -> paginated<json> {
+        "path/to/data/"
     }
 }
 
-[crud get, save]
-model PureKVModel {
-    keyfield {
-        id: string
-    }
-    
-    kv (namespace, "path/to/data/{id}") {
-        data: json
-    }
-    
-    kv (otherNamespace, "path/to/other/{id}") {
-        otherData: string
+kv otherNamespace {
+    otherData(id: int) -> string {
+        "path/to/other/{id}"
     }
 }
 
-[use db]
 [crud get, save, list]
-model D1BackedModel {
+model ModelWithKv for db {
     primary {
         id: int
     }
     
-    keyfield {
-        keyParam: string
+    kv namespace::data(id) {
+        someData
     }
-    
-    kv (namespace, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
-        kvData: json
+
+    kv otherNamespace::otherData(id) {
+        someOtherData
+    }
+
+    kv namespace::paginatedData() {
+        paginatedItems
     }
 
     column {
@@ -44,17 +42,6 @@ model D1BackedModel {
     }
 }
 
-[crud get]
-model PaginatedKVModel {
-    keyfield {
-        id: string
-    }
-    
-    kv (namespace, "paginated/items/") paginated {
-        items: json
-    }
-}
-
-api PaginatedKVModel {
+api ModelWithKv {
     post acceptPaginated(ps: paginated<kvobject<json>>) -> paginated<kvobject<json>>
 }

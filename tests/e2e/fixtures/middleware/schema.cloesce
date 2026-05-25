@@ -1,16 +1,13 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
 inject {
     InjectedThing
 }
 
-[use db] 
 [crud save]
-model Foo {
+model Foo for db {
     primary {
         id: string
     }

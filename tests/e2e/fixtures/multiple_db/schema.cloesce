@@ -1,13 +1,10 @@
-env {
-    d1 {
-        db1
-        db2
-    }
+d1 {
+    db1
+    db2
 }
 
-[use db1]
 [crud get, save, list]
-model DB1Model {
+model DB1Model for db1 {
     primary {
         id: int
     }
@@ -17,9 +14,8 @@ model DB1Model {
     }
 }
 
-[use db2]
 [crud get, save, list]
-model DB2Model {
+model DB2Model for db2 {
     primary {
         id: int
     }

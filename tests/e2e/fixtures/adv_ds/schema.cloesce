@@ -1,12 +1,9 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
 [crud save]
-model Topping {
+model Topping for db {
     primary {
         id: int
     }
@@ -20,9 +17,8 @@ model Topping {
     }
 }
 
-[use db]
 [crud save, list]
-model Hamburger {
+model Hamburger for db {
     primary {
         id: int
     }

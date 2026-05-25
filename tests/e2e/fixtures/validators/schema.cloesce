@@ -1,16 +1,16 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
+}
 
-    kv {
-        store
+kv store {
+    [maxlen 500]
+    data(email: string) -> string {
+        "some_crap/{email}"
     }
 }
 
-[use db]
 [crud save, get, list]
-model Validator {
+model Validator for db {
     primary {
         [lt 100]
         id: int
@@ -23,14 +23,8 @@ model Validator {
         email: string
     }
 
-    keyfield {
-        [len 10]
-        name: string
-    }
-
-    kv(store, "some_crap/{email}/{name}") {
-        [maxlen 500]
-        data: string
+    kv store::data(email) {
+        someData
     }
 }
 

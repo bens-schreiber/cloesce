@@ -1,12 +1,9 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
 [crud get, list, save]
-model Student {
+model Student for db {
     primary {
         id: int
         name: string
@@ -38,9 +35,8 @@ source CoursesOrderedDescending for Student {
     }
 }
 
-[use db]
 [crud get, list, save]
-model Course {
+model Course for db {
     primary {
         id: int
     }
@@ -54,9 +50,8 @@ model Course {
     }
 }
 
-[use db]
 [crud get, list, save]
-model StudentCourse {
+model StudentCourse for db{
     primary {
         foreign (Student::id, Student::name) {
             studentId
