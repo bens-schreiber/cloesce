@@ -437,7 +437,6 @@ fn objects_partials() {
         let obj = result.unwrap();
         assert_eq!(obj, Some(json!({ "id": 1 })));
     }
-
 }
 
 #[test]

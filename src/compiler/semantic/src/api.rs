@@ -155,14 +155,14 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             method: &method.symbol,
         };
 
-        let resolved_type =
-            match resolve_cidl_type(&method.symbol, &method.symbol.cidl_type, table) {
-                Ok(t) => t,
-                Err(e) => {
-                    self.sink.push(e);
-                    return (CidlType::Void, MediaType::Json);
-                }
-            };
+        let resolved_type = match resolve_cidl_type(&method.symbol, &method.symbol.cidl_type, table)
+        {
+            Ok(t) => t,
+            Err(e) => {
+                self.sink.push(e);
+                return (CidlType::Void, MediaType::Json);
+            }
+        };
 
         let return_media = match resolved_type.root_type() {
             CidlType::Stream => MediaType::Octet,

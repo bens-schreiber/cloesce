@@ -55,7 +55,9 @@ fn top_level_bindings() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            AstBlockKind::D1Binding(b) => Some(b.bindings.iter().map(|s| s.name).collect::<Vec<_>>()),
+            AstBlockKind::D1Binding(b) => {
+                Some(b.bindings.iter().map(|s| s.name).collect::<Vec<_>>())
+            }
             _ => None,
         })
         .expect("d1 binding block to be present");
@@ -387,10 +389,7 @@ fn model_primary_unique_optional_foreign() {
 
     let m = find_model(&ast, "M");
 
-    assert_eq!(
-        m.backing_binding.as_ref().map(|s| s.name),
-        Some("d1_db")
-    );
+    assert_eq!(m.backing_binding.as_ref().map(|s| s.name), Some("d1_db"));
 
     let cruds: Vec<CrudKind> = m
         .symbol

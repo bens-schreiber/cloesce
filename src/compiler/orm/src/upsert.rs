@@ -201,7 +201,7 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        if !model.backing_binding.is_some() {
+        if model.backing_binding.is_none() {
             return Ok(());
         }
 

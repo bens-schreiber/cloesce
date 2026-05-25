@@ -347,10 +347,7 @@ fn display(
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
             report!(binding_path.clone(), binding_range.clone())
-                .with_message(format!(
-                    "'{}' is not a valid D1 binding",
-                    binding.name
-                ))
+                .with_message(format!("'{}' is not a valid D1 binding", binding.name))
                 .with_label(
                     Label::new((binding_path, binding_range))
                         .with_message("this binding is not declared as a top-level `d1` binding")
