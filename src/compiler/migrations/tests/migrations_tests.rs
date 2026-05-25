@@ -104,12 +104,9 @@ async fn migrate_models_scalars(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -163,19 +160,15 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -228,12 +221,9 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Boss {
+            model Boss for db {
                 primary {
                     id: int
                 }
@@ -243,8 +233,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -262,8 +251,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -273,8 +261,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Cat {
+            model Cat for db {
                 primary {
                     id: int
                 }
@@ -340,12 +327,9 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     id: int
                 }
@@ -355,8 +339,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     id: int
                 }
@@ -409,12 +392,9 @@ async fn migrate_with_rebuild(db: SqlitePool) {
     let mut base_ast = {
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -441,12 +421,9 @@ async fn migrate_with_rebuild(db: SqlitePool) {
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -496,12 +473,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: string
                 }
@@ -542,19 +516,15 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
             }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: string
                 }
@@ -595,12 +565,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         let mut base_unique_ast = {
             let migration = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -639,12 +606,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let with_age_unique_ast = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -685,12 +649,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let without_age_unique_ast = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -731,12 +692,9 @@ async fn migrate_with_rename(db: SqlitePool) {
     let base_ast = {
         let migration = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -748,8 +706,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model UserSettings {
+            model UserSettings for db {
                 primary {
                     id: int
                 }
@@ -771,12 +728,9 @@ async fn migrate_with_rename(db: SqlitePool) {
 
     let new = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model AppUser {
+        model AppUser for db {
             primary {
                 id: int
             }
@@ -788,8 +742,7 @@ async fn migrate_with_rename(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model UserSettings {
+        model UserSettings for db {
             primary {
                 id: int
             }
@@ -824,12 +777,9 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     let m2m_ast = {
         let migration = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     id: int
                 }
@@ -839,8 +789,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     id: int
                 }
@@ -863,19 +812,15 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
 
     let no_m2m_ast = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Student {
+        model Student for db {
             primary {
                 id: int
             }
         }
 
-        [use db]
-        model Course {
+        model Course for db {
             primary {
                 id: int
             }
@@ -904,19 +849,15 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     let no_m2m_ast = {
         let migration = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     id: int
                 }
             }
 
-            [use db]
-            model Course {
+            model Course for db {
                 primary {
                     id: int
                 }
@@ -934,12 +875,9 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
 
     let m2m_ast = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Student {
+        model Student for db {
             primary {
                 id: int
             }
@@ -949,8 +887,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Course {
+        model Course for db {
             primary {
                 id: int
             }
@@ -983,12 +920,9 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
 
     let idl = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Parent {
+        model Parent for db {
             primary {
                 orgId: int
                 userId: int
@@ -999,8 +933,7 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Child {
+        model Child for db {
             primary {
                 id: int
             }
@@ -1035,12 +968,9 @@ async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
 
     let idl = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Student {
+        model Student for db {
             primary {
                 schoolId: int
                 studentId: int
@@ -1051,8 +981,7 @@ async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Course {
+        model Course for db {
             primary {
                 deptId: int
                 courseId: int

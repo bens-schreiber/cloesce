@@ -108,10 +108,12 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
 /// }
 /// ```
 ///
-/// R2 binding fields do not specify a return type.
+/// R2 binding fields do not specify a return type, but may be marked with the
+/// `paginated` infix keyword to indicate the field returns a `Paginated<R2Object>`
+/// rather than a single `R2Object`.
 pub fn r2_binding_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // `name(params) { "format" }`
+    // `name(params) [paginated] { "format" }`
     let field = symbol()
         .then(
             tagged_typed_symbol()
@@ -120,14 +122,16 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
+        .then(kw!(GPaginated).or_not())
         .then(
             select! { Token::StringLit(value) => value }
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|((sym, params), key_format)| R2BindingField {
+        .map_spanned(|(((sym, params), paginated), key_format)| R2BindingField {
             symbol: sym,
             params,
             key_format,
+            is_paginated: paginated.is_some(),
         });
 
     kw!(R2)

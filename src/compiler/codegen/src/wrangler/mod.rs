@@ -467,60 +467,62 @@ impl WranglerDefault {
             }
 
             for kv_binding in &env.kv_bindings {
+                let name = kv_binding.name;
                 let kv = spec
                     .kv_namespaces
                     .iter_mut()
-                    .find(|ns| ns.binding.as_deref() == Some(kv_binding));
+                    .find(|ns| ns.binding.as_deref() == Some(name));
 
                 match kv {
                     Some(ns) => {
                         if ns.id.is_none() {
-                            ns.id = Some(format!("replace_with_{}_id", kv_binding));
+                            ns.id = Some(format!("replace_with_{}_id", name));
                             tracing::warn!(
                                 "KV Namespace with binding {} is missing an id. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
-                                kv_binding
+                                name
                             );
                         }
                     }
                     None => {
                         spec.kv_namespaces.push(KVNamespace {
-                            binding: Some(kv_binding.to_string()),
-                            id: Some(format!("replace_with_{}_id", kv_binding)),
+                            binding: Some(name.to_string()),
+                            id: Some(format!("replace_with_{}_id", name)),
                         });
 
                         tracing::warn!(
                             "KV Namespace with binding {} was missing, added a default. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
-                            kv_binding
+                            name
                         );
                     }
                 }
             }
 
             for r2_binding in &env.r2_bindings {
+                let name = r2_binding.name;
                 let r2 = spec
                     .r2_buckets
                     .iter_mut()
-                    .find(|bucket| bucket.binding.as_deref() == Some(r2_binding));
+                    .find(|bucket| bucket.binding.as_deref() == Some(name));
 
                 match r2 {
                     Some(bucket) => {
                         if bucket.bucket_name.is_none() {
-                            bucket.bucket_name = Some(format!("replace-with-{}-name", r2_binding));
+                            bucket.bucket_name = Some(format!("replace-with-{}-name", name));
                             tracing::warn!(
                                 "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
-                                r2_binding
+                                name
                             );
                         }
                     }
                     None => {
                         spec.r2_buckets.push(idl::R2Bucket {
-                            binding: Some(r2_binding.to_string()),
-                            bucket_name: Some(format!("replace-with-{}-name", r2_binding)),
+                            binding: Some(name.to_string()),
+                            bucket_name: Some(format!("replace-with-{}-name", name)),
                         });
 
                         tracing::warn!(
                             "R2 Bucket with binding {} was missing, added a default. See https://developers.cloudflare.com/r2/get-started/",
-                            r2_binding
+                            name
                         );
                     }
                 }

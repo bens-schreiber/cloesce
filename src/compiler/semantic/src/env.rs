@@ -76,6 +76,7 @@ pub fn build_wrangler_env<'src, 'p>(
                 name: bf.symbol.name,
                 params,
                 key_format: bf.key_format,
+                is_paginated: bf.is_paginated,
             });
         }
         r2_bindings.push(R2Binding {

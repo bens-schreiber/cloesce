@@ -191,7 +191,7 @@ export class ModelWithCompositePk {
 }
 export class ModelWithKv {
   id1: string;
-  id2: string;
+  id2: number;
   someValue: KValue<unknown>;
   manyValues: Paginated<KValue<unknown>>;
   streamValue: KValue<void>;
@@ -335,7 +335,6 @@ export class ToyotaPrius {
   id: number;
   ownerId: string;
   modelYear: number;
-  someKey: string;
   metadata: KValue<unknown>;
   photoData: R2Object;
   async instanceMethod(
@@ -344,7 +343,6 @@ export class ToyotaPrius {
   ): Promise<HttpResult<string>> {
     const __$id = [
       encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.someKey)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ToyotaPrius/${__$id}/instanceMethod`

@@ -35,15 +35,35 @@ export interface Env {
     {{ binding }}: D1Database;
 {%- endfor %}
 {%- for binding in &env.kv_bindings %}
-    {{ binding }}: KVNamespace;
+    {{ binding.name }}: KVNamespace;
 {%- endfor %}
 {%- for binding in &env.r2_bindings %}
-    {{ binding }}: R2Bucket;
+    {{ binding.name }}: R2Bucket;
 {%- endfor %}
 {%- for var in &env.vars %}
     {{ var.name }}: {{ self.map_type(&var.cidl_type) }};
 {%- endfor %}
 }
+
+{%- for binding in &env.kv_bindings %}
+export class {{ binding.name }} {
+{%- for field in &binding.fields %}
+    static {{ field.name }}({% for param in &field.params %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string {
+        return {{ self.interpolate_key_format(field.key_format, &field.params) }};
+    }
+{%- endfor %}
+}
+{%- endfor %}
+
+{%- for binding in &env.r2_bindings %}
+export class {{ binding.name }} {
+{%- for field in &binding.fields %}
+    static {{ field.name }}({% for param in &field.params %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string {
+        return {{ self.interpolate_key_format(field.key_format, &field.params) }};
+    }
+{%- endfor %}
+}
+{%- endfor %}
 {%- else %}
 export interface Env {}
 {%- endif %}
@@ -90,9 +110,6 @@ export namespace {{ model.name }} {
 {%- for col in &model.primary_columns %}
         {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
 {%- endfor %}
-{%- for field in &model.key_fields %}
-        {{ field.name }}: string;
-{%- endfor %}
 {%- for col in &model.columns %}
         {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
 {%- endfor %}
@@ -107,19 +124,6 @@ export namespace {{ model.name }} {
 {%- endfor %}
     }
 
-    export namespace Key {
-{%- for kv in &model.kv_fields %}
-        export function {{ kv.field.name }}({% for param in &kv.format_parameters %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }},{% endfor %}): string {
-            return {{ self.mapper.interpolate_format(&kv.format, &kv.format_parameters) }};
-        }
-{%- endfor %}
-{%- for r2 in &model.r2_fields %}
-        export function {{ r2.field.name }}({% for param in &r2.format_parameters %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }},{% endfor %}): string {
-            return {{ self.mapper.interpolate_format(&r2.format, &r2.format_parameters) }};
-        }
-{%- endfor %}
-    }
-
     export interface Api {
 {%- for api in &model.apis -%}
 {%- if !self.is_generated_method(api.name) -%}
@@ -129,7 +133,7 @@ export namespace {{ model.name }} {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: {% if model.kv_fields.is_empty() && model.r2_fields.is_empty() %}any{% else %}typeof Key{% endif %}; Orm: typeof Orm }>): typeof Source & { tag: string; Key: {% if model.kv_fields.is_empty() && model.r2_fields.is_empty() %}any{% else %}typeof Key{% endif %}; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl({{ model.name }}, implObj);
     }
 {%- if !model.data_sources.is_empty() %}
@@ -143,17 +147,17 @@ export namespace {{ model.name }} {
             },
 {%- let ds_bindings = self.model_bindings(model, Some(&ds.tree)) %}
 {%- if let Some(get) = &ds.get %}
-            getQuery: (env: {{ env_type(ds_bindings) }}{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
-            async get(env: {{ env_type(ds_bindings) }}{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}): Promise<CloesceResult<{{ model.name }}.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.Source.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.parameter.name }}{% endfor %}), {{ model.name }}.Source.{{ ds.name }}.include, { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
+            getQuery: (env: {{ env_type(ds_bindings) }}{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}) => env.{{ model.backing_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
+            async get(env: {{ env_type(ds_bindings) }}{% for param in get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}): Promise<CloesceResult<{{ model.name }}.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.Source.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.parameter.name }}{% endfor %}), {{ model.name }}.Source.{{ ds.name }}.include, {});
             },
 {%- else %}
-            async get(env: {{ env_type(ds_bindings) }}{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}): Promise<{{ model.name }}.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, null, {{ model.name }}.Source.{{ ds.name }}.include, { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
+            async get(env: {{ env_type(ds_bindings) }}): Promise<{{ model.name }}.Self | null> {
+                return await CloesceOrm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, null, {{ model.name }}.Source.{{ ds.name }}.include, {});
             },
 {%- endif %}
 {%- if let Some(list) = &ds.list %}
-            listQuery: (env: {{ env_type(ds_bindings) }}{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ list.raw_sql }}`).bind({% for (i, param) in list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < list.parameters.len() %}, {% endif %}{% endfor %}),
+            listQuery: (env: {{ env_type(ds_bindings) }}{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.backing_binding.unwrap() }}.prepare(`{{ list.raw_sql }}`).bind({% for (i, param) in list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < list.parameters.len() %}, {% endif %}{% endfor %}),
             async list(env: {{ env_type(ds_bindings) }}{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}): Promise<CloesceResult<{{ model.name }}.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.Source.{{ ds.name }}.listQuery(env{% for param in list.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.Source.{{ ds.name }}.include);
             },
@@ -169,9 +173,9 @@ export namespace {{ model.name }} {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>{% if !model.key_fields.is_empty() %}, keyFields?: { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}?: string{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} }{% endif %} }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {% if !model.key_fields.is_empty() %}args.keyFields ?? {}{% else %}{}{% endif %});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
         export async function list(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<{{ model.name }}.Self[]>> {
@@ -187,8 +191,8 @@ export namespace {{ model.name }} {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: {{ env_type(orm_bindings) }}, base: DeepPartial<Self>{% for field in &model.key_fields %}, {{ field.name }}: string{% endfor %}, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { {% for (i, field) in model.key_fields.iter().enumerate() %}{{ field.name }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} }, include);
+        export async function hydrate(env: {{ env_type(orm_bindings) }}, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -197,7 +201,7 @@ export namespace {{ model.name }} {
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

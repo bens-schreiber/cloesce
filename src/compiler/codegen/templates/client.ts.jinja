@@ -69,9 +69,6 @@ export class {{ model.name }} {
 {%- for nav in &model.navigation_fields %}
   {{ nav.field.name }}: {{ self.nav_type(nav) }}{% if self.is_one_to_one(nav) %} | undefined{% endif %};
 {%- endfor %}
-{%- for field in &model.key_fields %}
-  {{ field.name }}: string;
-{%- endfor %}
 {%- for kv in &model.kv_fields %}
   {{ kv.field.name }}: {% if self.contains_stream(&kv.field.cidl_type) %}KValue<void>{% else %}{{ self.map_type(&kv.field.cidl_type) }}{% endif %};
 {%- endfor %}
@@ -101,9 +98,6 @@ export class {{ model.name }} {
 {%- else %}
       encodeURIComponent(String({{ p.parameter.name }})),
 {%- endif %}
-{%- endfor %}
-{%- for field in &model.key_fields %}
-      encodeURIComponent(String(this.{{ field.name }})),
 {%- endfor %}
     ].join("/");
 {%- endif %}

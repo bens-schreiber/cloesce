@@ -480,6 +480,9 @@ pub struct R2BindingField<'src> {
 
     /// The key format string (e.g. `"key/{id}"`)
     pub key_format: &'src str,
+
+    /// If true, the field returns a `Paginated<R2Object>``
+    pub is_paginated: bool,
 }
 
 pub struct R2BindingBlock<'src> {

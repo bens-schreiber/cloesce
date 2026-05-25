@@ -12,9 +12,37 @@ export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 export interface Env {
     db: D1Database;
-    my_kv: KVNamespace;
-    my_r2: R2Bucket;
+    MyKv: KVNamespace;
+    MyR2: R2Bucket;
     MY_VAR: string;
+}
+export class MyKv {
+    static someValue(id1: string, id2: number): string {
+        return `${id1}/${id2}`;
+    }
+    static manyValues(): string {
+        return ``;
+    }
+    static streamValue(id1: string, id2: number): string {
+        return `${id1}/${id2}`;
+    }
+}
+export class MyR2 {
+    static fileData(id: string): string {
+        return `${id}`;
+    }
+    static manyFileDatas(id: string): string {
+        return `${id}/files`;
+    }
+    static metadata(ownerId: string, modelYear: number): string {
+        return `${ownerId}/${modelYear}`;
+    }
+    static photoData(modelYear: number): string {
+        return `${modelYear}/photos`;
+    }
+    static customDsData(id: number): string {
+        return `${id}/data`;
+    }
 }
 export abstract class YouTubeApi {
     readonly tag = "YouTubeApi";
@@ -67,14 +95,11 @@ export namespace HasSqlColumnTypes {
         dateNull: Date | null;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(HasSqlColumnTypes, implObj);
     }
 
@@ -86,7 +111,7 @@ export namespace HasSqlColumnTypes {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<HasSqlColumnTypes.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.Source.Default.getQuery(env, id), HasSqlColumnTypes.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<HasSqlColumnTypes.Self>(HasSqlColumnTypes.Meta, HasSqlColumnTypes.Source.Default.getQuery(env, id), HasSqlColumnTypes.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" > ?1 ORDER BY "HasSqlColumnTypes"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<HasSqlColumnTypes.Self[]>> {
@@ -119,7 +144,7 @@ export namespace HasSqlColumnTypes {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -132,14 +157,11 @@ export namespace ManyToManyModelA {
         manyToManyNav: ManyToManyModelB.Self[];
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ManyToManyModelA, implObj);
     }
 
@@ -151,7 +173,7 @@ export namespace ManyToManyModelA {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ManyToManyModelA"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."right" AS "manyToManyNav.id" FROM "ManyToManyModelA" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelA"."id" = "ManyToManyModelAManyToManyModelB_2"."left" LEFT JOIN "ManyToManyModelB" AS "ManyToManyModelB_1" ON "ManyToManyModelAManyToManyModelB_2"."right" = "ManyToManyModelB_1"."id" WHERE "ManyToManyModelA"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<ManyToManyModelA.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.Source.Default.getQuery(env, id), ManyToManyModelA.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<ManyToManyModelA.Self>(ManyToManyModelA.Meta, ManyToManyModelA.Source.Default.getQuery(env, id), ManyToManyModelA.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ManyToManyModelA"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."right" AS "manyToManyNav.id" FROM "ManyToManyModelA" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelA"."id" = "ManyToManyModelAManyToManyModelB_2"."left" LEFT JOIN "ManyToManyModelB" AS "ManyToManyModelB_1" ON "ManyToManyModelAManyToManyModelB_2"."right" = "ManyToManyModelB_1"."id" WHERE "ManyToManyModelA"."id" > ?1 ORDER BY "ManyToManyModelA"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ManyToManyModelA.Self[]>> {
@@ -184,7 +206,7 @@ export namespace ManyToManyModelA {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -197,14 +219,11 @@ export namespace ManyToManyModelB {
         manyToManyNav: ManyToManyModelA.Self[];
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ManyToManyModelB, implObj);
     }
 
@@ -216,7 +235,7 @@ export namespace ManyToManyModelB {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ManyToManyModelB"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."left" AS "manyToManyNav.id" FROM "ManyToManyModelB" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelB"."id" = "ManyToManyModelAManyToManyModelB_2"."right" LEFT JOIN "ManyToManyModelA" AS "ManyToManyModelA_1" ON "ManyToManyModelAManyToManyModelB_2"."left" = "ManyToManyModelA_1"."id" WHERE "ManyToManyModelB"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<ManyToManyModelB.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.Source.Default.getQuery(env, id), ManyToManyModelB.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<ManyToManyModelB.Self>(ManyToManyModelB.Meta, ManyToManyModelB.Source.Default.getQuery(env, id), ManyToManyModelB.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ManyToManyModelB"."id" AS "id", "ManyToManyModelAManyToManyModelB_2"."left" AS "manyToManyNav.id" FROM "ManyToManyModelB" LEFT JOIN "ManyToManyModelAManyToManyModelB" AS "ManyToManyModelAManyToManyModelB_2" ON "ManyToManyModelB"."id" = "ManyToManyModelAManyToManyModelB_2"."right" LEFT JOIN "ManyToManyModelA" AS "ManyToManyModelA_1" ON "ManyToManyModelAManyToManyModelB_2"."left" = "ManyToManyModelA_1"."id" WHERE "ManyToManyModelB"."id" > ?1 ORDER BY "ManyToManyModelB"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ManyToManyModelB.Self[]>> {
@@ -249,7 +268,7 @@ export namespace ManyToManyModelB {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -263,9 +282,6 @@ export namespace ModelWithCompositePk {
         name: string;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
         instanceMethod(
             self: ModelWithCompositePk.Self,
@@ -277,7 +293,7 @@ export namespace ModelWithCompositePk {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ModelWithCompositePk, implObj);
     }
 
@@ -289,7 +305,7 @@ export namespace ModelWithCompositePk {
             },
             getQuery: (env: { db: Env["db"] }, tenantId: string, rowId: number) => env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") = (?1, ?2)`).bind(tenantId, rowId),
             async get(env: { db: Env["db"] }, tenantId: string, rowId: number): Promise<CloesceResult<ModelWithCompositePk.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.Source.Default.getQuery(env, tenantId, rowId), ModelWithCompositePk.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<ModelWithCompositePk.Self>(ModelWithCompositePk.Meta, ModelWithCompositePk.Source.Default.getQuery(env, tenantId, rowId), ModelWithCompositePk.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_tenantId: string, lastSeen_rowId: number, limit: number) => env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") > (?1, ?2) ORDER BY "ModelWithCompositePk"."tenantId" ASC, "ModelWithCompositePk"."rowId" ASC LIMIT ?3`).bind(lastSeen_tenantId, lastSeen_rowId, limit),
             async list(env: { db: Env["db"] }, lastSeen_tenantId: string, lastSeen_rowId: number, limit: number): Promise<CloesceResult<ModelWithCompositePk.Self[]>> {
@@ -322,7 +338,7 @@ export namespace ModelWithCompositePk {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -332,22 +348,10 @@ export namespace ModelWithKv {
 
     export interface Self {
         id1: string;
-        id2: string;
+        id2: number;
         someValue: KValue<unknown>;
         manyValues: Paginated<KValue<unknown>>;
         streamValue: KValue<CfReadableStream>;
-    }
-
-    export namespace Key {
-        export function someValue(id1: string,): string {
-            return `${id1}`;
-        }
-        export function manyValues(): string {
-            return ``;
-        }
-        export function streamValue(id1: string,id2: string,): string {
-            return `${id1}/${id2}`;
-        }
     }
 
     export interface Api {
@@ -368,33 +372,38 @@ export namespace ModelWithKv {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ModelWithKv, implObj);
     }
 
     export namespace Source {
         export const Default = {
             include: {"manyValues":{},"someValue":{},"streamValue":{}},
-            async save(env: { my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyKv: Env["MyKv"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"manyValues":{},"someValue":{},"streamValue":{}});
             },
-            async get(env: { my_kv: Env["my_kv"] }, id1: string, id2: string): Promise<ModelWithKv.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithKv.Self>(ModelWithKv.Meta, null, ModelWithKv.Source.Default.include, { id1, id2 });
+            getQuery: (env: { MyKv: Env["MyKv"], db: Env["db"] }, id1: string, id2: number) => env.db.prepare(`SELECT "ModelWithKv"."id1" AS "id1", "ModelWithKv"."id2" AS "id2" FROM "ModelWithKv" WHERE ("ModelWithKv"."id1", "ModelWithKv"."id2") = (?1, ?2)`).bind(id1, id2),
+            async get(env: { MyKv: Env["MyKv"], db: Env["db"] }, id1: string, id2: number): Promise<CloesceResult<ModelWithKv.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.getQuery(env, id1, id2), ModelWithKv.Source.Default.include, {});
+            },
+            listQuery: (env: { MyKv: Env["MyKv"], db: Env["db"] }, lastSeen_id1: string, lastSeen_id2: number, limit: number) => env.db.prepare(`SELECT "ModelWithKv"."id1" AS "id1", "ModelWithKv"."id2" AS "id2" FROM "ModelWithKv" WHERE ("ModelWithKv"."id1", "ModelWithKv"."id2") > (?1, ?2) ORDER BY "ModelWithKv"."id1" ASC, "ModelWithKv"."id2" ASC LIMIT ?3`).bind(lastSeen_id1, lastSeen_id2, limit),
+            async list(env: { MyKv: Env["MyKv"], db: Env["db"] }, lastSeen_id1: string, lastSeen_id2: number, limit: number): Promise<CloesceResult<ModelWithKv.Self[]>> {
+                return await CloesceOrm.fromEnv(env).list<ModelWithKv.Self>(ModelWithKv.Meta, ModelWithKv.Source.Default.listQuery(env, lastSeen_id1, lastSeen_id2, limit), ModelWithKv.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: { my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyKv: Env["MyKv"], db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { my_kv: Env["my_kv"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id1?: string, id2?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyKv: Env["MyKv"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: { my_kv: Env["my_kv"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
+        export async function list(env: { MyKv: Env["MyKv"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -407,8 +416,8 @@ export namespace ModelWithKv {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { my_kv: Env["my_kv"] }, base: DeepPartial<Self>, id1: string, id2: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { id1, id2 }, include);
+        export async function hydrate(env: { MyKv: Env["MyKv"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -422,15 +431,6 @@ export namespace ModelWithR2 {
         manyFileDatas: Paginated<R2ObjectBody>;
     }
 
-    export namespace Key {
-        export function fileData(id: string,): string {
-            return `${id}`;
-        }
-        export function manyFileDatas(id: string,): string {
-            return `${id}/files`;
-        }
-    }
-
     export interface Api {
         hasR2ParamAndRes(
             self: ModelWithR2.Self,
@@ -439,33 +439,38 @@ export namespace ModelWithR2 {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ModelWithR2, implObj);
     }
 
     export namespace Source {
         export const Default = {
             include: {"fileData":{},"manyFileDatas":{}},
-            async save(env: { my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"fileData":{},"manyFileDatas":{}});
             },
-            async get(env: { my_r2: Env["my_r2"] }, id: string): Promise<ModelWithR2.Self | null> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithR2.Self>(ModelWithR2.Meta, null, ModelWithR2.Source.Default.include, { id });
+            getQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, id: string) => env.db.prepare(`SELECT "ModelWithR2"."id" AS "id" FROM "ModelWithR2" WHERE "ModelWithR2"."id" = ?1`).bind(id),
+            async get(env: { MyR2: Env["MyR2"], db: Env["db"] }, id: string): Promise<CloesceResult<ModelWithR2.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ModelWithR2.Self>(ModelWithR2.Meta, ModelWithR2.Source.Default.getQuery(env, id), ModelWithR2.Source.Default.include, {});
+            },
+            listQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: string, limit: number) => env.db.prepare(`SELECT "ModelWithR2"."id" AS "id" FROM "ModelWithR2" WHERE "ModelWithR2"."id" > ?1 ORDER BY "ModelWithR2"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: string, limit: number): Promise<CloesceResult<ModelWithR2.Self[]>> {
+                return await CloesceOrm.fromEnv(env).list<ModelWithR2.Self>(ModelWithR2.Meta, ModelWithR2.Source.Default.listQuery(env, lastSeen_id, limit), ModelWithR2.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: { my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { id?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: { my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithR2.Self[]>> {
+        export async function list(env: { MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithR2.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -478,8 +483,8 @@ export namespace ModelWithR2 {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { my_r2: Env["my_r2"] }, base: DeepPartial<Self>, id: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { id }, include);
+        export async function hydrate(env: { MyR2: Env["MyR2"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -492,14 +497,11 @@ export namespace OneToManyModel {
         oneToManyNav: BasicModel.Self[];
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(OneToManyModel, implObj);
     }
 
@@ -511,7 +513,7 @@ export namespace OneToManyModel {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<OneToManyModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.Source.Default.getQuery(env, id), OneToManyModel.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<OneToManyModel.Self>(OneToManyModel.Meta, OneToManyModel.Source.Default.getQuery(env, id), OneToManyModel.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" > ?1 ORDER BY "OneToManyModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<OneToManyModel.Self[]>> {
@@ -544,7 +546,7 @@ export namespace OneToManyModel {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -554,20 +556,10 @@ export namespace ToyotaPrius {
 
     export interface Self {
         id: number;
-        someKey: string;
         ownerId: string;
         modelYear: number;
         photoData: R2ObjectBody;
         metadata: KValue<unknown>;
-    }
-
-    export namespace Key {
-        export function metadata(ownerId: string,modelYear: number,): string {
-            return `${ownerId}/${modelYear}`;
-        }
-        export function photoData(modelYear: number,): string {
-            return `${modelYear}/photos`;
-        }
     }
 
     export interface Api {
@@ -578,66 +570,66 @@ export namespace ToyotaPrius {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ToyotaPrius, implObj);
     }
 
     export namespace Source {
         export const Default = {
             include: {"metadata":{},"photoData":{}},
-            async save(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"metadata":{},"photoData":{}});
             },
-            getQuery: (env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, id: number, someKey: string): Promise<CloesceResult<ToyotaPrius.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.Default.getQuery(env, id), ToyotaPrius.Source.Default.include, { someKey });
+            getQuery: (env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
+            async get(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, id: number): Promise<CloesceResult<ToyotaPrius.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.Default.getQuery(env, id), ToyotaPrius.Source.Default.include, {});
             },
-            listQuery: (env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
+            listQuery: (env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.Default.listQuery(env, lastSeen_id, limit), ToyotaPrius.Source.Default.include);
             },
         }
         export const WithKv = {
             include: {"metadata":{}},
-            async save(env: { db: Env["db"], my_kv: Env["my_kv"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyKv: Env["MyKv"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"metadata":{}});
             },
-            getQuery: (env: { db: Env["db"], my_kv: Env["my_kv"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], my_kv: Env["my_kv"] }, id: number, someKey: string): Promise<CloesceResult<ToyotaPrius.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithKv.getQuery(env, id), ToyotaPrius.Source.WithKv.include, { someKey });
+            getQuery: (env: { MyKv: Env["MyKv"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
+            async get(env: { MyKv: Env["MyKv"], db: Env["db"] }, id: number): Promise<CloesceResult<ToyotaPrius.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithKv.getQuery(env, id), ToyotaPrius.Source.WithKv.include, {});
             },
-            listQuery: (env: { db: Env["db"], my_kv: Env["my_kv"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], my_kv: Env["my_kv"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
+            listQuery: (env: { MyKv: Env["MyKv"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyKv: Env["MyKv"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithKv.listQuery(env, lastSeen_id, limit), ToyotaPrius.Source.WithKv.include);
             },
         }
         export const WithR2 = {
             include: {"photoData":{}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"photoData":{}});
             },
-            getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number, someKey: string): Promise<CloesceResult<ToyotaPrius.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithR2.getQuery(env, id), ToyotaPrius.Source.WithR2.include, { someKey });
+            getQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id),
+            async get(env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number): Promise<CloesceResult<ToyotaPrius.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithR2.getQuery(env, id), ToyotaPrius.Source.WithR2.include, {});
             },
-            listQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
+            listQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ToyotaPrius.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<ToyotaPrius.Self>(ToyotaPrius.Meta, ToyotaPrius.Source.WithR2.listQuery(env, lastSeen_id, limit), ToyotaPrius.Source.WithR2.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self>, keyFields?: { someKey?: string } }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, args.keyFields ?? {});
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ToyotaPrius.Self[]>> {
+        export async function list(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ToyotaPrius.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -650,8 +642,8 @@ export namespace ToyotaPrius {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"], my_kv: Env["my_kv"], my_r2: Env["my_r2"] }, base: DeepPartial<Self>, someKey: string, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, { someKey }, include);
+        export async function hydrate(env: { MyKv: Env["MyKv"], MyR2: Env["MyR2"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -664,14 +656,11 @@ export namespace BasicModel {
         fk_to_model: number;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(BasicModel, implObj);
     }
 
@@ -683,7 +672,7 @@ export namespace BasicModel {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<BasicModel.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<BasicModel.Self>(BasicModel.Meta, BasicModel.Source.Default.getQuery(env, id), BasicModel.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<BasicModel.Self>(BasicModel.Meta, BasicModel.Source.Default.getQuery(env, id), BasicModel.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" > ?1 ORDER BY "BasicModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<BasicModel.Self[]>> {
@@ -716,7 +705,7 @@ export namespace BasicModel {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -732,12 +721,6 @@ export namespace ModelWithCustomDs {
         data: R2ObjectBody;
     }
 
-    export namespace Key {
-        export function data(id: number,): string {
-            return `${id}/data`;
-        }
-    }
-
     export interface Api {
         instanceMethod(
             self: ModelWithCustomDs.Self,
@@ -746,52 +729,52 @@ export namespace ModelWithCustomDs {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm }>): typeof Source & { tag: string; Key: typeof Key; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ModelWithCustomDs, implObj);
     }
 
     export namespace Source {
         export const Custom = {
             include: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"oneToManyModel":{"oneToManyNav":{}}});
             },
-            getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number, externalParam: string) => env.db.prepare(`SELECT * FROM ModelWithCustomDs WHERE id = ?1 AND name LIKE ?2`).bind(id, externalParam),
-            async get(env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number, externalParam: string): Promise<CloesceResult<ModelWithCustomDs.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Custom.getQuery(env, id, externalParam), ModelWithCustomDs.Source.Custom.include, {  });
+            getQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number, externalParam: string) => env.db.prepare(`SELECT * FROM ModelWithCustomDs WHERE id = ?1 AND name LIKE ?2`).bind(id, externalParam),
+            async get(env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number, externalParam: string): Promise<CloesceResult<ModelWithCustomDs.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Custom.getQuery(env, id, externalParam), ModelWithCustomDs.Source.Custom.include, {});
             },
-            listQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
+            listQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Custom.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.Source.Custom.include);
             },
         }
         export const Default = {
             include: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
-            async save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
+            async save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>): Promise<CloesceResult<Self | null>> {
                 return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, {"data":{},"oneToManyModel":{"oneToManyNav":{}}});
             },
-            getQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id),
-            async get(env: { db: Env["db"], my_r2: Env["my_r2"] }, id: number): Promise<CloesceResult<ModelWithCustomDs.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Default.getQuery(env, id), ModelWithCustomDs.Source.Default.include, {  });
+            getQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id),
+            async get(env: { MyR2: Env["MyR2"], db: Env["db"] }, id: number): Promise<CloesceResult<ModelWithCustomDs.Self | null>> {
+                return await CloesceOrm.fromEnv(env).get<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Default.getQuery(env, id), ModelWithCustomDs.Source.Default.include, {});
             },
-            listQuery: (env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
-            async list(env: { db: Env["db"], my_r2: Env["my_r2"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
+            listQuery: (env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            async list(env: { MyR2: Env["MyR2"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
                 return await CloesceOrm.fromEnv(env).list<ModelWithCustomDs.Self>(ModelWithCustomDs.Meta, ModelWithCustomDs.Source.Default.listQuery(env, lastSeen_id, limit), ModelWithCustomDs.Source.Default.include);
             },
         }
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"], my_r2: Env["my_r2"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyR2: Env["MyR2"], db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"], my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include, {});
         }
 
-        export async function list(env: { db: Env["db"], my_r2: Env["my_r2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
+        export async function list(env: { MyR2: Env["MyR2"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
             args.include ??= Source.Default.include;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -804,8 +787,8 @@ export namespace ModelWithCustomDs {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"], my_r2: Env["my_r2"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+        export async function hydrate(env: { MyR2: Env["MyR2"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -819,14 +802,11 @@ export namespace HasOneToOne {
         oneToOneNav: BasicModel.Self;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(HasOneToOne, implObj);
     }
 
@@ -838,7 +818,7 @@ export namespace HasOneToOne {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<HasOneToOne.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.Source.Default.getQuery(env, id), HasOneToOne.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<HasOneToOne.Self>(HasOneToOne.Meta, HasOneToOne.Source.Default.getQuery(env, id), HasOneToOne.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" > ?1 ORDER BY "HasOneToOne"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<HasOneToOne.Self[]>> {
@@ -871,7 +851,7 @@ export namespace HasOneToOne {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
@@ -885,14 +865,11 @@ export namespace ModelWithCruds {
         categoryId: number;
     }
 
-    export namespace Key {
-    }
-
     export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
-    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Key: any; Orm: typeof Orm }>): typeof Source & { tag: string; Key: any; Orm: typeof Orm } & Impl {
+    export function impl<Impl extends Api>(implObj: Impl & ThisType<typeof Source & { tag: string; Orm: typeof Orm }>): typeof Source & { tag: string; Orm: typeof Orm } & Impl {
         return _impl(ModelWithCruds, implObj);
     }
 
@@ -904,7 +881,7 @@ export namespace ModelWithCruds {
             },
             getQuery: (env: { db: Env["db"] }, name: string) => env.db.prepare(`SELECT * FROM ModelWithCruds WHERE name = ?1`).bind(name),
             async get(env: { db: Env["db"] }, name: string): Promise<CloesceResult<ModelWithCruds.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.Source.ByName.getQuery(env, name), ModelWithCruds.Source.ByName.include, {  });
+                return await CloesceOrm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.Source.ByName.getQuery(env, name), ModelWithCruds.Source.ByName.include, {});
             },
             listQuery: (env: { db: Env["db"] }, name: string, limit: number) => env.db.prepare(`SELECT * FROM ModelWithCruds WHERE name LIKE ?1 LIMIT ?2`).bind(name, limit),
             async list(env: { db: Env["db"] }, name: string, limit: number): Promise<CloesceResult<ModelWithCruds.Self[]>> {
@@ -918,7 +895,7 @@ export namespace ModelWithCruds {
             },
             getQuery: (env: { db: Env["db"] }, id: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id),
             async get(env: { db: Env["db"] }, id: number): Promise<CloesceResult<ModelWithCruds.Self | null>> {
-                return await CloesceOrm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.Source.Default.getQuery(env, id), ModelWithCruds.Source.Default.include, {  });
+                return await CloesceOrm.fromEnv(env).get<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.Source.Default.getQuery(env, id), ModelWithCruds.Source.Default.include, {});
             },
             listQuery: (env: { db: Env["db"] }, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<CloesceResult<ModelWithCruds.Self[]>> {
@@ -951,14 +928,14 @@ export namespace ModelWithCruds {
         }
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = Source.Default.include): Promise<CloesceResult<Self>> {
-            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {  }, include);
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, {}, include);
         }
     }
 }
 
 function _impl(namespace: any, implObj: any) {
     const base = namespace.Source
-        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Key: namespace.Key, Orm: namespace.Orm }
+        ? { ...implObj, ...namespace.Source, tag: namespace.Meta.name, Orm: namespace.Orm }
         : { ...implObj, tag: namespace.Tag };
     for (const key of Object.keys(implObj as object)) {
         const fn = (base as any)[key];

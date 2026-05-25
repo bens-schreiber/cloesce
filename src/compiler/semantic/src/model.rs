@@ -723,10 +723,16 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             return;
         }
 
+        let local_type = if bf.is_paginated {
+            CidlType::paginated(CidlType::R2Object)
+        } else {
+            CidlType::R2Object
+        };
+
         self.r2_fields.push(R2Field {
             field: Field {
                 name: r2.field.name.into(),
-                cidl_type: CidlType::R2Object,
+                cidl_type: local_type,
             },
             binding: binding.symbol.name,
             binding_field: bf.symbol.name,

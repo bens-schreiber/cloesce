@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use askama::Template;
-use idl::{CidlType, CloesceIdl, IncludeTree, Model};
+use idl::{CidlType, CloesceIdl, IncludeTree, Model, ValidatedField};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
@@ -24,6 +24,13 @@ impl<'src> BackendTemplate<'src> {
 
     fn is_env_injected(&self, name: &str) -> bool {
         !self.idl.injects.contains(&name)
+    }
+
+    /// Format a binding field's `key_format` into a JS template literal,
+    /// using the field's declared param names as placeholders.
+    fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {
+        let names: Vec<&str> = params.iter().map(|p| p.name.as_ref()).collect();
+        self.mapper.interpolate_format(format, &names)
     }
 
     /// Wrangler bindings a model's method may touch.
@@ -53,7 +60,7 @@ impl<'src> BackendTemplate<'src> {
         }
         let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
 
-        if let Some(b) = model.d1_binding {
+        if let Some(b) = model.backing_binding {
             bindings.insert(b);
         }
         for kv in &model.kv_fields {

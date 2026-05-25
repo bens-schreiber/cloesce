@@ -511,6 +511,9 @@ pub struct R2BindingField<'src> {
     /// The key format string (e.g. `"key/{id}"`).
     #[serde(borrow)]
     pub key_format: &'src str,
+
+    /// If true, the field returns a `Paginated<R2Object>`
+    pub is_paginated: bool,
 }
 
 #[derive(Deserialize, Serialize)]

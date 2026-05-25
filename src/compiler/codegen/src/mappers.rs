@@ -1,4 +1,4 @@
-use idl::{CidlType, CloesceIdl, Field, IncludeTree, MediaType};
+use idl::{CidlType, CloesceIdl, IncludeTree, MediaType};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
@@ -8,8 +8,8 @@ pub trait LanguageTypeMapper {
     fn media_type(&self, ty: &MediaType) -> String;
 
     /// Converts a format string to the target languages string interpolation syntax,
-    /// using the provided parameters to identify placeholders
-    fn interpolate_format(&self, format: &str, parameters: &[Field]) -> String;
+    /// using the provided parameter names to identify placeholders.
+    fn interpolate_format(&self, format: &str, param_names: &[&str]) -> String;
 
     /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
@@ -87,12 +87,9 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn interpolate_format(&self, format: &str, parameters: &[Field]) -> String {
-        let result = parameters.iter().fold(format.to_string(), |acc, field| {
-            acc.replace(
-                &format!("{{{}}}", field.name),
-                &format!("${{{}}}", field.name),
-            )
+    fn interpolate_format(&self, format: &str, param_names: &[&str]) -> String {
+        let result = param_names.iter().fold(format.to_string(), |acc, name| {
+            acc.replace(&format!("{{{name}}}"), &format!("${{{name}}}"))
         });
         format!("`{result}`")
     }

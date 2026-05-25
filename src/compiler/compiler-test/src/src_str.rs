@@ -24,7 +24,7 @@ r2 MyR2 {
         "{id}"
     }
 
-    manyFileDatas(id: string) {
+    manyFileDatas(id: string) paginated {
         "{id}/files"
     }
 
@@ -134,7 +134,7 @@ api ModelWithCompositePk {
     post instanceMethod(self, input: string) -> string
 }
 
-model ModelWithKv {
+model ModelWithKv for db {
     primary {
         id1: string
         id2: int
@@ -160,7 +160,7 @@ api ModelWithKv {
     post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
 }
 
-model ModelWithR2 {
+model ModelWithR2 for db {
     primary {
         id: string
     }
