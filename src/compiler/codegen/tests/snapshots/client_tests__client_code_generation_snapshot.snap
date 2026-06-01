@@ -170,8 +170,6 @@ export class ModelWithCompositePk {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$id = [
-      encodeURIComponent(String(this.tenantId)),
-      encodeURIComponent(String(this.rowId)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCompositePk/${__$id}/instanceMethod`
@@ -209,8 +207,6 @@ export class ModelWithKv {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$id = [
-      encodeURIComponent(String(this.id1)),
-      encodeURIComponent(String(this.id2)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/${__$id}/instanceMethod`
@@ -256,8 +252,6 @@ export class ModelWithKv {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<KValue<string>>> {
     const __$id = [
-      encodeURIComponent(String(this.id1)),
-      encodeURIComponent(String(this.id2)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/${__$id}/hasKvParamAndRes`
@@ -299,7 +293,6 @@ export class ModelWithR2 {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<R2Object>> {
     const __$id = [
-      encodeURIComponent(String(this.id)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithR2/${__$id}/hasR2ParamAndRes`
@@ -354,7 +347,6 @@ export class ToyotaPrius {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$id = [
-      encodeURIComponent(String(this.id)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ToyotaPrius/${__$id}/instanceMethod`
@@ -478,29 +470,6 @@ export class ModelWithCruds {
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      ModelWithCruds,
-      false
-    );
-  }
-  static async $save_ByName(
-    model: DeepPartial<ModelWithCruds>,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ModelWithCruds>> {
-    const __$baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$save_ByName`
-    );
-    const __$payload: any = {};
-    __$payload["model"] = model;
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(

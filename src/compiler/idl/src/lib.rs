@@ -265,12 +265,12 @@ pub enum CrudKind {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct DataSourceListMethod<'src> {
+pub struct DataSourceMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
 
-    #[serde(skip)]
-    pub raw_sql: String,
+    #[serde(borrow)]
+    pub injected: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -279,7 +279,8 @@ pub struct DataSourceGetMethodParam<'src> {
     pub parameter: ValidatedField<'src>,
 
     /// True if the parameter matches a field on the model,
-    /// meaning the client can automatically populate it when calling the method on an instance of the model.
+    /// meaning the client can automatically populate it when calling the method
+    /// on an instance of the model.
     pub instance_field: bool,
 }
 
@@ -288,8 +289,8 @@ pub struct DataSourceGetMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<DataSourceGetMethodParam<'src>>,
 
-    #[serde(skip)]
-    pub raw_sql: String,
+    #[serde(borrow)]
+    pub injected: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -301,14 +302,27 @@ pub struct DataSource<'src> {
     pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
-    pub list: Option<DataSourceListMethod<'src>>,
+    pub list: Option<DataSourceMethod<'src>>,
 
     #[serde(borrow)]
     pub get: Option<DataSourceGetMethod<'src>>,
 
+    #[serde(borrow)]
+    pub save: Option<DataSourceMethod<'src>>,
+
+    /// A raw SQL query generated from the WASM `select` method.
+    /// Empty if the data source is not backed by a SQL db
+    pub include_query: String,
+
     /// True if the data source is only used for internal method implementations
     /// and should not be exposed on the client.
     pub is_internal: bool,
+}
+
+impl DataSource<'_> {
+    pub fn has_stubs(&self) -> bool {
+        self.get.is_some() || self.list.is_some() || self.save.is_some()
+    }
 }
 
 #[derive(Deserialize, Serialize)]

@@ -3,7 +3,7 @@ use std::ops::Not;
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    resolve_cidl_type, resolve_validator_tags,
+    resolve_cidl_type, resolve_injects, resolve_validator_tags,
 };
 use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
 use idl::{ApiMethod, CidlType, HttpVerb, MediaType, ValidatedField};
@@ -55,8 +55,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let (parameters, parameters_media, is_static, data_source_name) =
             self.parameters(namespace, method, table);
 
-        // Validate method-level tags (only `[inject ...]` is permitted here)
-        let injected = self.method_injects(method, table);
+        let injected = resolve_injects(&method.symbol, table, &mut self.sink);
 
         let data_source = if table.models.contains_key(namespace) && !is_static {
             Some(data_source_name.unwrap_or("Default"))
@@ -75,63 +74,6 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             parameters,
             injected,
         })
-    }
-
-    /// Validates method-level tags. Only `[inject ...]` tags are valid here.
-    /// Returns the flattened list of injected symbol names declared on this method.
-    fn method_injects(
-        &mut self,
-        method: &'p ApiBlockMethod<'src>,
-        table: &SymbolTable<'src, 'p>,
-    ) -> Vec<&'src str> {
-        let mut injected: Vec<&'src str> = Vec::new();
-
-        for tag in &method.symbol.tags {
-            let Tag::Inject { bindings } = &tag.inner else {
-                self.sink.push(SemanticError::TagInvalidInContext {
-                    tag,
-                    symbol: &method.symbol,
-                });
-                continue;
-            };
-
-            for binding in bindings {
-                let name = binding.name;
-
-                let is_d1 = table
-                    .d1_bindings
-                    .iter()
-                    .flat_map(|b| b.bindings.iter())
-                    .any(|s| s.name == name);
-                let is_kv = table.kv_bindings.contains_key(name);
-                let is_r2 = table.r2_bindings.contains_key(name);
-                let is_env_var = table
-                    .vars_blocks
-                    .iter()
-                    .flat_map(|v| v.vars.iter())
-                    .any(|s| s.name == name);
-
-                let is_inject_block_symbol = table
-                    .injects
-                    .iter()
-                    .flat_map(|i| i.symbols.iter())
-                    .any(|s| s.name == name);
-
-                if !is_d1 && !is_kv && !is_r2 && !is_env_var && !is_inject_block_symbol {
-                    self.sink
-                        .push(SemanticError::UnresolvedSymbol { symbol: binding });
-                    continue;
-                }
-
-                if injected.contains(&name) {
-                    // Duplicate within the same method, silently de-dupe.
-                    continue;
-                }
-                injected.push(name);
-            }
-        }
-
-        injected
     }
 
     fn return_type(

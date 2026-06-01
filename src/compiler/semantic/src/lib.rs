@@ -638,6 +638,64 @@ fn resolve_validator_tags<'src, 'p>(
     }
 }
 
+/// Resolves the `[inject ...]` tags on a method's symbol into a deduplicated list of binding names.
+///
+/// Each binding name must resolve to one of:
+/// - an env binding (D1 / KV / R2),
+/// - an env var,
+/// - an `inject { ... }` block symbol.
+fn resolve_injects<'src, 'p>(
+    method: &'p Symbol<'src>,
+    table: &SymbolTable<'src, 'p>,
+    sink: &mut ErrorSink<'src, 'p>,
+) -> Vec<&'src str> {
+    let mut injected: Vec<&'src str> = Vec::new();
+
+    for tag in &method.tags {
+        let Tag::Inject { bindings } = &tag.inner else {
+            sink.push(SemanticError::TagInvalidInContext {
+                tag,
+                symbol: method,
+            });
+            continue;
+        };
+
+        for binding in bindings {
+            let name = binding.name;
+
+            let is_d1 = table
+                .d1_bindings
+                .iter()
+                .flat_map(|b| b.bindings.iter())
+                .any(|s| s.name == name);
+            let is_kv = table.kv_bindings.contains_key(name);
+            let is_r2 = table.r2_bindings.contains_key(name);
+            let is_env_var = table
+                .vars_blocks
+                .iter()
+                .flat_map(|v| v.vars.iter())
+                .any(|s| s.name == name);
+
+            let is_inject_block_symbol = table
+                .injects
+                .iter()
+                .flat_map(|i| i.symbols.iter())
+                .any(|s| s.name == name);
+
+            if !is_d1 && !is_kv && !is_r2 && !is_env_var && !is_inject_block_symbol {
+                sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
+                continue;
+            }
+
+            if !injected.contains(&name) {
+                injected.push(name);
+            }
+        }
+    }
+
+    injected
+}
+
 /// Returns if a column in a D1 model is a valid SQLite type
 fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     let inner = match cidl_type {

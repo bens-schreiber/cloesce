@@ -1,5 +1,6 @@
 ---
 source: src/compiler/frontend/tests/formatter_tests.rs
+assertion_line: 49
 expression: formatted
 ---
 // Top level comment
@@ -237,13 +238,9 @@ model ModelWithCruds for db {
 source ByName for ModelWithCruds {
     include {}
     
-    sql get([instance] name: string) {
-        "SELECT * FROM ModelWithCruds WHERE name = $name"
-    }
+    get([instance] name: string)
     
-    sql list(name: string, limit: int) {
-        "SELECT * FROM ModelWithCruds WHERE name LIKE $name LIMIT $limit"
-    }
+    list(name: string, limit: int)
 }
 
 model ModelWithCustomDs for db {
@@ -275,9 +272,7 @@ source Custom for ModelWithCustomDs {
         }
     }
     
-    sql get([instance] id: int, externalParam: string) {
-        "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
-    }
+    get([instance] id: int, externalParam: string)
 }
 
 api ModelWithCustomDs {
