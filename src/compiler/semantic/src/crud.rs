@@ -1,6 +1,6 @@
 use idl::{
-    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model,
-    ValidatedField,
+    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model, Number,
+    ValidatedField, Validator,
 };
 
 pub struct CrudExpansion;
@@ -51,7 +51,7 @@ impl CrudExpansion {
                         .get
                         .as_ref()
                         .map(|g| g.parameters.iter().map(|p| &p.parameter).cloned().collect())
-                        .unwrap_or_else(Vec::new)
+                        .unwrap_or_else(|| default_get_parameters(model))
                         .into_iter()
                         .chain(model.key_fields.iter().cloned())
                         .collect();
@@ -70,9 +70,13 @@ impl CrudExpansion {
                 })
                 .collect(),
             CrudKind::List => sources
-                .filter(|ds| ds.list.is_some())
+                .filter(|ds| ds.list.is_some() || ds.name == "Default")
                 .map(|ds| {
-                    let parameters = ds.list.as_ref().unwrap().parameters.clone();
+                    let parameters = ds
+                        .list
+                        .as_ref()
+                        .map(|l| l.parameters.clone())
+                        .unwrap_or_else(|| default_list_parameters(model));
 
                     ApiMethod {
                         name: format_name(ds),
@@ -88,24 +92,64 @@ impl CrudExpansion {
                 })
                 .collect(),
             CrudKind::Save => sources
-                .map(|ds| ApiMethod {
-                    name: format_name(ds),
-                    is_static: true,
-                    data_source: None,
-                    http_verb: HttpVerb::Post,
-                    return_type: CidlType::Object { name: model.name },
-                    return_media: MediaType::Json,
-                    parameters_media: MediaType::Json,
-                    parameters: vec![ValidatedField {
-                        name: "model".into(),
-                        cidl_type: CidlType::Partial {
-                            object_name: model.name,
-                        },
-                        validators: vec![],
-                    }],
-                    injected: vec![],
+                .filter(|ds| ds.save.is_some() || ds.name == "Default")
+                .map(|ds| {
+                    let parameters = ds
+                        .save
+                        .as_ref()
+                        .map(|s| s.parameters.clone())
+                        .unwrap_or_else(|| default_save_parameters(model));
+
+                    ApiMethod {
+                        name: format_name(ds),
+                        is_static: true,
+                        data_source: None,
+                        http_verb: HttpVerb::Post,
+                        return_type: CidlType::Object { name: model.name },
+                        return_media: MediaType::Json,
+                        parameters_media: MediaType::Json,
+                        parameters,
+                        injected: vec![],
+                    }
                 })
                 .collect(),
         }
     }
+}
+
+/// Fetch by primary key parameters
+fn default_get_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
+    model
+        .primary_columns
+        .iter()
+        .map(|pk| pk.field.clone())
+        .collect()
+}
+
+/// A single parameter of type `partial<Model>`
+fn default_save_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
+    vec![ValidatedField {
+        name: "model".into(),
+        cidl_type: CidlType::Partial {
+            object_name: model.name,
+        },
+        validators: vec![],
+    }]
+}
+
+/// Seek-based pagination parameters
+fn default_list_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
+    model
+        .primary_columns
+        .iter()
+        .map(|pk| ValidatedField {
+            name: format!("lastSeen_{}", pk.field.name).into(),
+            ..pk.field.clone()
+        })
+        .chain(std::iter::once(ValidatedField {
+            name: "limit".into(),
+            cidl_type: CidlType::Int,
+            validators: vec![Validator::GreaterThan(Number::Int(0))],
+        }))
+        .collect()
 }

@@ -211,13 +211,9 @@ model ModelWithCruds {
 source ByName for ModelWithCruds {
     include {}
 
-    sql get([instance] name: string) {
-        "SELECT * FROM ModelWithCruds WHERE name = $name"
-    }
+    get([instance] name: string)
 
-    sql list(name: string, limit: int) {
-        "SELECT * FROM ModelWithCruds WHERE name LIKE $name LIMIT $limit"
-    }
+    list(name: string, limit: int)
 }
 
 [use db]
@@ -248,9 +244,7 @@ source Custom for ModelWithCustomDs {
         data
     }
 
-    sql get([instance] id: int, externalParam: string) {
-        "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
-    }
+    get([instance] id: int, externalParam: string)
 }
 
 api ModelWithCustomDs {

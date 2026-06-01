@@ -680,15 +680,10 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
 impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.parameters, |param| ctx.sym_doc(param, 0, true));
-
-        let sql = Doc::hardline(2)
-            .then(Doc::text("\""))
-            .then(Doc::text(self.raw_sql))
-            .then(Doc::text("\""));
-        Doc::text("(")
+        ctx.sym_doc(&self.method, 0, true)
+            .then(Doc::text("("))
             .then(params)
             .then(Doc::text(")"))
-            .then(ctx.block(sql, 2))
     }
 }
 
@@ -711,23 +706,11 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
                 .then(ctx.block(self.tree.to_doc_at(ctx, 2), 2))
         };
 
-        if let Some(get) = &self.get {
+        for stub in [&self.get, &self.list, &self.save].into_iter().flatten() {
             include = include
                 .then(Doc::hardline(1))
                 .then(Doc::hardline(1))
-                .then(Doc::kw(Keyword::Sql))
-                .then(Doc::text(" "))
-                .then(Doc::kw(Keyword::Get))
-                .then(ctx.spd_doc(get, 1, true));
-        }
-        if let Some(list) = &self.list {
-            include = include
-                .then(Doc::hardline(1))
-                .then(Doc::hardline(1))
-                .then(Doc::kw(Keyword::Sql))
-                .then(Doc::text(" "))
-                .then(Doc::kw(Keyword::List))
-                .then(ctx.spd_doc(list, 1, true));
+                .then(ctx.spd_doc(stub, 1, true));
         }
 
         source_doc.then(ctx.block(include, 1))

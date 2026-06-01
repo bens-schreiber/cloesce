@@ -835,17 +835,8 @@ fn data_source_errors() {
         // Invalid method param type (Object, not a sqlite type)
         source BadParamSource for User {
             include { posts }
-            sql get(u: User) {
-                "SELECT * FROM users WHERE id = ?"
-            }
+            get(u: User)
         }
-
-        // SQL references $ghost which is not a declared param
-        source UnknownSqlParam for User {
-            include {}
-            sql get(id: int) { "($include) WHERE id = $ghost" }
-        }
-
     "#,
     );
     let parse = lex_and_ast(src);
@@ -854,34 +845,24 @@ fn data_source_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    // BadModelSource: unknown model
     expect_err!(
         errors,
         SemanticError::DataSourceUnknownModelReference { .. }
     );
 
-    // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
             if field.name == "nonexistent"
     )));
 
-    // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
             if field.name == "bogus"
     )));
 
-    // BadParamSource: User is not a valid sql type
     expect_err!(errors, SemanticError::DataSourceInvalidMethodParam { .. });
-
-    // UnknownSqlParam: $ghost is not a declared param
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
-    )));
 }
 
 #[test]

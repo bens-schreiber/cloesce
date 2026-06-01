@@ -150,13 +150,6 @@ pub enum SemanticError<'src, 'p> {
         param: &'p Symbol<'src>,
     },
 
-    /// A data source method SQL references a `$name` placeholder that does not match any parameter
-    /// (and is not the reserved `$include` placeholder).
-    DataSourceUnknownSqlParam {
-        source: &'p Symbol<'src>,
-        name: String,
-    },
-
     /// A model has a CRUD operation that is not supported for its backing store.
     UnsupportedCrudOperation {
         model: &'p Symbol<'src>,
@@ -688,19 +681,6 @@ fn display(
                     Label::new((source_path, source_range))
                         .with_message(format!("data source '{}' declared here", source.name))
                         .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::DataSourceUnknownSqlParam { source, name } => {
-            let (path, range) = span_parts(&source.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!("SQL references unknown placeholder '${name}'"))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(format!(
-                            "'${name}' does not match any parameter on data source '{}'",
-                            source.name
-                        ))
-                        .with_color(Color::Red),
                 )
         }
         SemanticError::UnsupportedCrudOperation { model, crud } => {

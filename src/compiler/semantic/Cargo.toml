@@ -12,7 +12,6 @@ orm = { path = "../orm" }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
-sqlx = { workspace = true }
 
 [lib]
 doctest = false

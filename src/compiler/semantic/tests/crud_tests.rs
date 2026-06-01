@@ -116,22 +116,18 @@ fn crud_methods_namespace_sources_inherit_validators() {
         source CustomDs for Product {
             include {}
 
-            sql get(
+            get(
                 [lt 100]
                 id: int
-            ) {
-                "SELECT * FROM Product WHERE id = ?"
-            }
+            )
 
-            sql list(
+            list(
                 [step 10]
                 lastSeen_id: int,
 
                 [gt 0]
                 limit: int
-            ) {
-                "SELECT * FROM Product WHERE id > ? LIMIT ?"
-            }
+            )
         }
     "#,
     );

@@ -272,7 +272,9 @@ pub enum ApiBlockMethodParamKind<'src> {
 }
 
 pub struct DataSourceBlockMethod<'src> {
+    pub method: Symbol<'src>,
     pub parameters: Vec<Symbol<'src>>,
+    /// Always empty after proposal 7; retained until semantic crate drops it.
     pub raw_sql: &'src str,
 }
 
@@ -289,6 +291,7 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
+    pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
 }
 
 pub struct NavigationBlock<'src> {

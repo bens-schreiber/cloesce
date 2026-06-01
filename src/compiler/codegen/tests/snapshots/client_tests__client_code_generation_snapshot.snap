@@ -162,8 +162,6 @@ export class ModelWithCompositePk {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$id = [
-      encodeURIComponent(String(this.tenantId)),
-      encodeURIComponent(String(this.rowId)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCompositePk/${__$id}/instanceMethod`
@@ -343,7 +341,6 @@ export class ToyotaPrius {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$id = [
-      encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.someKey)),
     ].join("/");
     const __$baseUrl = new URL(
@@ -464,29 +461,6 @@ export class ModelWithCruds {
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      ModelWithCruds,
-      false
-    );
-  }
-  static async $save_ByName(
-    model: DeepPartial<ModelWithCruds>,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ModelWithCruds>> {
-    const __$baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$save_ByName`
-    );
-    const __$payload: any = {};
-    __$payload["model"] = model;
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, __$payload),
     });
 
     return await HttpResult.fromResponse(
