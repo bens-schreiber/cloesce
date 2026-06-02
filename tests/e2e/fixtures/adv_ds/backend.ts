@@ -109,7 +109,7 @@ export namespace Hamburger {
     export interface Self {
         id: number;
         name: string;
-        toppings: Topping.Self[];
+        toppings: HamburgerTopping.Self[];
     }
 
     export interface Api {
@@ -130,10 +130,10 @@ export namespace Hamburger {
 
     export namespace GeneratedSource {
         export const BurgersWithLettuceOrdered = {
-            tree: {"toppings":{}},
-            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id"`,
-            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`,
-            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
+            tree: {"toppings":{"topping":{}}},
+            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
+            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`,
+            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -173,9 +173,9 @@ export namespace Hamburger {
         };
         export const Default = {
             tree: {"toppings":{}},
-            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id"`,
-            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`,
-            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
+            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId"`,
+            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" = ?1`,
+            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -222,10 +222,10 @@ export namespace Hamburger {
             },
         };
         export const NoLettuce = {
-            tree: {"toppings":{}},
-            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id"`,
-            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`,
-            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
+            tree: {"toppings":{"topping":{}}},
+            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
+            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`,
+            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -261,10 +261,10 @@ export namespace Hamburger {
             },
         };
         export const OnlyBacon = {
-            tree: {"toppings":{}},
-            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id"`,
-            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" = ?1`,
-            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
+            tree: {"toppings":{"topping":{}}},
+            selectQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
+            getQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`,
+            listQueryRaw: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -367,7 +367,7 @@ export namespace Topping {
     export interface Self {
         id: number;
         name: string;
-        hamburger: Hamburger.Self[];
+        hamburgers: HamburgerTopping.Self[];
     }
 
     export interface Api {
@@ -379,10 +379,10 @@ export namespace Topping {
 
     export namespace GeneratedSource {
         export const Default = {
-            tree: {"hamburger":{}},
-            selectQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id"`,
-            getQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id" WHERE "Topping"."id" = ?1`,
-            listQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_2"."left" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Topping"."id" = "HamburgerTopping_2"."right" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping_2"."left" = "Hamburger_1"."id" WHERE "Topping"."id" > ?1 ORDER BY "Topping"."id" ASC LIMIT ?2`,
+            tree: {"hamburgers":{}},
+            selectQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId"`,
+            getQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" = ?1`,
+            listQueryRaw: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" > ?1 ORDER BY "Topping"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -445,6 +445,109 @@ export namespace Topping {
         }
 
         export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Topping.Self[]>> {
+            args.include ??= GeneratedSource.Default.tree;
+            return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
+
+        export function select(include: IncludeTree<Self> = GeneratedSource.Default.tree, from?: string): string {
+            return CloesceOrm.select(Meta, from ?? null, include);
+        }
+
+        export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
+        }
+
+        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace HamburgerTopping {
+    export const Tag = "HamburgerTopping" as const;
+    export const Meta = cidl.models.HamburgerTopping as any;
+
+    export interface Self {
+        hamburgerId: number;
+        toppingId: number;
+        hamburger: Hamburger.Self;
+        topping: Topping.Self;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"hamburger":{"toppings":{}},"topping":{"hamburgers":{}}},
+            selectQueryRaw: `SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId"`,
+            getQueryRaw: `SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") = (?1, ?2)`,
+            listQueryRaw: `SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") > (?1, ?2) ORDER BY "HamburgerTopping"."hamburgerId" ASC, "HamburgerTopping"."toppingId" ASC LIMIT ?3`,
+
+            selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
+                return env.db.prepare(this.selectQueryRaw);
+            },
+            getQuery(env: { db: Env["db"] }, hamburgerId: number, toppingId: number): D1PreparedStatement {
+                return env.db.prepare(this.getQueryRaw).bind(hamburgerId, toppingId);
+            },
+            listQuery(env: { db: Env["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): D1PreparedStatement {
+                return env.db.prepare(this.listQueryRaw).bind(lastSeen_hamburgerId, lastSeen_toppingId, limit);
+            },
+            async get(env: { db: Env["db"] }, hamburgerId: number, toppingId: number): Promise<HttpResult<Self | null>> {
+                const stmt = this.getQuery(env, hamburgerId, toppingId);
+                const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async list(env: { db: Env["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): Promise<HttpResult<Self[]>> {
+                const stmt = this.listQuery(env, lastSeen_hamburgerId, lastSeen_toppingId, limit);
+                const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+            async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("HamburgerTopping", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+            args.include ??= GeneratedSource.Default.tree
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
+        }
+
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HamburgerTopping.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }

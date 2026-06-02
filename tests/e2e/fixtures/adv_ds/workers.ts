@@ -7,7 +7,7 @@ const NoLettuce = clo.Hamburger.NoLettuce.impl({
       .prepare(
         `WITH included AS (${this.selectQueryRaw})
            SELECT * FROM included
-           WHERE "toppings.name" != 'LETTUCE'
+           WHERE "toppings.topping.name" != 'LETTUCE'
            AND id = ?1
            ORDER BY id`,
       )
@@ -29,7 +29,7 @@ const BurgersWithLettuceOrdered = clo.Hamburger.BurgersWithLettuceOrdered.impl({
       .prepare(
         `WITH included AS (${this.selectQueryRaw})
            SELECT * FROM included
-           WHERE "toppings.name" = 'LETTUCE'
+           WHERE "toppings.topping.name" = 'LETTUCE'
            AND id > ?1
            ORDER BY id
            LIMIT ?2`,
@@ -50,7 +50,7 @@ const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
       .prepare(
         `WITH included AS (${this.selectQueryRaw})
            SELECT * FROM included
-           WHERE "toppings.name" = 'BACON'
+           WHERE "toppings.topping.name" = 'BACON'
            AND id = ?1
            ORDER BY id`,
       )
@@ -68,11 +68,11 @@ const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
 
 const Hamburger = clo.Hamburger.impl({
   noLettuceToppings(self) {
-    return self.toppings;
+    return self.toppings.map((t) => t.topping);
   },
 
   onlyBaconToppings(self) {
-    return self.toppings;
+    return self.toppings.map((t) => t.topping);
   },
 
   BurgersWithLettuceOrdered,

@@ -29,10 +29,31 @@ describe("Advanced Data Sources", () => {
 
     const burger1 = Hamburger.$save({
       name: "bacon lettuce burger",
-      toppings: [baconTopping, lettuceTopping],
+      toppings: [
+        {
+          toppingId: baconTopping.id,
+        },
+        {
+          toppingId: lettuceTopping.id,
+        },
+      ],
     });
-    const burger2 = Hamburger.$save({ name: "lettuce burger", toppings: [lettuceTopping] });
-    const burger3 = Hamburger.$save({ name: "bacon burger", toppings: [baconTopping] });
+    const burger2 = Hamburger.$save({
+      name: "lettuce burger",
+      toppings: [
+        {
+          toppingId: lettuceTopping.id,
+        },
+      ],
+    });
+    const burger3 = Hamburger.$save({
+      name: "bacon burger",
+      toppings: [
+        {
+          toppingId: baconTopping.id,
+        },
+      ],
+    });
     const burger4 = Hamburger.$save({ name: "plain burger", toppings: [] });
 
     const burgerRes = await Promise.all([burger1, burger2, burger3, burger4]);

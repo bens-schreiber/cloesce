@@ -29,16 +29,6 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
             }
         }
 
-        model Role for db {
-            primary {
-                id: int
-            }
-
-            nav(User::id) {
-                users
-            }
-        }
-
         model Order for db {
             primary {
                 id: int
@@ -63,10 +53,6 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
                 orders
             }
 
-            nav(Role::id) {
-                roles
-            }
-
             kv kv_namespace::userCache(id) {
                 userCache
             }
@@ -84,7 +70,7 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
         .expect("User should have default data source");
     let tree = &default_ds.tree;
 
-    for key in ["profile", "orders", "roles", "userCache", "userDocuments"] {
+    for key in ["profile", "orders", "userCache", "userDocuments"] {
         assert!(
             tree.0.contains_key(key),
             "Default data source should include '{key}'"
@@ -105,13 +91,11 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
            CREATE TABLE Role (id INTEGER PRIMARY KEY);
            CREATE TABLE "Order" (id INTEGER PRIMARY KEY, userId INTEGER NOT NULL);
            CREATE TABLE User (id INTEGER PRIMARY KEY, profileId INTEGER NOT NULL);
-           CREATE TABLE RoleUser ("left" INTEGER NOT NULL, "right" INTEGER NOT NULL);
 
            INSERT INTO Profile (id) VALUES (1);
            INSERT INTO Role (id) VALUES (10);
            INSERT INTO User (id, profileId) VALUES (1, 1), (2, 1);
-           INSERT INTO "Order" (id, userId) VALUES (100, 1), (200, 1);
-           INSERT INTO RoleUser ("left", "right") VALUES (10, 1);"#,
+           INSERT INTO "Order" (id, userId) VALUES (100, 1), (200, 1);"#,
     )
     .await;
 

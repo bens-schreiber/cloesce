@@ -331,7 +331,7 @@ export namespace Course {
 
     export interface Self {
         id: number;
-        students: Student.Self[];
+        students: CourseStudent.Self[];
     }
 
     export interface Api {
@@ -344,9 +344,9 @@ export namespace Course {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"students":{}},
-            selectQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_2"."right" AS "students.id" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course"."id" = "CourseStudent_2"."left" LEFT JOIN "Student" AS "Student_1" ON "CourseStudent_2"."right" = "Student_1"."id"`,
-            getQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_2"."right" AS "students.id" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course"."id" = "CourseStudent_2"."left" LEFT JOIN "Student" AS "Student_1" ON "CourseStudent_2"."right" = "Student_1"."id" WHERE "Course"."id" = ?1`,
-            listQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_2"."right" AS "students.id" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course"."id" = "CourseStudent_2"."left" LEFT JOIN "Student" AS "Student_1" ON "CourseStudent_2"."right" = "Student_1"."id" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`,
+            selectQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_1"."courseId" AS "students.courseId", "CourseStudent_1"."studentId" AS "students.studentId" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Course"."id" = "CourseStudent_1"."courseId"`,
+            getQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_1"."courseId" AS "students.courseId", "CourseStudent_1"."studentId" AS "students.studentId" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Course"."id" = "CourseStudent_1"."courseId" WHERE "Course"."id" = ?1`,
+            listQueryRaw: `SELECT "Course"."id" AS "id", "CourseStudent_1"."courseId" AS "students.courseId", "CourseStudent_1"."studentId" AS "students.studentId" FROM "Course" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Course"."id" = "CourseStudent_1"."courseId" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -440,7 +440,7 @@ export namespace Person {
             env: {
                 db: Env["db"],
             },
-            person: Person.Self,
+            person: DeepPartial<Person.Self>,
         ): ApiResult<Person.Self>;
         withoutDogs(
             self: Person.Self,
@@ -642,7 +642,7 @@ export namespace Student {
 
     export interface Self {
         id: number;
-        courses: Course.Self[];
+        courses: CourseStudent.Self[];
     }
 
     export interface Api {
@@ -650,7 +650,7 @@ export namespace Student {
             env: {
                 db: Env["db"],
             },
-            student: Student.Self,
+            student: DeepPartial<Student.Self>,
         ): ApiResult<Student.Self>;
         none(
             self: Student.Self,
@@ -664,9 +664,9 @@ export namespace Student {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"courses":{}},
-            selectQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id"`,
-            getQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" WHERE "Student"."id" = ?1`,
-            listQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" WHERE "Student"."id" > ?1 ORDER BY "Student"."id" ASC LIMIT ?2`,
+            selectQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId"`,
+            getQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId" WHERE "Student"."id" = ?1`,
+            listQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId" WHERE "Student"."id" > ?1 ORDER BY "Student"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -763,10 +763,10 @@ export namespace Student {
             },
         };
         export const WithCoursesStudentsCourses = {
-            tree: {"courses":{"students":{"courses":{}}}},
-            selectQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id", "CourseStudent_4"."right" AS "courses.students.id", "CourseStudent_6"."left" AS "courses.students.courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Course_1"."id" = "CourseStudent_4"."left" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent_4"."right" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_6" ON "Student_3"."id" = "CourseStudent_6"."right" LEFT JOIN "Course" AS "Course_5" ON "CourseStudent_6"."left" = "Course_5"."id"`,
-            getQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id", "CourseStudent_4"."right" AS "courses.students.id", "CourseStudent_6"."left" AS "courses.students.courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Course_1"."id" = "CourseStudent_4"."left" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent_4"."right" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_6" ON "Student_3"."id" = "CourseStudent_6"."right" LEFT JOIN "Course" AS "Course_5" ON "CourseStudent_6"."left" = "Course_5"."id" WHERE "Student"."id" = ?1`,
-            listQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id", "CourseStudent_4"."right" AS "courses.students.id", "CourseStudent_6"."left" AS "courses.students.courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Course_1"."id" = "CourseStudent_4"."left" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent_4"."right" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_6" ON "Student_3"."id" = "CourseStudent_6"."right" LEFT JOIN "Course" AS "Course_5" ON "CourseStudent_6"."left" = "Course_5"."id" WHERE "Student"."id" > ?1 ORDER BY "Student"."id" ASC LIMIT ?2`,
+            tree: {"courses":{"course":{"students":{"student":{"courses":{}}}}}},
+            selectQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId", "Course_2"."id" AS "courses.course.id", "CourseStudent_3"."courseId" AS "courses.course.students.courseId", "CourseStudent_3"."studentId" AS "courses.course.students.studentId", "Student_4"."id" AS "courses.course.students.student.id", "CourseStudent_5"."courseId" AS "courses.course.students.student.courses.courseId", "CourseStudent_5"."studentId" AS "courses.course.students.student.courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId" LEFT JOIN "Course" AS "Course_2" ON "CourseStudent_1"."courseId" = "Course_2"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_3" ON "Course_2"."id" = "CourseStudent_3"."courseId" LEFT JOIN "Student" AS "Student_4" ON "CourseStudent_3"."studentId" = "Student_4"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_5" ON "Student_4"."id" = "CourseStudent_5"."studentId"`,
+            getQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId", "Course_2"."id" AS "courses.course.id", "CourseStudent_3"."courseId" AS "courses.course.students.courseId", "CourseStudent_3"."studentId" AS "courses.course.students.studentId", "Student_4"."id" AS "courses.course.students.student.id", "CourseStudent_5"."courseId" AS "courses.course.students.student.courses.courseId", "CourseStudent_5"."studentId" AS "courses.course.students.student.courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId" LEFT JOIN "Course" AS "Course_2" ON "CourseStudent_1"."courseId" = "Course_2"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_3" ON "Course_2"."id" = "CourseStudent_3"."courseId" LEFT JOIN "Student" AS "Student_4" ON "CourseStudent_3"."studentId" = "Student_4"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_5" ON "Student_4"."id" = "CourseStudent_5"."studentId" WHERE "Student"."id" = ?1`,
+            listQueryRaw: `SELECT "Student"."id" AS "id", "CourseStudent_1"."courseId" AS "courses.courseId", "CourseStudent_1"."studentId" AS "courses.studentId", "Course_2"."id" AS "courses.course.id", "CourseStudent_3"."courseId" AS "courses.course.students.courseId", "CourseStudent_3"."studentId" AS "courses.course.students.studentId", "Student_4"."id" AS "courses.course.students.student.id", "CourseStudent_5"."courseId" AS "courses.course.students.student.courses.courseId", "CourseStudent_5"."studentId" AS "courses.course.students.student.courses.studentId" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_1" ON "Student"."id" = "CourseStudent_1"."studentId" LEFT JOIN "Course" AS "Course_2" ON "CourseStudent_1"."courseId" = "Course_2"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_3" ON "Course_2"."id" = "CourseStudent_3"."courseId" LEFT JOIN "Student" AS "Student_4" ON "CourseStudent_3"."studentId" = "Student_4"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_5" ON "Student_4"."id" = "CourseStudent_5"."studentId" WHERE "Student"."id" > ?1 ORDER BY "Student"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
@@ -934,6 +934,109 @@ export namespace Dog {
         }
 
         export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Dog.Self[]>> {
+            args.include ??= GeneratedSource.Default.tree;
+            return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
+        }
+
+        export function select(include: IncludeTree<Self> = GeneratedSource.Default.tree, from?: string): string {
+            return CloesceOrm.select(Meta, from ?? null, include);
+        }
+
+        export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
+            return CloesceOrm.map<Self>(Meta, result, include);
+        }
+
+        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace CourseStudent {
+    export const Tag = "CourseStudent" as const;
+    export const Meta = cidl.models.CourseStudent as any;
+
+    export interface Self {
+        courseId: number;
+        studentId: number;
+        course: Course.Self;
+        student: Student.Self;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"course":{"students":{}},"student":{"courses":{}}},
+            selectQueryRaw: `SELECT "CourseStudent"."courseId" AS "courseId", "CourseStudent"."studentId" AS "studentId", "Course_1"."id" AS "course.id", "CourseStudent_2"."courseId" AS "course.students.courseId", "CourseStudent_2"."studentId" AS "course.students.studentId", "Student_3"."id" AS "student.id", "CourseStudent_4"."courseId" AS "student.courses.courseId", "CourseStudent_4"."studentId" AS "student.courses.studentId" FROM "CourseStudent" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent"."courseId" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course_1"."id" = "CourseStudent_2"."courseId" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent"."studentId" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Student_3"."id" = "CourseStudent_4"."studentId"`,
+            getQueryRaw: `SELECT "CourseStudent"."courseId" AS "courseId", "CourseStudent"."studentId" AS "studentId", "Course_1"."id" AS "course.id", "CourseStudent_2"."courseId" AS "course.students.courseId", "CourseStudent_2"."studentId" AS "course.students.studentId", "Student_3"."id" AS "student.id", "CourseStudent_4"."courseId" AS "student.courses.courseId", "CourseStudent_4"."studentId" AS "student.courses.studentId" FROM "CourseStudent" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent"."courseId" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course_1"."id" = "CourseStudent_2"."courseId" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent"."studentId" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Student_3"."id" = "CourseStudent_4"."studentId" WHERE ("CourseStudent"."courseId", "CourseStudent"."studentId") = (?1, ?2)`,
+            listQueryRaw: `SELECT "CourseStudent"."courseId" AS "courseId", "CourseStudent"."studentId" AS "studentId", "Course_1"."id" AS "course.id", "CourseStudent_2"."courseId" AS "course.students.courseId", "CourseStudent_2"."studentId" AS "course.students.studentId", "Student_3"."id" AS "student.id", "CourseStudent_4"."courseId" AS "student.courses.courseId", "CourseStudent_4"."studentId" AS "student.courses.studentId" FROM "CourseStudent" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent"."courseId" = "Course_1"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Course_1"."id" = "CourseStudent_2"."courseId" LEFT JOIN "Student" AS "Student_3" ON "CourseStudent"."studentId" = "Student_3"."id" LEFT JOIN "CourseStudent" AS "CourseStudent_4" ON "Student_3"."id" = "CourseStudent_4"."studentId" WHERE ("CourseStudent"."courseId", "CourseStudent"."studentId") > (?1, ?2) ORDER BY "CourseStudent"."courseId" ASC, "CourseStudent"."studentId" ASC LIMIT ?3`,
+
+            selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
+                return env.db.prepare(this.selectQueryRaw);
+            },
+            getQuery(env: { db: Env["db"] }, courseId: number, studentId: number): D1PreparedStatement {
+                return env.db.prepare(this.getQueryRaw).bind(courseId, studentId);
+            },
+            listQuery(env: { db: Env["db"] }, lastSeen_courseId: number, lastSeen_studentId: number, limit: number): D1PreparedStatement {
+                return env.db.prepare(this.listQueryRaw).bind(lastSeen_courseId, lastSeen_studentId, limit);
+            },
+            async get(env: { db: Env["db"] }, courseId: number, studentId: number): Promise<HttpResult<Self | null>> {
+                const stmt = this.getQuery(env, courseId, studentId);
+                const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async list(env: { db: Env["db"] }, lastSeen_courseId: number, lastSeen_studentId: number, limit: number): Promise<HttpResult<Self[]>> {
+                const stmt = this.listQuery(env, lastSeen_courseId, lastSeen_studentId, limit);
+                const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+            async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("CourseStudent", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+            args.include ??= GeneratedSource.Default.tree
+            return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
+        }
+
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<CourseStudent.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }

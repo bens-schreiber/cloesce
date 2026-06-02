@@ -80,16 +80,6 @@ pub enum SemanticError<'src, 'p> {
         field: &'p Symbol<'src>,
     },
 
-    /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
-    NavigationMissingReciprocalM2M {
-        field: &'p Symbol<'src>,
-    },
-
-    /// A many-to-many navigation property found multiple reciprocal M2M navs on the adjacent model.
-    NavigationAmbiguousM2M {
-        field: &'p Symbol<'src>,
-    },
-
     CyclicalRelationship {
         cycle: Vec<&'src str>,
     },
@@ -477,26 +467,6 @@ fn display(
                         .with_message(
                             "navigation properties must reference models in the same D1 database",
                         )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::NavigationMissingReciprocalM2M { field: nav } => {
-            let (path, range) = span_parts(&nav.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message("many-to-many navigation property has no reciprocal `nav` on the adjacent model")
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("the adjacent model must have exactly one reciprocal many-to-many `nav`")
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::NavigationAmbiguousM2M { field: nav } => {
-            let (path, range) = span_parts(&nav.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message("many-to-many navigation property has multiple reciprocal `nav`s on the adjacent model")
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("there must be exactly one reciprocal many-to-many `nav`")
                         .with_color(Color::Red),
                 )
         }

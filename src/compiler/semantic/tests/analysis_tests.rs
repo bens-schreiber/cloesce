@@ -275,23 +275,11 @@ fn d1_model_nav_errors() {
             nav (DifferentDatabaseModel::id) {
                 invalidAdjModel
             }
-
-            nav (Post::id) {
-                posts
-            }
         }
 
         model Post for my_d1 {
             primary {
                 id: int
-            }
-
-            nav (User::id) {
-                users1
-            }
-
-            nav (User::id) {
-                users2
             }
         }
 
@@ -307,7 +295,7 @@ fn d1_model_nav_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 5);
+    assert_eq!(errors.len(), 2);
 
     let inconsistent_model_adj = expect_err!(
         errors,
@@ -324,9 +312,6 @@ fn d1_model_nav_errors() {
         SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
     );
     assert_eq!(nav_name, "invalidAdjModel");
-
-    let ambiguous_m2ms = count_errs!(errors, SemanticError::NavigationAmbiguousM2M { .. });
-    assert_eq!(ambiguous_m2ms, 3);
 }
 
 #[test]
@@ -423,47 +408,6 @@ fn d1_model_nav_one_to_many() {
     };
     assert_eq!(author_posts_nav_columns.len(), 1);
     assert_eq!(author_posts_nav_columns[0], "authorId");
-}
-
-#[test]
-fn d1_model_nav_many_to_many() {
-    // Arrange
-    let src = &with_env(
-        r#"
-        model Student for my_d1 {
-            primary { id: int }
-
-            nav (Course::id) {
-                courses
-            }
-        }
-
-        model Course for my_d1 {
-            primary { id: int }
-
-            nav (Student::id) {
-                students
-            }
-        }
-        "#,
-    );
-
-    // Act
-    let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0);
-
-    let student = result.models.get("Student").unwrap();
-
-    let student_courses_nav = student.navigation_fields.first().unwrap();
-    assert_eq!(student_courses_nav.field.name, "courses");
-    assert_eq!(student_courses_nav.model_reference, "Course");
-
-    let NavigationFieldKind::ManyToMany = &student_courses_nav.kind else {
-        unreachable!()
-    };
 }
 
 #[test]

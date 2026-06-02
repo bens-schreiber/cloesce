@@ -265,7 +265,7 @@ export class B {
 }
 export class Course {
   id: number;
-  students: Student[];
+  students: CourseStudent[];
   static async $save(
     model: DeepPartial<Course>,
     fetchImpl: typeof fetch = fetch
@@ -293,7 +293,7 @@ export class Course {
   static fromJson(data: any): Course {
     const __$res = Object.assign(new Course(), data);
     for (let i = 0; i < __$res.students?.length; i++) {
-      __$res.students[i] = Student.fromJson(__$res.students[i]);
+      __$res.students[i] = CourseStudent.fromJson(__$res.students[i]);
     }
     return __$res;
   }
@@ -302,7 +302,7 @@ export class Person {
   id: number;
   dogs: Dog[];
   static async create(
-    person: Person,
+    person: DeepPartial<Person>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const __$baseUrl = new URL(
@@ -485,9 +485,9 @@ export class Person {
 }
 export class Student {
   id: number;
-  courses: Course[];
+  courses: CourseStudent[];
   static async create(
-    student: Student,
+    student: DeepPartial<Student>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const __$baseUrl = new URL(
@@ -663,7 +663,7 @@ export class Student {
   static fromJson(data: any): Student {
     const __$res = Object.assign(new Student(), data);
     for (let i = 0; i < __$res.courses?.length; i++) {
-      __$res.courses[i] = Course.fromJson(__$res.courses[i]);
+      __$res.courses[i] = CourseStudent.fromJson(__$res.courses[i]);
     }
     return __$res;
   }
@@ -723,6 +723,19 @@ export class Dog {
   static fromJson(data: any): Dog {
     const __$res = Object.assign(new Dog(), data);
     __$res["person"] &&= Person.fromJson(__$res.person);
+    return __$res;
+  }
+}
+export class CourseStudent {
+  courseId: number;
+  studentId: number;
+  course: Course | undefined;
+  student: Student | undefined;
+
+  static fromJson(data: any): CourseStudent {
+    const __$res = Object.assign(new CourseStudent(), data);
+    __$res["course"] &&= Course.fromJson(__$res.course);
+    __$res["student"] &&= Student.fromJson(__$res.student);
     return __$res;
   }
 }

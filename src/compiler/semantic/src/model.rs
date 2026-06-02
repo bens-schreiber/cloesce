@@ -549,44 +549,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                     columns: referenced_field_names,
                 },
             });
-            return;
         }
-
-        // If the adjacent model has a reciprocal nav that references back to this model, it's a Many:Many nav.
-        let matching_reciprocal_nav_count = adj_model_block
-            .navigation_blocks()
-            .filter(|adj_nav| {
-                adj_nav
-                    .adj
-                    .first()
-                    .map(|(m, _)| m.name == self.name)
-                    .unwrap_or(false)
-            })
-            .count();
-
-        if matching_reciprocal_nav_count == 0 {
-            ma.sink
-                .push(SemanticError::NavigationMissingReciprocalM2M { field });
-            return;
-        }
-
-        if matching_reciprocal_nav_count > 1 {
-            ma.sink
-                .push(SemanticError::NavigationAmbiguousM2M { field });
-            return;
-        }
-
-        self.navigation_fields.push(NavigationField {
-            hash: 0,
-            field: Field {
-                name: field.name.into(),
-                cidl_type: CidlType::Array(Box::new(CidlType::Object {
-                    name: adj_model_block.symbol.name,
-                })),
-            },
-            model_reference: adj_model_block.symbol.name,
-            kind: NavigationFieldKind::ManyToMany,
-        })
     }
 
     // NOTE: Ran after all columns are processed

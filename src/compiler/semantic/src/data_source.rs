@@ -433,7 +433,7 @@ impl<'src> DataSourceExpansion {
                     let new_node = Self::include_dfs(models, nav.model_reference, visited);
                     current_node.0.insert(nav.field.name.clone(), new_node);
                 }
-                NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
+                NavigationFieldKind::OneToMany { .. } => {
                     // Include the related model as a leaf, but don't recurse.
                     current_node
                         .0

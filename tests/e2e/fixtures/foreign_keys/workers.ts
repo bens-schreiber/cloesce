@@ -1,6 +1,6 @@
-import * as Cloesce from "./backend.js";
+import * as clo from "./backend.js";
 
-const A = Cloesce.A.impl({
+const A = clo.A.impl({
   async create(e, a) {
     return (await this.Orm.save(e, a)).value!;
   },
@@ -9,13 +9,13 @@ const A = Cloesce.A.impl({
   },
 });
 
-const B = Cloesce.B.impl({
+const B = clo.B.impl({
   testMethod() {},
 });
 
-const Person = Cloesce.Person.impl({
+const Person = clo.Person.impl({
   async create(e, person) {
-    return (await this.Orm.save(e, person)).value!;
+    return (await this.Default.save(e, person)) as any;
   },
 
   withoutDogs(self) {
@@ -23,24 +23,24 @@ const Person = Cloesce.Person.impl({
   },
 });
 
-const Dog = Cloesce.Dog.impl({
+const Dog = clo.Dog.impl({
   testMethod() {},
 });
 
-const Student = Cloesce.Student.impl({
+const Student = clo.Student.impl({
   async create(e, student) {
-    return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.tree)).value!;
+    return (await this.WithCoursesStudentsCourses.save(e, student)) as any;
   },
   none(self) {
     return self;
   },
 });
 
-const Course = Cloesce.Course.impl({});
+const Course = clo.Course.impl({});
 
 export default {
-  async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
-    const app = await Cloesce.cloesce();
+  async fetch(request: Request, env: clo.Env): Promise<Response> {
+    const app = await clo.cloesce();
     app.register(A).register(B).register(Person).register(Dog).register(Student).register(Course);
 
     return await app.run(request, env);

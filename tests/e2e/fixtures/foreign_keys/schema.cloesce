@@ -73,7 +73,7 @@ source WithoutDogs for Person {
 
 api Person {
     [inject db]
-    post create(person: Person) -> Person
+    post create(person: partial<Person>) -> Person
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
@@ -103,7 +103,7 @@ model Student for db {
         id: int
     }
     
-    nav (Course::id) {
+    nav (CourseStudent::studentId) {
         courses
     }
 }
@@ -111,8 +111,12 @@ model Student for db {
 source WithCoursesStudentsCourses for Student {
     include {
         courses {
-            students {
-                courses
+            course {
+                students {
+                    student {
+                        courses
+                    }
+                }
             }
         }
     }
@@ -124,7 +128,7 @@ source None for Student {
 
 api Student {
     [inject db]
-    post create(student: Student) -> Student
+    post create(student: partial<Student>) -> Student
     get none([source None] self) -> Student
 }
 
@@ -134,8 +138,22 @@ model Course for db {
         id: int
     }
     
-    nav (Student::id) {
+    nav (CourseStudent::courseId) {
         students
+    }
+}
+
+model CourseStudent for db {
+    primary {
+        foreign (Course::id) {
+            courseId
+            nav { course }
+        }
+
+        foreign (Student::id) {
+            studentId
+            nav { student }
+        }
     }
 }
 // #endregion

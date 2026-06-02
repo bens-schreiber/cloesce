@@ -1,6 +1,5 @@
 ---
 source: src/compiler/frontend/tests/formatter_tests.rs
-assertion_line: 49
 expression: formatted
 ---
 // Top level comment
@@ -102,26 +101,6 @@ model OneToManyModel for db {
     
     nav (BasicModel::fk_to_model) {
         oneToManyNav
-    }
-}
-
-model ManyToManyModelA for db {
-    primary {
-        id: int
-    }
-    
-    nav (ManyToManyModelB::id) {
-        manyToManyNav
-    }
-}
-
-model ManyToManyModelB for db {
-    primary {
-        id: int
-    }
-    
-    nav (ManyToManyModelA::id) {
-        manyToManyNav
     }
 }
 

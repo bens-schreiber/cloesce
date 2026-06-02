@@ -54,11 +54,9 @@ impl ClientTemplate<'_> {
             NavigationFieldKind::OneToOne { .. } => CidlType::Object {
                 name: nav.model_reference,
             },
-            NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
-                CidlType::array(CidlType::Object {
-                    name: nav.model_reference,
-                })
-            }
+            NavigationFieldKind::OneToMany { .. } => CidlType::array(CidlType::Object {
+                name: nav.model_reference,
+            }),
         };
         self.mapper.cidl_type(&cidl_type, self.idl)
     }

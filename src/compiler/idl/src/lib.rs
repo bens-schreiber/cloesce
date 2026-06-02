@@ -196,10 +196,6 @@ pub enum NavigationFieldKind<'src> {
         #[serde(borrow)]
         columns: Vec<&'src str>,
     },
-
-    /// A many to many relationship expressed through a join table,
-    /// consisting of the two models primary keys (be they composite or not).
-    ManyToMany,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -216,14 +212,6 @@ pub struct NavigationField<'src> {
 
     #[serde(borrow)]
     pub kind: NavigationFieldKind<'src>,
-}
-
-impl<'src> NavigationField<'src> {
-    pub fn many_to_many_table_name(&self, parent_model_name: &'src str) -> String {
-        let mut names = [parent_model_name, self.model_reference];
-        names.sort();
-        format!("{}{}", names[0], names[1])
-    }
 }
 
 #[derive(Deserialize, Serialize, Hash)]

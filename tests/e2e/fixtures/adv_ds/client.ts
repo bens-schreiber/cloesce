@@ -70,7 +70,7 @@ export class DefaultOverride {
 export class Hamburger {
   id: number;
   name: string;
-  toppings: Topping[];
+  toppings: HamburgerTopping[];
   async noLettuceToppings(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
@@ -207,7 +207,7 @@ export class Hamburger {
   static fromJson(data: any): Hamburger {
     const __$res = Object.assign(new Hamburger(), data);
     for (let i = 0; i < __$res.toppings?.length; i++) {
-      __$res.toppings[i] = Topping.fromJson(__$res.toppings[i]);
+      __$res.toppings[i] = HamburgerTopping.fromJson(__$res.toppings[i]);
     }
     return __$res;
   }
@@ -215,7 +215,7 @@ export class Hamburger {
 export class Topping {
   id: number;
   name: string;
-  hamburger: Hamburger[];
+  hamburgers: HamburgerTopping[];
   static async $save(
     model: DeepPartial<Topping>,
     fetchImpl: typeof fetch = fetch
@@ -242,9 +242,22 @@ export class Topping {
 
   static fromJson(data: any): Topping {
     const __$res = Object.assign(new Topping(), data);
-    for (let i = 0; i < __$res.hamburger?.length; i++) {
-      __$res.hamburger[i] = Hamburger.fromJson(__$res.hamburger[i]);
+    for (let i = 0; i < __$res.hamburgers?.length; i++) {
+      __$res.hamburgers[i] = HamburgerTopping.fromJson(__$res.hamburgers[i]);
     }
+    return __$res;
+  }
+}
+export class HamburgerTopping {
+  hamburgerId: number;
+  toppingId: number;
+  hamburger: Hamburger | undefined;
+  topping: Topping | undefined;
+
+  static fromJson(data: any): HamburgerTopping {
+    const __$res = Object.assign(new HamburgerTopping(), data);
+    __$res["hamburger"] &&= Hamburger.fromJson(__$res.hamburger);
+    __$res["topping"] &&= Topping.fromJson(__$res.topping);
     return __$res;
   }
 }

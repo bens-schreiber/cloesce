@@ -12,8 +12,8 @@ model Topping for db {
         name: string
     }
 
-    nav (Hamburger::id) {
-        hamburger
+    nav (HamburgerTopping::toppingId) {
+        hamburgers
     }
 }
 
@@ -27,14 +27,30 @@ model Hamburger for db {
         name: string
     }
 
-    nav (Topping::id) {
+    nav (HamburgerTopping::hamburgerId) {
         toppings
+    }
+}
+
+model HamburgerTopping for db {
+    primary {
+        foreign (Hamburger::id) {
+            hamburgerId
+            nav { hamburger }
+        }
+
+        foreign (Topping::id) {
+            toppingId
+            nav { topping }
+        }
     }
 }
 
 source BurgersWithLettuceOrdered for Hamburger {
     include {
-        toppings
+        toppings {
+            topping
+        }
     }
 
     [inject db]
@@ -44,7 +60,9 @@ source BurgersWithLettuceOrdered for Hamburger {
 [internal]
 source NoLettuce for Hamburger {
     include {
-        toppings
+        toppings {
+            topping
+        }
     }
 
     [inject db]
@@ -54,7 +72,9 @@ source NoLettuce for Hamburger {
 [internal]
 source OnlyBacon for Hamburger {
     include {
-        toppings
+        toppings {
+            topping
+        }
     }
 
     [inject db]

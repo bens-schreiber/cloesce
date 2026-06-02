@@ -98,26 +98,6 @@ model OneToManyModel for db {
     }
 }
 
-model ManyToManyModelA for db {
-    primary {
-        id: int
-    }
-
-    nav(ManyToManyModelB::id) {
-        manyToManyNav
-    }
-}
-
-model ManyToManyModelB for db {
-    primary {
-        id: int
-    }
-
-    nav(ManyToManyModelA::id) {
-        manyToManyNav
-    }
-}
-
 model ModelWithCompositePk for db {
     primary {
         tenantId: string

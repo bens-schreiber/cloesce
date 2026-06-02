@@ -75,11 +75,9 @@ pub fn map_sql(
                 }
             }
 
-            // Initialize OneToMany / ManyToMany arrays as empty
+            // Initialize OneToMany arrays as empty
             for nav in &model.navigation_fields {
-                if matches!(nav.kind, NavigationFieldKind::OneToMany { .. })
-                    || matches!(nav.kind, NavigationFieldKind::ManyToMany)
-                {
+                if matches!(nav.kind, NavigationFieldKind::OneToMany { .. }) {
                     m.insert(nav.field.name.to_string(), serde_json::Value::Array(vec![]));
                 }
             }
@@ -174,9 +172,7 @@ fn process_navigation_properties(
 
         // Initialize navigation property arrays
         for nested_nav_prop in &nested_model.navigation_fields {
-            if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. })
-                || matches!(nested_nav_prop.kind, NavigationFieldKind::ManyToMany)
-            {
+            if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. }) {
                 nested_model_json
                     .insert(nested_nav_prop.field.name.to_string(), Value::Array(vec![]));
             }
@@ -201,9 +197,7 @@ fn process_navigation_properties(
             )?;
         }
 
-        if matches!(nav_prop.kind, NavigationFieldKind::OneToMany { .. })
-            || matches!(nav_prop.kind, NavigationFieldKind::ManyToMany)
-        {
+        if matches!(nav_prop.kind, NavigationFieldKind::OneToMany { .. }) {
             if let Value::Array(arr) = model_json.get_mut(nav_prop.field.name.as_ref()).unwrap() {
                 // Check if this nested object already exists by comparing all primary key values
                 let already_exists = arr.iter().any(|existing| {

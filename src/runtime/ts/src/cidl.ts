@@ -51,8 +51,7 @@ export interface Column {
 
 export type NavigationFieldKind =
   | { OneToOne: { columns: string[] } }
-  | { OneToMany: { columns: string[] } }
-  | "ManyToMany";
+  | { OneToMany: { columns: string[] } };
 
 export interface NavigationField {
   field: Field;

@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use idl::{
-    CidlType, CloesceIdl, Column, IncludeTree, Model, NavigationField, NavigationFieldKind,
-    ValidatedField,
-};
+use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationFieldKind, ValidatedField};
 
 use frontend::fmt_cidl_type;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
@@ -201,34 +198,7 @@ impl<'a> UpsertModel<'a> {
             return Ok(());
         }
 
-        let mut builder = SqlUpsertBuilder::new(model_name, &model.primary_columns, self.idl);
-
-        // Primary keys
-        let mut pk_vals: Vec<(String, Option<Value>)> = Vec::new();
-        let mut pk_missing = true;
-        for pk_col in &model.primary_columns {
-            match new_model.remove(pk_col.field.name.as_ref()) {
-                Some(val) => {
-                    pk_vals.push((pk_col.field.name.to_string(), Some(val)));
-                    pk_missing = false;
-                }
-                None if matches!(pk_col.field.cidl_type, CidlType::Int) => {
-                    if model.has_composite_pk() {
-                        fail!(OrmErrorKind::ModelKeyCannotAutoIncrement {
-                            model: model_name.to_string(),
-                            field: pk_col.field.name.to_string()
-                        })
-                    }
-
-                    // The value is auto incremented and will be generated on insertion.
-                    pk_vals.push((pk_col.field.name.to_string(), None));
-                }
-                _ => fail!(OrmErrorKind::MissingField {
-                    expected: fmt_cidl_type(&pk_col.field.cidl_type),
-                    missing: pk_col.field.name.to_string(),
-                }),
-            }
-        }
+        let mut builder = SqlUpsertBuilder::new(model_name, self.idl);
 
         let (one_to_ones, others): (Vec<_>, Vec<_>) = model
             .navigation_fields
@@ -280,75 +250,99 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        // Scalar attributes; attempt to retrieve FK's by value or context
-        {
-            // If this model depends on another, its dependency will have been inserted
-            // before this model. Thus, its parent pks exist in the context and can be used for FK resolution.
-            let parent_id_paths: Vec<String> = parent_model_name
-                .map(|p| {
-                    let parent_path = path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path);
-                    self.idl
-                        .models
-                        .get(p)
-                        .expect("Parent model not found in IDL")
-                        .primary_columns
-                        .iter()
-                        .map(|pk_col| format!("{}.{}", parent_path, pk_col.field.name))
-                        .collect()
-                })
-                .unwrap_or_default();
+        // If this model depends on another, its dependency will have been inserted
+        // before this model. Thus, its parent pks exist in the context and can be used for FK resolution.
+        let parent_id_paths = parent_model_name
+            .map(|p| {
+                let parent_path = path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path);
+                self.idl
+                    .models
+                    .get(p)
+                    .expect("Parent model not found in IDL")
+                    .primary_columns
+                    .iter()
+                    .map(|pk_col| format!("{}.{}", parent_path, pk_col.field.name))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
 
-            for attr in &model.columns {
-                let path_key = nav_ref_to_path.get(attr.field.name.as_ref()).or_else(|| {
-                    // Check if this column is part of a foreign key from parent
-                    let fk = &attr.foreign_key_reference.as_ref()?;
-                    let parent_name = parent_model_name?;
+        let pk_missing = model
+            .primary_columns
+            .iter()
+            .all(|pk| !new_model.contains_key(pk.field.name.as_ref()));
 
-                    if fk.model_name != parent_name {
-                        return None;
+        // Primary key columns and ordinary attributes resolve through the same
+        // logic: a provided value, a context lookup (navigation or parent key),
+        // an auto-incremented key, or a null default.
+        for (attr, is_pk) in model.all_columns() {
+            let path_key = nav_ref_to_path.get(attr.field.name.as_ref()).or_else(|| {
+                // Check if this column is part of a foreign key from parent
+                let fk = &attr.foreign_key_reference.as_ref()?;
+                let parent_name = parent_model_name?;
+
+                if fk.model_name != parent_name {
+                    return None;
+                }
+
+                // Find matching parent pk path
+                parent_id_paths
+                    .iter()
+                    .find(|p| p.ends_with(&fk.column_name))
+            });
+
+            let new_model_value = new_model.remove(attr.field.name.as_ref());
+
+            match (new_model_value, &attr.foreign_key_reference) {
+                (Some(value), _) => {
+                    // A value was provided in `new_model`
+                    builder.push(&attr.field, is_pk, ColumnSource::Value(value));
+                }
+
+                (None, Some(_)) if path_key.is_some() => {
+                    // No value provided, but this column is a FK reference
+                    // resolved through context (a navigation or the parent key).
+                    let path_key = path_key.unwrap();
+                    let source = match self.context.get(path_key).expect("Context path missing") {
+                        Some(value) => ColumnSource::Value(value.clone()),
+                        None => ColumnSource::Context(path_key.clone()),
+                    };
+
+                    builder.push(&attr.field, is_pk, source);
+                }
+
+                (None, _) if is_pk && matches!(attr.field.cidl_type, CidlType::Int) => {
+                    if model.has_composite_pk() {
+                        fail!(OrmErrorKind::ModelKeyCannotAutoIncrement {
+                            model: model_name.to_string(),
+                            field: attr.field.name.to_string()
+                        })
                     }
 
-                    // Find matching parent pk path
-                    parent_id_paths
-                        .iter()
-                        .find(|p| p.ends_with(&fk.column_name))
-                });
+                    // The value is auto incremented and generated on insertion.
+                    builder.push(&attr.field, is_pk, ColumnSource::AutoIncrement);
+                }
 
-                match (
-                    new_model.remove(attr.field.name.as_ref()),
-                    &attr.foreign_key_reference,
-                ) {
-                    (Some(value), _) => {
-                        // A value was provided in `new_model`
-                        builder.push_val(&attr.field, &value)?;
+                (None, _) if pk_missing && attr.field.cidl_type.is_nullable() => {
+                    // Default to null for INSERT (no PK provided).
+                    builder.push(&attr.field, is_pk, ColumnSource::Value(Value::Null));
+                }
+
+                (None, _) if !pk_missing && !is_pk => {
+                    if !attr.field.cidl_type.is_nullable() {
+                        // A non-nullable column is missing and we have a PK. This forces an UPDATE.
+                        builder.flag_missing_non_nullable();
                     }
-                    (None, Some(_)) if path_key.is_some() => {
-                        // No value provided, but this column is a FK reference
-                        // that can be resolved through context
-                        let path_key = path_key.unwrap();
-                        let ctx = self.context.get(path_key).expect("Context path missing");
-                        builder.push_val_ctx(&attr.field, ctx, path_key)?;
-                    }
-                    (None, _) if pk_missing && attr.field.cidl_type.is_nullable() => {
-                        // Default to null for INSERT (no PK provided).
-                        builder.push_val(&attr.field, &Value::Null)?;
-                    }
-                    (None, _) if !pk_missing => {
-                        if !attr.field.cidl_type.is_nullable() {
-                            // A non-nullable column is missing and we have a PK. This forces an UPDATE.
-                            builder.flag_missing_non_nullable();
-                        }
-                    }
-                    _ => fail!(OrmErrorKind::MissingField {
-                        expected: fmt_cidl_type(&attr.field.cidl_type),
-                        missing: attr.field.name.to_string(),
-                    }),
-                };
-            }
+                }
+
+                _ => fail!(OrmErrorKind::MissingField {
+                    expected: fmt_cidl_type(&attr.field.cidl_type),
+                    missing: attr.field.name.to_string(),
+                }),
+            };
         }
 
         // All sql dependencies have been resolved by this point.
-        self.upsert_table(&pk_vals, &path, builder)?;
+        self.upsert_table(&path, builder)?;
 
         // Traverse navigation properties, using the include tree as a guide
         for nav in others {
@@ -372,24 +366,6 @@ impl<'a> UpsertModel<'a> {
                         )?;
                     }
                 }
-                (NavigationFieldKind::ManyToMany, Some(Value::Array(nav_models))) => {
-                    for nav_model in nav_models {
-                        let Value::Object(obj) = nav_model else {
-                            continue;
-                        };
-
-                        self.dfs(
-                            Some(model.name),
-                            nav.model_reference,
-                            obj,
-                            nested_tree,
-                            format!("{path}.{}", nav.field.name),
-                        )?;
-
-                        let m2m_table_name = nav.many_to_many_table_name(model_name);
-                        self.insert_jct(&path, nav, &m2m_table_name, model)?;
-                    }
-                }
                 _ => {
                     // Ignore
                 }
@@ -399,122 +375,48 @@ impl<'a> UpsertModel<'a> {
         Ok(())
     }
 
-    /// Inserts a M:M junction table, consisting of the passed in models
-    /// id and the navigation properties id.
-    fn insert_jct(
-        &mut self,
-        path: &str,
-        nav: &NavigationField,
-        unique_id: &str,
-        model: &Model,
-    ) -> Result<()> {
-        let nav_meta = self.idl.models.get(&nav.model_reference).unwrap();
-
-        // Resolve both sides of the M:M relationship
-        // Each side may have multiple PK columns (composite keys)
-        let mut left_entries = Vec::new();
-        let mut right_entries = Vec::new();
-
-        // Collect nav model PKs
-        for pk_col in &nav_meta.primary_columns {
-            let path_key = format!("{path}.{}.{}", nav.field.name, pk_col.field.name);
-            let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
-                None => SqlUpsertBuilder::value_from_ctx(&path_key),
-            };
-            left_entries.push(value);
-        }
-
-        // Collect current models PKs
-        for pk_col in &model.primary_columns {
-            let path_key = format!("{path}.{}", pk_col.field.name);
-            let value = match self.context.get(&path_key).and_then(|v| v.as_ref()) {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
-                None => SqlUpsertBuilder::value_from_ctx(&path_key),
-            };
-            right_entries.push(value);
-        }
-
-        // Determine which is "left" and which is "right" (alphabetically)
-        let (left_vals, right_vals, left_model, right_model) = if nav.model_reference < model.name {
-            (left_entries, right_entries, nav_meta, model)
-        } else {
-            (right_entries, left_entries, model, nav_meta)
-        };
-
-        let mut columns = Vec::new();
-        let mut values = Vec::new();
-
-        // Left side columns
-        for (pk_col, val) in left_model.primary_columns.iter().zip(left_vals) {
-            let col_name = if left_model.primary_columns.len() == 1 {
-                "left".to_string()
-            } else {
-                format!("left_{}", pk_col.field.name)
-            };
-            columns.push(alias(&col_name));
-            values.push(val);
-        }
-
-        // Right side columns
-        for (pk_col, val) in right_model.primary_columns.iter().zip(right_vals) {
-            let col_name = if right_model.primary_columns.len() == 1 {
-                "right".to_string()
-            } else {
-                format!("right_{}", pk_col.field.name)
-            };
-            columns.push(alias(&col_name));
-            values.push(val);
-        }
-
-        // Build INSERT
-        let mut insert = Query::insert();
-        insert
-            .into_table(alias(unique_id))
-            .on_conflict(OnConflict::new().do_nothing().to_owned())
-            .columns(columns)
-            .values_panic(values);
-
-        self.sql_acc.push(build_sqlite(insert));
-        Ok(())
-    }
-
     /// Inserts the [SqlUpsertBuilder], updating the graph context to include the tables id.
     ///
     /// Returns an error if foreign key values exist that can not be resolved.
-    fn upsert_table(
-        &mut self,
-        pk_vals: &[(String, Option<Value>)],
-        path: &str,
-        builder: SqlUpsertBuilder,
-    ) -> Result<()> {
-        self.sql_acc.push(builder.build(pk_vals)?);
+    fn upsert_table(&mut self, path: &str, builder: SqlUpsertBuilder) -> Result<()> {
+        let all_pks_resolved = builder.all_pks_resolved();
 
-        // Add primary keys to the context
-        let all_pk_provided = pk_vals.iter().all(|(_, v)| v.is_some());
+        // Concrete primary key values are recorded so descendant rows can resolve
+        // foreign keys that point at this row.
+        let provided_pks = builder
+            .provided_pk_values()
+            .map(|(field, value)| (field.name.to_string(), value.clone()))
+            .collect::<Vec<_>>();
 
-        if all_pk_provided {
-            // All PKs provided, store them in context
-            for (pk_name, pk_val) in pk_vals {
-                let id_path = format!("{path}.{}", pk_name);
-                self.context.insert(id_path.clone(), pk_val.clone());
+        // The lone auto-incremented key (if any) whose value the database fills in.
+        let auto_increment_pk = builder
+            .columns
+            .iter()
+            .find(|c| c.is_pk && matches!(c.source, ColumnSource::AutoIncrement))
+            .map(|c| c.field.name.to_string());
+
+        self.sql_acc.push(builder.build()?);
+
+        if all_pks_resolved {
+            // Every key is known; store the concrete ones in context.
+            for (pk_name, pk_val) in provided_pks {
+                let id_path = format!("{path}.{pk_name}");
+                self.context.insert(id_path, Some(pk_val));
             }
 
             return Ok(());
         }
 
-        if pk_vals.len() != 1 {
-            unreachable!("Only single column PKs can be auto-generated")
-        }
-
         // The PK is not composite and is auto generated, we can retrieve the last
         // inserted rowid and store it in context.
         // The path for the JSON object is just the model path (not per-column)
-        self.sql_acc.push(VariablesTable::insert_pk(path, pk_vals));
+        let pk_name = auto_increment_pk.expect("a single auto-incremented primary key");
+        self.sql_acc
+            .push(VariablesTable::insert_pk(path, &[(pk_name.clone(), None)]));
 
         // Mark PK column in context as needing lookup
-        let id_path = format!("{path}.{}", pk_vals[0].0);
-        self.context.insert(id_path.clone(), None);
+        let id_path = format!("{path}.{pk_name}");
+        self.context.insert(id_path, None);
 
         Ok(())
     }
@@ -570,63 +472,72 @@ impl VariablesTable {
     }
 }
 
+/// Where a resolved column gets its value from.
+enum ColumnSource {
+    /// A concrete JSON value (provided directly or a null default).
+    Value(Value),
+    /// A single-column integer primary key whose value is generated on insert.
+    AutoIncrement,
+    /// A value looked up from the graph context (a navigation property or the
+    /// parent's primary key) via a `json_extract` subquery.
+    Context(String),
+}
+
+/// A column resolved to its name, metadata and value source. Primary key columns
+/// and ordinary attributes are resolved the same way and only diverge when the
+/// final statement is assembled.
+struct ResolvedColumn<'a> {
+    field: &'a ValidatedField<'a>,
+    is_pk: bool,
+    source: ColumnSource,
+}
+
 struct SqlUpsertBuilder<'a> {
     model_name: &'a str,
-    cols: Vec<Alias>,
-    vals: Vec<SimpleExpr>,
-    pk_cols: &'a [Column<'a>],
+    columns: Vec<ResolvedColumn<'a>>,
     idl: &'a CloesceIdl<'a>,
     has_missing_non_nullable: bool,
 }
 
 impl<'a> SqlUpsertBuilder<'a> {
-    fn new(
-        model_name: &'a str,
-        pk_cols: &'a [Column<'a>],
-        idl: &'a CloesceIdl<'a>,
-    ) -> SqlUpsertBuilder<'a> {
+    fn new(model_name: &'a str, idl: &'a CloesceIdl<'a>) -> SqlUpsertBuilder<'a> {
         Self {
             model_name,
-            pk_cols,
-            cols: Vec::default(),
-            vals: Vec::default(),
+            columns: Vec::default(),
             idl,
             has_missing_non_nullable: false,
         }
     }
 
-    /// Adds a column and value to the insert statement.
-    ///
-    /// Returns an error if the value does not match the meta type.
-    fn push_val(&mut self, field: &ValidatedField, value: &Value) -> Result<()> {
-        self.cols.push(alias(field.name.as_ref()));
-        let val = validate_and_transform(field, value, self.idl)?;
-        self.vals.push(val);
-        Ok(())
-    }
-
-    /// Adds a column and value from the graph context.
-    fn push_val_ctx(
-        &mut self,
-        field: &ValidatedField,
-        ctx: &Option<Value>,
-        path: &str,
-    ) -> Result<()> {
-        match ctx {
-            None => {
-                self.cols.push(alias(field.name.as_ref()));
-                self.vals.push(Self::value_from_ctx(path));
-            }
-            Some(v) => {
-                self.push_val(field, v)?;
-            }
-        }
-        Ok(())
+    /// Records a resolved column.
+    fn push(&mut self, field: &'a ValidatedField<'a>, is_pk: bool, source: ColumnSource) {
+        self.columns.push(ResolvedColumn {
+            field,
+            is_pk,
+            source,
+        });
     }
 
     /// Force an UPDATE instead of an INSERT
     fn flag_missing_non_nullable(&mut self) {
         self.has_missing_non_nullable = true;
+    }
+
+    /// The primary key columns that carry a concrete value, paired with that
+    /// value. Auto-increment and context-resolved keys are excluded.
+    fn provided_pk_values(&self) -> impl Iterator<Item = (&'a ValidatedField<'a>, &Value)> {
+        self.columns.iter().filter_map(|c| match &c.source {
+            ColumnSource::Value(v) if c.is_pk => Some((c.field, v)),
+            _ => None,
+        })
+    }
+
+    /// True when no primary key is auto-incremented, i.e. every key has a value
+    fn all_pks_resolved(&self) -> bool {
+        !self
+            .columns
+            .iter()
+            .any(|c| c.is_pk && matches!(c.source, ColumnSource::AutoIncrement))
     }
 
     /// Generates a subquery expression to retrieve a value from the context based on the path.
@@ -649,33 +560,34 @@ impl<'a> SqlUpsertBuilder<'a> {
     }
 
     /// Creates a SQL query, being either an update, insert, or upsert.
-    fn build(self, pk_vals: &[(String, Option<Value>)]) -> Result<SqlStatement> {
-        let all_pk_provided = pk_vals.iter().all(|(_, v)| v.is_some());
-        let any_pk_provided = pk_vals.iter().any(|(_, v)| v.is_some());
+    fn build(self) -> Result<SqlStatement> {
+        let column_expr = |col: &ResolvedColumn| {
+            Ok(match &col.source {
+                ColumnSource::Value(v) => Some(validate_and_transform(col.field, v, self.idl)?),
+                ColumnSource::Context(path) => Some(Self::value_from_ctx(path)),
+                ColumnSource::AutoIncrement => None,
+            })
+        };
 
-        // Build expressions for each PK
-        let mut pk_exprs: Vec<(String, SimpleExpr)> = Vec::new();
-        for (pk_col, (pk_name, pk_val)) in self.pk_cols.iter().zip(pk_vals.iter()) {
-            let expr = match pk_val {
-                Some(v) => validate_and_transform(&pk_col.field, v, self.idl)?,
-                None => {
-                    // Value will come from context (auto-generated)
-                    continue;
-                }
-            };
-            pk_exprs.push((pk_name.clone(), expr));
-        }
+        let any_pk_resolved = self.columns.iter().any(|c| c.is_pk);
+        let all_pks_resolved = self.all_pks_resolved();
 
         // If we have PKs and a non-nullable column is missing, this must be an UPDATE
-        if any_pk_provided && self.has_missing_non_nullable {
+        // keyed on the (fully known) primary key.
+        if any_pk_resolved && self.has_missing_non_nullable {
             let mut update = Query::update();
-            let mut update_stmt = update
-                .table(alias(self.model_name))
-                .values(self.cols.into_iter().zip(self.vals));
+            let mut update_stmt = update.table(alias(self.model_name));
 
-            // Add WHERE clause for each PK
-            for (pk_name, pk_expr) in pk_exprs {
-                update_stmt = update_stmt.and_where(Expr::col(alias(&pk_name)).eq(pk_expr));
+            for col in &self.columns {
+                if let (false, Some(expr)) = (col.is_pk, column_expr(col)?) {
+                    update_stmt = update_stmt.value(alias(col.field.name.as_ref()), expr);
+                }
+            }
+
+            for (pk_field, pk_val) in self.provided_pk_values() {
+                let expr = validate_and_transform(pk_field, pk_val, self.idl)?;
+                update_stmt =
+                    update_stmt.and_where(Expr::col(alias(pk_field.name.as_ref())).eq(expr));
             }
 
             return Ok(build_sqlite(update_stmt.to_owned()));
@@ -685,13 +597,13 @@ impl<'a> SqlUpsertBuilder<'a> {
         let mut insert = Query::insert();
         insert.into_table(alias(self.model_name));
 
-        let mut cols = self.cols.clone();
-        let mut vals = self.vals.clone();
-
-        // Add provided PKs to insert
-        for (pk_name, pk_expr) in &pk_exprs {
-            cols.push(alias(pk_name));
-            vals.push(pk_expr.clone());
+        let mut cols = Vec::<Alias>::new();
+        let mut vals = Vec::<SimpleExpr>::new();
+        for col in &self.columns {
+            if let Some(expr) = column_expr(col)? {
+                cols.push(alias(col.field.name.as_ref()));
+                vals.push(expr);
+            }
         }
 
         insert.columns(cols.clone()).values_panic(vals);
@@ -699,14 +611,25 @@ impl<'a> SqlUpsertBuilder<'a> {
             insert.or_default_values();
         }
 
-        // If we have all PKs and some attributes, enable conflict handling for upsert
-        if all_pk_provided && !self.cols.is_empty() {
-            // Build the ON CONFLICT clause with all PK columns
-            let pk_column_names: Vec<Alias> =
-                pk_exprs.iter().map(|(name, _)| alias(name)).collect();
+        // If the key is fully known and there are non-key columns, conflicting on
+        // the primary key updates those columns (an upsert).
+        let pk_names: Vec<&str> = self
+            .columns
+            .iter()
+            .filter(|c| c.is_pk)
+            .map(|c| c.field.name.as_ref())
+            .collect();
+        let update_cols: Vec<Alias> = self
+            .columns
+            .iter()
+            .filter(|c| !c.is_pk)
+            .map(|c| alias(c.field.name.as_ref()))
+            .collect();
+
+        if all_pks_resolved && !pk_names.is_empty() && !update_cols.is_empty() {
             insert.on_conflict(
-                OnConflict::columns(pk_column_names)
-                    .update_columns(self.cols)
+                OnConflict::columns(pk_names.into_iter().map(alias))
+                    .update_columns(update_cols)
                     .to_owned(),
             );
         }
