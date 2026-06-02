@@ -37,7 +37,7 @@ model Course for db {
         title: string
     }
     
-    nav (StudentCourse::courseId) {
+    nav StudentCourse::courseId {
         studentCourses
     }
 }
@@ -48,19 +48,19 @@ model StudentCourse for db{
         foreign (Student::id, Student::name) {
             studentId
             studentName
-            
-            nav {
-                student
-            }
         }
-        
+
         foreign (Course::id) {
             courseId
-        
-            nav {
-                course
-            }
         }
+    }
+
+    nav (Student::id(studentId), Student::name(studentName)) {
+        student
+    }
+
+    nav Course::id(courseId) {
+        course
     }
 }
 

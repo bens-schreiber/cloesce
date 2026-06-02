@@ -21,11 +21,10 @@ use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
-    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, ForeignBlock, ForeignBlockNav,
-    InjectBlock, Keyword, KvBindingBlock, KvBindingTemplate, KvFieldBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock,
-    R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type,
-    lexer::CommentMap,
+    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, ForeignBlock, InjectBlock, Keyword,
+    KvBindingBlock, KvBindingTemplate, KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd,
+    SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -554,26 +553,35 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             inner = inner.then(ctx.sym_doc(field, 2, false));
         }
 
-        if let Some(nav) = &self.nav {
-            inner = inner.then(ctx.spd_doc(nav, 2, false));
-        }
-
         doc.then(optional).then(ctx.block(inner, 2))
     }
 }
 
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let adjs = comma_separated(&self.adj, |adj| {
-            let left = ctx.sym_doc(&adj.0, 0, true);
-            let right = ctx.sym_doc(&adj.1, 0, true);
-            left.then(Doc::text("::")).then(right)
+        let entries = comma_separated(&self.adj, |adj| {
+            let mut d = ctx
+                .sym_doc(&adj.model, 0, true)
+                .then(Doc::text("::"))
+                .then(ctx.sym_doc(&adj.field, 0, true));
+            if let Some(local) = &adj.local_key {
+                d = d
+                    .then(Doc::text("("))
+                    .then(ctx.sym_doc(local, 0, true))
+                    .then(Doc::text(")"));
+            }
+            d
         });
 
+        // Single relationships omit the outer parens; composite ones use them.
+        let refs = if self.adj.len() > 1 {
+            Doc::text(" (").then(entries).then(Doc::text(")"))
+        } else {
+            Doc::text(" ").then(entries)
+        };
+
         Doc::kw(Keyword::Nav)
-            .then(Doc::text(" ("))
-            .then(adjs)
-            .then(Doc::text(")"))
+            .then(refs)
             .then(ctx.block(ctx.sym_doc(&self.nav.inner, 2, false), 2))
     }
 }
@@ -853,12 +861,6 @@ impl<'src> ToDoc<'src> for InjectBlock<'src> {
             inner = inner.then(ctx.sym_doc(sym, 1, false));
         }
         Doc::kw(Keyword::Inject).then(ctx.block(inner, 1))
-    }
-}
-
-impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::kw(Keyword::Nav).then(ctx.block(ctx.sym_doc(&self.symbol, 3, false), 3))
     }
 }
 

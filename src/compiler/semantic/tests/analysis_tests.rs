@@ -266,6 +266,11 @@ fn d1_model_nav_errors() {
         model User for my_d1 {
             primary {
                 id: int
+                tenant: int
+            }
+
+            column {
+                horseId: int
             }
 
             nav (Post::id, User::id) {
@@ -275,11 +280,27 @@ fn d1_model_nav_errors() {
             nav (DifferentDatabaseModel::id) {
                 invalidAdjModel
             }
+
+            // 1:1 nav whose local key is not a foreign key to Post
+            nav Post::id(horseId) {
+                missingOneToOneFk
+            }
+
+            // 1:M nav with no foreign key on Post referencing User
+            nav Post::id {
+                missingOneToManyFk
+            }
+
+            // Mixes a 1:1 entry (with local key) and a 1:M entry (without)
+            nav (Post::id(horseId), Post::tenant) {
+                mixedAdjacency
+            }
         }
 
         model Post for my_d1 {
             primary {
                 id: int
+                tenant: int
             }
         }
 
@@ -295,8 +316,6 @@ fn d1_model_nav_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 2);
-
     let inconsistent_model_adj = expect_err!(
         errors,
         SemanticError::InconsistentModelAdjacency {
@@ -312,6 +331,27 @@ fn d1_model_nav_errors() {
         SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
     );
     assert_eq!(nav_name, "invalidAdjModel");
+
+    let missing: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::NavigationMissingForeignKey { field, .. } => Some(field.name),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        missing.contains(&"missingOneToOneFk"),
+        "expected 1:1 nav error: {errors:#?}"
+    );
+    assert!(
+        missing.contains(&"missingOneToManyFk"),
+        "expected 1:M nav error: {errors:#?}"
+    );
+
+    let mixed = expect_err!(errors,
+        SemanticError::NavigationMixedAdjacency { field } => field.name
+    );
+    assert_eq!(mixed, "mixedAdjacency");
 }
 
 #[test]
@@ -326,7 +366,10 @@ fn d1_model_nav_one_to_one() {
 
             foreign (Horse::id) {
                 horseId
-                nav { horse }
+            }
+
+            nav Horse::id(horseId) {
+                horse
             }
         }
 
@@ -372,7 +415,7 @@ fn d1_model_nav_one_to_many() {
         model Author for my_d1 {
             primary { id: int }
 
-            nav (Post::authorId) {
+            nav Post::authorId {
                 posts
             }
         }
@@ -420,8 +463,9 @@ fn d1_model_cyclical_relationship_error() {
 
             foreign (B::id) {
                 bId2
-                nav { toB }
             }
+
+            nav B::id(bId2) { toB }
         }
 
         model B for my_d1 {
@@ -429,8 +473,9 @@ fn d1_model_cyclical_relationship_error() {
 
             foreign (C::id) {
                 cId
-                nav { toC }
             }
+
+            nav C::id(cId) { toC }
         }
 
         model C for my_d1 {
@@ -438,8 +483,9 @@ fn d1_model_cyclical_relationship_error() {
 
             foreign (A::id) {
                 aId
-                nav { toA }
             }
+
+            nav A::id(aId) { toA }
         }
         "#,
     );
@@ -470,8 +516,9 @@ fn d1_model_nullability_prevents_cycle() {
 
             foreign (B::id) optional {
                 bId
-                nav { toB }
             }
+
+            nav B::id(bId) { toB }
         }
 
         model B for my_d1 {
@@ -479,8 +526,9 @@ fn d1_model_nullability_prevents_cycle() {
 
             foreign (C::id) optional {
                 cId
-                nav { toC }
             }
+
+            nav C::id(cId) { toC }
         }
 
         model C for my_d1 {
@@ -488,8 +536,9 @@ fn d1_model_nullability_prevents_cycle() {
 
             foreign (A::id) optional {
                 aId
-                nav { toA }
             }
+
+            nav A::id(aId) { toA }
         }
         "#,
     );

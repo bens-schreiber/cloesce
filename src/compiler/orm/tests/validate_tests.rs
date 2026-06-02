@@ -460,8 +460,9 @@ fn one_to_many_nav_person_dogs() {
 
             foreign (Person::id) {
                 personId
-                nav { person }
             }
+
+            nav Person::id(personId) { person }
         }
         "#,
     );

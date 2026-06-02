@@ -74,9 +74,10 @@ async fn one_to_one(db: SqlitePool) {
 
                 foreign(Dog::id) {
                     dogId
-                    nav {
-                        dog
-                    }
+                }
+
+                nav Dog::id(dogId) {
+                    dog
                 }
             }
 
@@ -252,9 +253,10 @@ async fn composite_one_to_one(db: SqlitePool) {
                 foreign(Student::school_id, Student::student_number) {
                     school_id
                     student_number
-                    nav {
-                        student
-                    }
+                }
+
+                nav (Student::school_id(school_id), Student::student_number(student_number)) {
+                    student
                 }
 
                 column {
@@ -420,9 +422,10 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
 
                 foreign(Horse::id) {
                     horseId2
-                    nav {
-                        horse2
-                    }
+                }
+
+                nav Horse::id(horseId2) {
+                    horse2
                 }
             }
         "#,
@@ -446,7 +449,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Assert
     expected_str!(
         sql,
-        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId1" = "Horse_2"."id""#
+        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId2" = "Horse_2"."id""#
     );
 
     let results = test_sql(idl, vec![(insert_query, vec![]), (sql, vec![])], db)

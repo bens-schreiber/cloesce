@@ -46,10 +46,13 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
 
             foreign(Profile::id) {
                 profileId
-                nav { profile }
             }
 
-            nav(Order::userId) {
+            nav Profile::id(profileId) {
+                profile
+            }
+
+            nav Order::userId {
                 orders
             }
 
@@ -276,8 +279,9 @@ async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
 
             foreign(Toy::id) {
                 toyId
-                nav { toy }
             }
+
+            nav Toy::id(toyId) { toy }
         }
 
         model Owner for db {
@@ -290,8 +294,9 @@ async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
 
             foreign(Dog::id) {
                 dogId
-                nav { dog }
             }
+
+            nav Dog::id(dogId) { dog }
         }
     "#,
     );
@@ -360,8 +365,9 @@ async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool
 
             foreign(Team::id) {
                 teamId
-                nav { team }
             }
+
+            nav Team::id(teamId) { team }
         }
 
         model Company for db {
@@ -371,13 +377,15 @@ async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool
 
             foreign(Department::id) {
                 departmentId
-                nav { department }
             }
+
+            nav Department::id(departmentId) { department }
 
             foreign(Team::id) {
                 directTeamId
-                nav { team }
             }
+
+            nav Team::id(directTeamId) { team }
         }
     "#,
     );

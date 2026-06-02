@@ -84,8 +84,9 @@ model HasOneToOne for db {
 
     foreign(BasicModel::id) {
         basicModelId
-        nav { oneToOneNav }
     }
+
+    nav BasicModel::id(basicModelId) { oneToOneNav }
 }
 
 model OneToManyModel for db {
@@ -93,7 +94,7 @@ model OneToManyModel for db {
         id: int
     }
 
-    nav(BasicModel::fk_to_model) {
+    nav BasicModel::fk_to_model {
         oneToManyNav
     }
 }
@@ -231,8 +232,9 @@ model ModelWithCustomDs for db {
 
     foreign (OneToManyModel::id) {
         oneToManyId
-        nav { oneToManyModel }
     }
+
+    nav OneToManyModel::id(oneToManyId) { oneToManyModel }
 }
 
 source Custom for ModelWithCustomDs {

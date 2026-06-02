@@ -9,7 +9,7 @@ model B for db {
         id: int
     }
     
-    nav (A::bId) {
+    nav A::bId {
         a
     }
 }
@@ -26,10 +26,10 @@ model A for db{
     
     foreign (B::id) optional  {
         bId
-        
-        nav {
-            b
-        }
+    }
+
+    nav B::id(bId) {
+        b
     }
 }
 
@@ -56,7 +56,7 @@ model Person for db {
         id: int
     }
     
-    nav (Dog::personId) {
+    nav Dog::personId {
         dogs
     }
 }
@@ -85,10 +85,10 @@ model Dog for db {
     
     foreign (Person::id) {
         personId
-        
-        nav {
-            person
-        }
+    }
+
+    nav Person::id(personId) {
+        person
     }
 }
 
@@ -103,7 +103,7 @@ model Student for db {
         id: int
     }
     
-    nav (CourseStudent::studentId) {
+    nav CourseStudent::studentId {
         courses
     }
 }
@@ -138,7 +138,7 @@ model Course for db {
         id: int
     }
     
-    nav (CourseStudent::courseId) {
+    nav CourseStudent::courseId {
         students
     }
 }
@@ -147,13 +147,19 @@ model CourseStudent for db {
     primary {
         foreign (Course::id) {
             courseId
-            nav { course }
         }
 
         foreign (Student::id) {
             studentId
-            nav { student }
         }
+    }
+
+    nav Course::id(courseId) {
+        course
+    }
+
+    nav Student::id(studentId) {
+        student
     }
 }
 // #endregion

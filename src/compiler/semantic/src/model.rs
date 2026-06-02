@@ -4,8 +4,8 @@ use crate::{
     is_valid_sql_type, kahns, resolve_validator_tags,
 };
 use frontend::{
-    ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, R2FieldBlock, SpdSlice, SqlBlockKind,
-    Symbol, Tag,
+    ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, NavAdj, R2FieldBlock, SpdSlice,
+    SqlBlockKind, Symbol, Tag,
 };
 use idl::{
     Binding, BindingTemplate, CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField,
@@ -209,7 +209,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                     binding.unwrap().name,
                     &navigation_block.adj,
                     &navigation_block.nav.inner,
-                    false,
                     table,
                 ),
                 ModelBlockKind::Unique(_) | ModelBlockKind::Kv(_) | ModelBlockKind::R2(_) => {
@@ -432,31 +431,34 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 self.columns.push(col);
             }
         }
-
-        if let Some(nav_field) = &fk.nav {
-            self.nav(ma, binding, &fk.adj, &nav_field.inner.symbol, true, table);
-        }
     }
 
     fn nav(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         binding: &'src str,
-        adj: &'p [(Symbol<'src>, Symbol<'src>)],
+        adj: &'p [NavAdj<'src>],
         field: &'p Symbol<'src>,
-        is_one_to_one: bool,
         table: &SymbolTable<'src, 'p>,
     ) {
+        // 1:1 (local key present) and 1:M (no local key) entries cannot mix.
+        let keyed = adj.first().map(|a| a.local_key.is_some()).unwrap_or(false);
+        if adj.iter().any(|a| a.local_key.is_some() != keyed) {
+            ma.sink
+                .push(SemanticError::NavigationMixedAdjacency { field });
+            return;
+        }
+
         // Validate all referenced fields exist on the same adj model
         let mut referenced_field_names = Vec::new();
         {
             let mut all_valid = true;
-            let adj_model_sym = &adj.first().unwrap().0;
-            for (ref_model_sym, ref_field_sym) in adj {
-                if ref_model_sym.name != adj_model_sym.name {
+            let adj_model_sym = &adj.first().unwrap().model;
+            for entry in adj {
+                if entry.model.name != adj_model_sym.name {
                     ma.sink.push(SemanticError::InconsistentModelAdjacency {
                         first_model: adj_model_sym,
-                        second_model: ref_model_sym,
+                        second_model: &entry.model,
                     });
                     all_valid = false;
                     continue;
@@ -464,14 +466,14 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
                 if table.local.contains_key(&LocalSymbolKind::ModelField {
                     model: adj_model_sym.name,
-                    name: ref_field_sym.name,
+                    name: entry.field.name,
                 }) {
-                    referenced_field_names.push(ref_field_sym.name);
+                    referenced_field_names.push(entry.field.name);
                     continue;
                 }
 
                 ma.sink.push(SemanticError::UnresolvedSymbol {
-                    symbol: ref_field_sym,
+                    symbol: &entry.field,
                 });
                 all_valid = false;
             }
@@ -480,7 +482,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             }
         }
 
-        let adj_model_block = table.models.get(adj.first().unwrap().0.name).unwrap();
+        let adj_model_block = table.models.get(adj.first().unwrap().model.name).unwrap();
 
         // Must belong to the same database
         let adj_binding = adj_model_block.backing_binding.as_ref();
@@ -490,34 +492,59 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
-        // For 1:1: check if `model` has a FK whose adj fields match the nav adj fields
-        let matching_fk_by_adj = |model: &'p ModelBlock<'src>, name: &'src str| {
-            model.foreign_blocks().find(|fb| {
-                fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false)
-                    && fb.adj.len() == adj.len()
-                    && fb
-                        .adj
-                        .iter()
-                        .zip(adj)
-                        .all(|((_, fb_field), (_, nav_field))| fb_field.name == nav_field.name)
-            })
-        };
-
         // For 1:M: check if `model` has a FK pointing to `name` whose local fields match adj field names
         let matching_fk_by_local_fields = |model: &'p ModelBlock<'src>, name: &'src str| {
             model.foreign_blocks().find(|fb| {
-                fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false)
-                    && fb.fields.len() == adj.len()
+                let references_model = fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false);
+
+                let local_fields_match = fb.fields.len() == adj.len()
                     && fb
                         .fields
                         .iter()
                         .zip(adj)
-                        .all(|(local_field, (_, nav_field))| local_field.name == nav_field.name)
+                        .all(|(local_field, nav)| local_field.name == nav.field.name);
+
+                references_model && local_fields_match
             })
         };
+        // A nav is 1:1 iff it carries local keys
+        if keyed {
+            let local_keys = adj
+                .iter()
+                .map(|a| a.local_key.as_ref().unwrap())
+                .collect::<Vec<_>>();
 
-        if is_one_to_one {
-            let foreign_key = matching_fk_by_adj(self.model, adj_model_block.symbol.name).unwrap();
+            let foreign_key = self.model.foreign_blocks().find(|fb| {
+                let references_adj_model = fb
+                    .adj
+                    .first()
+                    .map(|(m, _)| m.name == adj_model_block.symbol.name)
+                    .unwrap_or(false);
+
+                let adj_fields_match = fb.adj.len() == adj.len()
+                    && fb
+                        .adj
+                        .iter()
+                        .zip(adj)
+                        .all(|((_, fb_field), nav)| fb_field.name == nav.field.name);
+
+                let local_keys_match = fb.fields.len() == local_keys.len()
+                    && fb
+                        .fields
+                        .iter()
+                        .zip(&local_keys)
+                        .all(|(fk_local, declared)| fk_local.name == declared.name);
+
+                references_adj_model && adj_fields_match && local_keys_match
+            });
+
+            let Some(foreign_key) = foreign_key else {
+                ma.sink.push(SemanticError::NavigationMissingForeignKey {
+                    field,
+                    model_reference: adj_model_block.symbol.name,
+                });
+                return;
+            };
 
             self.navigation_fields.push(NavigationField {
                 hash: 0,
@@ -535,21 +562,27 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
-        if matching_fk_by_local_fields(adj_model_block, self.name).is_some() {
-            self.navigation_fields.push(NavigationField {
-                hash: 0,
-                field: Field {
-                    name: field.name.into(),
-                    cidl_type: CidlType::Array(Box::new(CidlType::Object {
-                        name: adj_model_block.symbol.name,
-                    })),
-                },
+        if matching_fk_by_local_fields(adj_model_block, self.name).is_none() {
+            ma.sink.push(SemanticError::NavigationMissingForeignKey {
+                field,
                 model_reference: adj_model_block.symbol.name,
-                kind: NavigationFieldKind::OneToMany {
-                    columns: referenced_field_names,
-                },
             });
+            return;
         }
+
+        self.navigation_fields.push(NavigationField {
+            hash: 0,
+            field: Field {
+                name: field.name.into(),
+                cidl_type: CidlType::Array(Box::new(CidlType::Object {
+                    name: adj_model_block.symbol.name,
+                })),
+            },
+            model_reference: adj_model_block.symbol.name,
+            kind: NavigationFieldKind::OneToMany {
+                columns: referenced_field_names,
+            },
+        });
     }
 
     // NOTE: Ran after all columns are processed

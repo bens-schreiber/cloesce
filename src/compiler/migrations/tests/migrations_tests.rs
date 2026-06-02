@@ -175,8 +175,9 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
 
                 foreign(Dog::id) {
                     dogId
-                    nav { dog }
                 }
+
+                nav Dog::id(dogId) { dog }
             }
         "#,
         );

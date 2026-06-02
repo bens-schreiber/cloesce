@@ -12,7 +12,7 @@ model Topping for db {
         name: string
     }
 
-    nav (HamburgerTopping::toppingId) {
+    nav HamburgerTopping::toppingId {
         hamburgers
     }
 }
@@ -27,7 +27,7 @@ model Hamburger for db {
         name: string
     }
 
-    nav (HamburgerTopping::hamburgerId) {
+    nav HamburgerTopping::hamburgerId {
         toppings
     }
 }
@@ -36,13 +36,19 @@ model HamburgerTopping for db {
     primary {
         foreign (Hamburger::id) {
             hamburgerId
-            nav { hamburger }
         }
 
         foreign (Topping::id) {
             toppingId
-            nav { topping }
         }
+    }
+
+    nav Hamburger::id(hamburgerId) {
+        hamburger
+    }
+
+    nav Topping::id(toppingId) {
+        topping
     }
 }
 

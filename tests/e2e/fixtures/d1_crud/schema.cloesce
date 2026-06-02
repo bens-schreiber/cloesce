@@ -25,12 +25,13 @@ model Parent for db {
     
     foreign (Child::id) optional  {
         favoriteChildId
-        nav {
-            favoriteChild
-        }
     }
-    
-    nav (Child::parentId) {
+
+    nav Child::id(favoriteChildId) {
+        favoriteChild
+    }
+
+    nav Child::parentId {
         children
     }
 }
@@ -49,8 +50,9 @@ model Child for db {
     
     foreign (Parent::id) {
         parentId
-        nav {
-            parent
-        }
+    }
+
+    nav Parent::id(parentId) {
+        parent
     }
 }

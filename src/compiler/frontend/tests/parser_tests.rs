@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, Keyword, ModelBlock, ModelBlockKind, Spd,
-    SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, Keyword, ModelBlock, ModelBlockKind, NavAdj,
+    Spd, SqlBlockKind, Symbol, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -11,6 +11,16 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
             .iter()
             .zip(expected)
             .all(|((m, f), (em, ef))| m.name == *em && f.name == *ef)
+}
+
+/// Matches a nav block's adjacency entries against `(model, field, local_key)` triples.
+fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, &str, Option<&str>)]) -> bool {
+    adj.len() == expected.len()
+        && adj.iter().zip(expected).all(|(a, (em, ef, ek))| {
+            a.model.name == *em
+                && a.field.name == *ef
+                && a.local_key.as_ref().map(|s| s.name) == *ek
+        })
 }
 
 #[test]
@@ -498,11 +508,11 @@ fn model_navigation() {
         model M {
             foreign(Location::id) {
                 locationId
-                nav { location }
             }
             foreign(Tag::id) { tagId }
-            nav(Weather::reportId) { weathers }
-            nav(Alert::regionId, Alert::zoneId) { alerts }
+            nav Location::id(locationId) { location }
+            nav Weather::reportId { weathers }
+            nav (Alert::regionId, Alert::zoneId) { alerts }
         }
         "#,
     );
@@ -518,17 +528,20 @@ fn model_navigation() {
         })
         .unwrap();
     assert_eq!(loc_fb.fields[0].name, "locationId");
-    assert_eq!(loc_fb.nav.as_ref().unwrap().inner.symbol.name, "location");
 
-    let tag_fb = m
+    let location_nav = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "location" => Some(n),
             _ => None,
         })
         .unwrap();
-    assert!(tag_fb.nav.is_none());
+    assert!(location_nav.is_one_to_one());
+    assert!(nav_adj_matches(
+        &location_nav.adj,
+        &[("Location", "id", Some("locationId"))]
+    ));
 
     let weathers_nav = m
         .blocks
@@ -538,7 +551,11 @@ fn model_navigation() {
             _ => None,
         })
         .unwrap();
-    assert!(adj_matches(&weathers_nav.adj, &[("Weather", "reportId")]));
+    assert!(!weathers_nav.is_one_to_one());
+    assert!(nav_adj_matches(
+        &weathers_nav.adj,
+        &[("Weather", "reportId", None)]
+    ));
 
     let alerts_nav = m
         .blocks
@@ -548,9 +565,9 @@ fn model_navigation() {
             _ => None,
         })
         .unwrap();
-    assert!(adj_matches(
+    assert!(nav_adj_matches(
         &alerts_nav.adj,
-        &[("Alert", "regionId"), ("Alert", "zoneId")]
+        &[("Alert", "regionId", None), ("Alert", "zoneId", None)]
     ));
 }
 

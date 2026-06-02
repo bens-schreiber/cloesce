@@ -110,9 +110,10 @@ async fn upsert_one_to_one(db: SqlitePool) {
 
                 foreign(Rider::id) {
                     riderId
-                    nav {
-                        rider
-                    }
+                }
+
+                nav Rider::id(riderId) {
+                    rider
                 }
             }
 
@@ -317,11 +318,11 @@ async fn upsert_join_table_composite_fk_pk(db: SqlitePool) {
 
                     foreign(Topping::id) {
                         toppingId
-
-                        nav {
-                            topping
-                        }
                     }
+                }
+
+                nav Topping::id(toppingId) {
+                    topping
                 }
             }
         "#,

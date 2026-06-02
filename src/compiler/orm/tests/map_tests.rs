@@ -129,9 +129,10 @@ async fn one_to_one(db: SqlitePool) {
 
                 foreign(Rider::id) {
                     bestRiderId
-                    nav {
-                        bestRider
-                    }
+                }
+
+                nav Rider::id(bestRiderId) {
+                    bestRider
                 }
             }
 

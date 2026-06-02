@@ -286,16 +286,33 @@ pub struct DataSourceBlock<'src> {
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
 }
 
+pub struct NavAdj<'src> {
+    /// `AdjModel` in `AdjModel::field`
+    pub model: Symbol<'src>,
+
+    /// `field` in `AdjModel::field`
+    pub field: Symbol<'src>,
+
+    /// The local FK column on the current model: the `(localKey)` part.
+    /// `Some` => 1:1 entry, `None` => 1:M entry.
+    pub local_key: Option<Symbol<'src>>,
+}
+
 pub struct NavigationBlock<'src> {
-    // nav (AdjModel::field1, AdjModel::field2, ...)
-    pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
+    pub adj: Vec<NavAdj<'src>>,
 
     // { navName }
     pub nav: Spd<Symbol<'src>>,
 }
 
-pub struct ForeignBlockNav<'src> {
-    pub symbol: Symbol<'src>,
+impl<'src> NavigationBlock<'src> {
+    /// A nav is 1:1 iff it carries local keys
+    pub fn is_one_to_one(&self) -> bool {
+        self.adj
+            .first()
+            .map(|a| a.local_key.is_some())
+            .unwrap_or(false)
+    }
 }
 
 pub struct ForeignBlock<'src> {
@@ -304,15 +321,6 @@ pub struct ForeignBlock<'src> {
 
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
-
-    /// Nav field to the adjacent model, ex:
-    /// ```cloesce
-    /// foreign (...) {
-    ///     ...
-    ///     nav { navSymbol }
-    /// }
-    /// ```
-    pub nav: Option<Spd<ForeignBlockNav<'src>>>,
 
     pub is_optional: bool,
 }

@@ -80,6 +80,19 @@ pub enum SemanticError<'src, 'p> {
         field: &'p Symbol<'src>,
     },
 
+    /// A navigation property could not be resolved to either a 1:1 or a 1:M
+    /// relationship because no matching foreign key exists.
+    NavigationMissingForeignKey {
+        field: &'p Symbol<'src>,
+        model_reference: &'src str,
+    },
+
+    /// A navigation property mixes 1:1 entries (with a local key) and 1:M
+    /// entries (without one) in the same adjacency list.
+    NavigationMixedAdjacency {
+        field: &'p Symbol<'src>,
+    },
+
     CyclicalRelationship {
         cycle: Vec<&'src str>,
     },
@@ -466,6 +479,40 @@ fn display(
                     Label::new((path, range))
                         .with_message(
                             "navigation properties must reference models in the same D1 database",
+                        )
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::NavigationMissingForeignKey {
+            field: nav,
+            model_reference,
+        } => {
+            let (path, range) = span_parts(&nav.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "navigation property '{}' has no matching foreign key",
+                    nav.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!(
+                            "a 1:1 nav needs a foreign key on this model referencing '{model_reference}', \
+                             and a 1:M nav needs a foreign key on '{model_reference}' referencing this model"
+                        ))
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::NavigationMixedAdjacency { field: nav } => {
+            let (path, range) = span_parts(&nav.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "navigation property '{}' mixes 1:1 and 1:M entries",
+                    nav.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "all entries must either have a local key (1:1) or none (1:M)",
                         )
                         .with_color(Color::Red),
                 )
