@@ -178,7 +178,7 @@
           "model_reference": "Hamburger",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "hamburgerId"
               ]
             }
@@ -197,7 +197,7 @@
           "model_reference": "Topping",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "toppingId"
               ]
             }

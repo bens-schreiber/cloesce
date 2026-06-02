@@ -50,7 +50,7 @@ export interface Column {
 }
 
 export type NavigationFieldKind =
-  | { OneToOne: { columns: string[] } }
+  | { OneToOne: { fields: string[] } }
   | { OneToMany: { columns: string[] } };
 
 export interface NavigationField {
@@ -87,10 +87,11 @@ export interface ApiMethod {
 
 export interface Model {
   name: string;
-  backing_binding: string | null;
+  database_binding: string | null;
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
+  route_fields: ValidatedField[];
   kv_fields: KvField[];
   r2_fields: R2Field[];
   apis: ApiMethod[];

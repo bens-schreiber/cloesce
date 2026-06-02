@@ -25,7 +25,7 @@ pub fn map_sql(
             name: model_name.to_string(),
         }),
     };
-    if model.backing_binding.is_none() {
+    if model.database_binding.is_none() {
         fail!(OrmErrorKind::ModelMissingD1 {
             name: model_name.to_string(),
         })

@@ -248,6 +248,15 @@ pub fn validate_cidl_type(
                 }
             }
 
+            for route_field in &model.route_fields {
+                let route_value = obj.remove(route_field.name.as_ref());
+                let res = validate_cidl_type(route_field, route_value, idl, is_partial)?;
+
+                if let Some(res) = res {
+                    new_obj.insert(route_field.name.to_string(), res);
+                }
+            }
+
             for nav in &model.navigation_fields {
                 let nav_value = obj.remove(nav.field.name.as_ref());
                 if nav_value.is_none() {

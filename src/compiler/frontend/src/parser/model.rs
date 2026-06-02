@@ -106,6 +106,15 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         .map(ModelBlockKind::Primary),
     );
 
+    // `route { ([tag]* ident: cidl_type)* }`
+    let route_block = kw!(Route).ignore_then(
+        tagged_typed_symbol()
+            .repeated()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .map(ModelBlockKind::Route),
+    );
+
     // `unique (field1, field2, ...)`
     let unique_block = kw!(Unique).ignore_then(
         symbol()
@@ -162,6 +171,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         column_block,
         nav_block,
         primary_block,
+        route_block,
         unique_block,
     ))
     .boxed();
@@ -177,9 +187,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(((tags, symbol), backing_binding), blocks)| ModelBlock {
+        .map(|(((tags, symbol), database_binding), blocks)| ModelBlock {
             symbol: Symbol { tags, ..symbol },
-            backing_binding,
+            database_binding,
             blocks,
         });
 

@@ -690,7 +690,7 @@ mod migrate {
             let idl = {
                 let mut idl = MigrationsIdl::from_json(&ast_contents)?;
                 idl.models
-                    .retain(|_, m| m.backing_binding == Some(current_binding.to_string()));
+                    .retain(|_, m| m.database_binding == Some(current_binding.to_string()));
 
                 idl
             };

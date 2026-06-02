@@ -41,6 +41,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -263,7 +264,7 @@
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "favoriteChildId"
               ]
             }
@@ -291,6 +292,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -650,13 +652,14 @@
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "parentId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [],
       "data_sources": {

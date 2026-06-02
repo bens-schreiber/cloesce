@@ -319,6 +319,99 @@ export class OneToManyModel {
     return __$res;
   }
 }
+export class RouteCar {
+  ownerId: string;
+
+  static fromJson(data: any): RouteCar {
+    const __$res = Object.assign(new RouteCar(), data);
+    return __$res;
+  }
+}
+export class RouteOwner {
+  ownerId: string;
+  modelYear: number;
+  car: RouteCar | undefined;
+  metadata: KValue<unknown>;
+  async instanceMethod(
+    input: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const __$id = [
+      encodeURIComponent(String(this.ownerId)),
+      encodeURIComponent(String(this.modelYear)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/RouteOwner/${__$id}/instanceMethod`
+    );
+    const __$payload: any = {};
+    __$payload["input"] = input;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async $get(
+    ownerId: string,
+    modelYear: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<RouteOwner>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/RouteOwner/$get`
+    );
+    __$baseUrl.searchParams.append("ownerId", String(ownerId));
+    __$baseUrl.searchParams.append("modelYear", String(modelYear));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      RouteOwner,
+      false
+    );
+  }
+  static async $save(
+    model: DeepPartial<RouteOwner>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<RouteOwner>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/RouteOwner/$save`
+    );
+    const __$payload: any = {};
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      RouteOwner,
+      false
+    );
+  }
+
+  static fromJson(data: any): RouteOwner {
+    const __$res = Object.assign(new RouteOwner(), data);
+    __$res["car"] &&= RouteCar.fromJson(__$res.car);
+    if (__$res.metadata) __$res.metadata = Object.assign(new KValue(), __$res.metadata);
+    return __$res;
+  }
+}
 export class ToyotaPrius {
   id: number;
   ownerId: string;

@@ -63,6 +63,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -290,6 +291,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -699,7 +701,7 @@
           "model_reference": "Student",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "studentId",
                 "studentName"
               ]
@@ -719,13 +721,14 @@
           "model_reference": "Course",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "courseId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {

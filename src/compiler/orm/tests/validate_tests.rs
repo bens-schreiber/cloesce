@@ -1089,3 +1089,40 @@ fn validators_in_model() {
         ));
     }
 }
+
+#[test]
+fn route_model_validates_route_fields() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model RouteModel {
+            route {
+                id: int
+                tenant: string
+            }
+        }
+    "#,
+    );
+
+    // Route fields are validated and carried through, with type coercion enforced.
+    {
+        let result = validate(
+            CidlType::Object { name: "RouteModel" },
+            Some(json!({ "id": 1, "tenant": "acme" })),
+            &idl,
+        );
+        let value = result.expect("validation to succeed").expect("a value");
+        assert_eq!(value, json!({ "id": 1, "tenant": "acme" }));
+    }
+
+    // A route field of the wrong type is rejected.
+    {
+        let result = validate(
+            CidlType::Object { name: "RouteModel" },
+            Some(json!({ "id": "not an int", "tenant": "acme" })),
+            &idl,
+        );
+        assert!(result.is_err());
+    }
+}

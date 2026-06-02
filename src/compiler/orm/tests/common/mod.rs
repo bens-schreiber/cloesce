@@ -16,7 +16,7 @@ pub async fn test_sql(
                     MigrationsModel {
                         hash: model.hash,
                         name: model.name.to_string(),
-                        backing_binding: None, // Not used in test
+                        database_binding: None, // Not used in test
                         primary_columns: model.primary_columns,
                         columns: model.columns,
                         navigation_fields: model.navigation_fields,

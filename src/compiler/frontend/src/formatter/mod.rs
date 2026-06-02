@@ -414,7 +414,7 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let mut doc = ctx.top_decl_doc(&self.symbol, Keyword::Model);
 
-        if let Some(binding) = &self.backing_binding {
+        if let Some(binding) = &self.database_binding {
             doc = doc
                 .then(Doc::text(" "))
                 .then(Doc::kw(Keyword::For))
@@ -508,6 +508,7 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
 
         match self {
             ModelBlockKind::Column(syms) => symbol_block(Keyword::Column, syms, ctx),
+            ModelBlockKind::Route(syms) => symbol_block(Keyword::Route, syms, ctx),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),

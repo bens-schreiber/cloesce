@@ -180,15 +180,14 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-/// A D1 Navigation field, representing a relationship to another model
-/// through a foreign key or composite foreign key.
+/// Represents a relationship to another model
 #[derive(Deserialize, Serialize, Hash)]
 pub enum NavigationFieldKind<'src> {
     OneToOne {
-        /// The columns on the current model that reference the other model's primary key.
-        /// Multiple columns indicate a composite foreign key.
+        /// The fields on the current model that reference the other model's primary key.
+        /// Multiple fields indicate a composite foreign key.
         #[serde(borrow)]
-        columns: Vec<&'src str>,
+        fields: Vec<&'src str>,
     },
     OneToMany {
         /// The columns on the other model that reference the current model's primary key.
@@ -410,8 +409,12 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub navigation_fields: Vec<NavigationField<'src>>,
 
+    #[serde(borrow, default)]
+    pub route_fields: Vec<ValidatedField<'src>>,
+
+    /// References a Wrangler binding if this model is backed by a SQLite database
     #[serde(borrow)]
-    pub backing_binding: Option<&'src str>,
+    pub database_binding: Option<&'src str>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
@@ -531,10 +534,16 @@ impl CloesceIdl<'_> {
 
         let mut root_h = FxHasher::default();
         for model in self.models.values_mut() {
+            // Route models have no SQL representation, so they are excluded from
+            // the merkle hash, which tracks migration-relevant schema changes.
+            if model.database_binding.is_none() && !model.route_fields.is_empty() {
+                continue;
+            }
+
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
-            model.backing_binding.hash(&mut model_h);
+            model.database_binding.hash(&mut model_h);
 
             for pk in model.primary_columns.iter_mut() {
                 let pk_col_h = {
@@ -635,7 +644,7 @@ pub struct MigrationsModel<'src> {
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub backing_binding: Option<String>,
+    pub database_binding: Option<String>,
 
     #[serde(borrow)]
     pub primary_columns: Vec<Column<'src>>,
@@ -707,7 +716,7 @@ fn collect_model_bindings<'src>(
     }
     let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
 
-    if let Some(b) = model.backing_binding {
+    if let Some(b) = model.database_binding {
         bindings.insert(b);
     }
     for kv in &model.kv_fields {

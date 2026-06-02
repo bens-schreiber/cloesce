@@ -129,6 +129,98 @@ export class D1BackedModel {
     return __$res;
   }
 }
+export class R2Only {
+  id: number;
+  sibling: R2Sibling | undefined;
+  someData: R2Object;
+  async uploadData(
+    data: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const __$id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/R2Only/${__$id}/uploadData`
+    );
+    const __$payload: any = {};
+    __$payload["data"] = data;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async $get(
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<R2Only>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/R2Only/$get`
+    );
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      R2Only,
+      false
+    );
+  }
+
+  static fromJson(data: any): R2Only {
+    const __$res = Object.assign(new R2Only(), data);
+    __$res["sibling"] &&= R2Sibling.fromJson(__$res.sibling);
+    return __$res;
+  }
+}
+export class R2Sibling {
+  siblingId: number;
+  siblingData: R2Object;
+  async uploadData(
+    data: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const __$id = [
+      encodeURIComponent(String(this.siblingId)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/R2Sibling/${__$id}/uploadData`
+    );
+    const __$payload: any = {};
+    __$payload["data"] = data;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): R2Sibling {
+    const __$res = Object.assign(new R2Sibling(), data);
+    return __$res;
+  }
+}
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }

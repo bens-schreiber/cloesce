@@ -44,8 +44,8 @@ pub struct DelayedKvUpload {
 #[derive(Serialize)]
 pub struct UpsertResult {
     pub sql: Vec<SqlStatement>,
-    kv_uploads: Vec<KvUpload>,
-    kv_delayed_uploads: Vec<DelayedKvUpload>,
+    pub kv_uploads: Vec<KvUpload>,
+    pub kv_delayed_uploads: Vec<DelayedKvUpload>,
 }
 
 pub struct UpsertModel<'a> {
@@ -89,7 +89,7 @@ impl<'a> UpsertModel<'a> {
         )?;
 
         let model = idl.models.get(model_name).expect("Model to exist");
-        if model.backing_binding.is_some() {
+        if model.database_binding.is_some() {
             // Final select to return the upserted model
             let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
@@ -194,7 +194,26 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        if model.backing_binding.is_none() {
+        if model.database_binding.is_none() {
+            // Route models have no SQL. Their navigation targets are sibling route models
+            // assembled from this model's route fields, so persist their KV/R2 by recursing.
+            for nav in &model.navigation_fields {
+                let Some(Value::Object(nested_tree)) = include_tree.get(nav.field.name.as_ref())
+                else {
+                    continue;
+                };
+                let Some(Value::Object(nav_model)) = new_model.remove(nav.field.name.as_ref())
+                else {
+                    continue;
+                };
+                self.dfs(
+                    Some(model.name),
+                    nav.model_reference,
+                    nav_model,
+                    nested_tree,
+                    format!("{path}.{}", nav.field.name),
+                )?;
+            }
             return Ok(());
         }
 
@@ -215,10 +234,7 @@ impl<'a> UpsertModel<'a> {
             let Some(Value::Object(nav_model)) = new_model.remove(nav.field.name.as_ref()) else {
                 continue;
             };
-            let NavigationFieldKind::OneToOne {
-                columns: key_columns,
-            } = &nav.kind
-            else {
+            let NavigationFieldKind::OneToOne { fields } = &nav.kind else {
                 continue;
             };
 
@@ -232,10 +248,10 @@ impl<'a> UpsertModel<'a> {
             )?;
 
             // Map each key column to the path in the context wheere its value can be found
-            for key in key_columns {
+            for field in fields {
                 let (col, _) = model
                     .all_columns()
-                    .find(|(c, _)| c.field.name == *key)
+                    .find(|(c, _)| c.field.name == *field)
                     .expect("key column to exist in model");
 
                 let fk = col
@@ -244,7 +260,7 @@ impl<'a> UpsertModel<'a> {
                     .expect("foreign key to exist");
 
                 nav_ref_to_path.insert(
-                    *key,
+                    *field,
                     format!("{path}.{}.{}", nav.field.name, fk.column_name),
                 );
             }
@@ -666,11 +682,12 @@ fn key_format_interpolation(
             continue;
         };
 
-        // Field is a column or primary key on the model.
+        // Field is a column, primary key, or route field on the model.
         let field_meta = meta
             .all_columns()
-            .find(|(col, _)| col.field.name == param_name)
             .map(|(col, _)| &col.field)
+            .chain(meta.route_fields.iter())
+            .find(|f| f.name == param_name)
             // guaranteed to exist by semantic analysis
             .unwrap();
 

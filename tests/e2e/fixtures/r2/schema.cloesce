@@ -44,3 +44,38 @@ api D1BackedModel {
     [inject bucket1]
     put uploadOtherData(self, data: stream)
 }
+
+[crud get]
+model R2Only {
+    route {
+        id: int
+    }
+
+    r2 bucket1::data(id) {
+        someData
+    }
+
+    nav R2Sibling::siblingId(id) {
+        sibling
+    }
+}
+
+api R2Only {
+    [inject bucket1]
+    put uploadData(self, data: stream)
+}
+
+model R2Sibling {
+    route {
+        siblingId: int
+    }
+
+    r2 bucket1::otherData(siblingId) {
+        siblingData
+    }
+}
+
+api R2Sibling {
+    [inject bucket1]
+    put uploadData(self, data: stream)
+}

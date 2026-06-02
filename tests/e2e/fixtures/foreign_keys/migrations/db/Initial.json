@@ -50,7 +50,7 @@
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "bId"
               ]
             }
@@ -273,7 +273,7 @@
           "model_reference": "Person",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "personId"
               ]
             }
@@ -330,7 +330,7 @@
           "model_reference": "Course",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "courseId"
               ]
             }
@@ -349,7 +349,7 @@
           "model_reference": "Student",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "studentId"
               ]
             }

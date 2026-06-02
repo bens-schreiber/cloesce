@@ -66,6 +66,9 @@ export class {{ model.name }} {
 {%- for col in &model.columns %}
   {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
 {%- endfor %}
+{%- for field in &model.route_fields %}
+  {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
+{%- endfor %}
 {%- for nav in &model.navigation_fields %}
   {{ nav.field.name }}: {{ self.nav_type(nav) }}{% if self.is_one_to_one(nav) %} | undefined{% endif %};
 {%- endfor %}
@@ -132,6 +135,7 @@ export class {{ model.name }} {
 {%- endif %}
 {%- endfor %}
 {%- for col in &model.columns %}{{ deserialize_field(col.field.name, &col.field.cidl_type) }}{%- endfor %}
+{%- for field in &model.route_fields %}{{ deserialize_field(field.name, &field.cidl_type) }}{%- endfor %}
 {%- for kv in &model.kv_fields %}
 {%- if self.is_paginated(&kv.field.cidl_type) %}
     if (__$res.{{ kv.field.name }}?.results) {

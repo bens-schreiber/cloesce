@@ -370,3 +370,73 @@ async fn upsert_join_table_composite_fk_pk(db: SqlitePool) {
     topping_ids.sort();
     assert_eq!(topping_ids, vec![101, 102]);
 }
+
+#[test]
+fn upsert_route_model_persists_kv_without_sql() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        kv namespace {
+            data(id: int) -> json {
+                "data/{id}"
+            }
+        }
+
+        kv otherNamespace {
+            otherData(siblingId: int) -> json {
+                "other/{siblingId}"
+            }
+        }
+
+        model RouteOwner {
+            route {
+                id: int
+            }
+
+            kv namespace::data(id) {
+                someData
+            }
+
+            nav RouteSibling::siblingId(id) {
+                sibling
+            }
+        }
+
+        model RouteSibling {
+            route {
+                siblingId: int
+            }
+
+            kv otherNamespace::otherData(siblingId) {
+                siblingData
+            }
+        }
+    "#,
+    );
+
+    let new_model = json!({
+        "id": 7,
+        "someData": { "raw": { "hello": "world" } },
+        "sibling": {
+            "siblingId": 7,
+            "siblingData": { "raw": { "foo": "bar" } }
+        }
+    });
+
+    let res = UpsertModel::query(
+        "RouteOwner",
+        &idl,
+        new_model.as_object().unwrap().clone(),
+        include(json!({ "someData": {}, "sibling": { "siblingData": {} } })),
+    )
+    .expect("upsert to succeed");
+
+    // Route models have no SQL representation.
+    assert!(res.sql.is_empty());
+
+    // The model's own KV field and its nav target's KV field are both persisted.
+    let keys: Vec<&str> = res.kv_uploads.iter().map(|u| u.key.as_str()).collect();
+    assert!(keys.contains(&"data/7"), "got keys: {keys:?}");
+    assert!(keys.contains(&"other/7"), "got keys: {keys:?}");
+}

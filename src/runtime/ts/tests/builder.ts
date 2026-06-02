@@ -13,6 +13,7 @@ import {
   CrudKind,
   KvField,
   R2Field,
+  ValidatedField,
 } from "../src/cidl";
 
 export function createIdl(args?: { models?: Model[] }): Cidl {
@@ -70,10 +71,11 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private backing_binding: string | null = null;
+  private database_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
+  private route_fields: ValidatedField[] = [];
   private navigation_fields: NavigationField[] = [];
   private kv_fields: KvField[] = [];
   private r2_fields: R2Field[] = [];
@@ -90,12 +92,12 @@ export class ModelBuilder {
   }
 
   d1(binding: string): this {
-    this.backing_binding = binding;
+    this.database_binding = binding;
     return this;
   }
 
   defaultDb(): this {
-    this.backing_binding = "d1";
+    this.database_binding = "d1";
     return this;
   }
 
@@ -110,6 +112,11 @@ export class ModelBuilder {
       unique_ids: [],
       composite_id: null,
     });
+    return this;
+  }
+
+  routeField(name: string, cidl_type: CidlType): this {
+    this.route_fields.push({ name, cidl_type, validators: [] });
     return this;
   }
 
@@ -231,9 +238,10 @@ export class ModelBuilder {
 
     return {
       name: this.name,
-      backing_binding: this.backing_binding,
+      database_binding: this.database_binding,
       primary_columns,
       columns: mutableColumns,
+      route_fields: this.route_fields,
       navigation_fields: this.navigation_fields,
       kv_fields: this.kv_fields,
       r2_fields: this.r2_fields,

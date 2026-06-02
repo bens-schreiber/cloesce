@@ -45,3 +45,28 @@ model ModelWithKv for db {
 api ModelWithKv {
     post acceptPaginated(ps: paginated<kvobject<json>>) -> paginated<kvobject<json>>
 }
+
+[crud get, save]
+model KVOnly {
+    route {
+        id: int
+    }
+
+    kv namespace::data(id) {
+        someData
+    }
+
+    nav KVSibling::siblingId(id) {
+        sibling
+    }
+}
+
+model KVSibling {
+    route {
+        siblingId: int
+    }
+
+    kv otherNamespace::otherData(siblingId) {
+        siblingData
+    }
+}

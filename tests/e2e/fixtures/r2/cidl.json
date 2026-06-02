@@ -116,6 +116,7 @@
         }
       ],
       "navigation_fields": [],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -320,6 +321,241 @@
         "Save",
         "List"
       ]
+    },
+    "R2Only": {
+      "hash": 0,
+      "name": "R2Only",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [
+        {
+          "field": {
+            "name": "someData",
+            "cidl_type": "R2Object"
+          },
+          "binding": "bucket1",
+          "key_format": "path/to/data/{id}"
+        }
+      ],
+      "navigation_fields": [
+        {
+          "hash": 0,
+          "field": {
+            "name": "sibling",
+            "cidl_type": {
+              "Object": {
+                "name": "R2Sibling"
+              }
+            }
+          },
+          "model_reference": "R2Sibling",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "id"
+              ]
+            }
+          }
+        }
+      ],
+      "route_fields": [
+        {
+          "name": "id",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "backing_binding": null,
+      "apis": [
+        {
+          "name": "uploadData",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Put",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "data",
+              "cidl_type": "Stream",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "bucket1"
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "R2Only"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "bucket1"
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "bucket1"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "R2Only"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "bucket1"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get"
+      ]
+    },
+    "R2Sibling": {
+      "hash": 0,
+      "name": "R2Sibling",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [
+        {
+          "field": {
+            "name": "siblingData",
+            "cidl_type": "R2Object"
+          },
+          "binding": "bucket1",
+          "key_format": "path/to/other/{siblingId}"
+        }
+      ],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "siblingId",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "backing_binding": null,
+      "apis": [
+        {
+          "name": "uploadData",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Put",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "data",
+              "cidl_type": "Stream",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "bucket1"
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "siblingId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "bucket1"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "R2Sibling"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "bucket1"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": []
     }
   },
   "poos": {},

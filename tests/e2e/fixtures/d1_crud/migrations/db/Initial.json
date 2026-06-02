@@ -82,7 +82,7 @@
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "favoriteChildId"
               ]
             }
@@ -158,7 +158,7 @@
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "parentId"
               ]
             }

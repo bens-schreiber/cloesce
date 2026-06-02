@@ -260,6 +260,32 @@ api ModelWithCustomDs {
     post instanceMethod([source Custom] self, input: string) -> string
 }
 
+[crud get, save]
+model RouteOwner {
+    route {
+        ownerId: string
+        modelYear: int
+    }
+    
+    kv MyKv::someValue(ownerId, modelYear) {
+        metadata
+    }
+    
+    nav RouteCar::ownerId(ownerId) {
+        car
+    }
+}
+
+model RouteCar {
+    route {
+        ownerId: string
+    }
+}
+
+api RouteOwner {
+    post instanceMethod(self, input: string) -> string
+}
+
 model BasicService {}
 api BasicService {
     get downloadData() -> stream

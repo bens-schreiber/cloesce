@@ -29,6 +29,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -195,6 +196,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -663,6 +665,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -813,7 +816,7 @@
           "model_reference": "Hamburger",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "hamburgerId"
               ]
             }
@@ -832,13 +835,14 @@
           "model_reference": "Topping",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "toppingId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [],
       "data_sources": {

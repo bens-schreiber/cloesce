@@ -76,8 +76,23 @@ pub enum SemanticError<'src, 'p> {
         second_model: &'p Symbol<'src>,
     },
 
-    NavigationReferencesDifferentDatabase {
+    /// A navigation property references a model with a different backing: a different D1
+    /// database, or one side is a route model and the other is not.
+    NavigationReferencesDifferentBacking {
         field: &'p Symbol<'src>,
+    },
+
+    /// A route model declares a block it cannot have: a `for` binding, or a SQL block
+    /// (column/foreign/primary/unique).
+    RouteModelInvalidBlock {
+        model: &'p Symbol<'src>,
+        block: &'static str,
+    },
+
+    /// A route model declares a navigation that is not a 1:1 to another route model.
+    RouteNavigationInvalid {
+        field: &'p Symbol<'src>,
+        reason: &'static str,
     },
 
     /// A navigation property could not be resolved to either a 1:1 or a 1:M
@@ -468,18 +483,45 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationReferencesDifferentDatabase { field: nav } => {
+        SemanticError::NavigationReferencesDifferentBacking { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "navigation property '{}' references a model in a different database",
+                    "navigation property '{}' references a model with a different backing",
                     nav.name
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "navigation properties must reference models in the same D1 database",
+                            "navigation properties must reference models with the same backing \
+                             (the same D1 database, or both route models)",
                         )
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::RouteModelInvalidBlock { model, block } => {
+            let (path, range) = span_parts(&model.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "route model '{}' cannot have a {block}",
+                    model.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("route models have no SQL backing")
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::RouteNavigationInvalid { field: nav, reason } => {
+            let (path, range) = span_parts(&nav.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "navigation property '{}' is not a valid route navigation",
+                    nav.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(*reason)
                         .with_color(Color::Red),
                 )
         }

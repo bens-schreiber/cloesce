@@ -67,6 +67,240 @@
     "vars": []
   },
   "models": {
+    "KVOnly": {
+      "hash": 0,
+      "name": "KVOnly",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "someData",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "namespace",
+          "key_format": "path/to/data/{id}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 0,
+          "field": {
+            "name": "sibling",
+            "cidl_type": {
+              "Object": {
+                "name": "KVSibling"
+              }
+            }
+          },
+          "model_reference": "KVSibling",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "id"
+              ]
+            }
+          }
+        }
+      ],
+      "route_fields": [
+        {
+          "name": "id",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "backing_binding": null,
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnly"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace",
+            "otherNamespace"
+          ]
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnly"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "KVOnly"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace",
+            "otherNamespace"
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "KVOnly"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "Save"
+      ]
+    },
+    "KVSibling": {
+      "hash": 0,
+      "name": "KVSibling",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "siblingData",
+            "cidl_type": {
+              "KvObject": "String"
+            },
+            "validators": []
+          },
+          "binding": "otherNamespace",
+          "key_format": "path/to/other/{siblingId}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "siblingId",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "backing_binding": null,
+      "apis": [],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "siblingId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "KVSibling"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": []
+    },
     "ModelWithKv": {
       "hash": 2176846329808501385,
       "name": "ModelWithKv",
@@ -146,6 +380,7 @@
       ],
       "r2_fields": [],
       "navigation_fields": [],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {

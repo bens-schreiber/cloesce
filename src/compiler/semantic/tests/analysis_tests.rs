@@ -328,7 +328,7 @@ fn d1_model_nav_errors() {
     assert_eq!(inconsistent_model_adj.1, "User");
 
     let nav_name = expect_err!(errors,
-        SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
+        SemanticError::NavigationReferencesDifferentBacking { field, .. } => field.name
     );
     assert_eq!(nav_name, "invalidAdjModel");
 
@@ -400,7 +400,7 @@ fn d1_model_nav_one_to_one() {
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
             && nav.model_reference == "Horse"
-            && matches!(&nav.kind, NavigationFieldKind::OneToOne { columns } if columns.len() == 1 && columns[0] == "horseId")
+            && matches!(&nav.kind, NavigationFieldKind::OneToOne { fields } if fields.len() == 1 && fields[0] == "horseId")
             && nav.field.cidl_type == CidlType::Object {
                 name: "Horse"
             }
@@ -451,6 +451,135 @@ fn d1_model_nav_one_to_many() {
     };
     assert_eq!(author_posts_nav_columns.len(), 1);
     assert_eq!(author_posts_nav_columns[0], "authorId");
+}
+
+#[test]
+fn route_model_valid() {
+    // Arrange: route fields, a KV field keyed on a route field, a composite 1:1 nav
+    // declared out of the target's route order, and a `get` keyed on route fields.
+    let src = &with_env(
+        r#"
+        [crud get, save]
+        model Person {
+            route {
+                id: int
+                org: string
+            }
+
+            kv my_kv::cached(id) { cached }
+
+            nav (Dog::tenant(org), Dog::ownerId(id)) { dog }
+        }
+
+        model Dog {
+            route {
+                ownerId: int
+                tenant: string
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let person = result.models.get("Person").unwrap();
+    assert!(person.database_binding.is_none());
+    let route_fields: Vec<&str> = person
+        .route_fields
+        .iter()
+        .map(|f| f.name.as_ref())
+        .collect();
+    assert_eq!(route_fields, vec!["id", "org"]);
+
+    // 1:1 nav columns are ordered to match Dog's route fields (ownerId, tenant).
+    let dog_nav = person.navigation_fields.first().unwrap();
+    assert_eq!(dog_nav.field.name, "dog");
+    assert_eq!(dog_nav.model_reference, "Dog");
+    assert_eq!(dog_nav.field.cidl_type, CidlType::Object { name: "Dog" });
+    let NavigationFieldKind::OneToOne { fields } = &dog_nav.kind else {
+        unreachable!()
+    };
+    assert_eq!(fields, &vec!["id", "org"]);
+
+    // The default data source has no SQL and is keyed on the route fields.
+    let ds = person.default_data_source().unwrap();
+    assert!(ds.include_query.is_empty());
+    let params: Vec<&str> = ds
+        .get
+        .parameters
+        .iter()
+        .map(|p| p.parameter.name.as_ref())
+        .collect();
+    assert_eq!(params, vec!["id", "org"]);
+    assert!(ds.get.parameters.iter().all(|p| p.instance_field));
+}
+
+#[test]
+fn route_model_errors() {
+    // Arrange: every way a route model or route navigation can be invalid.
+    let src = &with_env(
+        r#"
+        [crud get, list]
+        model Worker {
+            route { id: int }
+
+            nav Stored::id(id) { stored }  // references a D1 model
+            nav Other::id { others }       // 1:M not allowed
+            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
+        }
+
+        model HasBinding for my_d1 {
+            route { id: int }              // route block with a `for` binding
+        }
+
+        model HasColumn {
+            route { id: int }
+            column { name: string }        // route block with a SQL block
+        }
+
+        model Stored for my_d1 {
+            primary { id: int }
+        }
+
+        model Other {
+            route { id: int }
+        }
+
+        model Partial {
+            route {
+                a: int
+                b: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    expect_err!(
+        errors,
+        SemanticError::NavigationReferencesDifferentBacking { .. }
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
+        2 // 1:M nav, and the nav missing a target route field
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteModelInvalidBlock { .. }),
+        2 // `for` binding, and the SQL column block
+    );
+    let crud = expect_err!(errors,
+        SemanticError::UnsupportedCrudOperation { crud, .. } => crud
+    );
+    assert!(matches!(crud.inner, idl::CrudKind::List)); // list needs SQL
 }
 
 #[test]

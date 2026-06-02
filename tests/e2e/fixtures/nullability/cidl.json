@@ -54,6 +54,7 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {

@@ -25,6 +25,135 @@ export class otherNamespace {
         return `path/to/other/${id}`;
     }
 }
+export namespace KVOnly {
+    export const Tag = "KVOnly" as const;
+    export const Meta = cidl.models.KVOnly as any;
+
+    export interface Self {
+        id: number;
+        sibling: KVSibling.Self;
+        someData: KValue<unknown>;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"sibling":{"siblingData":{}},"someData":{}},
+            async get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number): Promise<HttpResult<Self | null>> {
+                const base = { id } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("KVOnly", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { id: args.id,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace KVSibling {
+    export const Tag = "KVSibling" as const;
+    export const Meta = cidl.models.KVSibling as any;
+
+    export interface Self {
+        siblingId: number;
+        siblingData: KValue<string>;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"siblingData":{}},
+            async get(env: { otherNamespace: Env["otherNamespace"] }, siblingId: number): Promise<HttpResult<Self | null>> {
+                const base = { siblingId } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { otherNamespace: Env["otherNamespace"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("KVSibling", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: { otherNamespace: Env["otherNamespace"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { siblingId: args.siblingId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: { otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
 export namespace ModelWithKv {
     export const Tag = "ModelWithKv" as const;
     export const Meta = cidl.models.ModelWithKv as any;

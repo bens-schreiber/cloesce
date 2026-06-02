@@ -103,11 +103,11 @@ impl<'a> SelectModel<'a> {
             let child_alias = self.id(child.name);
 
             match &nav.kind {
-                NavigationFieldKind::OneToOne { columns } => {
+                NavigationFieldKind::OneToOne { fields } => {
                     // Build join condition for all key columns
                     let mut condition = sea_query::Condition::all();
 
-                    for (fk, pk) in columns.iter().zip(child.primary_columns.iter()) {
+                    for (fk, pk) in fields.iter().zip(child.primary_columns.iter()) {
                         condition = condition.add(
                             Expr::col((alias(&model_alias), alias(*fk)))
                                 .equals((alias(&child_alias), alias(pk.field.name.as_ref()))),

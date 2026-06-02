@@ -59,13 +59,14 @@
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "bId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -502,6 +503,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -679,6 +681,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -821,6 +824,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -1257,6 +1261,7 @@
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -1699,13 +1704,14 @@
           "model_reference": "Person",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "personId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [
         {
@@ -1867,7 +1873,7 @@
           "model_reference": "Course",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "courseId"
               ]
             }
@@ -1886,13 +1892,14 @@
           "model_reference": "Student",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "studentId"
               ]
             }
           }
         }
       ],
+      "route_fields": [],
       "backing_binding": "db",
       "apis": [],
       "data_sources": {

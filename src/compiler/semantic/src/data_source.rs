@@ -284,7 +284,10 @@ impl<'src> DataSourceExpansion {
         let needs_default = idl
             .models
             .values()
-            .filter(|m| m.backing_binding.is_some() && m.default_data_source().is_none())
+            .filter(|m| {
+                (m.database_binding.is_some() || !m.route_fields.is_empty())
+                    && m.default_data_source().is_none()
+            })
             .map(|m| m.name)
             .collect::<Vec<&str>>();
 
@@ -309,7 +312,7 @@ impl<'src> DataSourceExpansion {
         let pending = idl
             .models
             .values()
-            .filter(|m| m.backing_binding.is_some())
+            .filter(|m| m.database_binding.is_some())
             .flat_map(|model| {
                 model.data_sources.iter().map(|(ds_name, ds)| {
                     let include_query = SelectModel::query(model.name, None, Some(&ds.tree), idl)
@@ -399,6 +402,60 @@ impl<'src> DataSourceExpansion {
             }
             if let Some(s) = save {
                 ds.save = s;
+            }
+        }
+
+        // Route models have no SQL, but still synthesize a `get` keyed on their route
+        // fields (so the runtime can fetch them and resolve their navigations) and a
+        // `save` that persists their KV/R2 fields.
+        let route_pending = idl
+            .models
+            .values()
+            .filter(|m| m.database_binding.is_none() && !m.route_fields.is_empty())
+            .flat_map(|model| {
+                model.data_sources.keys().map(|ds_name| {
+                    let bindings = model_bindings(idl, model, None);
+                    let get = DataSourceGetMethod {
+                        parameters: model
+                            .route_fields
+                            .iter()
+                            .map(|f| DataSourceGetMethodParam {
+                                parameter: f.clone(),
+                                instance_field: true,
+                            })
+                            .collect(),
+                        injected: bindings.clone(),
+                        is_stub: false,
+                    };
+                    let save = DataSourceMethod {
+                        parameters: vec![ValidatedField {
+                            name: "model".into(),
+                            cidl_type: CidlType::Partial {
+                                object_name: model.name,
+                            },
+                            validators: vec![],
+                        }],
+                        injected: bindings,
+                        is_stub: false,
+                    };
+                    (model.name, *ds_name, get, save)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for (model_name, ds_name, get, save) in route_pending {
+            let Some(ds) = idl
+                .models
+                .get_mut(model_name)
+                .and_then(|m| m.data_sources.get_mut(ds_name))
+            else {
+                continue;
+            };
+            if !ds.get.is_stub {
+                ds.get = get;
+            }
+            if !ds.save.is_stub {
+                ds.save = save;
             }
         }
     }

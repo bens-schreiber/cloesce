@@ -622,6 +622,139 @@ export namespace OneToManyModel {
         }
     }
 }
+export namespace RouteCar {
+    export const Tag = "RouteCar" as const;
+    export const Meta = cidl.models.RouteCar as any;
+
+    export interface Self {
+        ownerId: string;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {},
+            async get(env: {  }, ownerId: string): Promise<HttpResult<Self | null>> {
+                const base = { ownerId } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: {  }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("RouteCar", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: {  }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: {  }, args: { ownerId: string, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { ownerId: args.ownerId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: {  }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace RouteOwner {
+    export const Tag = "RouteOwner" as const;
+    export const Meta = cidl.models.RouteOwner as any;
+
+    export interface Self {
+        ownerId: string;
+        modelYear: number;
+        car: RouteCar.Self;
+        metadata: KValue<unknown>;
+    }
+
+    export interface Api {
+        instanceMethod(
+            self: RouteOwner.Self,
+            input: string,
+        ): ApiResult<string>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"car":{},"metadata":{}},
+            async get(env: { MyKv: Env["MyKv"] }, ownerId: string, modelYear: number): Promise<HttpResult<Self | null>> {
+                const base = { ownerId, modelYear } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { MyKv: Env["MyKv"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("RouteOwner", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { MyKv: Env["MyKv"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: { MyKv: Env["MyKv"] }, args: { ownerId: string, modelYear: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { ownerId: args.ownerId, modelYear: args.modelYear,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: { MyKv: Env["MyKv"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
 export namespace ToyotaPrius {
     export const Tag = "ToyotaPrius" as const;
     export const Meta = cidl.models.ToyotaPrius as any;

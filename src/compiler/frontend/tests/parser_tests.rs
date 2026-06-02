@@ -397,7 +397,7 @@ fn model_primary_unique_optional_foreign() {
 
     let m = find_model(&ast, "M");
 
-    assert_eq!(m.backing_binding.as_ref().map(|s| s.name), Some("d1_db"));
+    assert_eq!(m.database_binding.as_ref().map(|s| s.name), Some("d1_db"));
 
     let cruds: Vec<CrudKind> = m
         .symbol
@@ -568,6 +568,51 @@ fn model_navigation() {
     assert!(nav_adj_matches(
         &alerts_nav.adj,
         &[("Alert", "regionId", None), ("Alert", "zoneId", None)]
+    ));
+}
+
+#[test]
+fn model_route() {
+    let ast = lex_and_ast(
+        r#"
+        model Person {
+            route {
+                id: int
+                tenant: int
+            }
+
+            nav Dog::ownerId(id) { dog }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "Person");
+
+    let route = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Route(syms) => Some(syms),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(route[0].name, "id");
+    assert_eq!(route[0].cidl_type, CidlType::Int);
+    assert_eq!(route[1].name, "tenant");
+    assert_eq!(route[1].cidl_type, CidlType::Int);
+
+    let dog_nav = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "dog" => Some(n),
+            _ => None,
+        })
+        .unwrap();
+    assert!(dog_nav.is_one_to_one());
+    assert!(nav_adj_matches(
+        &dog_nav.adj,
+        &[("Dog", "ownerId", Some("id"))]
     ));
 }
 

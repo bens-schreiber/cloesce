@@ -140,6 +140,149 @@ export namespace D1BackedModel {
         }
     }
 }
+export namespace R2Only {
+    export const Tag = "R2Only" as const;
+    export const Meta = cidl.models.R2Only as any;
+
+    export interface Self {
+        id: number;
+        sibling: R2Sibling.Self;
+        someData: R2ObjectBody;
+    }
+
+    export interface Api {
+        uploadData(
+            self: R2Only.Self,
+            env: {
+                bucket1: Env["bucket1"],
+            },
+            data: CfReadableStream,
+        ): ApiResult<void>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"sibling":{"siblingData":{}},"someData":{}},
+            async get(env: { bucket1: Env["bucket1"] }, id: number): Promise<HttpResult<Self | null>> {
+                const base = { id } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { bucket1: Env["bucket1"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("R2Only", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: { bucket1: Env["bucket1"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { id: args.id,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace R2Sibling {
+    export const Tag = "R2Sibling" as const;
+    export const Meta = cidl.models.R2Sibling as any;
+
+    export interface Self {
+        siblingId: number;
+        siblingData: R2ObjectBody;
+    }
+
+    export interface Api {
+        uploadData(
+            self: R2Sibling.Self,
+            env: {
+                bucket1: Env["bucket1"],
+            },
+            data: CfReadableStream,
+        ): ApiResult<void>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"siblingData":{}},
+            async get(env: { bucket1: Env["bucket1"] }, siblingId: number): Promise<HttpResult<Self | null>> {
+                const base = { siblingId } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { bucket1: Env["bucket1"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
+                let res: CloesceResult<Self | null>;
+                try {
+                    res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                } catch (e) {
+                    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
+                }
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("R2Sibling", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+        export async function save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
+        }
+        export async function get(env: { bucket1: Env["bucket1"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { siblingId: args.siblingId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
 
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };

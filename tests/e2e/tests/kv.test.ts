@@ -1,6 +1,6 @@
 import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ModelWithKv, KValue, Paginated } from "../fixtures/kv/client";
+import { ModelWithKv, KVOnly, KValue, Paginated } from "../fixtures/kv/client";
 import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -73,5 +73,36 @@ describe("ModelWithKv", () => {
     expect(res.ok, withRes("acceptPaginated should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data).toEqual(paginatedData);
+  });
+});
+
+describe("KVOnly (route model)", () => {
+  const id = 7;
+  const someData = { hello: "world" };
+  const siblingData = "sibling string data";
+
+  it("POST persists the route model's and its nav target's KV fields", async () => {
+    const model = {
+      id,
+      someData: { raw: someData },
+      sibling: {
+        siblingId: id,
+        siblingData: { raw: siblingData },
+      },
+    };
+    const res = await KVOnly.$save(model);
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+  });
+
+  it("GET hydrates KV and the assembled route nav with its KV", async () => {
+    const res = await KVOnly.$get(id);
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data?.id).toBe(id);
+    expect(res.data?.someData.value).toEqual(someData);
+
+    // The sibling is assembled from this model's route fields, then its KV hydrated.
+    expect(res.data?.sibling).toBeDefined();
+    expect(res.data?.sibling?.siblingId).toBe(id);
+    expect(res.data?.sibling?.siblingData.value).toBe(siblingData);
   });
 });

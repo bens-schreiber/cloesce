@@ -62,6 +62,7 @@ contextual_keywords! {
     Optional => "optional",
     Unique => "unique",
     Column => "column",
+    Route => "route",
     For => "for",
     Include => "include",
 
@@ -365,17 +366,16 @@ pub enum ModelBlockKind<'src> {
     Kv(KvFieldBlock<'src>),
     R2(R2FieldBlock<'src>),
     Primary(Vec<Spd<SqlBlockKind<'src>>>),
+    Route(Vec<Symbol<'src>>),
     Unique(Vec<Symbol<'src>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
     /// Returns the field-declaration symbols introduced by this block.
-    ///
-    /// `Unique` is excluded because it only *references* existing fields rather than
-    /// declaring new ones.
     pub fn symbols(&self) -> Vec<&Symbol<'src>> {
         match self {
             ModelBlockKind::Column(symbols) => symbols.iter().collect(),
+            ModelBlockKind::Route(symbols) => symbols.iter().collect(),
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
             ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.inner],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
@@ -397,7 +397,7 @@ pub struct ModelBlock<'src> {
     pub symbol: Symbol<'src>,
 
     /// Optional binding the model is backed by, e.g. `for SomeBinding` in `model M for SomeBinding { ... }`.
-    pub backing_binding: Option<Symbol<'src>>,
+    pub database_binding: Option<Symbol<'src>>,
 
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }

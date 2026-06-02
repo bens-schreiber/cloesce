@@ -136,7 +136,7 @@ describe("hydrateType Tests", () => {
       const parentMeta = ModelBuilder.model("ParentModel")
         .idPk()
         .navP("child", "ChildModel", {
-          OneToOne: { columns: ["id"] },
+          OneToOne: { fields: ["id"] },
         })
         .build();
 
@@ -167,6 +167,40 @@ describe("hydrateType Tests", () => {
       expect(result.child.createdAt.toISOString()).toBe(iso);
     });
 
+    test("assembles a route model nav target from this model's route fields", () => {
+      // Arrange: a route model whose nav target is built entirely from route values.
+      const carMeta = ModelBuilder.model("RouteCar")
+        .routeField("ownerId", "Int")
+        .routeField("tenant", "String")
+        .build();
+
+      const ownerMeta = ModelBuilder.model("RouteOwner")
+        .routeField("id", "Int")
+        .routeField("org", "String")
+        .navP("car", "RouteCar", {
+          OneToOne: { fields: ["id", "org"] },
+        })
+        .build();
+
+      const idl = createIdl({ models: [ownerMeta, carMeta] });
+
+      const base = { id: 1, org: "acme" };
+
+      // Act
+      const result = hydrateType(
+        base,
+        { Object: { name: "RouteOwner" } },
+        {
+          ...createHydrateArgs(),
+          idl,
+          includeTree: null,
+        },
+      );
+
+      // Assert: car is assembled with ownerId <- id, tenant <- org.
+      expect(result.car).toEqual({ ownerId: 1, tenant: "acme" });
+    });
+
     test("does not hydrate navigation properties when exclude from include tree", () => {
       // Arrange
       const iso = "2024-03-10T08:00:00.000Z";
@@ -179,7 +213,7 @@ describe("hydrateType Tests", () => {
       const parentMeta = ModelBuilder.model("ParentModel2")
         .idPk()
         .navP("child", "ChildModel2", {
-          OneToOne: { columns: ["id"] },
+          OneToOne: { fields: ["id"] },
         })
         .build();
 
@@ -227,7 +261,7 @@ describe("ORM Hydrate Tests", () => {
       .kvField("emptyConfig", "namespace1", "emptyConfig", "Json")
       .r2Field("images/{id}", "bucket1", "image")
       .r2Field("images", "bucket1", "imageList", { Paginated: "R2Object" })
-      .r2Field("emptyImage", "bucket1", "emptyImage", false)
+      .r2Field("emptyImage", "bucket1", "emptyImage")
       .build();
 
     const base = {

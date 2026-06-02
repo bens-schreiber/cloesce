@@ -63,11 +63,11 @@ impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
                 continue;
             };
 
-            // Validate CRUD operations
+            // Validate CRUD operations. `list` needs a SQL store for seek pagination;
+            // `get` and `save` (which may persist KV/R2 fields) do not.
             for crud in &cruds {
-                // List requires a D1 binding
                 ensure!(
-                    !matches!(crud.inner, CrudKind::List) || model.backing_binding.is_some(),
+                    !matches!(crud.inner, CrudKind::List) || model.database_binding.is_some(),
                     self.sink,
                     SemanticError::UnsupportedCrudOperation {
                         model: &model_block.symbol,
@@ -112,6 +112,7 @@ struct ModelBuilder<'src, 'p> {
     navigation_fields: Vec<NavigationField<'src>>,
     kv_fields: Vec<KvField<'src>>,
     r2_fields: Vec<R2Field<'src>>,
+    route_fields: Vec<ValidatedField<'src>>,
 }
 
 impl<'src, 'p> ModelBuilder<'src, 'p> {
@@ -129,6 +130,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             navigation_fields: Vec::new(),
             kv_fields: Vec::new(),
             r2_fields: Vec::new(),
+            route_fields: Vec::new(),
         }
     }
 }
@@ -142,6 +144,37 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         ma.graph.entry(self.name).or_default();
         ma.in_degree.entry(self.name).or_insert(0);
 
+        let is_route = self
+            .model
+            .blocks
+            .inners()
+            .any(|b| matches!(b, ModelBlockKind::Route(_)));
+
+        // A route model has no SQL backing, so it cannot carry SQL blocks or a `for` binding.
+        if is_route {
+            if self.model.database_binding.is_some() {
+                ma.sink.push(SemanticError::RouteModelInvalidBlock {
+                    model: self.symbol,
+                    block: "`for` binding",
+                });
+                return None;
+            }
+            let sql_block = self.model.blocks.inners().find_map(|b| match b {
+                ModelBlockKind::Column(_) => Some("column block"),
+                ModelBlockKind::Foreign(_) => Some("foreign block"),
+                ModelBlockKind::Primary(_) => Some("primary block"),
+                ModelBlockKind::Unique(_) => Some("unique block"),
+                _ => None,
+            });
+            if let Some(block) = sql_block {
+                ma.sink.push(SemanticError::RouteModelInvalidBlock {
+                    model: self.symbol,
+                    block,
+                });
+                return None;
+            }
+        }
+
         // Models with SQL columns require a D1 binding
         let has_sql_blocks = self.model.blocks.inners().any(|b| {
             matches!(
@@ -154,8 +187,8 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             )
         });
 
-        let binding = if has_sql_blocks || self.model.backing_binding.is_some() {
-            let Some(binding_sym) = self.model.backing_binding.as_ref() else {
+        let binding = if !is_route && (has_sql_blocks || self.model.database_binding.is_some()) {
+            let Some(binding_sym) = self.model.database_binding.as_ref() else {
                 ma.sink
                     .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });
                 return None;
@@ -178,6 +211,8 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         } else {
             None
         };
+
+        let binding_name = binding.map(|b| b.name);
 
         for block in self.model.blocks.inners() {
             match block {
@@ -206,11 +241,16 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
-                    binding.unwrap().name,
+                    binding_name,
                     &navigation_block.adj,
                     &navigation_block.nav.inner,
                     table,
                 ),
+                ModelBlockKind::Route(symbols) => {
+                    for symbol in symbols {
+                        self.route_field(ma, symbol);
+                    }
+                }
                 ModelBlockKind::Unique(_) | ModelBlockKind::Kv(_) | ModelBlockKind::R2(_) => {
                     // Processed once all columns are built
                 }
@@ -232,15 +272,15 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return None;
         }
 
-        let binding_name = binding.map(|b| b.name);
         Some(Model {
             name: self.name,
-            backing_binding: binding_name,
+            database_binding: binding_name,
             primary_columns: self.primary_columns,
             columns: self.columns,
             kv_fields: self.kv_fields,
             r2_fields: self.r2_fields,
             navigation_fields: self.navigation_fields,
+            route_fields: self.route_fields,
             ..Default::default()
         })
     }
@@ -300,6 +340,36 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         }
     }
 
+    fn route_field(&mut self, ma: &mut ModelAnalysis<'src, 'p, 'sem>, symbol: &'p Symbol<'src>) {
+        let cidl_type = symbol.cidl_type.clone();
+
+        if !is_valid_sql_type(&cidl_type) {
+            ma.sink
+                .push(SemanticError::InvalidColumnType { column: symbol });
+            return;
+        }
+
+        for tag in &symbol.tags {
+            if !matches!(tag.inner, Tag::Validator { .. }) {
+                ma.sink
+                    .push(SemanticError::TagInvalidInContext { tag, symbol });
+            }
+        }
+        let validators = match resolve_validator_tags(symbol) {
+            Ok(v) => v,
+            Err(errs) => {
+                ma.sink.extend(errs);
+                Vec::new()
+            }
+        };
+
+        self.route_fields.push(ValidatedField {
+            name: symbol.name.into(),
+            cidl_type,
+            validators,
+        });
+    }
+
     fn foreign(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
@@ -328,7 +398,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         }
 
         // Must belong to the same database
-        let adj_binding = adj_model_block.backing_binding.as_ref();
+        let adj_binding = adj_model_block.database_binding.as_ref();
         if adj_binding.map(|s| s.name) != Some(binding) {
             ma.sink
                 .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
@@ -436,7 +506,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
     fn nav(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
-        binding: &'src str,
+        binding: Option<&'src str>,
         adj: &'p [NavAdj<'src>],
         field: &'p Symbol<'src>,
         table: &SymbolTable<'src, 'p>,
@@ -484,11 +554,21 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         let adj_model_block = table.models.get(adj.first().unwrap().model.name).unwrap();
 
-        // Must belong to the same database
-        let adj_binding = adj_model_block.backing_binding.as_ref();
-        if adj_binding.map(|s| s.name) != Some(binding) {
+        // Must share the same backing (same D1 database, or both Worker backed)
+        let adj_binding = adj_model_block.database_binding.as_ref().map(|s| s.name);
+        if adj_binding != binding {
             ma.sink
-                .push(SemanticError::NavigationReferencesDifferentDatabase { field });
+                .push(SemanticError::NavigationReferencesDifferentBacking { field });
+            return;
+        }
+
+        // Worker backed models resolve navigations by fetching the sibling model, not via SQL.
+        if binding.is_none() {
+            let adj_is_route = adj_model_block
+                .blocks
+                .inners()
+                .any(|b| matches!(b, ModelBlockKind::Route(_)));
+            self.route_nav(ma, table, adj, field, adj_model_block, adj_is_route, keyed);
             return;
         }
 
@@ -556,7 +636,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 },
                 model_reference: adj_model_block.symbol.name,
                 kind: NavigationFieldKind::OneToOne {
-                    columns: foreign_key.fields.iter().map(|f| f.name).collect(),
+                    fields: foreign_key.fields.iter().map(|f| f.name).collect(),
                 },
             });
             return;
@@ -582,6 +662,99 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             kind: NavigationFieldKind::OneToMany {
                 columns: referenced_field_names,
             },
+        });
+    }
+
+    /// Validates a navigation declared on a Worker backed model. These must be 1:1
+    /// relationships to a route model whose entire route is supplied by this model's
+    /// fields, so the target can be assembled during hydration with no extra lookup.
+    ///
+    /// The emitted `columns` are this model's local field names, ordered to match the
+    /// target's route field declaration order, so the runtime can build the target as
+    /// `{ target.route_fields[i]: value[columns[i]] }`.
+    #[allow(clippy::too_many_arguments)]
+    fn route_nav(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
+        table: &SymbolTable<'src, 'p>,
+        adj: &'p [NavAdj<'src>],
+        field: &'p Symbol<'src>,
+        adj_model_block: &'p ModelBlock<'src>,
+        adj_is_route: bool,
+        keyed: bool,
+    ) {
+        if !keyed {
+            ma.sink.push(SemanticError::RouteNavigationInvalid {
+                field,
+                reason: "route navigations must be 1:1; declare the local key, e.g. `nav T::f(localKey)`",
+            });
+            return;
+        }
+
+        if !adj_is_route {
+            ma.sink.push(SemanticError::RouteNavigationInvalid {
+                field,
+                reason: "route navigations must reference a route model",
+            });
+            return;
+        }
+
+        // Each adj entry maps a target route field to one of this model's local fields.
+        for entry in adj {
+            let local_key = entry.local_key.as_ref().unwrap();
+
+            let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
+                model: self.name,
+                name: local_key.name,
+            }) else {
+                ma.sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: local_key });
+                return;
+            };
+            let adj_field = table
+                .local
+                .get(&LocalSymbolKind::ModelField {
+                    model: adj_model_block.symbol.name,
+                    name: entry.field.name,
+                })
+                .unwrap();
+
+            if local_field.cidl_type != adj_field.cidl_type {
+                ma.sink.push(SemanticError::RouteNavigationInvalid {
+                    field,
+                    reason: "local route field type does not match the referenced route field type",
+                });
+                return;
+            }
+        }
+
+        // The target must have all of its route fields supplied, in their declaration order.
+        let target_route_fields = adj_model_block.blocks.inners().find_map(|b| match b {
+            ModelBlockKind::Route(symbols) => Some(symbols),
+            _ => None,
+        });
+        let mut fields = Vec::new();
+        for route_field in target_route_fields.into_iter().flatten() {
+            let Some(entry) = adj.iter().find(|a| a.field.name == route_field.name) else {
+                ma.sink.push(SemanticError::RouteNavigationInvalid {
+                    field,
+                    reason: "a route navigation must supply every route field of the target model",
+                });
+                return;
+            };
+            fields.push(entry.local_key.as_ref().unwrap().name);
+        }
+
+        self.navigation_fields.push(NavigationField {
+            hash: 0,
+            field: Field {
+                name: field.name.into(),
+                cidl_type: CidlType::Object {
+                    name: adj_model_block.symbol.name,
+                },
+            },
+            model_reference: adj_model_block.symbol.name,
+            kind: NavigationFieldKind::OneToOne { fields },
         });
     }
 
@@ -761,24 +934,26 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 return None;
             }
 
-            let Some(column) = self
+            let Some(arg_field) = self
                 .primary_columns
                 .iter_mut()
                 .chain(&mut self.columns)
-                .find(|f| f.field.name == arg.name)
+                .map(|c| &mut c.field)
+                .chain(&mut self.route_fields)
+                .find(|f| f.name == arg.name)
             else {
-                // The referenced symbol exists on the model but is not a column.
+                // The referenced symbol exists on the model but is not a column or route field.
                 ma.sink.push(SemanticError::ArgTypeMismatch { field, arg });
                 return None;
             };
 
-            if column.field.cidl_type != param.cidl_type {
+            if arg_field.cidl_type != param.cidl_type {
                 ma.sink.push(SemanticError::ArgTypeMismatch { field, arg });
                 return None;
             }
 
-            // Inherit validators from the binding template param onto the model's column
-            column.field.validators.extend(param.validators.clone());
+            // Inherit validators from the binding template param onto the model's field
+            arg_field.validators.extend(param.validators.clone());
 
             // Replace the `{param}` placeholder with `{arg}`
             key_format =

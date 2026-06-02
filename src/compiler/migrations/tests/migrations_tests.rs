@@ -38,7 +38,7 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name.to_string(),
-                backing_binding: Some("db".into()),
+                database_binding: Some("db".into()),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
                 navigation_fields: model.navigation_fields,

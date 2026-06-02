@@ -83,7 +83,7 @@ export class Orm {
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
-    if (!meta.backing_binding) {
+    if (!meta.database_binding) {
       return "";
     }
 
@@ -201,8 +201,8 @@ export class Orm {
     });
 
     // If there are any SQL queries to execute, collect them as [D1PreparedStatement]s
-    const db: D1Database | undefined = meta.backing_binding
-      ? (this.env as any)[meta.backing_binding]
+    const db: D1Database | undefined = meta.database_binding
+      ? (this.env as any)[meta.database_binding]
       : undefined;
     const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
@@ -319,7 +319,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T | null>> {
-    if (!query || !meta.backing_binding) {
+    if (!query || !meta.database_binding) {
       // No query provided, hydrate any non-SQL fields
       return await this.hydrate(meta, {}, includeTree);
     }
@@ -347,7 +347,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query || !meta.backing_binding) {
+    if (!query || !meta.database_binding) {
       return { value: [], errors: [] };
     }
 
@@ -463,6 +463,25 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     for (const nav of modelMeta.navigation_fields) {
       const tree = args.includeTree ? args.includeTree[nav.field.name] : null;
       if (tree === undefined) continue;
+
+      // A route model nav target has no unique fields: it is assembled entirely from
+      // this model's route values, mapped onto the target's route fields in order.
+      const target = args.idl.models[nav.model_reference];
+      if (
+        value[nav.field.name] === undefined &&
+        !target.database_binding &&
+        target.route_fields.length > 0 &&
+        typeof nav.kind === "object" &&
+        "OneToOne" in nav.kind
+      ) {
+        const columns = nav.kind.OneToOne.fields;
+        const assembled: any = {};
+        target.route_fields.forEach((field, i) => {
+          assembled[field.name] = value[columns[i]];
+        });
+        value[nav.field.name] = assembled;
+      }
+
       const res = hydrateType(value[nav.field.name], getNavigationCidlType(nav), {
         ...args,
         includeTree: tree,
