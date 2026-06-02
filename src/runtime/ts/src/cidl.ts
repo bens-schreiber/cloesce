@@ -1,5 +1,3 @@
-import type { CloesceResult } from "./common.js";
-
 /** NOTE: These definitions mirror the definitions in the Compiler */
 export type CrudKind = "Save" | "Get" | "List";
 
@@ -110,8 +108,10 @@ export interface IncludeTree {
   [key: string]: IncludeTree;
 }
 
-export interface DataSourceListMethod {
+export interface DataSourceMethod {
   parameters: ValidatedField[];
+  injected: string[];
+  is_stub: boolean;
 }
 
 export interface DataSourceGetMethodParam {
@@ -121,22 +121,20 @@ export interface DataSourceGetMethodParam {
 
 export interface DataSourceGetMethod {
   parameters: DataSourceGetMethodParam[];
-}
-
-export interface DataSourceImpl {
-  include: IncludeTree;
-  get: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
-  list?: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
+  injected: string[];
+  is_stub: boolean;
 }
 
 export interface DataSource {
   name: string;
-  list?: DataSourceListMethod;
-  get?: DataSourceGetMethod;
+  tree: IncludeTree;
+  include_query: string;
+  get_query: string;
+  list_query: string;
+  get: DataSourceGetMethod;
+  list: DataSourceMethod;
+  save: DataSourceMethod;
   is_internal: boolean;
-
-  // Generated at runtime, not serialized.
-  gen: DataSourceImpl;
 }
 
 export interface WranglerEnv {

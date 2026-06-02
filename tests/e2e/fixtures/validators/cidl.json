@@ -161,7 +161,10 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$save_None",
@@ -186,7 +189,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -213,7 +218,10 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$get_None",
@@ -240,7 +248,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -280,7 +290,10 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$list_None",
@@ -320,7 +333,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -350,7 +365,12 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -368,8 +388,34 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Validator"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
+          "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",
+          "list_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" > ?1 ORDER BY \"Validator\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "None": {
@@ -398,7 +444,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -416,8 +466,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Validator"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
+          "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",
+          "list_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" > ?1 ORDER BY \"Validator\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

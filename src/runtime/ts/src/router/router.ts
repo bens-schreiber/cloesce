@@ -1,6 +1,6 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
 import { Cidl, Model, ApiMethod, CrudKind, DataSource, Field } from "../cidl.js";
-import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
+import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
@@ -104,16 +104,17 @@ export class CloesceApp {
     return new CloesceApp();
   }
 
-  // Maps a model name to an instance containing the implementations of its API methods.
-  // Additionally, contains injected dependencies, mapped to their instance.
-  private apiRegistry: Map<string, unknown> = new Map();
+  // Maps a model name to its registered namespace object: API method impls,
+  // data source impls (under their DS name), and injected dependencies all live here.
+  private modelRegistry: Map<string, unknown> = new Map();
 
   /**
-   * Register an API implementation or Injected dependency with the router,
-   * making it available for routing and injection, respectively.
+   * Register a model namespace (produced by `Model.impl({...})`) or an injected
+   * dependency with the router, making API methods, data source stubs, and
+   * injections available for routing.
    */
-  public register(api: { readonly tag: string }): this {
-    this.apiRegistry.set(api.tag, api);
+  public register(model: { readonly tag: string }): this {
+    this.modelRegistry.set(model.tag, model);
     return this;
   }
 
@@ -183,13 +184,13 @@ export class CloesceApp {
   ): Promise<HttpResult<unknown>> {
     // Inject all injectables
     for (const inject of idl.injects) {
-      if (this.apiRegistry.has(inject)) {
-        di._set({ tag: inject }, this.apiRegistry.get(inject) ?? undefined);
+      if (this.modelRegistry.has(inject)) {
+        di._set({ tag: inject }, this.modelRegistry.get(inject) ?? undefined);
       }
     }
 
     // Route match
-    const routeRes = matchRoute(request, idl, workerUrl, this.apiRegistry, env);
+    const routeRes = matchRoute(request, idl, workerUrl, this.modelRegistry);
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
@@ -227,7 +228,7 @@ export class CloesceApp {
     }
 
     // Hydration
-    const hydrated = await hydrate(di, route, env);
+    const hydrated = await hydrate(this.modelRegistry, di, route, env);
     if (hydrated?.isLeft()) {
       return hydrated.value;
     }
@@ -305,7 +306,6 @@ function matchRoute(
   idl: Cidl,
   workerUrl: string,
   registry: Map<string, any>,
-  env: any,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
@@ -350,15 +350,16 @@ function matchRoute(
     }
   } else {
     dataSource = model.data_sources[method.data_source!];
-    numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
+    numGetParams = dataSource.get.parameters.length;
     if (parts.length !== 2 + numGetParams) {
       return notFound(RouterError.UnknownRoute);
     }
   }
 
-  let impl =
-    registry.get(model.name)?.[method.name] ??
-    (crudRoute(model, method, env) as ApiImplementation | undefined);
+  const userNamespace = registry.get(model.name);
+  const impl =
+    userNamespace?.[method.name] ??
+    (crudRoute(model, method, userNamespace) as ApiImplementation | undefined);
   if (!impl) {
     return notImplemented();
   }
@@ -375,7 +376,7 @@ function matchRoute(
 
   const getParamValues: Record<string, unknown> = {};
   for (let i = 0; i < numGetParams; i++) {
-    const param = dataSource!.get!.parameters[i].parameter;
+    const param = dataSource!.get.parameters[i].parameter;
     getParamValues[param.name] = parts[1 + i];
   }
 
@@ -518,6 +519,7 @@ async function validateRequest(
  * @returns 500 or the hydrated instance
  */
 async function hydrate(
+  registry: Map<string, any>,
   di: DependencyContainer,
   route: MatchedRoute,
   env: any,
@@ -528,10 +530,9 @@ async function hydrate(
   }
 
   const meta = route.model!;
-  const dataSource: DataSource = meta.data_sources[route.method.data_source ?? "Default"];
+  const dsName = route.method.data_source ?? "Default";
+  const dataSource: DataSource = meta.data_sources[dsName];
 
-  // Error state: If some outside force tweaked the database schema, or some outage caused the
-  // data store to return an error, hydration may fail.
   const hydrationFailed = (e: any) =>
     exit(
       500,
@@ -539,16 +540,43 @@ async function hydrate(
       `Error in hydration query: ${e instanceof Error ? e.message : String(e)}`,
     );
 
-  try {
-    let result = await dataSource.gen.get(env, ...Object.values(route.getParamValues));
+  const dsNamespace = registry.get(meta.name)?.[dsName];
+  const stub = dsNamespace?.get;
+  if (typeof stub !== "function") {
+    return exit(
+      501,
+      RouterError.NotImplemented,
+      `${meta.name}.${dsName}.get is declared in the schema but no implementation was provided.`,
+    );
+  }
 
-    if (result.errors.length > 0) {
-      return hydrationFailed(CloesceError.displayErrors(result as CloesceResult<never>));
+  try {
+    const args =
+      dataSource.get.injected.length > 0
+        ? [
+            resolveInjectedArgs(di, env, dataSource.get.injected),
+            ...Object.values(route.getParamValues),
+          ]
+        : Object.values(route.getParamValues);
+    // Bind `this` to the data source namespace so the generated default impl can
+    // reach `this.tree` / `this.getQuery` / `this.listQuery`.
+    const result = await stub.apply(dsNamespace, args);
+
+    // Generated default impls return HttpResult; user stubs may return raw values
+    // or HttpResults too. Treat any HttpResult as authoritative.
+    if (result instanceof HttpResult) {
+      if (!result.ok) return Either.left(result);
+      if (result.data === null || result.data === undefined) {
+        return exit(
+          404,
+          RouterError.ModelNotFound,
+          `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
+        );
+      }
+      return Either.right(result.data);
     }
 
-    // Result will only be null if the record does not exist for a D1 query
-    // (KV or R2 based models will just be empty, as that is a valid state).
-    if (result.value === null) {
+    if (result === null || result === undefined) {
       return exit(
         404,
         RouterError.ModelNotFound,
@@ -556,7 +584,7 @@ async function hydrate(
       );
     }
 
-    return Either.right(result.value);
+    return Either.right(result);
   } catch (e) {
     return hydrationFailed(JSON.stringify(e));
   }

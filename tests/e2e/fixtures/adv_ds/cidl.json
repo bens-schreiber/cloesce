@@ -1,5 +1,5 @@
 {
-  "hash": 974407415389773040,
+  "hash": 5849354775898882701,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -9,6 +9,138 @@
     "vars": []
   },
   "models": {
+    "DefaultOverride": {
+      "hash": 3283447504166446726,
+      "name": "DefaultOverride",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "backing_binding": "db",
+      "apis": [
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "DefaultOverride"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "DefaultOverride"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "db"
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "DefaultOverride"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": [
+            "db"
+          ]
+        },
+        {
+          "name": "$list",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "DefaultOverride"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": [
+            "db"
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [
+              "db"
+            ],
+            "is_stub": true
+          },
+          "get": {
+            "parameters": [],
+            "injected": [
+              "db"
+            ],
+            "is_stub": true
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "DefaultOverride"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"DefaultOverride\".\"id\" AS \"id\" FROM \"DefaultOverride\"",
+          "get_query": "SELECT \"DefaultOverride\".\"id\" AS \"id\" FROM \"DefaultOverride\" WHERE \"DefaultOverride\".\"id\" = ?1",
+          "list_query": "SELECT \"DefaultOverride\".\"id\" AS \"id\" FROM \"DefaultOverride\" WHERE \"DefaultOverride\".\"id\" > ?1 ORDER BY \"DefaultOverride\".\"id\" ASC LIMIT ?2",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save",
+        "Get",
+        "List"
+      ]
+    },
     "Hamburger": {
       "hash": 14499320733461841178,
       "name": "Hamburger",
@@ -116,7 +248,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save",
@@ -141,7 +275,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list_BurgersWithLettuceOrdered",
@@ -169,7 +305,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -203,7 +341,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -221,7 +361,11 @@
                 "cidl_type": "Int",
                 "validators": []
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": true
           },
           "get": {
             "parameters": [
@@ -233,8 +377,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Hamburger"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\"",
+          "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
+          "list_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" > ?1 ORDER BY \"Hamburger\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "Default": {
@@ -257,7 +425,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -269,8 +441,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Hamburger"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\"",
+          "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
+          "list_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" > ?1 ORDER BY \"Hamburger\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "NoLettuce": {
@@ -293,7 +489,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -305,8 +505,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": true
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Hamburger"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\"",
+          "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
+          "list_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" > ?1 ORDER BY \"Hamburger\".\"id\" ASC LIMIT ?2",
           "is_internal": true
         },
         "OnlyBacon": {
@@ -329,7 +553,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -341,8 +569,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": true
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Hamburger"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\"",
+          "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
+          "list_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"right\" AS \"toppings.id\", \"Topping_1\".\"name\" AS \"toppings.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_2\".\"left\" LEFT JOIN \"Topping\" AS \"Topping_1\" ON \"HamburgerTopping_2\".\"right\" = \"Topping_1\".\"id\" WHERE \"Hamburger\".\"id\" > ?1 ORDER BY \"Hamburger\".\"id\" ASC LIMIT ?2",
           "is_internal": true
         }
       },
@@ -424,7 +676,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -448,7 +702,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -460,8 +718,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Topping"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Topping\".\"id\" AS \"id\", \"Topping\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"left\" AS \"hamburger.id\", \"Hamburger_1\".\"name\" AS \"hamburger.name\" FROM \"Topping\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Topping\".\"id\" = \"HamburgerTopping_2\".\"right\" LEFT JOIN \"Hamburger\" AS \"Hamburger_1\" ON \"HamburgerTopping_2\".\"left\" = \"Hamburger_1\".\"id\"",
+          "get_query": "SELECT \"Topping\".\"id\" AS \"id\", \"Topping\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"left\" AS \"hamburger.id\", \"Hamburger_1\".\"name\" AS \"hamburger.name\" FROM \"Topping\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Topping\".\"id\" = \"HamburgerTopping_2\".\"right\" LEFT JOIN \"Hamburger\" AS \"Hamburger_1\" ON \"HamburgerTopping_2\".\"left\" = \"Hamburger_1\".\"id\" WHERE \"Topping\".\"id\" = ?1",
+          "list_query": "SELECT \"Topping\".\"id\" AS \"id\", \"Topping\".\"name\" AS \"name\", \"HamburgerTopping_2\".\"left\" AS \"hamburger.id\", \"Hamburger_1\".\"name\" AS \"hamburger.name\" FROM \"Topping\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Topping\".\"id\" = \"HamburgerTopping_2\".\"right\" LEFT JOIN \"Hamburger\" AS \"Hamburger_1\" ON \"HamburgerTopping_2\".\"left\" = \"Hamburger_1\".\"id\" WHERE \"Topping\".\"id\" > ?1 ORDER BY \"Topping\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

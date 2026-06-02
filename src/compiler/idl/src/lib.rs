@@ -11,7 +11,9 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -264,13 +266,17 @@ pub enum CrudKind {
     Save,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct DataSourceMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
 
     #[serde(borrow)]
     pub injected: Vec<&'src str>,
+
+    /// True if the user declared this method as a stub in the schema (must be implemented
+    /// by the user). False if the compiler synthesized the default PK/seek-pagination impl.
+    pub is_stub: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -284,13 +290,17 @@ pub struct DataSourceGetMethodParam<'src> {
     pub instance_field: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct DataSourceGetMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<DataSourceGetMethodParam<'src>>,
 
     #[serde(borrow)]
     pub injected: Vec<&'src str>,
+
+    /// True if the user declared this method as a stub in the schema (must be implemented
+    /// by the user). False if the compiler synthesized the default PK fetch.
+    pub is_stub: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -302,26 +312,32 @@ pub struct DataSource<'src> {
     pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
-    pub list: Option<DataSourceMethod<'src>>,
+    pub list: DataSourceMethod<'src>,
 
     #[serde(borrow)]
-    pub get: Option<DataSourceGetMethod<'src>>,
+    pub get: DataSourceGetMethod<'src>,
 
     #[serde(borrow)]
-    pub save: Option<DataSourceMethod<'src>>,
+    pub save: DataSourceMethod<'src>,
 
     /// A raw SQL query generated from the WASM `select` method.
     /// Empty if the data source is not backed by a SQL db
     pub include_query: String,
 
-    /// True if the data source is only used for internal method implementations
-    /// and should not be exposed on the client.
+    /// Fetch by primary key based on [Self::include_query]
+    pub get_query: String,
+
+    /// Seek pagination query based on [Self::include_query]
+    pub list_query: String,
+
+    /// True if the data source should not be exposed to the client
     pub is_internal: bool,
 }
 
 impl DataSource<'_> {
+    /// True if any of get/list/save was user-declared as a stub (must be implemented).
     pub fn has_stubs(&self) -> bool {
-        self.get.is_some() || self.list.is_some() || self.save.is_some()
+        self.get.is_stub || self.list.is_stub || self.save.is_stub
     }
 }
 
@@ -670,5 +686,62 @@ impl<'src> MigrationsIdl<'src> {
 
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
+    }
+}
+
+/// All Wrangler bindings (D1 / KV / R2) a model's view through `include` may touch.
+///
+/// Walks the include tree: each nav field's target model is recursed into;
+/// kv/r2 fields contribute their binding when included.
+///
+/// An [IncludeTree] of [None] means every single nav field is included and recursed into,
+/// while [Some] will use only the nav fields specified in the tree, ignoring the rest.
+pub fn model_bindings<'src>(
+    idl: &CloesceIdl<'src>,
+    model: &Model<'src>,
+    include: Option<&IncludeTree<'src>>,
+) -> Vec<&'src str> {
+    let mut visited = HashSet::new();
+    let mut bindings = BTreeSet::new();
+    collect_model_bindings(idl, model, include, &mut visited, &mut bindings);
+    bindings.into_iter().collect()
+}
+
+fn collect_model_bindings<'src>(
+    idl: &CloesceIdl<'src>,
+    model: &Model<'src>,
+    include: Option<&IncludeTree<'src>>,
+    visited: &mut HashSet<&'src str>,
+    bindings: &mut BTreeSet<&'src str>,
+) {
+    if !visited.insert(model.name) {
+        return;
+    }
+    let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
+
+    if let Some(b) = model.backing_binding {
+        bindings.insert(b);
+    }
+    for kv in &model.kv_fields {
+        if included(kv.field.name.as_ref()) {
+            bindings.insert(kv.binding);
+        }
+    }
+    for r2 in &model.r2_fields {
+        if included(r2.field.name.as_ref()) {
+            bindings.insert(r2.binding);
+        }
+    }
+    for nav in &model.navigation_fields {
+        let subtree = match include {
+            Some(t) => match t.0.get(nav.field.name.as_ref()) {
+                Some(sub) => Some(sub),
+                None => continue,
+            },
+            None => None,
+        };
+        if let Some(referenced) = idl.models.get(nav.model_reference) {
+            collect_model_bindings(idl, referenced, subtree, visited, bindings);
+        }
     }
 }

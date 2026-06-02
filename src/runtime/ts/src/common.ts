@@ -1,7 +1,6 @@
 import type { D1Result } from "@cloudflare/workers-types";
 
 /**
- * @internal
  * Denotes that some error occured internally in Cloesce that should not happen.
  */
 export class InternalError extends Error {
@@ -59,9 +58,7 @@ export type CloesceResult<T> =
   | { value: T; errors: [] };
 
 /**
- * @internal
- *
- * An internal class to raise a user facing `CloesceResult`
+ * A class to raise a user-facing `CloesceResult`.
  */
 export class CloesceError {
   static drain<T>(results: CloesceResult<T>[]): CloesceResult<never> | void {
@@ -97,7 +94,7 @@ export class CloesceError {
     return { value: null, errors: [{ kind: "d1", result }] };
   }
 
-  static displayErrors(result: CloesceResult<never>): string {
+  static displayErrors(result: CloesceResult<unknown>): string {
     function display(v: unknown): string {
       try {
         return JSON.stringify(v);

@@ -1750,6 +1750,7 @@ dependencies = [
  "indexmap",
  "orm",
  "regex",
+ "sqlx",
 ]
 
 [[package]]

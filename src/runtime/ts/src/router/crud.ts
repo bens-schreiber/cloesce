@@ -1,7 +1,6 @@
-import { Orm, HttpResult } from "../ui/backend.js";
+import { HttpResult } from "../ui/backend.js";
 import { ApiMethod, Model } from "../cidl.js";
 import { ApiImplementation } from "./router.js";
-import { CloesceError, CloesceResult, InternalError } from "../common.js";
 
 /**
  * Parses a CRUD method name into its (verb, dataSourceName) pair.
@@ -24,94 +23,47 @@ function parseCrudName(
   return { verb, dataSourceName };
 }
 
-export function crudRoute(meta: Model, method: ApiMethod, env: any): ApiImplementation | null {
+/**
+ * Returns the implementation for a CRUD route by consulting the registered
+ * model namespace (produced by `Model.impl({...})`). The generated code merges
+ * its `GeneratedSource` defaults with any user overrides, so this lookup yields
+ * a function whether the user implemented it or not.
+ */
+export function crudRoute(
+  meta: Model,
+  method: ApiMethod,
+  userNamespace: any,
+): ApiImplementation | null {
   const parsed = parseCrudName(method.name);
   if (!parsed) return null;
 
   const { verb, dataSourceName } = parsed;
-  if (!meta.data_sources[dataSourceName]) return null;
+  const dataSource = meta.data_sources[dataSourceName];
+  if (!dataSource) return null;
 
-  switch (verb) {
-    case "get":
-      return (...args) => get(meta, args, dataSourceName, env);
-    case "list":
-      return (...args) => list(meta, args, dataSourceName, env);
-    case "save":
-      return (body) => upsert(meta, body, dataSourceName, env);
-    default:
-      return null;
+  const dsNamespace = userNamespace?.[dataSourceName];
+  const stub = dsNamespace?.[verb];
+  if (typeof stub !== "function") {
+    return () =>
+      HttpResult.fail(
+        501,
+        `${meta.name}.${dataSourceName}.${verb} is declared in the schema but no implementation was provided.`,
+      );
   }
+
+  // Call the stub with `this` bound to the data source namespace so the generated
+  // default impls can reference `this.tree` / `this.getQuery` / `this.listQuery`.
+  return async (...args: unknown[]) => stub.apply(dsNamespace, args);
 }
 
-async function upsert(
+export function dataSourceStub(
   meta: Model,
-  body: any,
-  dataSourceRef: string,
-  env: any,
-): Promise<HttpResult<unknown>> {
-  const dataSource = meta.data_sources[dataSourceRef];
-  const orm = Orm.fromEnv(env);
-
-  let result: CloesceResult<unknown | null>;
-  try {
-    result = await orm.upsert(meta, body, dataSource.gen.include);
-  } catch (e) {
-    throw new InternalError(`Upsert failed: ${JSON.stringify(e)}`);
-  }
-
-  if (result.errors.length > 0) {
-    return HttpResult.fail(400, CloesceError.displayErrors(result as CloesceResult<never>));
-  }
-
-  if (result.value === null) {
-    return HttpResult.fail(404);
-  }
-
-  return HttpResult.ok(200, result.value);
-}
-
-async function get(
-  meta: Model,
-  args: any[],
-  dataSourceRef: string,
-  env: any,
-): Promise<HttpResult<unknown>> {
-  const dataSource = meta.data_sources[dataSourceRef];
-
-  // Method parameters for $get_<DS> are DS.get.parameters
-  // (in this exact order, see semantic/src/crud.rs)
-  const numGetParams = dataSource.get?.parameters.length ?? 0;
-  const dataSourceArgs = args.slice(0, numGetParams);
-
-  const res = await dataSource.gen.get(env, ...dataSourceArgs);
-
-  if (res.errors.length > 0) {
-    return HttpResult.fail(400, CloesceError.displayErrors(res as CloesceResult<never>));
-  }
-
-  if (res.value === null) {
-    return HttpResult.fail(404);
-  }
-
-  return HttpResult.ok(200, res.value);
-}
-
-async function list(
-  meta: Model,
-  args: any[],
-  dataSourceRef: string,
-  env: any,
-): Promise<HttpResult<unknown>> {
-  const dataSource = meta.data_sources[dataSourceRef];
-
-  // Method parameters for $list_<DS> are exactly DS.list.parameters
-  const numListParams = dataSource.list?.parameters.length ?? 0;
-  const dataSourceArgs = args.slice(0, numListParams);
-
-  const res = await dataSource.gen.list!(env, ...dataSourceArgs);
-  if (res.errors.length > 0) {
-    return HttpResult.fail(400, CloesceError.displayErrors(res as CloesceResult<never>));
-  }
-
-  return HttpResult.ok(200, res.value);
+  dsName: string,
+  verb: "get" | "list" | "save",
+  userNamespace: any,
+): ((...args: unknown[]) => Promise<unknown>) | undefined {
+  const ds = meta.data_sources[dsName];
+  if (!ds) return undefined;
+  const stub = userNamespace?.[dsName]?.[verb];
+  return typeof stub === "function" ? stub : undefined;
 }

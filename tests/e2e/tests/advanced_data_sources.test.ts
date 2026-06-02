@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, withRes } from "../src/setup";
-import { Hamburger, Topping } from "../fixtures/adv_ds/client";
+import { DefaultOverride, Hamburger, Topping } from "../fixtures/adv_ds/client";
 import config from "../fixtures/adv_ds/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -68,5 +68,16 @@ describe("Advanced Data Sources", () => {
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(1);
     expect(res.data![0].name).toBe("BACON");
+  });
+
+  it("DefaultOverrides default data source returns fixed values", async () => {
+    const res = await DefaultOverride.$get();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data!.id).toBe(Number.MAX_VALUE);
+
+    const listRes = await DefaultOverride.$list();
+    expect(listRes.ok, withRes("LIST should be OK", listRes)).toBe(true);
+    expect(listRes.data!.length).toBe(1);
+    expect(listRes.data![0].id).toBe(Number.MAX_VALUE);
   });
 });

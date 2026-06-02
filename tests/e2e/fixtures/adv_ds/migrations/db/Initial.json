@@ -1,6 +1,26 @@
 {
-  "hash": 974407415389773040,
+  "hash": 5849354775898882701,
   "models": {
+    "DefaultOverride": {
+      "hash": 3283447504166446726,
+      "name": "DefaultOverride",
+      "backing_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_fields": []
+    },
     "Hamburger": {
       "hash": 14499320733461841178,
       "name": "Hamburger",

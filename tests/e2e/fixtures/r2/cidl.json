@@ -175,7 +175,10 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "bucket1",
+            "db"
+          ]
         },
         {
           "name": "$save",
@@ -200,7 +203,10 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "bucket1",
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -234,7 +240,10 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "bucket1",
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -258,7 +267,12 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "bucket1",
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -270,8 +284,34 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "bucket1",
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "D1BackedModel"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "bucket1",
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"D1BackedModel\".\"id\" AS \"id\", \"D1BackedModel\".\"someColumn\" AS \"someColumn\", \"D1BackedModel\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"D1BackedModel\"",
+          "get_query": "SELECT \"D1BackedModel\".\"id\" AS \"id\", \"D1BackedModel\".\"someColumn\" AS \"someColumn\", \"D1BackedModel\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"D1BackedModel\" WHERE \"D1BackedModel\".\"id\" = ?1",
+          "list_query": "SELECT \"D1BackedModel\".\"id\" AS \"id\", \"D1BackedModel\".\"someColumn\" AS \"someColumn\", \"D1BackedModel\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"D1BackedModel\" WHERE \"D1BackedModel\".\"id\" > ?1 ORDER BY \"D1BackedModel\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

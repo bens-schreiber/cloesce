@@ -21,8 +21,14 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
   for (const model of Object.values(modelsMap)) {
     model.data_sources["Default"] ??= {
       name: "Default",
+      tree: {},
+      include_query: "",
+      get_query: "",
+      list_query: "",
+      get: { parameters: [], injected: [], is_stub: false },
+      list: { parameters: [], injected: [], is_stub: false },
+      save: { parameters: [], injected: [], is_stub: false },
       is_internal: false,
-      gen: { include: {} } as any,
     };
   }
 
@@ -175,16 +181,22 @@ export class ModelBuilder {
   dataSource(name: string, tree: IncludeTree, get?: Field[], is_internal: boolean = false): this {
     this.data_sources[name] = {
       name,
+      tree,
+      include_query: "",
+      get_query: "",
+      list_query: "",
+      get: {
+        parameters:
+          get?.map((f) => ({
+            parameter: { ...f, validators: [] },
+            instance_field: false,
+          })) ?? [],
+        injected: [],
+        is_stub: false,
+      },
+      list: { parameters: [], injected: [], is_stub: false },
+      save: { parameters: [], injected: [], is_stub: false },
       is_internal,
-      gen: { include: tree } as any,
-      get: get
-        ? {
-            parameters: get.map((f) => ({
-              parameter: { ...f, validators: [] },
-              instance_field: false,
-            })),
-          }
-        : undefined,
     };
     return this;
   }

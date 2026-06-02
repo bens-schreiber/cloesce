@@ -1,4 +1,6 @@
 --- New Models
+CREATE TABLE IF NOT EXISTS "DefaultOverride" ("id" integer PRIMARY KEY);
+
 CREATE TABLE IF NOT EXISTS "Hamburger" ("id" integer PRIMARY KEY, "name" text NOT NULL);
 
 CREATE TABLE IF NOT EXISTS "Topping" ("id" integer PRIMARY KEY, "name" text NOT NULL);

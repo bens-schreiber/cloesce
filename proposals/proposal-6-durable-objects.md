@@ -422,38 +422,29 @@ Any instance method of a Model backed by a Durable Object will be given the DO i
 
 ```ts
 abstract class BlogDo extends DurableObject {
-    $id: string;
-    constructor(ctx: DurableObjectState, env: Env, $id: string) {
-        super(ctx, env);
-        this.$id = $id;
-    }
+  $id: string;
+  constructor(ctx: DurableObjectState, env: Env, $id: string) {
+    super(ctx, env);
+    this.$id = $id;
+  }
 }
 
 export namespace BlogPost {
-    // ...
-    export interface Self {
-        $id: string;
-        id: number;
-        title: string;
-        content: string;
-        created_at: Date;
-    }
+  // ...
+  export interface Self {
+    $id: string;
+    id: number;
+    title: string;
+    content: string;
+    created_at: Date;
+  }
 
-    // ...
-    export interface Api {
-        create(
-            $ctx: BlogDo,
-            title: string,
-            content: string,
-        ): ApiResult<Self>;
+  // ...
+  export interface Api {
+    create($ctx: BlogDo, title: string, content: string): ApiResult<Self>;
 
-        update(
-            self: Self,
-            $ctx: BlogDo,
-            title: string,
-            content: string,
-        ): ApiResult<Self>;
-    }
+    update(self: Self, $ctx: BlogDo, title: string, content: string): ApiResult<Self>;
+  }
 }
 ```
 
@@ -470,16 +461,14 @@ An example migration:
 ```ts
 // <binding>/<timestamp>_<migration name>.ts
 async function up(db) {
-    await db.prepare(
-        `ALTER TABLE users ADD COLUMN age INTEGER ...`
-    );
+  await db.prepare(`ALTER TABLE users ADD COLUMN age INTEGER ...`);
 }
 export default {
-    name: "migrationName",
-    timestamp: 1234567890,
-    id: "migrationName_timestamp",
-    up
-}
+  name: "migrationName",
+  timestamp: 1234567890,
+  id: "migrationName_timestamp",
+  up,
+};
 ```
 
 Cloesce will not provide a runner for migrations (at least, not in this initial proposal), leaving it to the developer to decide how and when to run migrations on their DO instances.

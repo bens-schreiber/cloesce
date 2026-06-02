@@ -107,7 +107,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -119,8 +123,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "PooAcceptYield"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"PooAcceptYield\".\"id\" AS \"id\" FROM \"PooAcceptYield\"",
+          "get_query": "SELECT \"PooAcceptYield\".\"id\" AS \"id\" FROM \"PooAcceptYield\" WHERE \"PooAcceptYield\".\"id\" = ?1",
+          "list_query": "SELECT \"PooAcceptYield\".\"id\" AS \"id\" FROM \"PooAcceptYield\" WHERE \"PooAcceptYield\".\"id\" > ?1 ORDER BY \"PooAcceptYield\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

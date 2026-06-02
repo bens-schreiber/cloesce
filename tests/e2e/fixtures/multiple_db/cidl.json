@@ -63,7 +63,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db1"
+          ]
         },
         {
           "name": "$save",
@@ -88,7 +90,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db1"
+          ]
         },
         {
           "name": "$list",
@@ -122,7 +126,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db1"
+          ]
         }
       ],
       "data_sources": {
@@ -146,7 +152,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db1"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -158,8 +168,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db1"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "DB1Model"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db1"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"DB1Model\".\"id\" AS \"id\", \"DB1Model\".\"someColumn\" AS \"someColumn\" FROM \"DB1Model\"",
+          "get_query": "SELECT \"DB1Model\".\"id\" AS \"id\", \"DB1Model\".\"someColumn\" AS \"someColumn\" FROM \"DB1Model\" WHERE \"DB1Model\".\"id\" = ?1",
+          "list_query": "SELECT \"DB1Model\".\"id\" AS \"id\", \"DB1Model\".\"someColumn\" AS \"someColumn\" FROM \"DB1Model\" WHERE \"DB1Model\".\"id\" > ?1 ORDER BY \"DB1Model\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -222,7 +256,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db2"
+          ]
         },
         {
           "name": "$save",
@@ -247,7 +283,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db2"
+          ]
         },
         {
           "name": "$list",
@@ -281,7 +319,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db2"
+          ]
         }
       ],
       "data_sources": {
@@ -305,7 +345,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db2"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -317,8 +361,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db2"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "DB2Model"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db2"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"DB2Model\".\"id\" AS \"id\", \"DB2Model\".\"someColumn\" AS \"someColumn\" FROM \"DB2Model\"",
+          "get_query": "SELECT \"DB2Model\".\"id\" AS \"id\", \"DB2Model\".\"someColumn\" AS \"someColumn\" FROM \"DB2Model\" WHERE \"DB2Model\".\"id\" = ?1",
+          "list_query": "SELECT \"DB2Model\".\"id\" AS \"id\", \"DB2Model\".\"someColumn\" AS \"someColumn\" FROM \"DB2Model\" WHERE \"DB2Model\".\"id\" > ?1 ORDER BY \"DB2Model\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

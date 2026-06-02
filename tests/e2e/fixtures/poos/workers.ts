@@ -1,13 +1,13 @@
 import { HttpResult } from "cloesce";
-import { cloesce, Env, PooAcceptYield, PooC } from "./backend.js";
+import { cloesce, Env, PooAcceptYield } from "./backend.js";
 
 export const PooAcceptYieldImpl = PooAcceptYield.impl({
   acceptPoos() {
-    return HttpResult.ok<void>(200);
+    return HttpResult.ok(200);
   },
 
   yieldPoo() {
-    return HttpResult.ok<PooC>(200, {
+    return HttpResult.ok(200, {
       a: { name: "name", major: "major" },
       b: [{ color: "color" }],
     });

@@ -29,17 +29,19 @@ const Dog = Cloesce.Dog.impl({
 
 const Student = Cloesce.Student.impl({
   async create(e, student) {
-    return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.include)).value!;
+    return (await this.Orm.save(e, student, this.WithCoursesStudentsCourses.tree)).value!;
   },
   none(self) {
     return self;
   },
 });
 
+const Course = Cloesce.Course.impl({});
+
 export default {
   async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
     const app = await Cloesce.cloesce();
-    app.register(A).register(B).register(Person).register(Dog).register(Student);
+    app.register(A).register(B).register(Person).register(Dog).register(Student).register(Course);
 
     return await app.run(request, env);
   },

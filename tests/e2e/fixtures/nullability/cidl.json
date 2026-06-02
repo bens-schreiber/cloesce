@@ -203,7 +203,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -215,8 +219,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "NullabilityChecks"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\"",
+          "get_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\" WHERE \"NullabilityChecks\".\"id\" = ?1",
+          "list_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\" WHERE \"NullabilityChecks\".\"id\" > ?1 ORDER BY \"NullabilityChecks\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

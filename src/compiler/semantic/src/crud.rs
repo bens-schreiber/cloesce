@@ -1,7 +1,4 @@
-use idl::{
-    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model, Number,
-    ValidatedField, Validator,
-};
+use idl::{ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model};
 
 pub struct CrudExpansion;
 impl CrudExpansion {
@@ -17,17 +14,11 @@ impl CrudExpansion {
         }
     }
 
-    /// Returns a list of API methods for the given [CrudKind]
+    /// Returns a list of API methods for the given [CrudKind].
     ///
-    /// - [CrudKind::Get] generates a method for each public data source with a `get` block
-    ///   with the name `$get_{data_source_name}`.
-    ///
-    /// - [CrudKind::List] generates a method for each public data source with a `list` block
-    ///   with the name `$list_{data_source_name}`.
-    ///
-    /// - [CrudKind::Save] generates a method for each public data source with the name `$save_{data_source_name}`.
-    ///
-    /// The `Default` data source is treated as a special case and does not have the data source name appended to the method.
+    /// Each CRUD verb produces one route per DS (e.g. `$get_WithKv`, `$save_Foo`, etc).
+    /// The route is named by combining the verb with the DS name, except in the case
+    /// of the `Default` DS, which omits the suffix (e.g. `$get` instead of `$get_Default`).
     fn methods<'src>(crud: &CrudKind, model: &Model<'src>) -> Vec<ApiMethod<'src>> {
         let sources = model.data_sources.values().filter(|ds| !ds.is_internal);
         let format_name = |ds: &DataSource<'src>| {
@@ -45,110 +36,49 @@ impl CrudExpansion {
 
         match crud {
             CrudKind::Get => sources
-                .filter(|ds| ds.get.is_some() || ds.name == "Default")
-                .map(|ds| {
-                    let parameters = ds
+                .map(|ds| ApiMethod {
+                    name: format_name(ds),
+                    is_static: true,
+                    data_source: None,
+                    http_verb: HttpVerb::Get,
+                    return_type: CidlType::Object { name: model.name },
+                    return_media: MediaType::Json,
+                    parameters_media: MediaType::Json,
+                    parameters: ds
                         .get
-                        .as_ref()
-                        .map(|g| g.parameters.iter().map(|p| &p.parameter).cloned().collect())
-                        .unwrap_or_else(|| default_get_parameters(model))
-                        .into_iter()
-                        .collect();
-
-                    ApiMethod {
-                        name: format_name(ds),
-                        is_static: true,
-                        data_source: None,
-                        http_verb: HttpVerb::Get,
-                        return_type: CidlType::Object { name: model.name },
-                        return_media: MediaType::Json,
-                        parameters_media: MediaType::Json,
-                        parameters,
-                        injected: vec![],
-                    }
+                        .parameters
+                        .iter()
+                        .map(|p| p.parameter.clone())
+                        .collect(),
+                    injected: ds.get.injected.clone(),
                 })
                 .collect(),
             CrudKind::List => sources
-                .filter(|ds| ds.list.is_some() || ds.name == "Default")
-                .map(|ds| {
-                    let parameters = ds
-                        .list
-                        .as_ref()
-                        .map(|l| l.parameters.clone())
-                        .unwrap_or_else(|| default_list_parameters(model));
-
-                    ApiMethod {
-                        name: format_name(ds),
-                        is_static: true,
-                        data_source: None,
-                        http_verb: HttpVerb::Get,
-                        return_type: CidlType::array(CidlType::Object { name: model.name }),
-                        return_media: MediaType::Json,
-                        parameters_media: MediaType::Json,
-                        parameters,
-                        injected: vec![],
-                    }
+                .map(|ds| ApiMethod {
+                    name: format_name(ds),
+                    is_static: true,
+                    data_source: None,
+                    http_verb: HttpVerb::Get,
+                    return_type: CidlType::array(CidlType::Object { name: model.name }),
+                    return_media: MediaType::Json,
+                    parameters_media: MediaType::Json,
+                    parameters: ds.list.parameters.clone(),
+                    injected: ds.list.injected.clone(),
                 })
                 .collect(),
             CrudKind::Save => sources
-                .filter(|ds| ds.save.is_some() || ds.name == "Default")
-                .map(|ds| {
-                    let parameters = ds
-                        .save
-                        .as_ref()
-                        .map(|s| s.parameters.clone())
-                        .unwrap_or_else(|| default_save_parameters(model));
-
-                    ApiMethod {
-                        name: format_name(ds),
-                        is_static: true,
-                        data_source: None,
-                        http_verb: HttpVerb::Post,
-                        return_type: CidlType::Object { name: model.name },
-                        return_media: MediaType::Json,
-                        parameters_media: MediaType::Json,
-                        parameters,
-                        injected: vec![],
-                    }
+                .map(|ds| ApiMethod {
+                    name: format_name(ds),
+                    is_static: true,
+                    data_source: None,
+                    http_verb: HttpVerb::Post,
+                    return_type: CidlType::Object { name: model.name },
+                    return_media: MediaType::Json,
+                    parameters_media: MediaType::Json,
+                    parameters: ds.save.parameters.clone(),
+                    injected: ds.save.injected.clone(),
                 })
                 .collect(),
         }
     }
-}
-
-/// Fetch by primary key parameters
-fn default_get_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
-    model
-        .primary_columns
-        .iter()
-        .map(|pk| pk.field.clone())
-        .collect()
-}
-
-/// A single parameter of type `partial<Model>`
-fn default_save_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
-    vec![ValidatedField {
-        name: "model".into(),
-        cidl_type: CidlType::Partial {
-            object_name: model.name,
-        },
-        validators: vec![],
-    }]
-}
-
-/// Seek-based pagination parameters
-fn default_list_parameters<'src>(model: &Model<'src>) -> Vec<ValidatedField<'src>> {
-    model
-        .primary_columns
-        .iter()
-        .map(|pk| ValidatedField {
-            name: format!("lastSeen_{}", pk.field.name).into(),
-            ..pk.field.clone()
-        })
-        .chain(std::iter::once(ValidatedField {
-            name: "limit".into(),
-            cidl_type: CidlType::Int,
-            validators: vec![Validator::GreaterThan(Number::Int(0))],
-        }))
-        .collect()
 }

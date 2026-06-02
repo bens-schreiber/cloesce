@@ -131,8 +131,7 @@ impl ClientTemplate<'_> {
     ) -> &'t [DataSourceGetMethodParam<'t>] {
         api.data_source
             .and_then(|n| model.data_sources.get(n))
-            .and_then(|ds| ds.get.as_ref())
-            .map(|g| g.parameters.as_slice())
+            .map(|ds| ds.get.parameters.as_slice())
             .unwrap_or(&[])
     }
 }

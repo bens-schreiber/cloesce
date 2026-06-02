@@ -192,7 +192,11 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
         },
         {
           "name": "$save",
@@ -217,7 +221,11 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
         },
         {
           "name": "$list",
@@ -251,7 +259,11 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
         }
       ],
       "data_sources": {
@@ -275,7 +287,13 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -287,8 +305,36 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "ModelWithKv"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\"",
+          "get_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\" WHERE \"ModelWithKv\".\"id\" = ?1",
+          "list_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\" WHERE \"ModelWithKv\".\"id\" > ?1 ORDER BY \"ModelWithKv\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

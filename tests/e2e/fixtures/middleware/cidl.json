@@ -78,7 +78,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -102,7 +104,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -114,8 +120,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Foo"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Foo\".\"id\" AS \"id\" FROM \"Foo\"",
+          "get_query": "SELECT \"Foo\".\"id\" AS \"id\" FROM \"Foo\" WHERE \"Foo\".\"id\" = ?1",
+          "list_query": "SELECT \"Foo\".\"id\" AS \"id\" FROM \"Foo\" WHERE \"Foo\".\"id\" > ?1 ORDER BY \"Foo\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

@@ -77,7 +77,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -98,7 +100,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -132,7 +136,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -156,7 +162,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -168,8 +178,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "CrudHaver"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"CrudHaver\".\"id\" AS \"id\", \"CrudHaver\".\"name\" AS \"name\" FROM \"CrudHaver\"",
+          "get_query": "SELECT \"CrudHaver\".\"id\" AS \"id\", \"CrudHaver\".\"name\" AS \"name\" FROM \"CrudHaver\" WHERE \"CrudHaver\".\"id\" = ?1",
+          "list_query": "SELECT \"CrudHaver\".\"id\" AS \"id\", \"CrudHaver\".\"name\" AS \"name\" FROM \"CrudHaver\" WHERE \"CrudHaver\".\"id\" > ?1 ORDER BY \"CrudHaver\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -282,7 +316,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithChildren",
@@ -307,7 +343,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -328,7 +366,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithChildren",
@@ -349,7 +389,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -383,7 +425,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list_WithChildren",
@@ -417,7 +461,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -441,7 +487,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -453,8 +503,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Parent"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\"",
+          "get_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" = ?1",
+          "list_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" > ?1 ORDER BY \"Parent\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithChildren": {
@@ -477,7 +551,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -489,8 +567,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Parent"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\"",
+          "get_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" = ?1",
+          "list_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" > ?1 ORDER BY \"Parent\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -578,7 +680,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -590,8 +696,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Child"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Child\".\"id\" AS \"id\", \"Child\".\"parentId\" AS \"parentId\", \"Parent_1\".\"id\" AS \"parent.id\", \"Parent_1\".\"favoriteChildId\" AS \"parent.favoriteChildId\", \"Child_2\".\"id\" AS \"parent.children.id\", \"Child_2\".\"parentId\" AS \"parent.children.parentId\" FROM \"Child\" LEFT JOIN \"Parent\" AS \"Parent_1\" ON \"Child\".\"parentId\" = \"Parent_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent_1\".\"id\" = \"Child_2\".\"parentId\"",
+          "get_query": "SELECT \"Child\".\"id\" AS \"id\", \"Child\".\"parentId\" AS \"parentId\", \"Parent_1\".\"id\" AS \"parent.id\", \"Parent_1\".\"favoriteChildId\" AS \"parent.favoriteChildId\", \"Child_2\".\"id\" AS \"parent.children.id\", \"Child_2\".\"parentId\" AS \"parent.children.parentId\" FROM \"Child\" LEFT JOIN \"Parent\" AS \"Parent_1\" ON \"Child\".\"parentId\" = \"Parent_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent_1\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Child\".\"id\" = ?1",
+          "list_query": "SELECT \"Child\".\"id\" AS \"id\", \"Child\".\"parentId\" AS \"parentId\", \"Parent_1\".\"id\" AS \"parent.id\", \"Parent_1\".\"favoriteChildId\" AS \"parent.favoriteChildId\", \"Child_2\".\"id\" AS \"parent.children.id\", \"Child_2\".\"parentId\" AS \"parent.children.parentId\" FROM \"Child\" LEFT JOIN \"Parent\" AS \"Parent_1\" ON \"Child\".\"parentId\" = \"Parent_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent_1\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Child\".\"id\" > ?1 ORDER BY \"Child\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
