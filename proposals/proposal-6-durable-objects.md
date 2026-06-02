@@ -68,128 +68,6 @@ Several axioms underlie the design of this proposal:
 3. If a Model is backed by a Durable Object, every single instance of that Durable Object is capable of hydrating that Model.
 4. Given a serialized Model backed by a Durable Object, the client should be able to transparently invoke API methods on the same DO instance.
 
-## Breaking Refactors
-
-Currently, a Model must declare how it sources data from R2 or KV:
-
-```cloesce
-env {
-    r2 {
-        avatars
-    }
-
-    kv {
-        metadata
-    }
-}
-
-model User {
-    keyfield {
-        id: int
-    }
-
-    r2 (avatars, "key/{id}") {
-        avatar
-    }
-
-    kv (metadata, "metadata/{id}") {
-        meta: json
-    }
-
-    kv (metadata, "metadata/") paginated {
-        metas: json
-    }
-}
-```
-
-This has several problems:
-
-1. `keyfield` does not exist anywhere. `User` instances cannot be composed in a Model because there is no way to know how to hydrate the nested Model's keyfield.
-2. If another Model were to need an avatar or some metadata, it would have to declare its own R2 and KV fields (because we cannot compose non-relational Models), which leads to boilerplate and potential inconsistencies.
-3. CRUD methods like `list` cannot be generated for `User` because there is no way to know how to generate the keys for listing all users in R2 or KV.
-
-The proposed solution is to remove the `keyfield` completely, and instead, allow environment bindings to house their own key and value fields. For example:
-
-```cloesce
-r2 UserAvatars {
-    avatar(id: int) {
-        "key/{id}"
-    }
-}
-
-kv UserMetadata {
-    meta(id: int) -> json {
-        "metadata/{id}"
-    }
-
-    // note: can remove the `paginated` infix keyword on models now that the binding
-    // itself can define the key structure for listing
-    metas() -> paginated<json> {
-        "metadata/"
-    }
-}
-
-// D1 bindings will stay the same
-d1 {
-    UserDb
-}
-```
-
-The `env` block can be removed as well, with all bindings declared at the top level of the schema.
-
-How can we have a `User` Model if it is not backed by D1? In this proposal, we will allow a Model to be backed by a Durable Object, which will give it access to the DO's instance storage and SQLite database. Another approach to this could be the Service pattern:
-
-```cloesce
-poo User {
-    id: int
-    avatar: r2object
-    meta: json
-}
-
-model UserService {}
-
-api UserService {
-    get user(id: int) -> User
-    get avatar(id: int) -> stream
-}
-```
-
-Internally, the `UserService` will hydrate a `User` manually by utilizing the new generated methods of the `UserAvatars` and `UserMetadata` bindings.
-
-### Referencing a KV or R2 field
-
-To reference a field from a KV or R2 binding, a new syntax will replace the current `kv` and `r2` blocks on a Model:
-
-```cloesce
-model User {
-    primary {
-        id: int
-    }
-
-    kv UserMetadata::meta(id) {
-        meta
-    }
-
-    r2 UserAvatars::avatar(id) {
-        avatar
-    }
-}
-```
-
-Each declaration must specify the binding being used, as well as the parameters needed to generate the key for that field. If a parameter in the `kv` or `r2` declaration takes some set of validator tags, those same tags _must_ be declared on the field of the Model that is passed.
-
-### Removing the `use` tag
-
-The `use` tag on a Model will be removed in favor of the following syntax:
-
-```cloesce
-model User for UserDb {
-    // ...
-}
-```
-
-Unlike the ambiguous `use` tag, `for` makes it clear that this Model is for a specific binding, and that it is backed by that binding.
-
 ## Durable Object Bindings
 
 To declare a Durable Object binding, a new `durable` block will be added to the schema:
@@ -288,8 +166,6 @@ model BlogComment for BlogDo {
 ```
 
 In this schema, each Blog has its own `BlogDo` instance, which means each Blog has its own isolated SQLite database. The `BlogPost` and `BlogComment` Models are tables that exist within that database, and the relationship between them is defined by the `nav` and `foreign` fields as usual.
-
-Unlike the `keyfield` problem, where a Model could not be hydrated because there was no way to determine what the keys were, we know that a Model backed by a DO would only be hydrated within the context of a DO instance.
 
 ## API Methods in a Durable Object
 
@@ -514,14 +390,3 @@ renamed_classes = [
 tag = "v4"
 deleted_classes = ["OrgDO"]
 ```
-
----
-
-# Implementation
-
-The implementation for this proposal will be significant, broken down into the following phases:
-
-1. Breaking refactors: remove `keyfield`, `paginated` infix keyword, `env` block, `use` tag, and add new syntax for referencing KV/R2 fields and backing a Model with a DO.
-2. Durable Object bindings, with basic Wrangler configuration generation.
-3. Durable Object-backed Models with KV capabilities and API methods.
-4. SQLite support including migrations.
