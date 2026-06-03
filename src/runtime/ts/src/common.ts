@@ -1,6 +1,7 @@
 import type { D1Result } from "@cloudflare/workers-types";
 
 /**
+ * @internal
  * Denotes that some error occured internally in Cloesce that should not happen.
  */
 export class InternalError extends Error {

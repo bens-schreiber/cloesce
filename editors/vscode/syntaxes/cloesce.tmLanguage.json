@@ -11,9 +11,6 @@
       "include": "#comment"
     },
     {
-      "include": "#sql-string"
-    },
-    {
       "include": "#tag"
     },
     {
@@ -33,9 +30,6 @@
     },
     {
       "include": "#http-verb"
-    },
-    {
-      "include": "#sql-keyword"
     },
     {
       "include": "#structural-keyword"
@@ -115,13 +109,9 @@
       "match": "\\b(model|poo|source|inject|api)\\b"
     },
     "http-verb": {
-      "comment": "HTTP verbs (also includes get/list/save used by crud and sql, since they share the same token color naturally)",
+      "comment": "HTTP verbs",
       "name": "keyword.control.http.cloesce",
       "match": "\\b(get|post|put|patch|delete|list|save)\\b"
-    },
-    "sql-keyword": {
-      "name": "keyword.other.sql.cloesce",
-      "match": "\\b(sql)\\b"
     },
     "structural-keyword": {
       "comment": "Block/sub-block keywords used by the parser",
@@ -149,59 +139,6 @@
     "identifier": {
       "name": "variable.other.cloesce",
       "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
-    },
-    "sql-string": {
-      "comment": "`sql get|list (...) { \"...\" }` — string body is delegated to the built-in SQL grammar",
-      "begin": "\\b(sql)\\s+(get|list)\\b",
-      "end": "(?<=\\})",
-      "beginCaptures": {
-        "1": {
-          "name": "keyword.other.sql.cloesce"
-        },
-        "2": {
-          "name": "keyword.control.http.cloesce"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#comment"
-        },
-        {
-          "include": "#tag"
-        },
-        {
-          "include": "#number"
-        },
-        {
-          "include": "#self-keyword"
-        },
-        {
-          "include": "#structural-keyword"
-        },
-        {
-          "include": "#builtin-type"
-        },
-        {
-          "include": "#generic-type"
-        },
-        {
-          "include": "#type-name"
-        },
-        {
-          "include": "#identifier"
-        },
-        {
-          "begin": "\"",
-          "end": "\"",
-          "name": "string.quoted.double.sql.cloesce",
-          "contentName": "meta.embedded.block.sql",
-          "patterns": [
-            {
-              "include": "source.sql"
-            }
-          ]
-        }
-      ]
     },
     "tag": {
       "comment": "Anything wrapped in [ ... ] — picks up tag keyword via inner patterns",

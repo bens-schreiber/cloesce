@@ -7,114 +7,117 @@ use crate::{
     resolve_cidl_type, resolve_validator_tags,
 };
 
-/// Builds the [WranglerEnv] from the symbol table, resolving and validating
-/// KV/R2 binding templates and their parameters along the way.
-pub fn build_wrangler_env<'src, 'p>(
-    table: &SymbolTable<'src, 'p>,
-    sink: &mut ErrorSink<'src, 'p>,
-) -> WranglerEnv<'src> {
-    let d1_bindings = table
-        .d1_bindings
-        .iter()
-        .flat_map(|b| b.bindings.iter().map(|s| s.name))
-        .collect::<Vec<_>>();
+pub struct WranglerAnalysis;
+impl WranglerAnalysis {
+    /// Builds the [WranglerEnv] from the symbol table, resolving and validating
+    /// KV/R2 binding templates and their parameters along the way.
+    pub fn analyze<'src, 'p>(
+        table: &SymbolTable<'src, 'p>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> WranglerEnv<'src> {
+        let d1_bindings = table
+            .d1_bindings
+            .iter()
+            .flat_map(|b| b.bindings.iter().map(|s| s.name))
+            .collect::<Vec<_>>();
 
-    let vars = table
-        .vars_blocks
-        .iter()
-        .flat_map(|b| b.vars.iter())
-        .map(|s| Field {
-            name: s.name.into(),
-            cidl_type: s.cidl_type.clone(),
-        })
-        .collect::<Vec<_>>();
+        let vars = table
+            .vars_blocks
+            .iter()
+            .flat_map(|b| b.vars.iter())
+            .map(|s| Field {
+                name: s.name.into(),
+                cidl_type: s.cidl_type.clone(),
+            })
+            .collect::<Vec<_>>();
 
-    let mut kv_bindings = Vec::new();
-    for block in table.kv_bindings.values() {
-        let mut templates = Vec::new();
-        for bf in block.templates.inners() {
-            let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
-                continue;
-            };
+        let mut kv_bindings = Vec::new();
+        for block in table.kv_bindings.values() {
+            let mut templates = Vec::new();
+            for bf in block.templates.inners() {
+                let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+                    continue;
+                };
 
-            // KV templates always return `KvObject<T>`
-            // (or `paginated<KvObject<T>>` if the template is paginated).
-            field.cidl_type = match &field.cidl_type {
-                CidlType::Paginated(inner) => {
-                    CidlType::paginated(CidlType::KvObject(inner.clone()))
+                // KV templates always return `KvObject<T>`
+                // (or `paginated<KvObject<T>>` if the template is paginated).
+                field.cidl_type = match &field.cidl_type {
+                    CidlType::Paginated(inner) => {
+                        CidlType::paginated(CidlType::KvObject(inner.clone()))
+                    }
+                    other => CidlType::KvObject(Box::new(other.clone())),
+                };
+
+                let params = bf
+                    .params
+                    .iter()
+                    .filter_map(|p| validate_symbol(p, sink, table))
+                    .collect::<Vec<_>>();
+
+                if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
+                    || params.len() != bf.params.len()
+                {
+                    continue;
                 }
-                other => CidlType::KvObject(Box::new(other.clone())),
-            };
 
-            let params = bf
-                .params
-                .iter()
-                .filter_map(|p| validate_symbol(p, sink, table))
-                .collect::<Vec<_>>();
-
-            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
-                || params.len() != bf.params.len()
-            {
-                continue;
+                templates.push(BindingTemplate {
+                    field,
+                    key_format: bf.key_format,
+                    params,
+                });
             }
 
-            templates.push(BindingTemplate {
-                field,
-                key_format: bf.key_format,
-                params,
+            kv_bindings.push(Binding {
+                name: block.symbol.name,
+                templates,
             });
         }
 
-        kv_bindings.push(Binding {
-            name: block.symbol.name,
-            templates,
-        });
-    }
+        let mut r2_bindings = Vec::new();
+        for block in table.r2_bindings.values() {
+            let mut templates = Vec::new();
+            for bf in block.templates.inners() {
+                let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+                    continue;
+                };
 
-    let mut r2_bindings = Vec::new();
-    for block in table.r2_bindings.values() {
-        let mut templates = Vec::new();
-        for bf in block.templates.inners() {
-            let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
-                continue;
-            };
+                // R2 templates always return `R2Object` (or `paginated<R2Object>` if the template is paginated).
+                field.cidl_type = if bf.is_paginated {
+                    CidlType::Paginated(Box::new(CidlType::R2Object))
+                } else {
+                    CidlType::R2Object
+                };
 
-            // R2 templates always return `R2Object` (or `paginated<R2Object>` if the template is paginated).
-            field.cidl_type = if bf.is_paginated {
-                CidlType::Paginated(Box::new(CidlType::R2Object))
-            } else {
-                CidlType::R2Object
-            };
+                let params = bf
+                    .params
+                    .iter()
+                    .filter_map(|p| validate_symbol(p, sink, table))
+                    .collect::<Vec<_>>();
 
-            let params = bf
-                .params
-                .iter()
-                .filter_map(|p| validate_symbol(p, sink, table))
-                .collect::<Vec<_>>();
-
-            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
-                || params.len() != bf.params.len()
-            {
-                continue;
+                if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
+                    || params.len() != bf.params.len()
+                {
+                    continue;
+                }
+                templates.push(BindingTemplate {
+                    field,
+                    key_format: bf.key_format,
+                    params,
+                });
             }
-            templates.push(BindingTemplate {
-                field,
-                key_format: bf.key_format,
-                params,
+
+            r2_bindings.push(Binding {
+                name: block.symbol.name,
+                templates,
             });
         }
 
-        r2_bindings.push(Binding {
-            name: block.symbol.name,
-            templates,
-        });
-    }
-
-    WranglerEnv {
-        d1_bindings,
-        r2_bindings,
-        kv_bindings,
-        vars,
+        WranglerEnv {
+            d1_bindings,
+            r2_bindings,
+            kv_bindings,
+            vars,
+        }
     }
 }
 

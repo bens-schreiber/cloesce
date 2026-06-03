@@ -5,7 +5,7 @@ const NoLettuce = clo.Hamburger.NoLettuce.impl({
   async get(env, id) {
     const stmt = env.db
       .prepare(
-        `WITH included AS (${this.selectQueryRaw})
+        `WITH included AS (${this.selectQuery})
            SELECT * FROM included
            WHERE "toppings.topping.name" != 'LETTUCE'
            AND id = ?1
@@ -27,7 +27,7 @@ const BurgersWithLettuceOrdered = clo.Hamburger.BurgersWithLettuceOrdered.impl({
   async list(env, lastId, limit) {
     const stmt = env.db
       .prepare(
-        `WITH included AS (${this.selectQueryRaw})
+        `WITH included AS (${this.selectQuery})
            SELECT * FROM included
            WHERE "toppings.topping.name" = 'LETTUCE'
            AND id > ?1
@@ -48,7 +48,7 @@ const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
   async get(env, id) {
     const stmt = env.db
       .prepare(
-        `WITH included AS (${this.selectQueryRaw})
+        `WITH included AS (${this.selectQuery})
            SELECT * FROM included
            WHERE "toppings.topping.name" = 'BACON'
            AND id = ?1

@@ -33,7 +33,7 @@ use crate::{
     api::ApiAnalysis,
     crud::CrudExpansion,
     data_source::{DataSourceAnalysis, DataSourceExpansion},
-    env::build_wrangler_env,
+    env::WranglerAnalysis,
     err::{BatchResult, ErrorSink, SemanticError},
     model::ModelAnalysis,
 };
@@ -51,7 +51,7 @@ impl<'src, 'p> SemanticAnalysis {
         let mut sink = ErrorSink::new();
         let table = SymbolTable::from_ast(ast, &mut sink);
 
-        let wrangler_env = build_wrangler_env(&table, &mut sink);
+        let wrangler_env = WranglerAnalysis::analyze(&table, &mut sink);
 
         let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
             Ok(models) => models,

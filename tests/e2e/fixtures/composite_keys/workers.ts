@@ -5,7 +5,7 @@ const CoursesOrderedDescending = Student.CoursesOrderedDescending.impl({
   async list(env, lastId, lastName, limit) {
     const stmt = env.db
       .prepare(
-        `WITH students AS (${this.selectQueryRaw})
+        `WITH students AS (${this.selectQuery})
            SELECT * FROM students
            WHERE id > ?1 AND name > ?2
            ORDER BY id DESC, name DESC

@@ -788,6 +788,11 @@ mod migrate {
 mod version {
     use super::*;
 
+    const GITHUB_RELEASE_API: &str =
+        "https://api.github.com/repos/bens-schreiber/cloesce/releases/latest";
+
+    const UPDATE_CHECK_INTERVAL_SECS: u64 = 3600; // 1 hour
+
     struct UpdateCache {
         path: PathBuf,
 
@@ -856,10 +861,59 @@ mod version {
             .as_secs()
     }
 
-    const GITHUB_RELEASE_API: &str =
-        "https://api.github.com/repos/bens-schreiber/cloesce/releases/latest";
+    struct CurlResponse {
+        status: u16,
+        body: String,
+        etag: String,
+    }
 
-    const UPDATE_CHECK_INTERVAL_SECS: u64 = 3600; // 1 hour
+    /// Returns [None] if curl fails to run, exits unsuccessfully, or its output
+    /// cannot be parsed.
+    fn curl(url: &str, etag: Option<&str>) -> Option<CurlResponse> {
+        let header_dump =
+            std::env::temp_dir().join(format!("cloesce_update_{}.headers", now_secs()));
+
+        let mut cmd = std::process::Command::new("curl");
+        cmd.arg("-sSL")
+            .args(["-A", "cloesce-cli"])
+            .args(["-D", &header_dump.to_string_lossy()])
+            .args(["-w", "\n%{http_code}"]);
+
+        // Attach If-None-Match when we have a cached ETag.
+        if let Some(etag) = etag.filter(|e| !e.is_empty()) {
+            cmd.args(["-H", &format!("If-None-Match: {etag}")]);
+        }
+        cmd.arg(url);
+
+        let output = cmd.output().ok()?;
+
+        let etag = {
+            let headers = std::fs::read_to_string(&header_dump).unwrap_or_default();
+            let _ = std::fs::remove_file(&header_dump);
+            if !output.status.success() {
+                return None;
+            }
+
+            // formatted like ETag: "some-etag-value"
+            headers
+                .lines()
+                .filter_map(|line| line.split_once(':'))
+                .filter(|(name, _)| name.trim().eq_ignore_ascii_case("etag"))
+                .map(|(_, value)| value.trim().to_string())
+                .next_back()
+                .unwrap_or_default()
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let (body, status) = stdout.rsplit_once('\n')?;
+        let status = status.trim().parse().ok()?;
+
+        Some(CurlResponse {
+            status,
+            body: body.to_string(),
+            etag,
+        })
+    }
 
     /// Fetches the latest released version of cloesce, using a local cache to avoid
     /// hitting the GitHub API rate limit.
@@ -880,18 +934,11 @@ mod version {
             return Some(c.version.clone());
         }
 
-        // Build the request, attaching If-None-Match when we have a cached ETag.
-        let mut req = ureq::get(GITHUB_RELEASE_API).header("User-Agent", "cloesce-cli");
-        if let Some(c) = &cached
-            && !c.etag.is_empty()
-        {
-            req = req.header("If-None-Match", c.etag.as_str());
-        }
-
-        let response = req.call().ok()?;
+        let CurlResponse { status, body, etag } =
+            curl(GITHUB_RELEASE_API, cached.as_ref().map(|c| c.etag.as_str()))?;
 
         // 304 Not Modified, refresh timestamp
-        if response.status() == 304 {
+        if status == 304 {
             if let Some(c) = cached {
                 let refreshed = UpdateCache {
                     fetched_at: now,
@@ -903,14 +950,11 @@ mod version {
             return None;
         }
 
-        let etag = response
-            .headers()
-            .get("etag")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+        if !(200..300).contains(&status) {
+            return None;
+        }
 
-        let json: serde_json::Value = response.into_body().read_json().ok()?;
+        let json: serde_json::Value = serde_json::from_str(&body).ok()?;
         let tag = json["tag_name"].as_str()?;
         let version = tag.trim_start_matches('v').to_string();
 

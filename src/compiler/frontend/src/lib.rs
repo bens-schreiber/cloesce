@@ -11,12 +11,6 @@
 //! The [Symbol] struct is used to represent any named entity in the source code, such as a model name, field name, API method name, etc.
 //! It contains the symbol's name, type, span, and any tags applied to it. Not all [Symbol]s will have a meaningful type, or any tags,
 //! but this struct is used for all named entities for consistency and ease of error reporting.
-//!
-//! ## Memory management
-//!
-//! All string data in the AST is borrowed from the original heap-allocated source string. The [Ast] is non-recursive at the node level
-//! (with the exception of [CidlType]). Child nodes are stored in flat [Vec]s rather than via recursive node-to-node ownership,
-//! so no arena or custom allocator is required.
 
 pub mod err;
 pub mod formatter;
@@ -81,7 +75,6 @@ contextual_keywords! {
     Get => "get",
     List => "list",
     Save => "save",
-    Sql => "sql",
 
     // HTTP verb
     Post => "post",
