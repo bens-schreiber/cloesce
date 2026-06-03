@@ -13,13 +13,10 @@ fn adds_crud_methods_to_models() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
         [crud get, save, list]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int
@@ -50,63 +47,14 @@ fn adds_crud_methods_to_models() {
 }
 
 #[test]
-fn crud_key_params() {
-    // Act
-    let idl = src_to_idl(
-        r#"
-        env {
-            d1 { db }
-            kv { my_kv }
-        }
-
-        [use db]
-        [crud get]
-        model Product {
-            primary {
-                id: int
-            }
-
-            keyfield {
-                category: string
-                subcategory: string
-            }
-
-            kv(my_kv, "{category}/{subcategory}") {
-                cached: json
-            }
-        }
-    "#,
-    );
-
-    // Assert
-    let product = idl.models.get("Product").unwrap();
-    let get_method = find_method(product, "$get").unwrap();
-
-    let category_param = get_method.parameters.iter().find(|p| p.name == "category");
-    assert!(category_param.is_some(), "Should have category key param");
-
-    let subcategory_param = get_method
-        .parameters
-        .iter()
-        .find(|p| p.name == "subcategory");
-    assert!(
-        subcategory_param.is_some(),
-        "Should have subcategory key param"
-    );
-}
-
-#[test]
 fn crud_methods_namespace_sources_inherit_validators() {
     // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
         [crud get, list]
-        model Product {
+        model Product for db {
             primary {
                 [gt 0]
                 id: int
@@ -116,22 +64,18 @@ fn crud_methods_namespace_sources_inherit_validators() {
         source CustomDs for Product {
             include {}
 
-            sql get(
+            get(
                 [lt 100]
                 id: int
-            ) {
-                "SELECT * FROM Product WHERE id = ?"
-            }
+            )
 
-            sql list(
+            list(
                 [step 10]
                 lastSeen_id: int,
 
                 [gt 0]
                 limit: int
-            ) {
-                "SELECT * FROM Product WHERE id > ? LIMIT ?"
-            }
+            )
         }
     "#,
     );

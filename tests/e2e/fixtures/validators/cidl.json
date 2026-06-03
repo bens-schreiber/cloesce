@@ -5,7 +5,36 @@
       "db"
     ],
     "kv_bindings": [
-      "store"
+      {
+        "name": "store",
+        "templates": [
+          {
+            "field": {
+              "name": "data",
+              "cidl_type": {
+                "KvObject": "String"
+              },
+              "validators": [
+                {
+                  "MaxLength": 500
+                }
+              ]
+            },
+            "params": [
+              {
+                "name": "email",
+                "cidl_type": "String",
+                "validators": [
+                  {
+                    "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                  }
+                ]
+              }
+            ],
+            "key_format": "some_crap/{email}"
+          }
+        ]
+      }
     ],
     "r2_bindings": [],
     "vars": []
@@ -14,7 +43,6 @@
     "Validator": {
       "hash": 1908438877902929966,
       "name": "Validator",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -42,13 +70,13 @@
             "cidl_type": "String",
             "validators": [
               {
-                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-              },
-              {
                 "MaxLength": 255
               },
               {
                 "MinLength": 5
+              },
+              {
+                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
               }
             ]
           },
@@ -60,7 +88,7 @@
       "kv_fields": [
         {
           "field": {
-            "name": "data",
+            "name": "someData",
             "cidl_type": {
               "KvObject": "String"
             },
@@ -70,34 +98,14 @@
               }
             ]
           },
-          "format": "some_crap/{email}/{name}",
-          "format_parameters": [
-            {
-              "name": "email",
-              "cidl_type": "String"
-            },
-            {
-              "name": "name",
-              "cidl_type": "String"
-            }
-          ],
           "binding": "store",
-          "list_prefix": false
+          "key_format": "some_crap/{email}"
         }
       ],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [
-        {
-          "name": "name",
-          "cidl_type": "String",
-          "validators": [
-            {
-              "Length": 10
-            }
-          ]
-        }
-      ],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "someMethod",
@@ -154,7 +162,10 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$save_None",
@@ -179,7 +190,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -204,18 +217,12 @@
                   }
                 }
               ]
-            },
-            {
-              "name": "name",
-              "cidl_type": "String",
-              "validators": [
-                {
-                  "Length": 10
-                }
-              ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$get_None",
@@ -240,18 +247,11 @@
                   }
                 }
               ]
-            },
-            {
-              "name": "name",
-              "cidl_type": "String",
-              "validators": [
-                {
-                  "Length": 10
-                }
-              ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -291,7 +291,10 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "store"
+          ]
         },
         {
           "name": "$list_None",
@@ -331,7 +334,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -361,7 +366,12 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -379,8 +389,34 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Validator"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db",
+              "store"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
+          "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",
+          "list_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" > ?1 ORDER BY \"Validator\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "None": {
@@ -409,7 +445,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -427,8 +467,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Validator"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
+          "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",
+          "list_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" > ?1 ORDER BY \"Validator\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

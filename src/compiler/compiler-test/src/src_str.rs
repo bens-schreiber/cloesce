@@ -1,22 +1,54 @@
 /// Cloesce source string containing a wide variety of features for codegen tests.
 pub const COMPREHENSIVE_SRC: &str = r#"
 // Top level comment
-env {
-// Comments
-    d1 { db }
-    // Can exist anywhere in code
-    kv { my_kv }
-    r2 { my_r2 } // Another Comment
-    vars {
-        // Comment again
-        MY_VAR: string // More comments
+d1 {
+    db
+}
+
+kv MyKv {
+    someValue(id1: string, id2: int) -> json {
+        "{id1}/{id2}"
     }
+
+    manyValues() -> paginated<json> {
+        ""
+    }
+
+    streamValue(id1: string, id2: int) -> stream {
+        "{id1}/{id2}"
+    }
+}
+
+r2 MyR2 {
+    fileData(id: string) {
+        "{id}"
+    }
+
+    manyFileDatas(id: string) paginated {
+        "{id}/files"
+    }
+
+    metadata(ownerId: string, modelYear: int) {
+        "{ownerId}/{modelYear}"
+    }
+
+    photoData(modelYear: int) {
+        "{modelYear}/photos"
+    }
+
+    customDsData(id: int) {
+        "{id}/data"
+    }
+}
+
+vars {
+    // Comment again
+    MY_VAR: string // More comments
 }
 
 inject { YouTubeApi }
 
-[use db]
-model BasicModel {
+model BasicModel for db {
     primary {
         id: int
     }
@@ -26,8 +58,7 @@ model BasicModel {
     }
 }
 
-[use db]
-model HasSqlColumnTypes {
+model HasSqlColumnTypes for db {
     primary {
         id: int
     }
@@ -46,53 +77,29 @@ model HasSqlColumnTypes {
     }
 }
 
-[use db]
-model HasOneToOne {
+model HasOneToOne for db {
     primary {
         id: int
     }
 
     foreign(BasicModel::id) {
         basicModelId
-        nav { oneToOneNav }
     }
+
+    nav BasicModel::id(basicModelId) { oneToOneNav }
 }
 
-[use db]
-model OneToManyModel {
+model OneToManyModel for db {
     primary {
         id: int
     }
 
-    nav(BasicModel::fk_to_model) {
+    nav BasicModel::fk_to_model {
         oneToManyNav
     }
 }
 
-[use db]
-model ManyToManyModelA {
-    primary {
-        id: int
-    }
-
-    nav(ManyToManyModelB::id) {
-        manyToManyNav
-    }
-}
-
-[use db]
-model ManyToManyModelB {
-    primary {
-        id: int
-    }
-
-    nav(ManyToManyModelA::id) {
-        manyToManyNav
-    }
-}
-
-[use db]
-model ModelWithCompositePk {
+model ModelWithCompositePk for db {
     primary {
         tenantId: string
         rowId: int
@@ -108,22 +115,22 @@ api ModelWithCompositePk {
     post instanceMethod(self, input: string) -> string
 }
 
-model ModelWithKv {
-    keyfield {
+model ModelWithKv for db {
+    primary {
         id1: string
         id2: int
     }
 
-    kv(my_kv, "{id1}") {
-        someValue: json
+    kv MyKv::someValue(id1, id2) {
+        someValue
     }
 
-    kv(my_kv, "") paginated {
-        manyValues: json
+    kv MyKv::manyValues() {
+        manyValues
     }
 
-    kv(my_kv, "{id1}/{id2}") {
-        streamValue: stream
+    kv MyKv::streamValue(id1, id2) {
+        streamValue
     }
 }
 
@@ -134,16 +141,16 @@ api ModelWithKv {
     post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
 }
 
-model ModelWithR2 {
-    keyfield {
+model ModelWithR2 for db {
+    primary {
         id: string
     }
 
-    r2(my_r2, "{id}") {
+    r2 MyR2::fileData(id) {
         fileData
     }
 
-    r2(my_r2, "{id}/files") paginated {
+    r2 MyR2::manyFileDatas(id) {
         manyFileDatas
     }
 }
@@ -152,8 +159,7 @@ api ModelWithR2 {
     post hasR2ParamAndRes(self, input: r2object) -> r2object
 }
 
-[use db]
-model ToyotaPrius {
+model ToyotaPrius for db {
     primary {
         id: int
     }
@@ -163,15 +169,11 @@ model ToyotaPrius {
         modelYear: int
     }
 
-    keyfield {
-        someKey: string
+    kv MyKv::someValue(ownerId, modelYear) {
+        metadata
     }
 
-    kv(my_kv, "{ownerId}/{modelYear}") {
-        metadata: json
-    }
-
-    r2(my_r2, "{modelYear}/photos") {
+    r2 MyR2::photoData(modelYear) {
         photoData
     }
 }
@@ -192,9 +194,8 @@ source WithR2 for ToyotaPrius {
     }
 }
 
-[use db]
 [crud get, save, list]
-model ModelWithCruds {
+model ModelWithCruds for db {
     primary {
         id: int
     }
@@ -211,17 +212,12 @@ model ModelWithCruds {
 source ByName for ModelWithCruds {
     include {}
 
-    sql get([instance] name: string) {
-        "SELECT * FROM ModelWithCruds WHERE name = $name"
-    }
+    get([instance] name: string)
 
-    sql list(name: string, limit: int) {
-        "SELECT * FROM ModelWithCruds WHERE name LIKE $name LIMIT $limit"
-    }
+    list(name: string, limit: int)
 }
 
-[use db]
-model ModelWithCustomDs {
+model ModelWithCustomDs for db {
     primary {
         id: int
     }
@@ -230,14 +226,15 @@ model ModelWithCustomDs {
         name: string
     }
 
-    r2 (my_r2, "{id}/data") {
+    r2 MyR2::customDsData(id) {
         data
     }
 
     foreign (OneToManyModel::id) {
         oneToManyId
-        nav { oneToManyModel }
     }
+
+    nav OneToManyModel::id(oneToManyId) { oneToManyModel }
 }
 
 source Custom for ModelWithCustomDs {
@@ -248,13 +245,35 @@ source Custom for ModelWithCustomDs {
         data
     }
 
-    sql get([instance] id: int, externalParam: string) {
-        "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
-    }
+    get([instance] id: int, externalParam: string)
 }
 
 api ModelWithCustomDs {
     post instanceMethod([source Custom] self, input: string) -> string
+}
+
+[crud get, save]
+model RouteOwner {
+    route {
+        ownerId: string
+        modelYear: int
+    }
+
+    kv MyKv::someValue(ownerId, modelYear) {
+        metadata
+    }
+
+    nav RouteCar::ownerId(ownerId) { car }
+}
+
+model RouteCar {
+    route {
+        ownerId: string
+    }
+}
+
+api RouteOwner {
+    post instanceMethod(self, input: string) -> string
 }
 
 model BasicService {}

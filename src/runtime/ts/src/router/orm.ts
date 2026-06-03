@@ -16,7 +16,6 @@ import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
-  keyFields: Record<string, unknown>;
   env: any;
   promises: Promise<CloesceResult<void>>[];
 };
@@ -84,7 +83,7 @@ export class Orm {
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
-    if (!meta.d1_binding) {
+    if (!meta.database_binding) {
       return "";
     }
 
@@ -113,7 +112,6 @@ export class Orm {
   async hydrate<T extends object>(
     meta: Model,
     base: any,
-    keyFields: Record<string, unknown>,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T>> {
     base ??= {};
@@ -127,7 +125,6 @@ export class Orm {
     const hydrated = hydrateType(base, modelCidlType, {
       idl,
       includeTree,
-      keyFields,
       env,
       promises,
     });
@@ -204,8 +201,8 @@ export class Orm {
     });
 
     // If there are any SQL queries to execute, collect them as [D1PreparedStatement]s
-    const db: D1Database | undefined = meta.d1_binding
-      ? (this.env as any)[meta.d1_binding]
+    const db: D1Database | undefined = meta.database_binding
+      ? (this.env as any)[meta.database_binding]
       : undefined;
     const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
@@ -240,13 +237,6 @@ export class Orm {
     ];
     while (q.length > 0) {
       const { model: currentModel, meta: currentMeta, tree: currentTree } = q.shift()!;
-
-      // Key fields
-      for (const field of currentMeta.key_fields) {
-        if (currentModel[field.name] === undefined) {
-          currentModel[field.name] = (newModel as any)[field.name];
-        }
-      }
 
       // Navigation properties
       for (const navProp of currentMeta.navigation_fields) {
@@ -294,7 +284,7 @@ export class Orm {
           );
         }
 
-        const key = resolveKey(upload.key, current, {});
+        const key = resolveKey(upload.key, current);
         if (!key) {
           throw new InternalError(
             `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
@@ -315,7 +305,7 @@ export class Orm {
     }
 
     // Hydrate and return the upserted model
-    return await this.hydrate(meta, base, {}, includeTree);
+    return await this.hydrate(meta, base, includeTree);
   }
 
   /**
@@ -328,11 +318,10 @@ export class Orm {
     meta: Model,
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
-    keyFields: Record<string, unknown>,
   ): Promise<CloesceResult<T | null>> {
-    if (!query || !meta.d1_binding) {
+    if (!query || !meta.database_binding) {
       // No query provided, hydrate any non-SQL fields
-      return await this.hydrate(meta, {}, keyFields, includeTree);
+      return await this.hydrate(meta, {}, includeTree);
     }
 
     const res = await query.run();
@@ -344,7 +333,7 @@ export class Orm {
     if (!mapped) {
       return { value: null, errors: [] };
     }
-    return await this.hydrate(meta, mapped, keyFields, includeTree);
+    return await this.hydrate(meta, mapped, includeTree);
   }
 
   /**
@@ -358,7 +347,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query || !meta.d1_binding) {
+    if (!query || !meta.database_binding) {
       return { value: [], errors: [] };
     }
 
@@ -369,7 +358,7 @@ export class Orm {
 
     const results = Orm.map(meta, rows, includeTree);
     const hydratedResults = await Promise.all(
-      results.map((modelJson) => this.hydrate<T>(meta, modelJson, {}, includeTree)),
+      results.map((modelJson) => this.hydrate<T>(meta, modelJson, includeTree)),
     );
 
     const errors = hydratedResults.flatMap((r) => r.errors);
@@ -384,14 +373,10 @@ export class Orm {
 /**
  * @returns null if any parameter could not be resolved
  */
-function resolveKey(
-  format: string,
-  current: any,
-  keyFields: Record<string, unknown>,
-): string | null {
+function resolveKey(format: string, current: any): string | null {
   try {
     return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-      const paramValue = keyFields[paramName] ?? current[paramName];
+      const paramValue = current[paramName];
       if (paramValue === undefined) throw null;
       return String(paramValue);
     });
@@ -478,6 +463,25 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     for (const nav of modelMeta.navigation_fields) {
       const tree = args.includeTree ? args.includeTree[nav.field.name] : null;
       if (tree === undefined) continue;
+
+      // A route model nav target has no unique fields: it is assembled entirely from
+      // this model's route values, mapped onto the target's route fields in order.
+      const target = args.idl.models[nav.model_reference];
+      if (
+        value[nav.field.name] === undefined &&
+        !target.database_binding &&
+        target.route_fields.length > 0 &&
+        typeof nav.kind === "object" &&
+        "OneToOne" in nav.kind
+      ) {
+        const columns = nav.kind.OneToOne.fields;
+        const assembled: any = {};
+        target.route_fields.forEach((field, i) => {
+          assembled[field.name] = value[columns[i]];
+        });
+        value[nav.field.name] = assembled;
+      }
+
       const res = hydrateType(value[nav.field.name], getNavigationCidlType(nav), {
         ...args,
         includeTree: tree,
@@ -485,16 +489,12 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       if (res) value[nav.field.name] = res;
     }
 
-    for (const field of modelMeta.key_fields) {
-      const raw = args.keyFields[field.name] ?? value[field.name];
-      const hydrated = hydrateType(raw, field.cidl_type, args);
-      value[field.name] = hydrated !== undefined ? hydrated : raw;
-    }
-
     for (const kv of modelMeta.kv_fields) {
-      const key = resolveKey(kv.format, value, args.keyFields);
+      const key = resolveKey(kv.key_format, value);
+      const isPaginated =
+        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        if (kv.list_prefix) {
+        if (isPaginated) {
           value[kv.field.name] = {
             results: [],
             cursor: null,
@@ -505,16 +505,18 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       }
       const namespace: KVNamespace = args.env[kv.binding]!;
       args.promises.push(
-        kv.list_prefix
+        isPaginated
           ? hydrateKVList(namespace, key, kv, value)
           : hydrateKVSingle(namespace, key, kv, value),
       );
     }
 
     for (const r2 of modelMeta.r2_fields) {
-      const key = resolveKey(r2.format, value, args.keyFields);
+      const key = resolveKey(r2.key_format, value);
+      const isPaginated =
+        typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        if (r2.list_prefix) {
+        if (isPaginated) {
           value[r2.field.name] = {
             results: [],
             cursor: null,
@@ -525,7 +527,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       }
       const bucket: R2Bucket = args.env[r2.binding]!;
       args.promises.push(
-        r2.list_prefix
+        isPaginated
           ? CloesceError.catchGeneric(async () => {
               const list = await bucket.list({ prefix: key });
               const results = await Promise.all(list.objects.map((obj) => bucket.get(obj.key)));
@@ -566,7 +568,12 @@ function hydrateKVList(
     const cursor = !res.list_complete ? (res.cursor ?? null) : null;
     const complete = res.list_complete || !cursor;
 
-    if (kv.field.cidl_type === "Stream") {
+    const inner =
+      typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
+        ? kv.field.cidl_type.Paginated
+        : kv.field.cidl_type;
+
+    if (inner === "Stream") {
       const results = await Promise.all(
         res.keys.map(
           async (k: any) =>

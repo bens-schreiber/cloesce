@@ -1,10 +1,30 @@
 {
-  "hash": 974407415389773040,
+  "hash": 18434063000749143771,
   "models": {
+    "DefaultOverride": {
+      "hash": 3283447504166446726,
+      "name": "DefaultOverride",
+      "database_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_fields": []
+    },
     "Hamburger": {
-      "hash": 14499320733461841178,
+      "hash": 14624565934395245746,
       "name": "Hamburger",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -33,26 +53,32 @@
       ],
       "navigation_fields": [
         {
-          "hash": 5001806448139386955,
+          "hash": 6182088962321199291,
           "field": {
             "name": "toppings",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Topping"
+                  "name": "HamburgerTopping"
                 }
               }
             }
           },
-          "model_reference": "Topping",
-          "kind": "ManyToMany"
+          "model_reference": "HamburgerTopping",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "hamburgerId"
+              ]
+            }
+          }
         }
       ]
     },
     "Topping": {
-      "hash": 8564943250551181191,
+      "hash": 2310149034276584210,
       "name": "Topping",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -81,19 +107,101 @@
       ],
       "navigation_fields": [
         {
-          "hash": 13615920006540611054,
+          "hash": 3331554412914364471,
           "field": {
-            "name": "hamburger",
+            "name": "hamburgers",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Hamburger"
+                  "name": "HamburgerTopping"
                 }
               }
             }
           },
+          "model_reference": "HamburgerTopping",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "toppingId"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "HamburgerTopping": {
+      "hash": 4024964836951031313,
+      "name": "HamburgerTopping",
+      "database_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 15597455802024041115,
+          "field": {
+            "name": "hamburgerId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Hamburger",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 10781001798876360458,
+          "field": {
+            "name": "toppingId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Topping",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_fields": [
+        {
+          "hash": 12477842615739260649,
+          "field": {
+            "name": "hamburger",
+            "cidl_type": {
+              "Object": {
+                "name": "Hamburger"
+              }
+            }
+          },
           "model_reference": "Hamburger",
-          "kind": "ManyToMany"
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "hamburgerId"
+              ]
+            }
+          }
+        },
+        {
+          "hash": 9758849375850875244,
+          "field": {
+            "name": "topping",
+            "cidl_type": {
+              "Object": {
+                "name": "Topping"
+              }
+            }
+          },
+          "model_reference": "Topping",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "toppingId"
+              ]
+            }
+          }
         }
       ]
     }

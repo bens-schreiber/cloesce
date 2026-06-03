@@ -1,6 +1,6 @@
 import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PureR2Model, D1BackedModel } from "../fixtures/r2/client";
+import { D1BackedModel, R2Only, R2Sibling } from "../fixtures/r2/client";
 import config from "../fixtures/r2/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -13,49 +13,11 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("Pure R2 Model", () => {
-  it("uploads data", async () => {
-    const model = Object.assign(new PureR2Model(), {
-      id: "test-id-1",
-    });
-
-    const res = await model.uploadData(new TextEncoder().encode("Hello, R2!"));
-
-    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
-  });
-
-  it("uploads other data", async () => {
-    const model = Object.assign(new PureR2Model(), {
-      id: "test-id-1",
-    });
-
-    const res = await model.uploadOtherData(new TextEncoder().encode("Hello, R2!"));
-
-    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
-  });
-
-  it("retrieves head", async () => {
-    const res = await PureR2Model.$get("test-id-1");
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-    expect(res.data).toBeDefined();
-    expect(res.data?.id).toBe("test-id-1");
-
-    expect(res.data?.data.key).toBe("path/to/data/test-id-1");
-    expect(res.data?.otherData.key).toBe("path/to/other/test-id-1");
-    expect(res.data?.allData.results.length).toBe(2);
-
-    expect(res.data?.allData.results.map((obj) => obj.key).sort()).toEqual([
-      "path/to/data/test-id-1",
-      "path/to/other/test-id-1",
-    ]);
-  });
-});
-
 describe("D1 Backed Model", () => {
   let model: D1BackedModel;
-  it("uploads d1", async () => {
+  it("saves model", async () => {
     const res = await D1BackedModel.$save({
-      keyParam: "key-param-1",
+      id: 1,
       someColumn: 42,
       someOtherColumn: "foo",
     });
@@ -69,13 +31,18 @@ describe("D1 Backed Model", () => {
     expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
   });
 
+  it("uploads r2 other data", async () => {
+    const res = await model.uploadOtherData(new TextEncoder().encode("Other R2 Data"));
+    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
+  });
+
   it("retrieves full model", async () => {
-    const res = await D1BackedModel.$get(model.id, model.keyParam);
+    const res = await D1BackedModel.$get(model.id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(model.id);
-    expect(res.data?.keyParam).toBe(model.keyParam);
-    expect(res.data?.r2Data.key).toBe("d1Backed/1/key-param-1/42/foo");
+    expect(res.data?.someData?.key).toBe(`path/to/data/${model.id}`);
+    expect(res.data?.someOtherData?.key).toBe(`path/to/other/${model.id}`);
   });
 
   it("lists models", async () => {
@@ -85,6 +52,31 @@ describe("D1 Backed Model", () => {
 
     const found = res.data!.find((m) => m.id === model.id)!;
     expect(found).toBeDefined();
-    expect(found.r2Data).toBeUndefined(); // model takes a keyparam and thus cannot list R2 components
+  });
+});
+
+describe("R2Only (route model)", () => {
+  const id = 9;
+
+  it("uploads its own and its nav target's r2 data", async () => {
+    const only = Object.assign(new R2Only(), { id });
+    const res = await only.uploadData(new TextEncoder().encode("R2Only Data"));
+    expect(res.ok, withRes("PUT should be OK", res)).toBe(true);
+
+    const sibling = Object.assign(new R2Sibling(), { siblingId: id });
+    const sibRes = await sibling.uploadData(new TextEncoder().encode("R2Sibling Data"));
+    expect(sibRes.ok, withRes("sibling PUT should be OK", sibRes)).toBe(true);
+  });
+
+  it("GET hydrates r2 and the assembled route nav with its r2", async () => {
+    const res = await R2Only.$get(id);
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data?.id).toBe(id);
+    expect(res.data?.someData?.key).toBe(`path/to/data/${id}`);
+
+    // The sibling is assembled from this model's route fields, then its r2 hydrated.
+    expect(res.data?.sibling).toBeDefined();
+    expect(res.data?.sibling?.siblingId).toBe(id);
+    expect(res.data?.sibling?.siblingData?.key).toBe(`path/to/other/${id}`);
   });
 });

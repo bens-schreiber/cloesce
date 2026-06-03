@@ -1,5 +1,3 @@
-import type { CloesceResult } from "./common.js";
-
 /** NOTE: These definitions mirror the definitions in the Compiler */
 export type CrudKind = "Save" | "Get" | "List";
 
@@ -52,9 +50,8 @@ export interface Column {
 }
 
 export type NavigationFieldKind =
-  | { OneToOne: { columns: string[] } }
-  | { OneToMany: { columns: string[] } }
-  | "ManyToMany";
+  | { OneToOne: { fields: string[] } }
+  | { OneToMany: { columns: string[] } };
 
 export interface NavigationField {
   field: Field;
@@ -64,18 +61,14 @@ export interface NavigationField {
 
 export interface KvField {
   field: ValidatedField;
-  format: string;
-  format_parameters: Field[];
   binding: string;
-  list_prefix: boolean;
+  key_format: string;
 }
 
 export interface R2Field {
   field: Field;
-  format: string;
-  format_parameters: Field[];
   binding: string;
-  list_prefix: boolean;
+  key_format: string;
 }
 
 export type MediaType = "Json" | "Octet";
@@ -94,11 +87,11 @@ export interface ApiMethod {
 
 export interface Model {
   name: string;
-  d1_binding: string | null;
+  database_binding: string | null;
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
-  key_fields: ValidatedField[];
+  route_fields: ValidatedField[];
   kv_fields: KvField[];
   r2_fields: R2Field[];
   apis: ApiMethod[];
@@ -115,8 +108,10 @@ export interface IncludeTree {
   [key: string]: IncludeTree;
 }
 
-export interface DataSourceListMethod {
+export interface DataSourceMethod {
   parameters: ValidatedField[];
+  injected: string[];
+  is_stub: boolean;
 }
 
 export interface DataSourceGetMethodParam {
@@ -126,28 +121,26 @@ export interface DataSourceGetMethodParam {
 
 export interface DataSourceGetMethod {
   parameters: DataSourceGetMethodParam[];
-}
-
-export interface DataSourceImpl {
-  include: IncludeTree;
-  get: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
-  list?: (env: any, ...args: unknown[]) => Promise<CloesceResult<unknown>>;
+  injected: string[];
+  is_stub: boolean;
 }
 
 export interface DataSource {
   name: string;
-  list?: DataSourceListMethod;
-  get?: DataSourceGetMethod;
+  tree: IncludeTree;
+  include_query: string;
+  get_query: string;
+  list_query: string;
+  get: DataSourceGetMethod;
+  list: DataSourceMethod;
+  save: DataSourceMethod;
   is_internal: boolean;
-
-  // Generated at runtime, not serialized.
-  gen: DataSourceImpl;
 }
 
 export interface WranglerEnv {
   d1_bindings: string[];
-  kv_bindings: string[];
-  r2_bindings: string[];
+  kv_bindings: unknown[];
+  r2_bindings: unknown[];
   vars: Field[];
 }
 

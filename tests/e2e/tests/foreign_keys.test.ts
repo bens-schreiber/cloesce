@@ -1,6 +1,6 @@
 import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { A, Person, Dog, Student, Course, B } from "../fixtures/foreign_keys/client";
+import { A, Person, Dog, Student, Course, CourseStudent, B } from "../fixtures/foreign_keys/client";
 import config from "../fixtures/foreign_keys/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -62,16 +62,19 @@ describe("POST and refresh Person", () => {
 
 describe("POST and refresh Student", () => {
   const course = Object.assign(new Course(), { id: 500, students: [] });
-  const student = Object.assign(new Student(), { id: 1, courses: [course] });
+  const join = Object.assign(new CourseStudent(), { course });
+  const student = Object.assign(new Student(), { id: 1, courses: [join] });
 
   it("POST Student", async () => {
     const res = await Student.create(student);
     expect(res.ok, withRes("Expected POST to work", res)).toBe(true);
     expect(res.data!.courses.length).toBe(1);
 
-    // should have returned a student with courses, which should have students, which should have courses
-    expect(res.data!.courses[0].students.length).toBe(1);
-    expect(res.data!.courses[0].students[0].courses.length).toBe(1);
+    // student -> courses (junction) -> course -> students (junction) -> student -> courses (junction)
+    const joinRow = res.data!.courses[0];
+    expect(joinRow.course!.id).toBe(500);
+    expect(joinRow.course!.students.length).toBe(1);
+    expect(joinRow.course!.students[0].student!.courses.length).toBe(1);
   });
 
   it("none returns Student without Courses", async () => {

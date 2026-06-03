@@ -45,12 +45,9 @@ pub fn rows_to_json(rows: &[SqliteRow]) -> Vec<Map<String, Value>> {
 fn no_records_returns_empty() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -64,8 +61,7 @@ fn no_records_returns_empty() {
             }
         }
 
-        [use db]
-        model Rider {
+        model Rider for db {
             primary {
                 id: int
             }
@@ -89,12 +85,9 @@ fn no_records_returns_empty() {
 fn flat() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -118,17 +111,61 @@ fn flat() {
     assert_eq!(horse.get("name"), Some(&json!("Lightning")));
 }
 
+#[test]
+fn one_to_one_worker_model_is_skipped() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Person for db {
+            primary {
+                id: int
+            }
+
+            column {
+                name: string
+            }
+
+            nav Profile::ownerId(id) {
+                profile
+            }
+        }
+
+        model Profile {
+            route {
+                ownerId: int
+            }
+        }
+    "#,
+    );
+
+    let row = vec![
+        ("id".to_string(), json!(1)),
+        ("name".to_string(), json!("Alice")),
+    ]
+    .into_iter()
+    .collect::<Map<String, Value>>();
+
+    // Act
+    let result = map_sql("Person", vec![row], include(json!({ "profile": {} })), &idl)
+        .expect("map_sql to succeed");
+
+    // Assert
+    let person = result.first().unwrap().as_object().unwrap();
+    assert_eq!(person.get("id"), Some(&json!(1)));
+    assert_eq!(person.get("name"), Some(&json!("Alice")));
+    assert_eq!(person.get("profile"), None);
+}
+
 #[sqlx::test]
 async fn one_to_one(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -139,14 +176,14 @@ async fn one_to_one(db: SqlitePool) {
 
                 foreign(Rider::id) {
                     bestRiderId
-                    nav {
-                        bestRider
-                    }
+                }
+
+                nav Rider::id(bestRiderId) {
+                    bestRider
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -204,12 +241,9 @@ async fn one_to_many(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -223,8 +257,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -280,97 +313,13 @@ async fn one_to_many(db: SqlitePool) {
     assert_eq!(result, vec![new_model]);
 }
 
-#[sqlx::test]
-async fn many_to_many(db: SqlitePool) {
-    let meta = || {
-        src_to_idl(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-
-                column {
-                    name: option<string>
-                }
-
-                nav(Course::id) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-
-                column {
-                    title: option<string>
-                }
-
-                nav(Student::id) {
-                    students
-                }
-            }
-        "#,
-        )
-    };
-
-    let new_model = json!({
-        "id": 1,
-        "name": "John Doe",
-        "courses": [
-            { "id": 1, "title": "Math 101", "students": [] },
-            { "id": 2, "title": "History 201", "students": [] }
-        ]
-    });
-
-    let include_tree_json = json!({ "courses": {} });
-
-    let upsert_stmts = UpsertModel::query(
-        "Student",
-        &meta(),
-        new_model.as_object().unwrap().clone(),
-        include(include_tree_json.clone()),
-    )
-    .expect("upsert to succeed");
-
-    let results = test_sql(
-        meta(),
-        upsert_stmts
-            .sql
-            .into_iter()
-            .map(|r| (r.query, r.values))
-            .collect(),
-        db,
-    )
-    .await
-    .expect("test_sql to succeed");
-
-    let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
-
-    let result = map_sql("Student", select_rows, include(include_tree_json), &meta())
-        .expect("map_sql to succeed");
-
-    assert_eq!(result, vec![new_model]);
-}
-
 #[test]
 fn composite_primary_key_deduplication() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int

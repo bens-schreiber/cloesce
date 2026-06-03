@@ -12,7 +12,6 @@
     "Weather": {
       "hash": 10306382131681195126,
       "name": "Weather",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -53,8 +52,57 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
+        {
+          "name": "isItRainingSomewhere",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "Boolean",
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": []
+        },
+        {
+          "name": "getCurrentDate",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "DateIso",
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": []
+        },
+        {
+          "name": "echo",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Weather"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "date",
+              "cidl_type": "DateIso",
+              "validators": []
+            },
+            {
+              "name": "isRaining",
+              "cidl_type": "Boolean",
+              "validators": []
+            }
+          ],
+          "injected": []
+        },
         {
           "name": "$save",
           "is_static": true,
@@ -78,7 +126,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -99,7 +149,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -123,7 +175,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -135,8 +191,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Weather"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Weather\".\"id\" AS \"id\", \"Weather\".\"date\" AS \"date\", \"Weather\".\"isRaining\" AS \"isRaining\" FROM \"Weather\"",
+          "get_query": "SELECT \"Weather\".\"id\" AS \"id\", \"Weather\".\"date\" AS \"date\", \"Weather\".\"isRaining\" AS \"isRaining\" FROM \"Weather\" WHERE \"Weather\".\"id\" = ?1",
+          "list_query": "SELECT \"Weather\".\"id\" AS \"id\", \"Weather\".\"date\" AS \"date\", \"Weather\".\"isRaining\" AS \"isRaining\" FROM \"Weather\" WHERE \"Weather\".\"id\" > ?1 ORDER BY \"Weather\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

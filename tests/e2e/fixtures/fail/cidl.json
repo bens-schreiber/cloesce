@@ -12,7 +12,6 @@
     "FailModel": {
       "hash": 8168459232680355642,
       "name": "FailModel",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -42,7 +41,8 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "throwingMethod",
@@ -191,7 +191,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -212,7 +214,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -246,7 +250,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -270,7 +276,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -282,8 +292,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "FailModel"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"FailModel\".\"id\" AS \"id\", \"FailModel\".\"name\" AS \"name\" FROM \"FailModel\"",
+          "get_query": "SELECT \"FailModel\".\"id\" AS \"id\", \"FailModel\".\"name\" AS \"name\" FROM \"FailModel\" WHERE \"FailModel\".\"id\" = ?1",
+          "list_query": "SELECT \"FailModel\".\"id\" AS \"id\", \"FailModel\".\"name\" AS \"name\" FROM \"FailModel\" WHERE \"FailModel\".\"id\" > ?1 ORDER BY \"FailModel\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -296,13 +330,13 @@
     "UnregisteredService": {
       "hash": 9964477462680799238,
       "name": "UnregisteredService",
-      "d1_binding": null,
       "primary_columns": [],
       "columns": [],
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": null,
       "apis": [
         {
           "name": "unregistered",

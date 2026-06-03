@@ -1,14 +1,16 @@
 --- New Models
+CREATE TABLE IF NOT EXISTS "DefaultOverride" ("id" integer PRIMARY KEY);
+
 CREATE TABLE IF NOT EXISTS "Hamburger" ("id" integer PRIMARY KEY, "name" text NOT NULL);
 
 CREATE TABLE IF NOT EXISTS "Topping" ("id" integer PRIMARY KEY, "name" text NOT NULL);
 
 CREATE TABLE IF NOT EXISTS "HamburgerTopping" (
-  "left" integer NOT NULL,
-  "right" integer NOT NULL,
-  PRIMARY KEY ("left", "right"),
-  FOREIGN KEY ("left") REFERENCES "Hamburger" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  FOREIGN KEY ("right") REFERENCES "Topping" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  "hamburgerId" integer NOT NULL,
+  "toppingId" integer NOT NULL,
+  PRIMARY KEY ("hamburgerId", "toppingId"),
+  FOREIGN KEY ("hamburgerId") REFERENCES "Hamburger" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  FOREIGN KEY ("toppingId") REFERENCES "Topping" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 --- Cloesce Temporary Table

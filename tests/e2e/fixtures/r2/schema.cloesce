@@ -1,49 +1,26 @@
-env {
-    d1 {
-        db
+d1 {
+    db
+}
+
+r2 bucket1 {
+    data(id: int) {
+        "path/to/data/{id}"
     }
-    r2 {
-        bucket1
-        bucket2
+
+    otherData(id: int) {
+        "path/to/other/{id}"
+    }
+
+    allData() paginated {
+        "path/"
     }
 }
 
-[crud get]
-model PureR2Model {
-    keyfield {
-        id: string
-    }
-    
-    r2 (bucket1, "path/to/data/{id}") {
-        data
-    }
-    
-    r2 (bucket1, "path/to/other/{id}") {
-        otherData
-    }
-    
-    r2 (bucket1, "path/") paginated {
-        allData
-    }
-}
 
-api PureR2Model {
-    [inject bucket1]
-    put uploadData(self, data: stream)
-
-    [inject bucket1]
-    put uploadOtherData(self, data: stream)
-}
-
-[use db]
 [crud get, save, list]
-model D1BackedModel {
+model D1BackedModel for db {
     primary {
         id: int
-    }
-    
-    keyfield {
-        keyParam: string
     }
     
     column {
@@ -51,12 +28,54 @@ model D1BackedModel {
         someOtherColumn: string
     }
     
-    r2 (bucket1, "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}") {
-        r2Data
+    r2 bucket1::data(id) {
+        someData
+    }
+
+    r2 bucket1::otherData(id) {
+        someOtherData
     }
 }
 
 api D1BackedModel {
+    [inject bucket1]
+    put uploadData(self, data: stream)
+
+    [inject bucket1]
+    put uploadOtherData(self, data: stream)
+}
+
+[crud get]
+model R2Only {
+    route {
+        id: int
+    }
+
+    r2 bucket1::data(id) {
+        someData
+    }
+
+    nav R2Sibling::siblingId(id) {
+        sibling
+    }
+}
+
+api R2Only {
+    [inject bucket1]
+    put uploadData(self, data: stream)
+}
+
+model R2Sibling {
+    route {
+        siblingId: int
+    }
+
+    r2 bucket1::otherData(siblingId) {
+        siblingData
+    }
+}
+
+api R2Sibling {
     [inject bucket1]
     put uploadData(self, data: stream)
 }

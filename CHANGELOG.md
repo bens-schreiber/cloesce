@@ -1,3 +1,23 @@
+# [0.5.0] - Unreleased
+
+### Added
+
+- Data Source stubs for `get`, `list`, `save`
+- Binding templates for `kv` and `r2` allowing the declaration to list all key locations
+- New Worker backed models to replace `keyfield`
+- Allow D1 backed models to have a navigation property to a Worker backed model, but not the other way around.
+
+### Changed
+
+- Removed `keyfield` syntax in favor of the new Worker backed models
+- Data sources no longer accept inline SQL queries, instead generating stub functions
+- Removed many to many relationship support in favor of manual join tables using composite keys
+- Changed syntax of `nav` fields
+
+### Fixed
+
+- A bug with `date` serialization and deserialization using improper ISO strings
+
 # [0.4.1] - 2026-5-20
 
 ### Added

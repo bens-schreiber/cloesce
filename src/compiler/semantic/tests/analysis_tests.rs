@@ -37,10 +37,28 @@ macro_rules! count_errs {
 fn with_env(src: &str) -> String {
     format!(
         r#"
-        env {{
-            d1 {{ my_d1 }}
-            kv {{ my_kv }}
-            r2 {{ my_r2 }}
+        d1 {{
+            my_d1
+        }}
+
+        kv my_kv {{
+            cached(id: int) -> json {{
+                "users/{{id}}"
+            }}
+
+            items(field: string) -> json {{
+                "items/{{field}}"
+            }}
+        }}
+
+        r2 my_r2 {{
+            avatar(id: int) {{
+                "avatars/{{id}}"
+            }}
+
+            obj(field: string) {{
+                "assets/{{field}}"
+            }}
         }}
 
         {}
@@ -50,34 +68,14 @@ fn with_env(src: &str) -> String {
 }
 
 #[test]
-fn missing_wrangler_env_block() {
-    // Arrange
-    let src = r#"
-        [use db]
-        model User {
-            primary { id: int }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
-
-    // Assert
-    expect_err!(errors, SemanticError::MissingWranglerEnvBlock);
-}
-
-#[test]
 fn wrangler_duplicate_symbol() {
     // Arrange
     let src = r#"
-        env {
-            d1 {
-                my_d1
-            }
-            d1 {
-                my_d1 // duplicate symbol
-            }
+        d1 {
+            my_d1
+        }
+        d1 {
+            my_d1 // duplicate symbol
         }
     "#;
     let parse = lex_and_ast(src);
@@ -98,18 +96,15 @@ fn d1_model_basic_errors() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             // missing primary key
         }
 
-        [use other_d1] // unresolved, not in spec
-        model Post {}
+        model Post for other_d1 {} // unresolved, not in spec
 
         // missing binding
         model Comment {
             primary { id: int }
-            
         }
     "#,
     );
@@ -136,15 +131,12 @@ fn d1_model_basic_errors() {
 fn d1_model_column_fk_errors() {
     // Arrange
     let src = r#"
-        env {
-            d1 { 
-                my_d1 
-                other_d1
-            }
+        d1 {
+            my_d1
+            other_d1
         }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: option<int> // primary key cannot be nullable
             }
@@ -183,18 +175,16 @@ fn d1_model_column_fk_errors() {
 
             foreign (Post::id, Post::id) {
                 inconsistentFieldAdjacency
-            } 
+            }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
             }
         }
 
-        [use other_d1]
-        model OtherD1Model {
+        model OtherD1Model for other_d1 {
             primary {
                 id: int
             }
@@ -268,17 +258,19 @@ fn d1_model_column_fk_errors() {
 fn d1_model_nav_errors() {
     // Arrange
     let src = r#"
-        env {
-            d1 {
-                my_d1
-                other_d1
-            }
+        d1 {
+            my_d1
+            other_d1
         }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
+                tenant: int
+            }
+
+            column {
+                horseId: int
             }
 
             nav (Post::id, User::id) {
@@ -289,28 +281,30 @@ fn d1_model_nav_errors() {
                 invalidAdjModel
             }
 
-            nav (Post::id) {
-                posts
+            // 1:1 nav whose local key is not a foreign key to Post
+            nav Post::id(horseId) {
+                missingOneToOneFk
+            }
+
+            // 1:M nav with no foreign key on Post referencing User
+            nav Post::id {
+                missingOneToManyFk
+            }
+
+            // Mixes a 1:1 entry (with local key) and a 1:M entry (without)
+            nav (Post::id(horseId), Post::tenant) {
+                mixedAdjacency
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
-            }
-
-            nav (User::id) {
-                users1
-            }
-
-            nav (User::id) {
-                users2
+                tenant: int
             }
         }
 
-        [use other_d1]
-        model DifferentDatabaseModel {
+        model DifferentDatabaseModel for other_d1 {
             primary {
                 id: int
             }
@@ -322,8 +316,6 @@ fn d1_model_nav_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 5);
-
     let inconsistent_model_adj = expect_err!(
         errors,
         SemanticError::InconsistentModelAdjacency {
@@ -336,12 +328,30 @@ fn d1_model_nav_errors() {
     assert_eq!(inconsistent_model_adj.1, "User");
 
     let nav_name = expect_err!(errors,
-        SemanticError::NavigationReferencesDifferentDatabase { field, .. } => field.name
+        SemanticError::NavigationReferencesDifferentBacking { field, .. } => field.name
     );
     assert_eq!(nav_name, "invalidAdjModel");
 
-    let ambiguous_m2ms = count_errs!(errors, SemanticError::NavigationAmbiguousM2M { .. });
-    assert_eq!(ambiguous_m2ms, 3);
+    let missing: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::NavigationMissingForeignKey { field, .. } => Some(field.name),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        missing.contains(&"missingOneToOneFk"),
+        "expected 1:1 nav error: {errors:#?}"
+    );
+    assert!(
+        missing.contains(&"missingOneToManyFk"),
+        "expected 1:M nav error: {errors:#?}"
+    );
+
+    let mixed = expect_err!(errors,
+        SemanticError::NavigationMixedAdjacency { field } => field.name
+    );
+    assert_eq!(mixed, "mixedAdjacency");
 }
 
 #[test]
@@ -349,20 +359,21 @@ fn d1_model_nav_one_to_one() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Person {
+        model Person for my_d1 {
             primary {
                 id: int
             }
 
             foreign (Horse::id) {
                 horseId
-                nav { horse }
+            }
+
+            nav Horse::id(horseId) {
+                horse
             }
         }
 
-        [use my_d1]
-        model Horse {
+        model Horse for my_d1 {
             primary {
                 id: int
             }
@@ -389,7 +400,7 @@ fn d1_model_nav_one_to_one() {
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
             && nav.model_reference == "Horse"
-            && matches!(&nav.kind, NavigationFieldKind::OneToOne { columns } if columns.len() == 1 && columns[0] == "horseId")
+            && matches!(&nav.kind, NavigationFieldKind::OneToOne { fields } if fields.len() == 1 && fields[0] == "horseId")
             && nav.field.cidl_type == CidlType::Object {
                 name: "Horse"
             }
@@ -401,17 +412,15 @@ fn d1_model_nav_one_to_many() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Author {
+        model Author for my_d1 {
             primary { id: int }
 
-            nav (Post::authorId) {
+            nav Post::authorId {
                 posts
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary { id: int }
 
             foreign (Author::id) {
@@ -445,46 +454,220 @@ fn d1_model_nav_one_to_many() {
 }
 
 #[test]
-fn d1_model_nav_many_to_many() {
-    // Arrange
+fn route_model_valid() {
+    // Arrange: route fields, a KV field keyed on a route field, a composite 1:1 nav
+    // declared out of the target's route order, and a `get` keyed on route fields.
     let src = &with_env(
         r#"
-        [use my_d1]
-        model Student {
-            primary { id: int }
-
-            nav (Course::id) {
-                courses
+        [crud get, save]
+        model Person {
+            route {
+                id: int
+                org: string
             }
+
+            kv my_kv::cached(id) { cached }
+
+            nav (Dog::tenant(org), Dog::ownerId(id)) { dog }
         }
 
-        [use my_d1]
-        model Course {
-            primary { id: int }
-
-            nav (Student::id) {
-                students
+        model Dog {
+            route {
+                ownerId: int
+                tenant: string
             }
         }
         "#,
     );
+    let parse = lex_and_ast(src);
 
     // Act
-    let parse = lex_and_ast(src);
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 0);
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
-    let student = result.models.get("Student").unwrap();
+    let person = result.models.get("Person").unwrap();
+    assert!(person.database_binding.is_none());
+    let route_fields: Vec<&str> = person
+        .route_fields
+        .iter()
+        .map(|f| f.name.as_ref())
+        .collect();
+    assert_eq!(route_fields, vec!["id", "org"]);
 
-    let student_courses_nav = student.navigation_fields.first().unwrap();
-    assert_eq!(student_courses_nav.field.name, "courses");
-    assert_eq!(student_courses_nav.model_reference, "Course");
-
-    let NavigationFieldKind::ManyToMany = &student_courses_nav.kind else {
+    // 1:1 nav columns are ordered to match Dog's route fields (ownerId, tenant).
+    let dog_nav = person.navigation_fields.first().unwrap();
+    assert_eq!(dog_nav.field.name, "dog");
+    assert_eq!(dog_nav.model_reference, "Dog");
+    assert_eq!(dog_nav.field.cidl_type, CidlType::Object { name: "Dog" });
+    let NavigationFieldKind::OneToOne { fields } = &dog_nav.kind else {
         unreachable!()
     };
+    assert_eq!(fields, &vec!["id", "org"]);
+
+    // The default data source has no SQL and is keyed on the route fields.
+    let ds = person.default_data_source().unwrap();
+    assert!(ds.include_query.is_empty());
+    let params: Vec<&str> = ds
+        .get
+        .parameters
+        .iter()
+        .map(|p| p.parameter.name.as_ref())
+        .collect();
+    assert_eq!(params, vec!["id", "org"]);
+    assert!(ds.get.parameters.iter().all(|p| p.instance_field));
+}
+
+#[test]
+fn d1_model_navigates_to_worker_model() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+
+            column {
+                org: string
+            }
+
+            nav (Person::id(id), Person::tenant(org)) { person }
+        }
+
+        model Person {
+            route {
+                tenant: string
+                id: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let user = result.models.get("User").unwrap();
+    assert_eq!(user.database_binding, Some("my_d1"));
+
+    let person_nav = user.navigation_fields.first().unwrap();
+    assert_eq!(person_nav.field.name, "person");
+    assert_eq!(person_nav.model_reference, "Person");
+    assert_eq!(
+        person_nav.field.cidl_type,
+        CidlType::Object { name: "Person" }
+    );
+
+    let NavigationFieldKind::OneToOne { fields } = &person_nav.kind else {
+        unreachable!()
+    };
+    assert_eq!(fields, &vec!["org", "id"]);
+}
+
+#[test]
+fn d1_model_route_navigation_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+
+            nav Person::id { people }      // 1:M not allowed to a route model
+            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
+        }
+
+        model Person {
+            route { id: int }
+        }
+
+        model Partial {
+            route {
+                a: int
+                b: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
+        2
+    );
+}
+
+#[test]
+fn worker_model_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        [crud get, list]
+        model Worker {
+            route { id: int }
+
+            nav Stored::id(id) { stored }  // references a D1 model
+            nav Other::id { others }       // 1:M not allowed
+            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
+        }
+
+        model HasBinding for my_d1 {
+            route { id: int }              // route block with a `for` binding
+        }
+
+        model HasColumn {
+            route { id: int }
+            column { name: string }        // route block with a SQL block
+        }
+
+        model Stored for my_d1 {
+            primary { id: int }
+        }
+
+        model Other {
+            route { id: int }
+        }
+
+        model Partial {
+            route {
+                a: int
+                b: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    expect_err!(
+        errors,
+        SemanticError::NavigationReferencesDifferentBacking { .. }
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
+        2 // 1:M nav, and the nav missing a target route field
+    );
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteModelInvalidBlock { .. }),
+        2 // `for` binding, and the SQL column block
+    );
+    let crud = expect_err!(errors,
+        SemanticError::UnsupportedCrudOperation { crud, .. } => crud
+    );
+    assert!(matches!(crud.inner, idl::CrudKind::List)); // list needs SQL
 }
 
 #[test]
@@ -492,34 +675,34 @@ fn d1_model_cyclical_relationship_error() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model A {
+        model A for my_d1 {
             primary { id: int }
 
             foreign (B::id) {
                 bId2
-                nav { toB }
             }
+
+            nav B::id(bId2) { toB }
         }
 
-        [use my_d1]
-        model B {
+        model B for my_d1 {
             primary { id: int }
 
             foreign (C::id) {
                 cId
-                nav { toC }
             }
+
+            nav C::id(cId) { toC }
         }
 
-        [use my_d1]
-        model C {
+        model C for my_d1 {
             primary { id: int }
 
             foreign (A::id) {
                 aId
-                nav { toA }
             }
+
+            nav A::id(aId) { toA }
         }
         "#,
     );
@@ -545,34 +728,34 @@ fn d1_model_nullability_prevents_cycle() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model A {
+        model A for my_d1 {
             primary { id: int }
 
             foreign (B::id) optional {
                 bId
-                nav { toB }
             }
+
+            nav B::id(bId) { toB }
         }
 
-        [use my_d1]
-        model B {
+        model B for my_d1 {
             primary { id: int }
 
             foreign (C::id) optional {
                 cId
-                nav { toC }
             }
+
+            nav C::id(cId) { toC }
         }
 
-        [use my_d1]
-        model C {
+        model C for my_d1 {
             primary { id: int }
 
             foreign (A::id) optional {
                 aId
-                nav { toA }
             }
+
+            nav A::id(aId) { toA }
         }
         "#,
     );
@@ -590,23 +773,14 @@ fn kv_r2_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        model Foo {
-            keyfield { field: string }
-            kv(my_d1, "items/{field}") { // invalid binding type (my_d1 is a D1, not KV)
-                foo: json
-            }
+        model Foo for my_d1 {
+            primary { field: string }
 
-            r2(my_kv, "assets/{field}") { // invalid binding type (my_kv is a KV, not R2)
-                obj
-            }
+            // invalid binding type (my_d1 is a D1, not KV)
+            kv my_d1::items(field) { foo }
 
-            kv(my_kv, "items/{field}/{nonexistent}") { // unknown variable in format
-                cached: json
-            }
-
-            r2(my_r2, "assets/{field") { // invalid format, unclosed brace
-                obj2
-            }
+            // invalid binding type (my_kv is a KV, not R2)
+            r2 my_kv::items(field) { obj }
         }
         "#,
     );
@@ -616,46 +790,124 @@ fn kv_r2_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 4);
-
-    let binding = expect_err!(errors,
-        SemanticError::KvInvalidBinding { binding, ..} => binding.name
+    assert_eq!(
+        count_errs!(errors, SemanticError::UnresolvedSymbol { .. }),
+        2,
+        "expected two unresolved symbol errors, got: {:#?}",
+        errors
     );
-    assert_eq!(binding, "my_d1");
-
-    let binding = expect_err!(errors,
-        SemanticError::R2InvalidBinding { binding, .. } => binding.name
-    );
-    assert_eq!(binding, "my_kv");
-
-    let variable = expect_err!(errors,
-        SemanticError::KvR2UnknownKeyVariable { variable, .. } => *variable
-    );
-    assert_eq!(variable, "nonexistent");
-
-    expect_err!(errors, SemanticError::KvR2InvalidKeyFormat { .. });
 }
 
 #[test]
-fn kv_and_d1_coexist() {
-    // A model can have both D1 and KV/R2 properties
-    let src = &with_env(
-        r#"
-        [use my_d1]
-        model User {
+fn binding_key_format_unknown_param() {
+    // Arrange
+    let src = r#"
+        kv UserMeta {
+            meta(id: int) -> json {
+                "metadata/{id}/{bogus}"
+            }
+        }
+
+        r2 UserAvatars {
+            avatar(id: int) {
+                "avatars/{ghost}.jpg"
+            }
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    let unknowns = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::TemplateUnknownVariable { variable, .. } => Some(*variable),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        unknowns.contains(&"bogus"),
+        "expected 'bogus' to be flagged, got: {:?}",
+        unknowns
+    );
+    assert!(
+        unknowns.contains(&"ghost"),
+        "expected 'ghost' to be flagged, got: {:?}",
+        unknowns
+    );
+}
+
+#[test]
+fn binding_key_format_invalid_syntax() {
+    // Arrange
+    let src = r#"
+        kv NsA {
+            entry(id: int) -> json {
+                "entry/{id" // missing closing brace
+            }
+        }
+
+        r2 NsB {
+            obj(id: int) {
+                "obj/{{id}" // nested braces not allowed
+            }
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::TemplateInvalidFormat { .. }),
+        2,
+        "expected two invalid-key-format errors, got: {:#?}",
+        errors
+    );
+}
+
+#[test]
+fn kv_r2_templates_inherit_validators_update_key_format() {
+    // Arrange
+    let src = r#"
+        d1 {
+            my_d1
+        }
+
+        kv MyKv {
+            [gt 10]
+            value([step 5] foo: int) -> int {
+                "users/{foo}"
+            }
+        }
+
+        r2 MyR2 {
+            obj([len 5] bar: string, [gt 0] baz: int) {
+                "objects/{bar}/{baz}"
+            }
+        }
+
+        model User for my_d1 {
             primary {
-                id: int
+                userId: int
             }
             column {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv MyKv::value(userId) {
+                cached
+            }
+
+            r2 MyR2::obj(name, userId) {
+                avatar
             }
         }
-        "#,
-    );
+        "#;
+
     let parse = lex_and_ast(src);
 
     // Act
@@ -664,14 +916,48 @@ fn kv_and_d1_coexist() {
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
     let user = result.models.get("User").unwrap();
-    assert!(user.d1_binding.is_some());
+
     assert_eq!(user.kv_fields.len(), 1);
-    assert_eq!(user.columns.len(), 1,);
-    assert_eq!(user.kv_fields[0].format_parameters[0].name, "id");
+    assert_eq!(user.kv_fields[0].binding, "MyKv");
+    let kv_binding = &user.kv_fields[0];
+    assert_eq!(kv_binding.field.name, "cached");
     assert_eq!(
-        user.kv_fields[0].format_parameters[0].cidl_type,
-        CidlType::Int
+        kv_binding.field.cidl_type,
+        CidlType::KvObject(Box::new(CidlType::Int))
     );
+    assert_eq!(kv_binding.field.validators.len(), 1);
+    assert!(matches!(
+        kv_binding.field.validators[0],
+        Validator::GreaterThan(Number::Int(10))
+    ));
+    assert_eq!(kv_binding.key_format, "users/{userId}");
+
+    assert_eq!(user.r2_fields.len(), 1);
+    assert_eq!(user.r2_fields[0].binding, "MyR2");
+    let r2_binding = &user.r2_fields[0];
+    assert_eq!(r2_binding.field.name, "avatar");
+    assert_eq!(r2_binding.field.cidl_type, CidlType::R2Object);
+    assert_eq!(r2_binding.key_format, "objects/{name}/{userId}");
+
+    let id_col = user
+        .primary_columns
+        .iter()
+        .find(|c| c.field.name == "userId")
+        .unwrap();
+    assert_eq!(id_col.field.validators.len(), 2);
+    assert!(matches!(id_col.field.validators[0], Validator::Step(5)));
+    assert!(matches!(
+        id_col.field.validators[1],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let name_col = user
+        .columns
+        .iter()
+        .find(|c| c.field.name == "name")
+        .unwrap();
+    assert_eq!(name_col.field.validators.len(), 1);
+    assert!(matches!(name_col.field.validators[0], Validator::Length(5)));
 }
 
 #[test]
@@ -679,8 +965,7 @@ fn api_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -736,8 +1021,7 @@ fn api_sets_media_types() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -781,8 +1065,7 @@ fn data_source_errors() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -790,11 +1073,11 @@ fn data_source_errors() {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv my_kv::cached(id) {
+                cached
             }
 
-            r2(my_r2, "avatars/{id}") {
+            r2 my_r2::avatar(id) {
                 avatar
             }
 
@@ -803,8 +1086,7 @@ fn data_source_errors() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary {
                 id: int
             }
@@ -835,17 +1117,8 @@ fn data_source_errors() {
         // Invalid method param type (Object, not a sqlite type)
         source BadParamSource for User {
             include { posts }
-            sql get(u: User) {
-                "SELECT * FROM users WHERE id = ?"
-            }
+            get(u: User)
         }
-
-        // SQL references $ghost which is not a declared param
-        source UnknownSqlParam for User {
-            include {}
-            sql get(id: int) { "($include) WHERE id = $ghost" }
-        }
-
     "#,
     );
     let parse = lex_and_ast(src);
@@ -854,34 +1127,24 @@ fn data_source_errors() {
     let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    // BadModelSource: unknown model
     expect_err!(
         errors,
         SemanticError::DataSourceUnknownModelReference { .. }
     );
 
-    // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
             if field.name == "nonexistent"
     )));
 
-    // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
         SemanticError::DataSourceInvalidIncludeTreeReference { field, .. }
             if field.name == "bogus"
     )));
 
-    // BadParamSource: User is not a valid sql type
     expect_err!(errors, SemanticError::DataSourceInvalidMethodParam { .. });
-
-    // UnknownSqlParam: $ghost is not a declared param
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
-    )));
 }
 
 #[test]
@@ -889,8 +1152,7 @@ fn data_source_include_tree_kv_r2() {
     // Arrange
     let src = &with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -898,19 +1160,19 @@ fn data_source_include_tree_kv_r2() {
                 name: string
             }
 
-            kv(my_kv, "users/{id}") {
-                cached: json
+            kv my_kv::cached(id) {
+                cached
             }
 
-            r2(my_r2, "avatars/{id}") {
+            r2 my_r2::avatar(id) {
                 avatar
             }
         }
 
         source WithKvR2 for User {
-            include { 
-                cached 
-                avatar 
+            include {
+                cached
+                avatar
             }
         }
     "#,
@@ -952,12 +1214,9 @@ fn poo_errors() {
 #[test]
 fn poo_with_model_reference() {
     let src = r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model BasicModel {
+        model BasicModel for db {
             primary {
                 id: int
             }
@@ -981,12 +1240,9 @@ fn poo_with_model_reference() {
 fn cidl_types_resolve() {
     // Arrange
     let src = r#"
-        env {
-            d1 { my_d1 }
-        }
+        d1 { my_d1 }
 
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary {
                 id: int
             }
@@ -1026,11 +1282,10 @@ fn fk_inherits_validators() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
-            primary { 
+        model User for my_d1 {
+            primary {
                 [gt 0]
-                id: int 
+                id: int
             }
 
             column {
@@ -1039,8 +1294,7 @@ fn fk_inherits_validators() {
             }
         }
 
-        [use my_d1]
-        model Post {
+        model Post for my_d1 {
             primary { id: int }
 
             foreign (User::id) {
@@ -1089,16 +1343,13 @@ fn validator_errors() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary { id: int }
 
-            keyfield {
-                [len 3.14]            // ValidatorInvalidArgument (wrong literal kind)
-                name: string
-            }
-
             column {
+                [len 3.14]                // ValidatorInvalidArgument (wrong literal kind)
+                name: string
+
                 [step 2.5]                // ValidatorInvalidArgument (float to step)
                 [len 3]                   // ValidatorInvalidForType (length on non-string)
                 [regex "not_a_regex"]     // ValidatorInvalidForType (regex on non-string)
@@ -1126,8 +1377,7 @@ fn validator_valid() {
     // Arrange
     let src = with_env(
         r#"
-        [use my_d1]
-        model User {
+        model User for my_d1 {
             primary { id: int }
 
             column {
@@ -1177,16 +1427,19 @@ fn validator_valid() {
 #[test]
 fn inject_tag_populates_api_method_injected() {
     let src = r#"
-        env {
-            d1 { db }
-            kv { cache }
-            vars { API_KEY: string }
+        d1 { db }
+
+        kv cache {
+            entry(id: int) -> json {
+                "entry/{id}"
+            }
         }
+
+        vars { API_KEY: string }
 
         inject { YouTubeApi }
 
-        [use db]
-        model M {
+        model M for db {
             primary { id: int }
         }
 
@@ -1214,12 +1467,11 @@ fn inject_tag_populates_api_method_injected() {
 }
 
 #[test]
-fn inject_tag_dedupes_duplicates() {
+fn inject_tag_dedupes() {
     let src = r#"
-        env { d1 { db } }
+        d1 { db }
 
-        [use db]
-        model M {
+        model M for db {
             primary { id: int }
         }
 
@@ -1242,55 +1494,4 @@ fn inject_tag_dedupes_duplicates() {
         .find(|a| a.name == "dup")
         .unwrap();
     assert_eq!(api.injected, vec!["db"]);
-}
-
-#[test]
-fn dataless_model_errors() {
-    let src = r#"
-        env { d1 { db } }
-        model Foo {}
-        model Bar {}
-
-        api Foo {
-            get instanceLike(self) -> string
-        }
-
-        api Bar {
-            post takesFoo(foo: Foo) -> string
-            get yieldsFoo() -> Foo
-            post takesPartialFoo(foo: partial<Foo>) -> string
-        }
-
-        poo Container {
-            inner: Foo
-        }
-
-        source FooSource for Foo {
-            include {}
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
-
-    let method = expect_err!(errors,
-        SemanticError::ModelInstanceMethodWithNoData { method } => method
-    );
-    assert_eq!(method.name, "instanceLike");
-
-    let data_source = expect_err!(errors,
-        SemanticError::ModelDataSourceWithNoData { data_source, .. } => data_source
-    );
-    assert_eq!(data_source.name, "FooSource");
-
-    let used_as_type_count = errors
-        .iter()
-        .filter(|e| {
-            matches!(
-                e,
-                SemanticError::ModelWithNoDataUsedAsType { model_name, .. } if *model_name == "Foo"
-            )
-        })
-        .count();
-    assert_eq!(used_as_type_count, 4);
 }

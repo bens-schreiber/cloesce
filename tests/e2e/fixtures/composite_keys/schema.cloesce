@@ -1,12 +1,9 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
 [crud get, list, save]
-model Student {
+model Student for db {
     primary {
         id: int
         name: string
@@ -16,31 +13,14 @@ model Student {
         favoriteColor: string
     }
     
+    // Composite 1:M navigation to StudentCourse join table
     nav (StudentCourse::studentId, StudentCourse::studentName) {
         studentCourses
     }
 }
 
-source CoursesOrderedDescending for Student {
-    include {
-        studentCourses
-    }
-    
-    sql list(lastId: int, lastName: string, limit: int) {
-        "
-        WITH students AS ($include)
-        SELECT * FROM students
-        WHERE id > $lastId
-        AND name > $lastName
-        ORDER BY id DESC, name DESC
-        LIMIT $limit
-        "
-    }
-}
-
-[use db]
 [crud get, list, save]
-model Course {
+model Course for db {
     primary {
         id: int
     }
@@ -49,32 +29,44 @@ model Course {
         title: string
     }
     
-    nav (StudentCourse::courseId) {
+    nav StudentCourse::courseId {
         studentCourses
     }
 }
 
-[use db]
+// A join table with a composite foreign key to Student 
+// and a foreign key to Course
 [crud get, list, save]
-model StudentCourse {
+model StudentCourse for db{
     primary {
+        // Composite foreign key to Student
         foreign (Student::id, Student::name) {
             studentId
             studentName
-            
-            nav {
-                student
-            }
         }
-        
+
         foreign (Course::id) {
             courseId
-        
-            nav {
-                course
-            }
         }
     }
+
+    // Navigations to Student and Course using the foreign keys
+    nav (Student::id(studentId), Student::name(studentName)) {
+        student
+    }
+
+    nav Course::id(courseId) {
+        course
+    }
+}
+
+source CoursesOrderedDescending for Student {
+    include {
+        studentCourses
+    }
+
+    [inject db]
+    list(lastId: int, lastName: string, limit: int)
 }
 
 source Default for StudentCourse {

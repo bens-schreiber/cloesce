@@ -3,10 +3,11 @@ use std::{
     ops::Not,
 };
 
-use frontend::{DataSourceBlockMethod, ParsedIncludeTree, Symbol, Tag};
+use frontend::{ParsedIncludeTree, Spd, Symbol, Tag};
 use idl::{
     CidlType, CloesceIdl, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
-    DataSourceListMethod, IncludeTree, Model, NavigationFieldKind, ValidatedField, Validator,
+    DataSourceMethod, IncludeTree, Model, NavigationFieldKind, Number, ValidatedField, Validator,
+    model_bindings,
 };
 use indexmap::IndexMap;
 use orm::select::SelectModel;
@@ -14,13 +15,18 @@ use orm::select::SelectModel;
 use crate::{
     SymbolTable,
     err::{ErrorSink, SemanticError},
-    is_valid_sql_type, resolve_validator_tags,
+    is_valid_sql_type, resolve_injects, resolve_validator_tags,
 };
+
+enum DsMethodKind {
+    Scalar,
+    Body,
+}
 
 pub struct DataSourceAnalysis;
 impl<'src, 'p> DataSourceAnalysis {
     pub fn analyze(
-        models: &IndexMap<&'src str, Model>,
+        models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Vec<(&'src str, DataSource<'src>)> {
@@ -50,14 +56,6 @@ impl<'src, 'p> DataSourceAnalysis {
                 // Model must be invalid for some reason, skip.
                 continue;
             };
-
-            if model.is_dataless() {
-                sink.push(SemanticError::ModelDataSourceWithNoData {
-                    model: model_sym,
-                    data_source: &ds.symbol,
-                });
-                continue;
-            }
 
             // Validate include tree via BFS
             let mut q = VecDeque::new();
@@ -104,157 +102,171 @@ impl<'src, 'p> DataSourceAnalysis {
                 }
             }
 
-            let list = ds.list.as_ref().map(|method| {
-                validate_raw_sql(&ds.symbol, &method.inner, sink);
-
-                let params = method
-                    .inner
-                    .parameters
-                    .iter()
-                    .map(|p| {
-                        let (validators, instance_tag) = validate_ds_param(p, &ds.symbol, sink);
-
-                        if let Some(tag) = instance_tag {
-                            // Not allowed on list methods
-                            sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
-                        }
-
-                        ValidatedField {
-                            name: p.name.into(),
-                            cidl_type: p.cidl_type.clone(),
-                            validators,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                DataSourceListMethod {
-                    parameters: params,
-                    raw_sql: method.inner.raw_sql.to_string(),
-                }
-            });
-
-            let get = ds.get.as_ref().map(|method| {
-                validate_raw_sql(&ds.symbol, &method.inner, sink);
-
-                let params = method
-                    .inner
-                    .parameters
-                    .iter()
-                    .map(|p| {
-                        let (validators, instance_tag) = validate_ds_param(p, &ds.symbol, sink);
-
-                        if let Some(tag) = instance_tag {
-                            // Parameter must exist as a field on the model
-                            if !model.columns.iter().any(|c| c.field.name == p.name)
-                                && !model
-                                    .primary_columns
-                                    .iter()
-                                    .any(|pk| pk.field.name == p.name)
-                                && !model.key_fields.iter().any(|k| k.name == p.name)
-                            {
-                                sink.push(SemanticError::InstanceTagOnNonField {
-                                    tag,
-                                    source: &ds.symbol,
-                                    param: p,
-                                });
+            // For each verb: if the user declared a stub, validate and capture it.
+            // Otherwise a default-valued method is left in place for the expansion pass to fill.
+            let list = ds
+                .list
+                .as_ref()
+                .map(|method| {
+                    let parameters = method
+                        .inner
+                        .parameters
+                        .iter()
+                        .map(|p| {
+                            let (validators, instance_tag) =
+                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
+                            if let Some(tag) = instance_tag {
+                                // Not allowed on list methods
+                                sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
                             }
-                        }
-
-                        DataSourceGetMethodParam {
-                            parameter: ValidatedField {
+                            ValidatedField {
                                 name: p.name.into(),
                                 cidl_type: p.cidl_type.clone(),
                                 validators,
-                            },
-                            instance_field: instance_tag.is_some(),
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                            }
+                        })
+                        .collect();
 
-                DataSourceGetMethod {
-                    parameters: params,
-                    raw_sql: method.inner.raw_sql.to_string(),
-                }
-            });
+                    DataSourceMethod {
+                        parameters,
+                        injected: resolve_injects(&method.inner.method, table, sink),
+                        is_stub: true,
+                    }
+                })
+                .unwrap_or_default();
+
+            let get = ds
+                .get
+                .as_ref()
+                .map(|method| {
+                    let parameters = method
+                        .inner
+                        .parameters
+                        .iter()
+                        .map(|p| {
+                            let (validators, instance_tag) =
+                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
+
+                            if let Some(tag) = instance_tag {
+                                let is_field = model.columns.iter().any(|c| c.field.name == p.name)
+                                    || model
+                                        .primary_columns
+                                        .iter()
+                                        .any(|pk| pk.field.name == p.name);
+                                if !is_field {
+                                    sink.push(SemanticError::InstanceTagOnNonField {
+                                        tag,
+                                        source: &ds.symbol,
+                                        param: p,
+                                    });
+                                }
+                            }
+
+                            DataSourceGetMethodParam {
+                                parameter: ValidatedField {
+                                    name: p.name.into(),
+                                    cidl_type: p.cidl_type.clone(),
+                                    validators,
+                                },
+                                instance_field: instance_tag.is_some(),
+                            }
+                        })
+                        .collect();
+
+                    DataSourceGetMethod {
+                        parameters,
+                        injected: resolve_injects(&method.inner.method, table, sink),
+                        is_stub: true,
+                    }
+                })
+                .unwrap_or_default();
+
+            let save = ds
+                .save
+                .as_ref()
+                .map(|method| {
+                    let parameters = method
+                        .inner
+                        .parameters
+                        .iter()
+                        .map(|p| {
+                            let (validators, instance_tag) =
+                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Body, sink);
+                            if let Some(tag) = instance_tag {
+                                // Not allowed on save methods
+                                sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
+                            }
+                            ValidatedField {
+                                name: p.name.into(),
+                                cidl_type: p.cidl_type.clone(),
+                                validators,
+                            }
+                        })
+                        .collect();
+
+                    DataSourceMethod {
+                        parameters,
+                        injected: resolve_injects(&method.inner.method, table, sink),
+                        is_stub: true,
+                    }
+                })
+                .unwrap_or_default();
 
             res.push((
                 model_sym.name,
                 DataSource {
                     name: ds.symbol.name,
-                    tree: parsed_include_tree_to_ast(&ds.tree),
+                    tree: parsed_include_tree_to_idl(&ds.tree),
                     list,
                     get,
+                    save,
+                    include_query: String::new(),
+                    get_query: String::new(),
+                    list_query: String::new(),
                     is_internal,
                 },
             ));
         }
 
-        return res;
+        res
+    }
 
-        /// Validates that the raw SQL only references parameters that are defined
-        /// on the method.
-        fn validate_raw_sql<'src, 'p>(
-            source_sym: &'p Symbol<'src>,
-            method: &DataSourceBlockMethod,
-            sink: &mut ErrorSink<'src, 'p>,
-        ) {
-            let mut chars = method.raw_sql.chars().peekable();
-            while let Some(ch) = chars.next() {
-                if ch == '$' {
-                    let name: String =
-                        std::iter::from_fn(|| chars.next_if(|c| c.is_alphanumeric() || *c == '_'))
-                            .collect();
+    /// Validates that a parameter has a sensible type for its method kind and only
+    /// carries tags valid in a data source method parameter.
+    ///
+    /// Returns the resolved validators and the `instance` tag if present.
+    fn validate_ds_param(
+        param: &'p Symbol<'src>,
+        source_sym: &'p Symbol<'src>,
+        kind: DsMethodKind,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> (Vec<Validator<'src>>, Option<&'p Spd<Tag<'src>>>) {
+        let mut instance_tag = None;
 
-                    if !name.is_empty()
-                        && name != "include"
-                        && !method.parameters.iter().any(|p| p.name == name)
-                    {
-                        sink.push(SemanticError::DataSourceUnknownSqlParam {
-                            source: source_sym,
-                            name,
-                        });
-                    }
-                }
+        for tag in param.tags.iter() {
+            match &tag.inner {
+                Tag::Instance => instance_tag = Some(tag),
+                Tag::Validator { .. } => {}
+                _ => sink.push(SemanticError::TagInvalidInContext { tag, symbol: param }),
             }
         }
 
-        /// Validates that a parameter is a valid SQL type and has valid tags for
-        /// a data source method parameter.
-        ///
-        /// Returns a list of resolved validators and whether the parameter is an instance field.
-        fn validate_ds_param<'src, 'p>(
-            param: &'p Symbol<'src>,
-            source_sym: &'p Symbol<'src>,
-            sink: &mut ErrorSink<'src, 'p>,
-        ) -> (Vec<Validator<'src>>, Option<&'p frontend::Spd<Tag<'src>>>) {
-            let mut instance_tag = None;
+        let valid_type = match kind {
+            DsMethodKind::Scalar => is_valid_sql_type(&param.cidl_type),
+            DsMethodKind::Body => !matches!(param.cidl_type.root_type(), CidlType::Stream),
+        };
+        if !valid_type {
+            sink.push(SemanticError::DataSourceInvalidMethodParam {
+                source: source_sym,
+                param,
+            });
+        }
 
-            // Validate tags
-            for tag in param.tags.iter() {
-                match &tag.inner {
-                    Tag::Instance => instance_tag = Some(tag),
-                    Tag::Validator { .. } => {
-                        // Allowed
-                    }
-                    _ => sink.push(SemanticError::TagInvalidInContext { tag, symbol: param }),
-                }
-            }
-
-            // Validate type
-            if !is_valid_sql_type(&param.cidl_type) {
-                sink.push(SemanticError::DataSourceInvalidMethodParam {
-                    source: source_sym,
-                    param,
-                });
-            }
-
-            // Resolve all validator tags
-            match resolve_validator_tags(param) {
-                Ok(v) => (v, instance_tag),
-                Err(errs) => {
-                    sink.extend(errs);
-                    (vec![], None)
-                }
+        match resolve_validator_tags(param) {
+            Ok(v) => (v, instance_tag),
+            Err(errs) => {
+                sink.extend(errs);
+                (vec![], None)
             }
         }
     }
@@ -262,273 +274,188 @@ impl<'src, 'p> DataSourceAnalysis {
 
 pub struct DataSourceExpansion;
 impl<'src> DataSourceExpansion {
-    fn default_data_source(
-        model: &Model<'src>,
-        tree: IncludeTree<'src>,
-        idl: &CloesceIdl,
-    ) -> DataSource<'src> {
-        let Ok(include_sql) = SelectModel::query(model.name, None, Some(&tree), idl) else {
-            // Model doesn't have any D1 fields, no SQL needed.
-            return DataSource {
-                name: "Default",
-                tree,
-                is_internal: false,
-                list: None,
-                get: None,
-            };
-        };
-
-        DataSource {
-            name: "Default",
-            tree,
-            is_internal: false,
-            list: Some(Self::build_default_list(model, &include_sql)),
-            get: Some(Self::build_default_get(model, &include_sql)),
-        }
-    }
-
-    // Simple get by primary key
-    fn build_default_get(model: &Model<'src>, include_sql: &String) -> DataSourceGetMethod<'src> {
-        let parameters = model
-            .primary_columns
-            .iter()
-            .map(|pk| DataSourceGetMethodParam {
-                parameter: pk.field.clone(),
-                instance_field: true,
-            })
-            .collect();
-
-        let where_clause = if model.primary_columns.len() == 1 {
-            let pk = &model.primary_columns[0];
-            format!(r#""{}"."{}""#, model.name, pk.field.name)
-        } else {
-            model
-                .primary_columns
-                .iter()
-                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-                .collect::<Vec<String>>()
-                .join(", ")
-        };
-
-        let params = (0..model.primary_columns.len())
-            .enumerate()
-            .map(|(i, _)| format!("?{}", i + 1))
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let raw_sql = if model.primary_columns.len() == 1 {
-            format!("{include_sql} WHERE {where_clause} = ?1")
-        } else {
-            format!("{include_sql} WHERE ({where_clause}) = ({params})")
-        };
-
-        DataSourceGetMethod {
-            parameters,
-            raw_sql,
-        }
-    }
-
-    // Seek pagination based on primary keys with a limit, ordered by primary key ascending.
-    fn build_default_list(model: &Model<'src>, include_sql: &String) -> DataSourceListMethod<'src> {
-        let parameters = model
-            .primary_columns
-            .iter()
-            .map(|pk| ValidatedField {
-                name: format!("lastSeen_{}", pk.field.name).into(),
-                ..pk.field.clone()
-            })
-            .chain(vec![ValidatedField {
-                name: "limit".into(),
-                cidl_type: CidlType::Int,
-                validators: vec![idl::Validator::GreaterThan(idl::Number::Int(0))],
-            }])
-            .collect();
-
-        let where_clause = if model.primary_columns.len() == 1 {
-            let pk = &model.primary_columns[0];
-            format!(r#""{}"."{}""#, model.name, pk.field.name)
-        } else {
-            model
-                .primary_columns
-                .iter()
-                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-                .collect::<Vec<String>>()
-                .join(", ")
-        };
-
-        let params = (0..model.primary_columns.len())
-            .enumerate()
-            .map(|(i, _)| format!("?{}", i + 1))
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let where_expr = if model.primary_columns.len() == 1 {
-            format!("{where_clause} > ?1")
-        } else {
-            format!("({where_clause}) > ({params})")
-        };
-
-        let order = model
-            .primary_columns
-            .iter()
-            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-            .collect::<Vec<String>>()
-            .join(" ASC, ")
-            + " ASC";
-
-        let limit_param = model.primary_columns.len() + 1;
-        let raw_sql =
-            format!("{include_sql} WHERE {where_expr} ORDER BY {order} LIMIT ?{limit_param}");
-
-        DataSourceListMethod {
-            parameters,
-            raw_sql,
-        }
-    }
-
-    /// Normalizes input and resolves `$parameterName` placeholders
-    /// to positional `?N` syntax for prepared statements.
-    pub fn resolve_sql_params(
-        raw_sql: &str,
-        params: &[&ValidatedField<'_>],
-        include_sql: &str,
-    ) -> String {
-        // Normalize whitespace to keep generated SQL stable.
-        let normalized = raw_sql.split_whitespace().collect::<Vec<_>>().join(" ");
-
-        let mut result = String::with_capacity(normalized.len());
-        let mut chars = normalized.chars().peekable();
-
-        while let Some(ch) = chars.next() {
-            if ch == '$' {
-                // Collect an identifier following '$'.
-                let mut name = String::new();
-                while let Some(&c) = chars.peek() {
-                    if c.is_alphanumeric() || c == '_' {
-                        name.push(c);
-                        chars.next();
-                    } else {
-                        break;
-                    }
-                }
-
-                if name.is_empty() {
-                    // Standalone '$', keep as-is.
-                    result.push('$');
-                    continue;
-                }
-
-                if name == "include" {
-                    // Expand $include to the full include SQL.
-                    result.push_str(include_sql);
-                    continue;
-                }
-
-                // Look up the parameter index by exact name match.
-                if let Some((idx, _param)) = params
-                    .iter()
-                    .enumerate()
-                    .find(|(_, p)| p.name.as_ref() == name.as_str())
-                {
-                    // Replace with positional parameter ?N.
-                    result.push('?');
-                    result.push_str(&(idx + 1).to_string());
-                } else {
-                    // Unknown placeholder here: keep it literal.
-                    result.push('$');
-                    result.push_str(&name);
-                }
-            } else {
-                result.push(ch);
-            }
-        }
-
-        result
-    }
-
-    /// Creates a default [DataSource] for any model that doesn't have one,
-    /// including default get/list SQL queries for models with D1 fields.
+    /// Adds a `Default` [DataSource] to every D1-backed model that doesn't have one,
+    /// then for every DS: precomputes the include/get/list SQL and synthesizes default
+    /// get/list/save methods for any verb the user didn't declare as a stub.
     ///
-    /// Each data source has a default [IncludeTree] with all KV, R2, 1:1, 1:N and M:N relationships by default.
-    /// Does not include relationships after a 1:N or M:N to avoid explosion (of sql joins not the computer).
+    /// The default include tree contains all KV, R2, 1:1, 1:N and M:N relationships,
+    /// but stops recursing after a 1:N or M:N to avoid join explosion.
     pub fn expand(idl: &mut CloesceIdl<'src>) {
-        // For each model without a default DS, build one
-        {
-            let models_to_process = idl
-                .models
-                .iter()
-                .filter(|(_, model)| !model.is_dataless() && model.default_data_source().is_none())
-                .map(|(_, model)| model.name)
-                .collect::<Vec<&str>>();
+        let needs_default = idl
+            .models
+            .values()
+            .filter(|m| {
+                (m.database_binding.is_some() || !m.route_fields.is_empty())
+                    && m.default_data_source().is_none()
+            })
+            .map(|m| m.name)
+            .collect::<Vec<&str>>();
 
-            for model_name in models_to_process {
-                let data_source = {
-                    let tree = Self::include_dfs(&idl.models, model_name, &mut HashSet::new());
-                    let model = idl.models.get(&model_name).unwrap();
-                    Self::default_data_source(model, tree, idl)
-                };
-
-                idl.models
-                    .get_mut(model_name)
-                    .unwrap()
-                    .data_sources
-                    .insert(data_source.name, data_source);
-            }
+        for name in needs_default {
+            let tree = Self::include_dfs(&idl.models, name, &mut HashSet::new());
+            idl.models.get_mut(name).unwrap().data_sources.insert(
+                "Default",
+                DataSource {
+                    name: "Default",
+                    tree,
+                    list: DataSourceMethod::default(),
+                    get: DataSourceGetMethod::default(),
+                    save: DataSourceMethod::default(),
+                    include_query: String::new(),
+                    get_query: String::new(),
+                    list_query: String::new(),
+                    is_internal: false,
+                },
+            );
         }
 
-        // Fill in any missing get/list with the default implementation
         let pending = idl
             .models
             .values()
-            .filter(|m| m.has_d1())
-            .map(|model| {
-                let defaults = model
-                    .data_sources
-                    .iter()
-                    .map(|(ds_name, ds)| {
-                        let sql =
-                            SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap();
+            .filter(|m| m.database_binding.is_some())
+            .flat_map(|model| {
+                model.data_sources.iter().map(|(ds_name, ds)| {
+                    let include_query = SelectModel::query(model.name, None, Some(&ds.tree), idl)
+                        .unwrap_or_default();
+                    let bindings = model_bindings(idl, model, Some(&ds.tree));
 
-                        let get = ds
-                            .get
-                            .is_none()
-                            .then(|| Self::build_default_get(model, &sql));
-                        let list = ds
-                            .list
-                            .is_none()
-                            .then(|| Self::build_default_list(model, &sql));
-                        (*ds_name, get, list, sql)
-                    })
-                    .collect();
-                (model.name, defaults)
+                    let get_query = Self::build_get_query(model, &include_query);
+                    let list_query = Self::build_list_query(model, &include_query);
+
+                    // One PK-instance parameter per primary key column.
+                    let get = ds.get.is_stub.not().then(|| DataSourceGetMethod {
+                        parameters: model
+                            .primary_columns
+                            .iter()
+                            .map(|pk| DataSourceGetMethodParam {
+                                parameter: pk.field.clone(),
+                                instance_field: true,
+                            })
+                            .collect(),
+                        injected: bindings.clone(),
+                        is_stub: false,
+                    });
+
+                    // Seek-pagination params: `lastSeen_<pk>...`, `limit`.
+                    let list = ds.list.is_stub.not().then(|| DataSourceMethod {
+                        parameters: model
+                            .primary_columns
+                            .iter()
+                            .map(|pk| ValidatedField {
+                                name: format!("lastSeen_{}", pk.field.name).into(),
+                                ..pk.field.clone()
+                            })
+                            .chain(std::iter::once(ValidatedField {
+                                name: "limit".into(),
+                                cidl_type: CidlType::Int,
+                                validators: vec![Validator::GreaterThan(Number::Int(0))],
+                            }))
+                            .collect(),
+                        injected: bindings.clone(),
+                        is_stub: false,
+                    });
+
+                    // Single `model: partial<Model>` parameter.
+                    let save = ds.save.is_stub.not().then(|| DataSourceMethod {
+                        parameters: vec![ValidatedField {
+                            name: "model".into(),
+                            cidl_type: CidlType::Partial {
+                                object_name: model.name,
+                            },
+                            validators: vec![],
+                        }],
+                        injected: bindings,
+                        is_stub: false,
+                    });
+
+                    (
+                        model.name,
+                        *ds_name,
+                        include_query,
+                        get_query,
+                        list_query,
+                        get,
+                        list,
+                        save,
+                    )
+                })
             })
-            .collect::<Vec<(&str, Vec<_>)>>();
+            .collect::<Vec<_>>();
 
-        for (name, defaults) in pending {
-            let model = idl.models.get_mut(name).unwrap();
-            for (ds_name, get, list, include_sql) in defaults {
-                // Update the existing data source with missing get/list methods
-                let ds = model.data_sources.get_mut(ds_name).unwrap();
-                if let Some(g) = get {
-                    ds.get = Some(g);
-                }
-                if let Some(l) = list {
-                    ds.list = Some(l);
-                }
+        for (model_name, ds_name, include_query, get_query, list_query, get, list, save) in pending
+        {
+            let Some(ds) = idl
+                .models
+                .get_mut(model_name)
+                .and_then(|m| m.data_sources.get_mut(ds_name))
+            else {
+                continue;
+            };
+            ds.include_query = include_query;
+            ds.get_query = get_query;
+            ds.list_query = list_query;
+            if let Some(g) = get {
+                ds.get = g;
+            }
+            if let Some(l) = list {
+                ds.list = l;
+            }
+            if let Some(s) = save {
+                ds.save = s;
+            }
+        }
 
-                // Resolve $paramName -> ?N
-                if let Some(m) = &mut ds.get {
-                    let params = m
-                        .parameters
-                        .iter()
-                        .map(|p| &p.parameter)
-                        .collect::<Vec<_>>();
-                    m.raw_sql = Self::resolve_sql_params(&m.raw_sql, &params, &include_sql);
-                }
-                if let Some(m) = &mut ds.list {
-                    let params = m.parameters.iter().collect::<Vec<_>>();
-                    m.raw_sql = Self::resolve_sql_params(&m.raw_sql, &params, &include_sql);
-                }
+        // Route models have no SQL, but still synthesize a `get` keyed on their route
+        // fields (so the runtime can fetch them and resolve their navigations) and a
+        // `save` that persists their KV/R2 fields.
+        let route_pending = idl
+            .models
+            .values()
+            .filter(|m| m.database_binding.is_none() && !m.route_fields.is_empty())
+            .flat_map(|model| {
+                model.data_sources.keys().map(|ds_name| {
+                    let bindings = model_bindings(idl, model, None);
+                    let get = DataSourceGetMethod {
+                        parameters: model
+                            .route_fields
+                            .iter()
+                            .map(|f| DataSourceGetMethodParam {
+                                parameter: f.clone(),
+                                instance_field: true,
+                            })
+                            .collect(),
+                        injected: bindings.clone(),
+                        is_stub: false,
+                    };
+                    let save = DataSourceMethod {
+                        parameters: vec![ValidatedField {
+                            name: "model".into(),
+                            cidl_type: CidlType::Partial {
+                                object_name: model.name,
+                            },
+                            validators: vec![],
+                        }],
+                        injected: bindings,
+                        is_stub: false,
+                    };
+                    (model.name, *ds_name, get, save)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for (model_name, ds_name, get, save) in route_pending {
+            let Some(ds) = idl
+                .models
+                .get_mut(model_name)
+                .and_then(|m| m.data_sources.get_mut(ds_name))
+            else {
+                continue;
+            };
+            if !ds.get.is_stub {
+                ds.get = get;
+            }
+            if !ds.save.is_stub {
+                ds.save = save;
             }
         }
     }
@@ -560,11 +487,10 @@ impl<'src> DataSourceExpansion {
                         // Skip to avoid circular reference
                         continue;
                     }
-
                     let new_node = Self::include_dfs(models, nav.model_reference, visited);
                     current_node.0.insert(nav.field.name.clone(), new_node);
                 }
-                NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
+                NavigationFieldKind::OneToMany { .. } => {
                     // Include the related model as a leaf, but don't recurse.
                     current_node
                         .0
@@ -588,13 +514,62 @@ impl<'src> DataSourceExpansion {
         visited.remove(current_model);
         current_node
     }
+
+    /// Basic primary key fetch SELECT, e.g. `{include_query} WHERE "Model"."pk" = ?1`.
+    fn build_get_query(model: &Model, include_query: &str) -> String {
+        let cols = model
+            .primary_columns
+            .iter()
+            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+            .collect::<Vec<_>>();
+        let placeholders = (1..=cols.len())
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>();
+
+        if cols.len() == 1 {
+            format!("{include_query} WHERE {} = {}", cols[0], placeholders[0])
+        } else {
+            format!(
+                "{include_query} WHERE ({}) = ({})",
+                cols.join(", "),
+                placeholders.join(", ")
+            )
+        }
+    }
+
+    /// Seek-pagination SELECT keyed off the primary key:
+    /// `{include_query} WHERE pk > ?1 ORDER BY pk ASC LIMIT ?N`.
+    fn build_list_query(model: &Model, include_query: &str) -> String {
+        let cols = model
+            .primary_columns
+            .iter()
+            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+            .collect::<Vec<_>>();
+        let placeholders = (1..=cols.len())
+            .map(|i| format!("?{i}"))
+            .collect::<Vec<_>>();
+        let limit = format!("?{}", cols.len() + 1);
+        let order = cols
+            .iter()
+            .map(|c| format!("{c} ASC"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let where_clause = if cols.len() == 1 {
+            format!("{} > {}", cols[0], placeholders[0])
+        } else {
+            format!("({}) > ({})", cols.join(", "), placeholders.join(", "))
+        };
+
+        format!("{include_query} WHERE {where_clause} ORDER BY {order} LIMIT {limit}")
+    }
 }
 
-fn parsed_include_tree_to_ast<'src>(tree: &ParsedIncludeTree<'src>) -> IncludeTree<'src> {
+fn parsed_include_tree_to_idl<'src>(tree: &ParsedIncludeTree<'src>) -> IncludeTree<'src> {
     IncludeTree(
         tree.0
             .iter()
-            .map(|(sym, child)| (sym.name.into(), parsed_include_tree_to_ast(child)))
+            .map(|(sym, child)| (sym.name.into(), parsed_include_tree_to_idl(child)))
             .collect(),
     )
 }

@@ -12,7 +12,6 @@
     "Dog": {
       "hash": 16625692680497709233,
       "name": "Dog",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -53,7 +52,8 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -120,7 +120,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -144,7 +146,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -156,8 +162,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Dog"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"name\" AS \"name\", \"Dog\".\"age\" AS \"age\" FROM \"Dog\"",
+          "get_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"name\" AS \"name\", \"Dog\".\"age\" AS \"age\" FROM \"Dog\" WHERE \"Dog\".\"id\" = ?1",
+          "list_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"name\" AS \"name\", \"Dog\".\"age\" AS \"age\" FROM \"Dog\" WHERE \"Dog\".\"id\" > ?1 ORDER BY \"Dog\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

@@ -1,36 +1,32 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
+}
 
-    kv {
-        store
+kv store {
+    [maxlen 500]
+    data([regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/] email: string) -> string {
+        "some_crap/{email}"
     }
 }
 
-[use db]
 [crud save, get, list]
-model Validator {
+model Validator for db {
     primary {
         [lt 100]
         id: int
     }
 
     column {
-        [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
+        // because store::data(email) is used,
+        // the validator will be inherited and placed on
+        // the email field
         [maxlen 255]
         [minlen 5]
         email: string
     }
 
-    keyfield {
-        [len 10]
-        name: string
-    }
-
-    kv(store, "some_crap/{email}/{name}") {
-        [maxlen 500]
-        data: string
+    kv store::data(email) {
+        someData
     }
 }
 

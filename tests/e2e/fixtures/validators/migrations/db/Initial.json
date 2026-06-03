@@ -4,7 +4,7 @@
     "Validator": {
       "hash": 1908438877902929966,
       "name": "Validator",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -32,13 +32,13 @@
             "cidl_type": "String",
             "validators": [
               {
-                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-              },
-              {
                 "MaxLength": 255
               },
               {
                 "MinLength": 5
+              },
+              {
+                "Regex": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
               }
             ]
           },

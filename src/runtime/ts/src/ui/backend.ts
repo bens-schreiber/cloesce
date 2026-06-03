@@ -5,7 +5,6 @@ import { u8ToB64 } from "../common.js";
  * cloesce/backend
  */
 export { CloesceApp, DependencyContainer } from "../router/router.js";
-export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../cidl.js";
 export { Orm } from "../router/orm.js";
 export type { R2ObjectBody } from "@cloudflare/workers-types";
@@ -111,6 +110,15 @@ export class HttpResult<T = unknown> {
   }
 
   toResponse(): Response {
+    if (!this.mediaType || !this.ok) {
+      // Errors are always text.
+      this.headers.set("Content-Type", "text/plain");
+      return new Response(this.message, {
+        status: this.status,
+        headers: this.headers,
+      });
+    }
+
     let body: BodyInit;
     switch (this.mediaType) {
       case "Json": {
@@ -148,14 +156,6 @@ export class HttpResult<T = unknown> {
         // Assume proper BodyInit
         body = this.data as BodyInit;
         break;
-      }
-      case undefined: {
-        // Errors are always text.
-        this.headers.set("Content-Type", "text/plain");
-        return new Response(this.message, {
-          status: this.status,
-          headers: this.headers,
-        });
       }
     }
 

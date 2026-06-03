@@ -54,11 +54,9 @@ impl ClientTemplate<'_> {
             NavigationFieldKind::OneToOne { .. } => CidlType::Object {
                 name: nav.model_reference,
             },
-            NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
-                CidlType::array(CidlType::Object {
-                    name: nav.model_reference,
-                })
-            }
+            NavigationFieldKind::OneToMany { .. } => CidlType::array(CidlType::Object {
+                name: nav.model_reference,
+            }),
         };
         self.mapper.cidl_type(&cidl_type, self.idl)
     }
@@ -97,6 +95,10 @@ impl ClientTemplate<'_> {
         matches!(ty.root_type(), CidlType::Blob)
     }
 
+    fn is_date(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::DateIso)
+    }
+
     fn is_object(&self, ty: &CidlType<'_>) -> bool {
         matches!(
             ty.root_type(),
@@ -131,8 +133,7 @@ impl ClientTemplate<'_> {
     ) -> &'t [DataSourceGetMethodParam<'t>] {
         api.data_source
             .and_then(|n| model.data_sources.get(n))
-            .and_then(|ds| ds.get.as_ref())
-            .map(|g| g.parameters.as_slice())
+            .map(|ds| ds.get.parameters.as_slice())
             .unwrap_or(&[])
     }
 }

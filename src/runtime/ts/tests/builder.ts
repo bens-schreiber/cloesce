@@ -3,7 +3,6 @@ import {
   Cidl,
   IncludeTree,
   Field,
-  ValidatedField,
   HttpVerb,
   CidlType,
   NavigationFieldKind,
@@ -14,6 +13,7 @@ import {
   CrudKind,
   KvField,
   R2Field,
+  ValidatedField,
 } from "../src/cidl";
 
 export function createIdl(args?: { models?: Model[] }): Cidl {
@@ -22,20 +22,26 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
   for (const model of Object.values(modelsMap)) {
     model.data_sources["Default"] ??= {
       name: "Default",
+      tree: {},
+      include_query: "",
+      get_query: "",
+      list_query: "",
+      get: { parameters: [], injected: [], is_stub: false },
+      list: { parameters: [], injected: [], is_stub: false },
+      save: { parameters: [], injected: [], is_stub: false },
       is_internal: false,
-      gen: { include: {} } as any,
     };
   }
 
   return {
-    models: modelsMap,
-    poos: {},
     wrangler_env: {
-      d1_bindings: ["d1"],
+      d1_bindings: [],
       kv_bindings: [],
       r2_bindings: [],
       vars: [],
     },
+    models: modelsMap,
+    poos: {},
     injects: [],
   };
 }
@@ -65,12 +71,12 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private d1_binding: string | null = null;
+  private database_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
+  private route_fields: ValidatedField[] = [];
   private navigation_fields: NavigationField[] = [];
-  private key_fields: ValidatedField[] = [];
   private kv_fields: KvField[] = [];
   private r2_fields: R2Field[] = [];
   private apis: ApiMethod[] = [];
@@ -86,12 +92,12 @@ export class ModelBuilder {
   }
 
   d1(binding: string): this {
-    this.d1_binding = binding;
+    this.database_binding = binding;
     return this;
   }
 
   defaultDb(): this {
-    this.d1_binding = "d1";
+    this.database_binding = "d1";
     return this;
   }
 
@@ -106,6 +112,11 @@ export class ModelBuilder {
       unique_ids: [],
       composite_id: null,
     });
+    return this;
+  }
+
+  routeField(name: string, cidl_type: CidlType): this {
+    this.route_fields.push({ name, cidl_type, validators: [] });
     return this;
   }
 
@@ -130,43 +141,25 @@ export class ModelBuilder {
     return this.pk("id", "Int");
   }
 
-  keyField(name: string): this {
-    this.key_fields.push({ name, cidl_type: "String", validators: [] });
-    return this;
-  }
-
-  kvField(
-    format: string,
-    binding: string,
-    name: string,
-    list_prefix: boolean,
-    cidl_type: CidlType,
-    format_parameters: Field[] = [],
-  ): this {
+  kvField(key_format: string, binding: string, name: string, cidl_type: CidlType): this {
     this.kv_fields.push({
       field: { name, cidl_type, validators: [] },
-      format,
-      format_parameters,
+      key_format,
       binding,
-      list_prefix,
     });
     return this;
   }
 
   r2Field(
-    format: string,
+    key_format: string,
     binding: string,
     name: string,
-    list_prefix: boolean,
     cidl_type: CidlType = "R2Object",
-    format_parameters: Field[] = [],
   ): this {
     this.r2_fields.push({
       field: { name, cidl_type },
-      format,
-      format_parameters,
+      key_format,
       binding,
-      list_prefix,
     });
     return this;
   }
@@ -174,7 +167,7 @@ export class ModelBuilder {
   method(
     name: string,
     http_verb: HttpVerb,
-    parameters: ValidatedField[],
+    parameters: Field[],
     return_type: CidlType,
     data_source: string | null = null,
   ): this {
@@ -182,7 +175,7 @@ export class ModelBuilder {
       name,
       http_verb,
       is_static: data_source === null,
-      parameters,
+      parameters: parameters.map((p) => ({ ...p, validators: [] })),
       return_type,
       return_media: "Json",
       parameters_media: "Json",
@@ -195,16 +188,22 @@ export class ModelBuilder {
   dataSource(name: string, tree: IncludeTree, get?: Field[], is_internal: boolean = false): this {
     this.data_sources[name] = {
       name,
+      tree,
+      include_query: "",
+      get_query: "",
+      list_query: "",
+      get: {
+        parameters:
+          get?.map((f) => ({
+            parameter: { ...f, validators: [] },
+            instance_field: false,
+          })) ?? [],
+        injected: [],
+        is_stub: false,
+      },
+      list: { parameters: [], injected: [], is_stub: false },
+      save: { parameters: [], injected: [], is_stub: false },
       is_internal,
-      gen: { include: tree } as any,
-      get: get
-        ? {
-            parameters: get.map((f) => ({
-              parameter: { ...f, validators: [] },
-              instance_field: false,
-            })),
-          }
-        : undefined,
     };
     return this;
   }
@@ -239,11 +238,11 @@ export class ModelBuilder {
 
     return {
       name: this.name,
-      d1_binding: this.d1_binding,
+      database_binding: this.database_binding,
       primary_columns,
       columns: mutableColumns,
+      route_fields: this.route_fields,
       navigation_fields: this.navigation_fields,
-      key_fields: this.key_fields,
       kv_fields: this.kv_fields,
       r2_fields: this.r2_fields,
       apis: this.apis,

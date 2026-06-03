@@ -11,7 +11,9 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 
@@ -75,12 +77,6 @@ pub enum CidlType<'src> {
     /// A Cloudflare Workers KV object (GET value response)
     #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
-
-    /// A reference to an object or injected type that is not yet resolved by semantic analysis.
-    UnresolvedReference {
-        #[serde(borrow)]
-        name: &'src str,
-    },
 }
 
 impl<'src> CidlType<'src> {
@@ -184,15 +180,14 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-/// A D1 Navigation field, representing a relationship to another model
-/// through a foreign key or composite foreign key.
+/// Represents a relationship to another model
 #[derive(Deserialize, Serialize, Hash)]
 pub enum NavigationFieldKind<'src> {
     OneToOne {
-        /// The columns on the current model that reference the other model's primary key.
-        /// Multiple columns indicate a composite foreign key.
+        /// The fields on the current model that reference the other model's primary key.
+        /// Multiple fields indicate a composite foreign key.
         #[serde(borrow)]
-        columns: Vec<&'src str>,
+        fields: Vec<&'src str>,
     },
     OneToMany {
         /// The columns on the other model that reference the current model's primary key.
@@ -200,10 +195,6 @@ pub enum NavigationFieldKind<'src> {
         #[serde(borrow)]
         columns: Vec<&'src str>,
     },
-
-    /// A many to many relationship expressed through a join table,
-    /// consisting of the two models primary keys (be they composite or not).
-    ManyToMany,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -220,14 +211,6 @@ pub struct NavigationField<'src> {
 
     #[serde(borrow)]
     pub kind: NavigationFieldKind<'src>,
-}
-
-impl<'src> NavigationField<'src> {
-    pub fn many_to_many_table_name(&self, parent_model_name: &'src str) -> String {
-        let mut names = [parent_model_name, self.model_reference];
-        names.sort();
-        format!("{}{}", names[0], names[1])
-    }
 }
 
 #[derive(Deserialize, Serialize, Hash)]
@@ -270,13 +253,17 @@ pub enum CrudKind {
     Save,
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct DataSourceListMethod<'src> {
+#[derive(Deserialize, Serialize, Default)]
+pub struct DataSourceMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<ValidatedField<'src>>,
 
-    #[serde(skip)]
-    pub raw_sql: String,
+    #[serde(borrow)]
+    pub injected: Vec<&'src str>,
+
+    /// True if the user declared this method as a stub in the schema (must be implemented
+    /// by the user). False if the compiler synthesized the default PK/seek-pagination impl.
+    pub is_stub: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -285,17 +272,22 @@ pub struct DataSourceGetMethodParam<'src> {
     pub parameter: ValidatedField<'src>,
 
     /// True if the parameter matches a field on the model,
-    /// meaning the client can automatically populate it when calling the method on an instance of the model.
+    /// meaning the client can automatically populate it when calling the method
+    /// on an instance of the model.
     pub instance_field: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Default)]
 pub struct DataSourceGetMethod<'src> {
     #[serde(borrow)]
     pub parameters: Vec<DataSourceGetMethodParam<'src>>,
 
-    #[serde(skip)]
-    pub raw_sql: String,
+    #[serde(borrow)]
+    pub injected: Vec<&'src str>,
+
+    /// True if the user declared this method as a stub in the schema (must be implemented
+    /// by the user). False if the compiler synthesized the default PK fetch.
+    pub is_stub: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -307,31 +299,44 @@ pub struct DataSource<'src> {
     pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
-    pub list: Option<DataSourceListMethod<'src>>,
+    pub list: DataSourceMethod<'src>,
 
     #[serde(borrow)]
-    pub get: Option<DataSourceGetMethod<'src>>,
+    pub get: DataSourceGetMethod<'src>,
 
-    /// True if the data source is only used for internal method implementations
-    /// and should not be exposed on the client.
+    #[serde(borrow)]
+    pub save: DataSourceMethod<'src>,
+
+    /// A raw SQL query generated from the WASM `select` method.
+    /// Empty if the data source is not backed by a SQL db
+    pub include_query: String,
+
+    /// Fetch by primary key based on [Self::include_query]
+    pub get_query: String,
+
+    /// Seek pagination query based on [Self::include_query]
+    pub list_query: String,
+
+    /// True if the data source should not be exposed to the client
     pub is_internal: bool,
+}
+
+impl DataSource<'_> {
+    /// True if any of get/list/save was user-declared as a stub (must be implemented).
+    pub fn has_stubs(&self) -> bool {
+        self.get.is_stub || self.list.is_stub || self.save.is_stub
+    }
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct KvField<'src> {
-    #[serde(borrow)]
     pub field: ValidatedField<'src>,
 
-    #[serde(borrow)]
-    pub format: &'src str,
-
-    #[serde(borrow)]
-    pub format_parameters: Vec<Field<'src>>,
-
+    /// The KV namespace being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub list_prefix: bool,
+    pub key_format: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -339,16 +344,11 @@ pub struct R2Field<'src> {
     #[serde(borrow)]
     pub field: Field<'src>,
 
-    #[serde(borrow)]
-    pub format: &'src str,
-
-    #[serde(borrow)]
-    pub format_parameters: Vec<Field<'src>>,
-
+    /// The R2 bucket being referenced.
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub list_prefix: bool,
+    pub key_format: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq)]
@@ -395,9 +395,6 @@ pub struct Model<'src> {
     pub name: &'src str,
 
     #[serde(borrow)]
-    pub d1_binding: Option<&'src str>,
-
-    #[serde(borrow)]
     pub primary_columns: Vec<Column<'src>>,
 
     #[serde(borrow)]
@@ -412,8 +409,12 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub navigation_fields: Vec<NavigationField<'src>>,
 
+    #[serde(borrow, default)]
+    pub route_fields: Vec<ValidatedField<'src>>,
+
+    /// References a Wrangler binding if this model is backed by a SQLite database
     #[serde(borrow)]
-    pub key_fields: Vec<ValidatedField<'src>>,
+    pub database_binding: Option<&'src str>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
@@ -425,10 +426,6 @@ pub struct Model<'src> {
 }
 
 impl Model<'_> {
-    pub fn has_d1(&self) -> bool {
-        self.d1_binding.is_some()
-    }
-
     pub fn has_kv(&self) -> bool {
         !self.kv_fields.is_empty()
     }
@@ -444,18 +441,6 @@ impl Model<'_> {
 
     pub fn has_composite_pk(&self) -> bool {
         self.primary_columns.len() > 1
-    }
-
-    /// A "data-less" model has no actual data stored on it, and serves
-    /// only as a namespace for APIs.
-    pub fn is_dataless(&self) -> bool {
-        self.d1_binding.is_none()
-            && self.primary_columns.is_empty()
-            && self.columns.is_empty()
-            && self.kv_fields.is_empty()
-            && self.r2_fields.is_empty()
-            && self.key_fields.is_empty()
-            && self.navigation_fields.is_empty()
     }
 
     /// Returns all columns, including primary key columns, as a single list.
@@ -477,16 +462,37 @@ pub struct PlainOldObject<'src> {
     pub fields: Vec<ValidatedField<'src>>,
 }
 
+/// Some field within a KV or R2 binding
+/// which represents a function to create keys for the binding
 #[derive(Deserialize, Serialize)]
+pub struct BindingTemplate<'src> {
+    #[serde(borrow)]
+    pub field: ValidatedField<'src>,
+
+    #[serde(borrow)]
+    pub params: Vec<ValidatedField<'src>>,
+
+    #[serde(borrow)]
+    pub key_format: &'src str,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Binding<'src> {
+    pub name: &'src str,
+    pub templates: Vec<BindingTemplate<'src>>,
+}
+
+#[derive(Deserialize, Serialize, Default)]
 pub struct WranglerEnv<'src> {
+    /// Contains each d1 binding name
     #[serde(borrow)]
     pub d1_bindings: Vec<&'src str>,
 
     #[serde(borrow)]
-    pub kv_bindings: Vec<&'src str>,
+    pub kv_bindings: Vec<Binding<'src>>,
 
     #[serde(borrow)]
-    pub r2_bindings: Vec<&'src str>,
+    pub r2_bindings: Vec<Binding<'src>>,
 
     #[serde(borrow)]
     pub vars: Vec<Field<'src>>,
@@ -501,7 +507,7 @@ pub struct CloesceIdl<'src> {
     pub hash: u64,
 
     #[serde(borrow)]
-    pub wrangler_env: Option<WranglerEnv<'src>>,
+    pub wrangler_env: WranglerEnv<'src>,
 
     #[serde(borrow)]
     pub models: IndexMap<&'src str, Model<'src>>,
@@ -528,10 +534,16 @@ impl CloesceIdl<'_> {
 
         let mut root_h = FxHasher::default();
         for model in self.models.values_mut() {
+            // Route models have no SQL representation, so they are excluded from
+            // the merkle hash, which tracks migration-relevant schema changes.
+            if model.database_binding.is_none() && !model.route_fields.is_empty() {
+                continue;
+            }
+
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
-            model.d1_binding.hash(&mut model_h);
+            model.database_binding.hash(&mut model_h);
 
             for pk in model.primary_columns.iter_mut() {
                 let pk_col_h = {
@@ -632,7 +644,7 @@ pub struct MigrationsModel<'src> {
     pub name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub d1_binding: Option<String>,
+    pub database_binding: Option<String>,
 
     #[serde(borrow)]
     pub primary_columns: Vec<Column<'src>>,
@@ -671,5 +683,62 @@ impl<'src> MigrationsIdl<'src> {
 
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
+    }
+}
+
+/// All Wrangler bindings (D1 / KV / R2) a model's view through `include` may touch.
+///
+/// Walks the include tree: each nav field's target model is recursed into;
+/// kv/r2 fields contribute their binding when included.
+///
+/// An [IncludeTree] of [None] means every single nav field is included and recursed into,
+/// while [Some] will use only the nav fields specified in the tree, ignoring the rest.
+pub fn model_bindings<'src>(
+    idl: &CloesceIdl<'src>,
+    model: &Model<'src>,
+    include: Option<&IncludeTree<'src>>,
+) -> Vec<&'src str> {
+    let mut visited = HashSet::new();
+    let mut bindings = BTreeSet::new();
+    collect_model_bindings(idl, model, include, &mut visited, &mut bindings);
+    bindings.into_iter().collect()
+}
+
+fn collect_model_bindings<'src>(
+    idl: &CloesceIdl<'src>,
+    model: &Model<'src>,
+    include: Option<&IncludeTree<'src>>,
+    visited: &mut HashSet<&'src str>,
+    bindings: &mut BTreeSet<&'src str>,
+) {
+    if !visited.insert(model.name) {
+        return;
+    }
+    let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
+
+    if let Some(b) = model.database_binding {
+        bindings.insert(b);
+    }
+    for kv in &model.kv_fields {
+        if included(kv.field.name.as_ref()) {
+            bindings.insert(kv.binding);
+        }
+    }
+    for r2 in &model.r2_fields {
+        if included(r2.field.name.as_ref()) {
+            bindings.insert(r2.binding);
+        }
+    }
+    for nav in &model.navigation_fields {
+        let subtree = match include {
+            Some(t) => match t.0.get(nav.field.name.as_ref()) {
+                Some(sub) => Some(sub),
+                None => continue,
+            },
+            None => None,
+        };
+        if let Some(referenced) = idl.models.get(nav.model_reference) {
+            collect_model_bindings(idl, referenced, subtree, visited, bindings);
+        }
     }
 }

@@ -92,6 +92,7 @@ export class CrudHaver {
       true
     );
   }
+
   static fromJson(data: any): CrudHaver {
     const __$res = Object.assign(new CrudHaver(), data);
     return __$res;
@@ -232,6 +233,7 @@ export class Parent {
       true
     );
   }
+
   static fromJson(data: any): Parent {
     const __$res = Object.assign(new Parent(), data);
     __$res["favoriteChild"] &&= Child.fromJson(__$res.favoriteChild);
@@ -245,6 +247,7 @@ export class Child {
   id: number;
   parentId: number;
   parent: Parent | undefined;
+
   static fromJson(data: any): Child {
     const __$res = Object.assign(new Child(), data);
     __$res["parent"] &&= Parent.fromJson(__$res.parent);

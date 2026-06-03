@@ -19,9 +19,6 @@ pub enum SemanticError<'src, 'p> {
         symbol: &'p Symbol<'src>,
     },
 
-    /// A model relies on a Wrangler environment block that is not defined within the project.
-    MissingWranglerEnvBlock,
-
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
     D1ModelMissingD1Binding {
         model: &'p Symbol<'src>,
@@ -30,12 +27,7 @@ pub enum SemanticError<'src, 'p> {
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
         model: &'p Symbol<'src>,
-        binding: &'p Spd<&'src str>,
-    },
-
-    D1ModelMultipleD1Bindings {
-        model: &'p Symbol<'src>,
-        bindings: Vec<&'p Spd<&'src str>>,
+        binding: &'p Symbol<'src>,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
@@ -63,7 +55,7 @@ pub enum SemanticError<'src, 'p> {
     ForeignKeyReferencesDifferentDatabase {
         model: &'p Symbol<'src>,
         fk_model: &'p Symbol<'src>,
-        fk_binding: Option<&'p Spd<&'src str>>,
+        fk_binding: Option<&'p Symbol<'src>>,
     },
 
     // A foreign key references a field that is not a valid SQLite type
@@ -84,17 +76,35 @@ pub enum SemanticError<'src, 'p> {
         second_model: &'p Symbol<'src>,
     },
 
-    NavigationReferencesDifferentDatabase {
+    /// A navigation property references a model with a different backing: a different D1
+    /// database, or one side is a route model and the other is not.
+    NavigationReferencesDifferentBacking {
         field: &'p Symbol<'src>,
     },
 
-    /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
-    NavigationMissingReciprocalM2M {
-        field: &'p Symbol<'src>,
+    /// A route model declares a block it cannot have: a `for` binding, or a SQL block
+    /// (column/foreign/primary/unique).
+    RouteModelInvalidBlock {
+        model: &'p Symbol<'src>,
+        block: &'static str,
     },
 
-    /// A many-to-many navigation property found multiple reciprocal M2M navs on the adjacent model.
-    NavigationAmbiguousM2M {
+    /// A route model declares a navigation that is not a 1:1 to another route model.
+    RouteNavigationInvalid {
+        field: &'p Symbol<'src>,
+        reason: &'static str,
+    },
+
+    /// A navigation property could not be resolved to either a 1:1 or a 1:M
+    /// relationship because no matching foreign key exists.
+    NavigationMissingForeignKey {
+        field: &'p Symbol<'src>,
+        model_reference: &'src str,
+    },
+
+    /// A navigation property mixes 1:1 entries (with a local key) and 1:M
+    /// entries (without one) in the same adjacency list.
+    NavigationMixedAdjacency {
         field: &'p Symbol<'src>,
     },
 
@@ -102,28 +112,28 @@ pub enum SemanticError<'src, 'p> {
         cycle: Vec<&'src str>,
     },
 
-    KeyFieldInvalidType {
+    /// A model's KV/R2 reference supplies a different number of args than the binding field's params.
+    ArgCountMismatch {
         field: &'p Symbol<'src>,
+        expected: usize,
+        got: usize,
     },
 
-    /// A KV tag references an env binding that is not a KV namespace
-    KvInvalidBinding {
-        binding: &'p Symbol<'src>,
+    /// A model's KV/R2 reference supplies an arg whose type does not match the binding param's type.
+    ArgTypeMismatch {
+        field: &'p Symbol<'src>,
+        arg: &'p Symbol<'src>,
     },
 
-    /// An R2 tag references an env binding that is not an R2 bucket
-    R2InvalidBinding {
-        binding: &'p Symbol<'src>,
-    },
-
-    /// A KV/R2 key format string references a variable that is not a field or key param on the model
-    KvR2UnknownKeyVariable {
+    /// A template format string references a variable that is not in the
+    /// parameter list
+    TemplateUnknownVariable {
         field: &'p Symbol<'src>,
         variable: &'src str,
     },
 
-    /// A KV/R2 key format string has invalid syntax (e.g. nested or unclosed braces)
-    KvR2InvalidKeyFormat {
+    /// A template format string has invalid syntax (e.g. nested or unclosed braces)
+    TemplateInvalidFormat {
         field: &'p Symbol<'src>,
         reason: String,
     },
@@ -148,13 +158,6 @@ pub enum SemanticError<'src, 'p> {
     DataSourceInvalidMethodParam {
         source: &'p Symbol<'src>,
         param: &'p Symbol<'src>,
-    },
-
-    /// A data source method SQL references a `$name` placeholder that does not match any parameter
-    /// (and is not the reserved `$include` placeholder).
-    DataSourceUnknownSqlParam {
-        source: &'p Symbol<'src>,
-        name: String,
     },
 
     /// A model has a CRUD operation that is not supported for its backing store.
@@ -205,20 +208,6 @@ pub enum SemanticError<'src, 'p> {
     TagInvalidInContext {
         tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
-    },
-
-    ModelInstanceMethodWithNoData {
-        method: &'p Symbol<'src>,
-    },
-
-    ModelDataSourceWithNoData {
-        model: &'p Symbol<'src>,
-        data_source: &'p Symbol<'src>,
-    },
-
-    ModelWithNoDataUsedAsType {
-        usage: &'p Symbol<'src>,
-        model_name: &'src str,
     },
 }
 
@@ -322,10 +311,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::MissingWranglerEnvBlock => {
-            eprintln!("error: project has models but no `env` block is defined");
-            return;
-        }
         SemanticError::D1ModelMissingD1Binding { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
@@ -343,13 +328,10 @@ fn display(
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
             report!(binding_path.clone(), binding_range.clone())
-                .with_message(format!(
-                    "'{}' is not a valid D1 binding in the env block",
-                    binding.inner
-                ))
+                .with_message(format!("'{}' is not a valid D1 binding", binding.name))
                 .with_label(
                     Label::new((binding_path, binding_range))
-                        .with_message("this binding is not defined in the env block")
+                        .with_message("this binding is not declared as a top-level `d1` binding")
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -357,28 +339,6 @@ fn display(
                         .with_message(format!("required by model '{}'", model.name))
                         .with_color(Color::Yellow),
                 )
-        }
-        SemanticError::D1ModelMultipleD1Bindings { model, bindings } => {
-            let (model_path, model_range) = span_parts(&model.span, file_table);
-            let mut report = report!(model_path.clone(), model_range.clone())
-                .with_message(format!(
-                    "model '{}' specifies multiple D1 bindings",
-                    model.name,
-                ))
-                .with_label(
-                    Label::new((model_path, model_range))
-                        .with_message("a model may only have one `[use]` binding")
-                        .with_color(Color::Yellow),
-                );
-            for binding in bindings {
-                let (b_path, b_range) = span_parts(&binding.span, file_table);
-                report = report.with_label(
-                    Label::new((b_path, b_range))
-                        .with_message(format!("binding '{}' specified here", binding.inner))
-                        .with_color(Color::Red),
-                );
-            }
-            report
         }
         SemanticError::D1ModelMissingPrimaryKey { model } => {
             let (path, range) = span_parts(&model.span, file_table);
@@ -417,7 +377,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("remove the `?` from this column's type")
+                        .with_message("remove the `option` from this column's type")
                         .with_color(Color::Red),
                 )
         }
@@ -455,10 +415,10 @@ fn display(
                 .with_label(
                     Label::new((fk_path, fk_range))
                         .with_message(match fk_binding {
-                            Some(spd) => {
+                            Some(sym) => {
                                 format!(
                                     "model '{}' belongs to binding '{}'",
-                                    fk_model.name, spd.inner
+                                    fk_model.name, sym.name
                                 )
                             }
                             None => format!("model '{}' has no D1 binding", fk_model.name),
@@ -523,38 +483,79 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationReferencesDifferentDatabase { field: nav } => {
+        SemanticError::NavigationReferencesDifferentBacking { field: nav } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "navigation property '{}' references a model in a different database",
+                    "navigation property '{}' references a model with a different backing",
                     nav.name
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "navigation properties must reference models in the same D1 database",
+                            "navigation properties must reference models with the same backing \
+                             (the same D1 database, or both route models)",
                         )
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationMissingReciprocalM2M { field: nav } => {
-            let (path, range) = span_parts(&nav.span, file_table);
+        SemanticError::RouteModelInvalidBlock { model, block } => {
+            let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
-                .with_message("many-to-many navigation property has no reciprocal `nav` on the adjacent model")
+                .with_message(format!(
+                    "route model '{}' cannot have a {block}",
+                    model.name
+                ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("the adjacent model must have exactly one reciprocal many-to-many `nav`")
+                        .with_message("route models have no SQL backing")
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationAmbiguousM2M { field: nav } => {
+        SemanticError::RouteNavigationInvalid { field: nav, reason } => {
             let (path, range) = span_parts(&nav.span, file_table);
             report!(path.clone(), range.clone())
-                .with_message("many-to-many navigation property has multiple reciprocal `nav`s on the adjacent model")
+                .with_message(format!(
+                    "navigation property '{}' is not a valid route navigation",
+                    nav.name
+                ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("there must be exactly one reciprocal many-to-many `nav`")
+                        .with_message(*reason)
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::NavigationMissingForeignKey {
+            field: nav,
+            model_reference,
+        } => {
+            let (path, range) = span_parts(&nav.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "navigation property '{}' has no matching foreign key",
+                    nav.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!(
+                            "a 1:1 nav needs a foreign key on this model referencing '{model_reference}', \
+                             and a 1:M nav needs a foreign key on '{model_reference}' referencing this model"
+                        ))
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::NavigationMixedAdjacency { field: nav } => {
+            let (path, range) = span_parts(&nav.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "navigation property '{}' mixes 1:1 and 1:M entries",
+                    nav.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "all entries must either have a local key (1:1) or none (1:M)",
+                        )
                         .with_color(Color::Red),
                 )
         }
@@ -565,56 +566,66 @@ fn display(
             );
             return;
         }
-        SemanticError::KvInvalidBinding { binding } => {
-            let (path, range) = span_parts(&binding.span, file_table);
+        SemanticError::TemplateUnknownVariable { field, variable } => {
+            let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "'{}' is not a valid KV namespace binding",
-                    binding.name
+                    "template format references unknown variable '${variable}'"
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(
-                            "this binding does not refer to a KV namespace in the env block",
+                            "this variable is not declared as a parameter in the template",
                         )
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::R2InvalidBinding { binding } => {
-            let (path, range) = span_parts(&binding.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "'{}' is not a valid R2 bucket binding",
-                    binding.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "this binding does not refer to an R2 bucket in the env block",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::KvR2UnknownKeyVariable { field, variable } => {
+        SemanticError::TemplateInvalidFormat { field, reason } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "key format references unknown variable '${variable}'"
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("this variable is not a field or key param on the model")
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::KvR2InvalidKeyFormat { field, reason } => {
-            let (path, range) = span_parts(&field.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message("invalid key format string")
+                .with_message("invalid template format string")
                 .with_label(
                     Label::new((path, range))
                         .with_message(reason.as_str())
                         .with_color(Color::Red),
+                )
+        }
+        SemanticError::ArgCountMismatch {
+            field,
+            expected,
+            got,
+        } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "binding reference '{}' has the wrong number of arguments",
+                    field.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!(
+                            "expected {expected} arg(s) to match the binding field's params, got {got}"
+                        ))
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ArgTypeMismatch { field, arg } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            let (arg_path, arg_range) = span_parts(&arg.span, file_table);
+            report!(arg_path.clone(), arg_range.clone())
+                .with_message(format!(
+                    "binding reference arg '{}' does not match the binding param's type",
+                    arg.name
+                ))
+                .with_label(
+                    Label::new((arg_path, arg_range))
+                        .with_message("type mismatch with the binding param")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!("on binding reference '{}'", field.name))
+                        .with_color(Color::Yellow),
                 )
         }
         SemanticError::PlainOldObjectInvalidFieldType { field } => {
@@ -688,19 +699,6 @@ fn display(
                     Label::new((source_path, source_range))
                         .with_message(format!("data source '{}' declared here", source.name))
                         .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::DataSourceUnknownSqlParam { source, name } => {
-            let (path, range) = span_parts(&source.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!("SQL references unknown placeholder '${name}'"))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(format!(
-                            "'${name}' does not match any parameter on data source '{}'",
-                            source.name
-                        ))
-                        .with_color(Color::Red),
                 )
         }
         SemanticError::UnsupportedCrudOperation { model, crud } => {
@@ -841,21 +839,6 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-        SemanticError::KeyFieldInvalidType { field } => {
-            let (path, range) = span_parts(&field.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "key field '{}' has a type that is not a valid SQLite type",
-                    field.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "key fields must be a valid SQLite type (string, int, real, date, json, bool, or blob)"
-                        )
-                        .with_color(Color::Red),
-                )
-        }
         SemanticError::InstanceTagOnNonField { source, param, tag } => {
             let (s_path, s_range) = span_parts(&source.span, file_table);
             let (p_path, p_range) = span_parts(&param.span, file_table);
@@ -879,58 +862,6 @@ fn display(
                     Label::new((t_path, t_range))
                         .with_message("this tag is an instance tag")
                         .with_color(Color::Blue),
-                )
-        }
-        SemanticError::ModelInstanceMethodWithNoData { method } => {
-            let (path, range) = span_parts(&method.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "data-less model API method '{}' cannot declare `self`",
-                    method.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "data-less models have no instance state; only static methods are allowed",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::ModelDataSourceWithNoData { model, data_source } => {
-            let (m_path, m_range) = span_parts(&model.span, file_table);
-            let (d_path, d_range) = span_parts(&data_source.span, file_table);
-            report!(d_path.clone(), d_range.clone())
-                .with_message(format!(
-                    "data-less model '{}' cannot declare a data source",
-                    model.name
-                ))
-                .with_label(
-                    Label::new((d_path, d_range))
-                        .with_message("data sources require D1-backed storage")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((m_path, m_range))
-                        .with_message(format!(
-                            "model '{}' has no data fields (no columns, KV, R2, or key fields)",
-                            model.name
-                        ))
-                        .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::ModelWithNoDataUsedAsType { usage, model_name } => {
-            let (path, range) = span_parts(&usage.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "data-less model '{}' cannot be used as a value type",
-                    model_name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "data-less models have no fields and cannot appear as API parameters, return types, or POO fields",
-                        )
-                        .with_color(Color::Red),
                 )
         }
     };

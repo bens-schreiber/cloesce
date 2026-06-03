@@ -22,14 +22,12 @@ fn test_serialize_wrangler_spec() {
 fn generates_default_wrangler_value() {
     // Arrange
     let src = r#"
-        env {
-            d1 { db }
-            vars {
-                API_KEY: string
-                TIMEOUT: int
-                ENABLED: bool
-                THRESHOLD: real
-            }
+        d1 { db }
+        vars {
+            API_KEY: string
+            TIMEOUT: int
+            ENABLED: bool
+            THRESHOLD: real
         }
     "#;
     let idl = src_to_idl(src);
@@ -68,12 +66,9 @@ fn generates_default_wrangler_value() {
 fn generates_default_d1_wrangler_values() {
     // Arrange
     let src = r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model User {
+        model User for db {
             primary {
                 id: int
             }
@@ -122,13 +117,9 @@ fn generates_default_d1_wrangler_values() {
 fn generates_default_kv_wrangler_values() {
     // Arrange
     let src = r#"
-        env {
-            kv { my_kv }
-        }
-
-        model MyKV {
-            kv(my_kv, "kvObj") {
-                obj: json
+        kv my_kv {
+            obj() -> json {
+                "kvObj"
             }
         }
     "#;
@@ -172,12 +163,9 @@ fn handles_d1_database_with_missing_values() {
     "#;
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -299,13 +287,15 @@ fn env_reads_from_env_block_and_falls_back_to_root() {
 fn env_generate_writes_into_env_block() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { DB }
-            kv { CACHE }
+        d1 { DB }
+
+        kv CACHE {
+            entry(id: int) -> json {
+                "cache/{id}"
+            }
         }
 
-        [use DB]
-        model User {
+        model User for DB {
             primary { id: int }
         }
     "#,

@@ -68,6 +68,7 @@ export class DB1Model {
       true
     );
   }
+
   static fromJson(data: any): DB1Model {
     const __$res = Object.assign(new DB1Model(), data);
     return __$res;
@@ -141,6 +142,7 @@ export class DB2Model {
       true
     );
   }
+
   static fromJson(data: any): DB2Model {
     const __$res = Object.assign(new DB2Model(), data);
     return __$res;

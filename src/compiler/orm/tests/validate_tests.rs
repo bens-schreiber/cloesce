@@ -7,9 +7,7 @@ use serde_json::{Value, json};
 fn empty_idl() -> CloesceIdl<'static> {
     src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
         "#,
     )
 }
@@ -57,12 +55,9 @@ fn undefined() {
     {
         let idl = src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model SomeModel {
+            model SomeModel for db {
                 primary {
                     id: int
                 }
@@ -119,12 +114,9 @@ fn null_value() {
     {
         let idl = src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model SomeModel {
+            model SomeModel for db {
                 primary {
                     id: int
                 }
@@ -346,12 +338,9 @@ fn objects_partials() {
     {
         let idl = src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -374,12 +363,9 @@ fn objects_partials() {
     {
         let idl = src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -393,8 +379,7 @@ fn objects_partials() {
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -427,12 +412,9 @@ fn objects_partials() {
     {
         let idl = src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -455,70 +437,16 @@ fn objects_partials() {
         let obj = result.unwrap();
         assert_eq!(obj, Some(json!({ "id": 1 })));
     }
-
-    // partial KV passes
-    {
-        let idl = src_to_idl(
-            r#"
-            env {
-                kv { namespace otherNamespace }
-            }
-
-            model PureKVModel {
-                keyfield { id: string }
-
-                kv(namespace, "path/to/data/{id}") { data: json }
-                kv(otherNamespace, "path/to/other/{id}") { otherData: string }
-            }
-            "#,
-        );
-
-        let value = json!({
-            "id": "test-id",
-            "data": { "raw": { "foo": "bar" } },
-            "otherData": { "raw": "some string data" }
-        });
-
-        let result = validate(
-            CidlType::Partial {
-                object_name: "PureKVModel",
-            },
-            Some(value),
-            &idl,
-        );
-
-        assert!(result.is_ok());
-        let obj = result.unwrap().unwrap();
-        assert_eq!(
-            obj,
-            json!({
-                "id": "test-id",
-                "data": {
-                    "key": null,
-                    "metadata": null,
-                    "raw": { "foo": "bar" }
-                },
-                "otherData": {
-                    "key": null,
-                    "metadata": null,
-                    "raw": "some string data"
-                }
-            })
-        );
-    }
 }
 
 #[test]
 fn one_to_many_nav_person_dogs() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
         [crud save, get]
-        model Person {
+        model Person for db {
             primary { id: int }
 
             nav (Dog::personId) {
@@ -526,15 +454,15 @@ fn one_to_many_nav_person_dogs() {
             }
         }
 
-        [use db]
         [crud save]
-        model Dog {
+        model Dog for db {
             primary { id: int }
 
             foreign (Person::id) {
                 personId
-                nav { person }
             }
+
+            nav Person::id(personId) { person }
         }
         "#,
     );
@@ -1038,13 +966,15 @@ fn validator_regex() {
 fn validators_in_model() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { store }
+        d1 { db }
+
+        kv store {
+            slug(id: int) -> string {
+                "product/{id}/meta"
+            }
         }
 
-        [use db]
-        model Product {
+        model Product for db {
             primary {
                 id: int
             }
@@ -1056,16 +986,13 @@ fn validators_in_model() {
                 [minlen 3]
                 [maxlen 50]
                 name: string
-            }
 
-            kv(store, "product/{id}/meta") {
-                [regex /^[a-z0-9_]+$/]
-                slug: string
-            }
-
-            keyfield {
                 [maxlen 20]
                 kf: string
+            }
+
+            kv store::slug(id) {
+                slug
             }
         }
         "#,
@@ -1139,23 +1066,6 @@ fn validators_in_model() {
         ));
     }
 
-    // Fail slug regex
-    {
-        let value = json!({
-            "id": 1,
-            "price": 100,
-            "name": "Widget",
-            "slug": {
-                "key": "product/1/meta",
-                "metadata": null,
-                "raw": "Invalid Slug!"
-            },
-            "kf": "key123"
-        });
-        let result = validate(CidlType::Object { name: "Product" }, Some(value), &idl);
-        assert!(matches!(result, Err(OrmErrorKind::UnmatchedRegex { .. })));
-    }
-
     // Fail kf too long
     {
         let value = json!({
@@ -1177,5 +1087,42 @@ fn validators_in_model() {
                 ..
             })
         ));
+    }
+}
+
+#[test]
+fn route_model_validates_route_fields() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model RouteModel {
+            route {
+                id: int
+                tenant: string
+            }
+        }
+    "#,
+    );
+
+    // Route fields are validated and carried through, with type coercion enforced.
+    {
+        let result = validate(
+            CidlType::Object { name: "RouteModel" },
+            Some(json!({ "id": 1, "tenant": "acme" })),
+            &idl,
+        );
+        let value = result.expect("validation to succeed").expect("a value");
+        assert_eq!(value, json!({ "id": 1, "tenant": "acme" }));
+    }
+
+    // A route field of the wrong type is rejected.
+    {
+        let result = validate(
+            CidlType::Object { name: "RouteModel" },
+            Some(json!({ "id": "not an int", "tenant": "acme" })),
+            &idl,
+        );
+        assert!(result.is_err());
     }
 }

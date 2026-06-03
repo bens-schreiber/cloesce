@@ -7,6 +7,7 @@ const BlobService = Cloesce.BlobService.impl({
       throw new Error(`Received blob was not an instance of uint8array: ${JSON.stringify(blob)}`);
     }
 
+    // Add 1 to each byte in the blob
     return HttpResult.ok(
       200,
       blob.map((b) => b + 1),
@@ -15,6 +16,7 @@ const BlobService = Cloesce.BlobService.impl({
 });
 
 const BlobHaver = Cloesce.BlobHaver.impl({
+  // Returns a stream of its own blob1 column
   yieldStream(self: Cloesce.BlobHaver.Self): HttpResult<Cloesce.CfReadableStream> {
     const blob1 = self.blob1;
     return HttpResult.ok(
@@ -32,6 +34,7 @@ const BlobHaver = Cloesce.BlobHaver.impl({
     return HttpResult.ok(200, self.blob1);
   },
 
+  // Accepts some stream and validates that it sent [1, 2, 3, 4, 5]
   async inputStream(stream: Cloesce.CfReadableStream) {
     if (!(stream instanceof ReadableStream)) {
       throw new Error("Did not receive a stream");

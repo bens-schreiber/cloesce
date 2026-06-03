@@ -12,7 +12,6 @@
     "BlobHaver": {
       "hash": 560041510452854967,
       "name": "BlobHaver",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -53,7 +52,8 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "getBlob1",
@@ -117,7 +117,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -138,7 +140,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$list",
@@ -172,7 +176,9 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -196,7 +202,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -208,8 +218,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "BlobHaver"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"BlobHaver\".\"id\" AS \"id\", \"BlobHaver\".\"blob1\" AS \"blob1\", \"BlobHaver\".\"blob2\" AS \"blob2\" FROM \"BlobHaver\"",
+          "get_query": "SELECT \"BlobHaver\".\"id\" AS \"id\", \"BlobHaver\".\"blob1\" AS \"blob1\", \"BlobHaver\".\"blob2\" AS \"blob2\" FROM \"BlobHaver\" WHERE \"BlobHaver\".\"id\" = ?1",
+          "list_query": "SELECT \"BlobHaver\".\"id\" AS \"id\", \"BlobHaver\".\"blob1\" AS \"blob1\", \"BlobHaver\".\"blob2\" AS \"blob2\" FROM \"BlobHaver\" WHERE \"BlobHaver\".\"id\" > ?1 ORDER BY \"BlobHaver\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -222,13 +256,13 @@
     "BlobService": {
       "hash": 1852071612599625679,
       "name": "BlobService",
-      "d1_binding": null,
       "primary_columns": [],
       "columns": [],
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": null,
       "apis": [
         {
           "name": "incrementBlob",

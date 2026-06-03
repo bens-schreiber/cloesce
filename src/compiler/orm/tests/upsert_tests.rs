@@ -15,12 +15,9 @@ fn include(val: serde_json::Value) -> Option<Map<String, Value>> {
 async fn upsert_scalar_model(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -60,12 +57,9 @@ async fn upsert_scalar_model(db: SqlitePool) {
 async fn upsert_auto_increment(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Horse {
+        model Horse for db {
             primary {
                 id: int
             }
@@ -103,12 +97,9 @@ async fn upsert_one_to_one(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -119,14 +110,14 @@ async fn upsert_one_to_one(db: SqlitePool) {
 
                 foreign(Rider::id) {
                     riderId
-                    nav {
-                        rider
-                    }
+                }
+
+                nav Rider::id(riderId) {
+                    rider
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -176,12 +167,9 @@ async fn upsert_one_to_many(db: SqlitePool) {
     let idl = || {
         src_to_idl(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -195,8 +183,7 @@ async fn upsert_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Rider {
+            model Rider for db {
                 primary {
                     id: int
                 }
@@ -245,86 +232,12 @@ async fn upsert_one_to_many(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn upsert_many_to_many(db: SqlitePool) {
-    let idl = || {
-        src_to_idl(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-
-                column {
-                    name: string
-                }
-
-                nav(Course::id) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-
-                column {
-                    title: string
-                }
-
-                nav(Student::id) {
-                    students
-                }
-            }
-        "#,
-        )
-    };
-
-    let new_model = json!({
-        "id": 1,
-        "name": "Alice",
-        "courses": [
-            { "id": 1, "title": "Math 101", "students": [] },
-            { "id": 2, "title": "History 101", "students": [] }
-        ]
-    });
-
-    let stmts = UpsertModel::query(
-        "Student",
-        &idl(),
-        new_model.as_object().unwrap().clone(),
-        include(json!({ "courses": {} })),
-    )
-    .expect("upsert to succeed");
-
-    let results = test_sql(
-        idl(),
-        stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
-        db,
-    )
-    .await
-    .expect("SQL to succeed");
-
-    let select_rows = &results[results.len() - 2];
-    assert_eq!(select_rows.len(), 2);
-}
-
-#[sqlx::test]
 async fn upsert_composite_pk(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int
@@ -363,4 +276,167 @@ async fn upsert_composite_pk(db: SqlitePool) {
     assert_eq!(row.try_get::<i64, _>("orderId").unwrap(), 1);
     assert_eq!(row.try_get::<i64, _>("productId").unwrap(), 101);
     assert_eq!(row.try_get::<i64, _>("quantity").unwrap(), 3);
+}
+
+#[sqlx::test]
+async fn upsert_join_table_composite_fk_pk(db: SqlitePool) {
+    // Arrange
+    let idl = || {
+        src_to_idl(
+            r#"
+            d1 { db }
+
+            model Hamburger for db {
+                primary {
+                    id: int
+                }
+
+                column {
+                    name: string
+                }
+
+                nav(HamburgerTopping::hamburgerId) {
+                    toppings
+                }
+            }
+
+            model Topping for db {
+                primary {
+                    id: int
+                }
+
+                column {
+                    name: string
+                }
+            }
+
+            model HamburgerTopping for db {
+                primary {
+                    foreign(Hamburger::id) {
+                        hamburgerId
+                    }
+
+                    foreign(Topping::id) {
+                        toppingId
+                    }
+                }
+
+                nav Topping::id(toppingId) {
+                    topping
+                }
+            }
+        "#,
+        )
+    };
+
+    let new_model = json!({
+        "id": 1,
+        "name": "bacon lettuce burger",
+        "toppings": [
+            { "topping": { "id": 101, "name": "bacon" } },
+            { "topping": { "id": 102, "name": "lettuce" } }
+        ]
+    });
+
+    // Act
+    let stmts = UpsertModel::query(
+        "Hamburger",
+        &idl(),
+        new_model.as_object().unwrap().clone(),
+        include(json!({ "toppings": { "topping": {} } })),
+    )
+    .expect("upsert to succeed");
+
+    // Assert
+    let results = test_sql(
+        idl(),
+        stmts.sql.into_iter().map(|r| (r.query, r.values)).collect(),
+        db,
+    )
+    .await
+    .expect("SQL to succeed");
+
+    let select_rows = &results[results.len() - 2];
+    assert_eq!(select_rows.len(), 2);
+
+    let mut topping_ids: Vec<i64> = select_rows
+        .iter()
+        .map(|r| {
+            assert_eq!(r.try_get::<i64, _>("id").unwrap(), 1);
+            assert_eq!(r.try_get::<i64, _>("toppings.hamburgerId").unwrap(), 1);
+            r.try_get::<i64, _>("toppings.toppingId").unwrap()
+        })
+        .collect();
+    topping_ids.sort();
+    assert_eq!(topping_ids, vec![101, 102]);
+}
+
+#[test]
+fn upsert_route_model_persists_kv_without_sql() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        kv namespace {
+            data(id: int) -> json {
+                "data/{id}"
+            }
+        }
+
+        kv otherNamespace {
+            otherData(siblingId: int) -> json {
+                "other/{siblingId}"
+            }
+        }
+
+        model RouteOwner {
+            route {
+                id: int
+            }
+
+            kv namespace::data(id) {
+                someData
+            }
+
+            nav RouteSibling::siblingId(id) {
+                sibling
+            }
+        }
+
+        model RouteSibling {
+            route {
+                siblingId: int
+            }
+
+            kv otherNamespace::otherData(siblingId) {
+                siblingData
+            }
+        }
+    "#,
+    );
+
+    let new_model = json!({
+        "id": 7,
+        "someData": { "raw": { "hello": "world" } },
+        "sibling": {
+            "siblingId": 7,
+            "siblingData": { "raw": { "foo": "bar" } }
+        }
+    });
+
+    let res = UpsertModel::query(
+        "RouteOwner",
+        &idl,
+        new_model.as_object().unwrap().clone(),
+        include(json!({ "someData": {}, "sibling": { "siblingData": {} } })),
+    )
+    .expect("upsert to succeed");
+
+    // Route models have no SQL representation.
+    assert!(res.sql.is_empty());
+
+    // The model's own KV field and its nav target's KV field are both persisted.
+    let keys: Vec<&str> = res.kv_uploads.iter().map(|u| u.key.as_str()).collect();
+    assert!(keys.contains(&"data/7"), "got keys: {keys:?}");
+    assert!(keys.contains(&"other/7"), "got keys: {keys:?}");
 }
