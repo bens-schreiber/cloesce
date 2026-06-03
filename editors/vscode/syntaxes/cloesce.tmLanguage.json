@@ -112,7 +112,7 @@
     "declaration": {
       "comment": "Top-level block keywords",
       "name": "keyword.declaration.cloesce",
-      "match": "\\b(env|inject|service|model|api|source|poo)\\b"
+      "match": "\\b(model|poo|source|inject|api)\\b"
     },
     "http-verb": {
       "comment": "HTTP verbs (also includes get/list/save used by crud and sql, since they share the same token color naturally)",
@@ -126,10 +126,10 @@
     "structural-keyword": {
       "comment": "Block/sub-block keywords used by the parser",
       "name": "keyword.other.cloesce",
-      "match": "\\b(primary|optional|unique|foreign|nav|keyfield|column|paginated|include|for|crud|use|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
+      "match": "\\b(primary|optional|unique|foreign|nav|column|route|include|for|crud|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
     },
     "binding-keyword": {
-      "comment": "Storage binding kinds",
+      "comment": "Storage binding kinds (also introduce top-level binding blocks)",
       "name": "storage.type.binding.cloesce",
       "match": "\\b(d1|kv|r2|vars)\\b"
     },
@@ -139,7 +139,7 @@
     },
     "generic-type": {
       "name": "support.type.generic.cloesce",
-      "match": "\\b(option|array|kvobject|partial)\\b"
+      "match": "\\b(option|array|paginated|kvobject|partial)\\b"
     },
     "type-name": {
       "comment": "PascalCase identifiers — visually distinguishes model/source/poo references",
@@ -226,6 +226,11 @@
         },
         {
           "include": "#number"
+        },
+        {
+          "comment": "Tag-leading keywords: crud/internal/instance/validators via structural, plus inject/source",
+          "name": "keyword.other.cloesce",
+          "match": "\\b(inject|source)\\b"
         },
         {
           "include": "#structural-keyword"
