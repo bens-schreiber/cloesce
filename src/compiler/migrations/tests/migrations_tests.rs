@@ -38,7 +38,7 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name.to_string(),
-                d1_binding: Some("db".into()),
+                database_binding: Some("db".into()),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
                 navigation_fields: model.navigation_fields,
@@ -104,12 +104,9 @@ async fn migrate_models_scalars(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -163,27 +160,24 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
 
                 foreign(Dog::id) {
                     dogId
-                    nav { dog }
                 }
+
+                nav Dog::id(dogId) { dog }
             }
         "#,
         );
@@ -228,12 +222,9 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         // Arrange
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Boss {
+            model Boss for db {
                 primary {
                     id: int
                 }
@@ -243,8 +234,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -262,8 +252,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -273,8 +262,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Cat {
+            model Cat for db {
                 primary {
                     id: int
                 }
@@ -332,89 +320,13 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn migrate_models_many_to_many(db: SqlitePool) {
-    let empty_idl = empty_migration();
-
-    // Create
-    let idl = {
-        // Arrange
-        let idl = src_to_migration(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-
-                nav(Course::id) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-
-                nav(Student::id) {
-                    students
-                }
-            }
-        "#,
-        );
-
-        // Act
-        let sql =
-            MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
-
-        // Assert
-        expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
-        expected_str!(sql, r#""left" integer NOT NULL"#);
-        expected_str!(sql, r#""right" integer NOT NULL"#);
-        expected_str!(sql, r#"PRIMARY KEY ("left", "right")"#);
-        expected_str!(
-            sql,
-            r#"FOREIGN KEY ("left") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
-        );
-        expected_str!(
-            sql,
-            r#"FOREIGN KEY ("right") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
-        );
-
-        query(&db, &sql).await.expect("Insert tables query to work");
-        assert!(exists_in_db(&db, "CourseStudent").await);
-
-        idl
-    };
-
-    // Drop
-    {
-        // Act
-        let sql =
-            MigrationsGenerator::migrate(&empty_idl, Some(&idl), &MockMigrationsIntent::default());
-
-        // Assert
-        query(&db, &sql).await.expect("Drop tables query to work");
-        assert!(!exists_in_db(&db, "StudentsCourses").await);
-    }
-}
-
-#[sqlx::test]
 async fn migrate_with_rebuild(db: SqlitePool) {
     let mut base_ast = {
         let idl = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -441,12 +353,9 @@ async fn migrate_with_rebuild(db: SqlitePool) {
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -496,12 +405,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: string
                 }
@@ -542,19 +448,15 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
             }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: string
                 }
@@ -595,12 +497,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         let mut base_unique_ast = {
             let migration = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -639,12 +538,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let with_age_unique_ast = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -685,12 +581,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let without_age_unique_ast = src_to_migration(
                 r#"
-                env {
-                    d1 { db }
-                }
+                d1 { db }
 
-                [use db]
-                model UniqueUser {
+                model UniqueUser for db {
                     primary {
                         id: int
                     }
@@ -731,12 +624,9 @@ async fn migrate_with_rename(db: SqlitePool) {
     let base_ast = {
         let migration = src_to_migration(
             r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model User {
+            model User for db {
                 primary {
                     id: int
                 }
@@ -748,8 +638,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model UserSettings {
+            model UserSettings for db {
                 primary {
                     id: int
                 }
@@ -771,12 +660,9 @@ async fn migrate_with_rename(db: SqlitePool) {
 
     let new = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model AppUser {
+        model AppUser for db {
             primary {
                 id: int
             }
@@ -788,8 +674,7 @@ async fn migrate_with_rename(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model UserSettings {
+        model UserSettings for db {
             primary {
                 id: int
             }
@@ -819,176 +704,14 @@ async fn migrate_with_rename(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn migrate_alter_drop_m2m(db: SqlitePool) {
-    // Arrange
-    let m2m_ast = {
-        let migration = src_to_migration(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-
-                nav(Course::id) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-
-                nav(Student::id) {
-                    students
-                }
-            }
-        "#,
-        );
-
-        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
-        query(&db, &sql)
-            .await
-            .expect("Create table queries to work");
-        assert!(exists_in_db(&db, "CourseStudent").await);
-
-        migration
-    };
-
-    let no_m2m_ast = src_to_migration(
-        r#"
-        env {
-            d1 { db }
-        }
-
-        [use db]
-        model Student {
-            primary {
-                id: int
-            }
-        }
-
-        [use db]
-        model Course {
-            primary {
-                id: int
-            }
-        }
-    "#,
-    );
-
-    // Act
-    let sql = MigrationsGenerator::migrate(
-        &no_m2m_ast,
-        Some(&m2m_ast),
-        &MockMigrationsIntent::default(),
-    );
-
-    // Assert
-    query(&db, &sql)
-        .await
-        .expect("Create table queries to work");
-
-    assert!(!exists_in_db(&db, "CourseStudent").await)
-}
-
-#[sqlx::test]
-async fn migrate_alter_add_m2m(db: SqlitePool) {
-    // Arrange
-    let no_m2m_ast = {
-        let migration = src_to_migration(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-            }
-        "#,
-        );
-
-        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
-        query(&db, &sql)
-            .await
-            .expect("Create table queries to work");
-
-        migration
-    };
-
-    let m2m_ast = src_to_migration(
-        r#"
-        env {
-            d1 { db }
-        }
-
-        [use db]
-        model Student {
-            primary {
-                id: int
-            }
-
-            nav(Course::id) {
-                courses
-            }
-        }
-
-        [use db]
-        model Course {
-            primary {
-                id: int
-            }
-
-            nav(Student::id) {
-                students
-            }
-        }
-    "#,
-    );
-
-    // Act
-    let sql = MigrationsGenerator::migrate(
-        &m2m_ast,
-        Some(&no_m2m_ast),
-        &MockMigrationsIntent::default(),
-    );
-
-    // Assert
-    query(&db, &sql)
-        .await
-        .expect("Create table queries to work");
-
-    assert!(exists_in_db(&db, "CourseStudent").await)
-}
-
-#[sqlx::test]
 async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
     let empty_idl = empty_migration();
 
     let idl = src_to_migration(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Parent {
+        model Parent for db {
             primary {
                 orgId: int
                 userId: int
@@ -999,8 +722,7 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Child {
+        model Child for db {
             primary {
                 id: int
             }
@@ -1027,65 +749,4 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
     query(&db, &sql).await.expect("Create tables query to work");
     assert!(exists_in_db(&db, "Parent").await);
     assert!(exists_in_db(&db, "Child").await);
-}
-
-#[sqlx::test]
-async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
-    let empty_idl = empty_migration();
-
-    let idl = src_to_migration(
-        r#"
-        env {
-            d1 { db }
-        }
-
-        [use db]
-        model Student {
-            primary {
-                schoolId: int
-                studentId: int
-            }
-
-            nav(Course::deptId, Course::courseId) {
-                courses
-            }
-        }
-
-        [use db]
-        model Course {
-            primary {
-                deptId: int
-                courseId: int
-            }
-
-            nav(Student::schoolId, Student::studentId) {
-                students
-            }
-        }
-    "#,
-    );
-
-    let sql =
-        MigrationsGenerator::migrate(&idl, Some(&empty_idl), &MockMigrationsIntent::default());
-
-    expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
-    expected_str!(sql, r#""left_deptId" integer NOT NULL"#);
-    expected_str!(sql, r#""left_courseId" integer NOT NULL"#);
-    expected_str!(sql, r#""right_schoolId" integer NOT NULL"#);
-    expected_str!(sql, r#""right_studentId" integer NOT NULL"#);
-    expected_str!(
-        sql,
-        r#"PRIMARY KEY ("left_deptId", "left_courseId", "right_schoolId", "right_studentId")"#
-    );
-    expected_str!(
-        sql,
-        r#"FOREIGN KEY ("left_deptId", "left_courseId") REFERENCES "Course" ("deptId", "courseId") ON DELETE RESTRICT ON UPDATE CASCADE"#
-    );
-    expected_str!(
-        sql,
-        r#"FOREIGN KEY ("right_schoolId", "right_studentId") REFERENCES "Student" ("schoolId", "studentId") ON DELETE RESTRICT ON UPDATE CASCADE"#
-    );
-
-    query(&db, &sql).await.expect("Create tables query to work");
-    assert!(exists_in_db(&db, "CourseStudent").await);
 }

@@ -21,10 +21,10 @@ use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
-    DataSourceBlock, DataSourceBlockMethod, EnvBindingBlock, EnvBindingBlockKind, EnvBlock,
-    ForeignBlock, ForeignBlockNav, InjectBlock, Keyword, KvBlock, ModelBlock, ModelBlockKind,
-    NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock, R2Block, Spd, SqlBlockKind, Symbol,
-    Tag, fmt_cidl_type, lexer::CommentMap,
+    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, ForeignBlock, InjectBlock, Keyword,
+    KvBindingBlock, KvBindingTemplate, KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd,
+    SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -401,7 +401,10 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
             AstBlockKind::Api(b) => b.to_doc(ctx),
             AstBlockKind::DataSource(b) => b.to_doc(ctx),
             AstBlockKind::PlainOldObject(b) => b.to_doc(ctx),
-            AstBlockKind::Env(b) => b.to_doc(ctx),
+            AstBlockKind::D1Binding(b) => b.to_doc(ctx),
+            AstBlockKind::KvBinding(b) => b.to_doc(ctx),
+            AstBlockKind::R2Binding(b) => b.to_doc(ctx),
+            AstBlockKind::Vars(b) => b.to_doc(ctx),
             AstBlockKind::Inject(b) => b.to_doc(ctx),
         }
     }
@@ -409,7 +412,15 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for ModelBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Model);
+        let mut doc = ctx.top_decl_doc(&self.symbol, Keyword::Model);
+
+        if let Some(binding) = &self.database_binding {
+            doc = doc
+                .then(Doc::text(" "))
+                .then(Doc::kw(Keyword::For))
+                .then(Doc::text(" "))
+                .then(ctx.sym_doc(binding, 0, true));
+        }
 
         if self.blocks.is_empty() {
             // No content, return empty model
@@ -440,10 +451,6 @@ impl<'src> ToDoc<'src> for Tag<'src> {
 
                 Doc::text(name.as_str()).then(Doc::text(" ")).then(arg)
             }
-            Tag::Use { binding } => Doc::kw(Keyword::Use)
-                .then(Doc::text(" "))
-                .then(Doc::text(binding.inner)),
-
             Tag::Source { name } => Doc::kw(Keyword::Source)
                 .then(Doc::text(" "))
                 .then(Doc::text(name.inner)),
@@ -501,6 +508,7 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
 
         match self {
             ModelBlockKind::Column(syms) => symbol_block(Keyword::Column, syms, ctx),
+            ModelBlockKind::Route(syms) => symbol_block(Keyword::Route, syms, ctx),
             ModelBlockKind::Foreign(fb) => fb.to_doc(ctx),
             ModelBlockKind::Navigation(nb) => nb.to_doc(ctx),
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
@@ -510,7 +518,6 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
                 .then(Doc::text(" ("))
                 .then(comma_separated(fields, |sym| ctx.sym_doc(sym, 0, true)))
                 .then(Doc::text(")")),
-            ModelBlockKind::KeyField(syms) => symbol_block(Keyword::KeyField, syms, ctx),
         }
     }
 }
@@ -547,62 +554,65 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             inner = inner.then(ctx.sym_doc(field, 2, false));
         }
 
-        if let Some(nav) = &self.nav {
-            inner = inner.then(ctx.spd_doc(nav, 2, false));
-        }
-
         doc.then(optional).then(ctx.block(inner, 2))
     }
 }
 
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let adjs = comma_separated(&self.adj, |adj| {
-            let left = ctx.sym_doc(&adj.0, 0, true);
-            let right = ctx.sym_doc(&adj.1, 0, true);
-            left.then(Doc::text("::")).then(right)
+        let entries = comma_separated(&self.adj, |adj| {
+            let mut d = ctx
+                .sym_doc(&adj.model, 0, true)
+                .then(Doc::text("::"))
+                .then(ctx.sym_doc(&adj.field, 0, true));
+            if let Some(local) = &adj.local_key {
+                d = d
+                    .then(Doc::text("("))
+                    .then(ctx.sym_doc(local, 0, true))
+                    .then(Doc::text(")"));
+            }
+            d
         });
 
+        // Single relationships omit the outer parens; composite ones use them.
+        let refs = if self.adj.len() > 1 {
+            Doc::text(" (").then(entries).then(Doc::text(")"))
+        } else {
+            Doc::text(" ").then(entries)
+        };
+
         Doc::kw(Keyword::Nav)
-            .then(Doc::text(" ("))
-            .then(adjs)
-            .then(Doc::text(")"))
+            .then(refs)
             .then(ctx.block(ctx.sym_doc(&self.nav.inner, 2, false), 2))
     }
 }
 
-impl<'src> ToDoc<'src> for KvBlock<'src> {
+impl<'src> ToDoc<'src> for KvFieldBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let paginated = if self.is_paginated {
-            Doc::text(" ").then(Doc::kw(Keyword::Paginated))
-        } else {
-            Doc::nil()
-        };
+        let args = comma_separated(&self.args, |sym| ctx.sym_doc(sym, 0, true));
         Doc::kw(Keyword::Kv)
-            .then(Doc::text(" ("))
-            .then(ctx.sym_doc(&self.env_binding, 0, true))
-            .then(Doc::text(", \""))
-            .then(Doc::text(self.key_format))
-            .then(Doc::text("\")"))
-            .then(paginated)
+            .then(Doc::text(" "))
+            .then(ctx.sym_doc(&self.binding, 0, true))
+            .then(Doc::text("::"))
+            .then(ctx.sym_doc(&self.binding_template, 0, true))
+            .then(Doc::text("("))
+            .then(args)
+            .then(Doc::text(")"))
             .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
 
-impl<'src> ToDoc<'src> for R2Block<'src> {
+impl<'src> ToDoc<'src> for R2FieldBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let paginated = if self.is_paginated {
-            Doc::text(" ").then(Doc::kw(Keyword::Paginated))
-        } else {
-            Doc::nil()
-        };
+        let args = comma_separated(&self.args, |sym| ctx.sym_doc(sym, 0, true));
         Doc::kw(Keyword::R2)
-            .then(Doc::text(" ("))
-            .then(ctx.sym_doc(&self.env_binding, 0, true))
-            .then(Doc::text(", \""))
-            .then(Doc::text(self.key_format))
-            .then(Doc::text("\")"))
-            .then(paginated)
+            .then(Doc::text(" "))
+            .then(ctx.sym_doc(&self.binding, 0, true))
+            .then(Doc::text("::"))
+            .then(ctx.sym_doc(&self.binding_template, 0, true))
+            .then(Doc::text("("))
+            .then(args)
+            .then(Doc::text(")"))
             .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
@@ -667,12 +677,12 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
             .then(params)
             .then(Doc::text(")"));
 
-        if matches!(self.return_type, CidlType::Void) {
+        if matches!(self.symbol.cidl_type, CidlType::Void) {
             signature
         } else {
             signature
                 .then(Doc::text(" -> "))
-                .then(Doc::owned(fmt_cidl_type(&self.return_type)))
+                .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
         }
     }
 }
@@ -680,15 +690,10 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
 impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.parameters, |param| ctx.sym_doc(param, 0, true));
-
-        let sql = Doc::hardline(2)
-            .then(Doc::text("\""))
-            .then(Doc::text(self.raw_sql))
-            .then(Doc::text("\""));
-        Doc::text("(")
+        ctx.sym_doc(&self.method, 0, true)
+            .then(Doc::text("("))
             .then(params)
             .then(Doc::text(")"))
-            .then(ctx.block(sql, 2))
     }
 }
 
@@ -711,23 +716,11 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
                 .then(ctx.block(self.tree.to_doc_at(ctx, 2), 2))
         };
 
-        if let Some(get) = &self.get {
+        for stub in [&self.get, &self.list, &self.save].into_iter().flatten() {
             include = include
                 .then(Doc::hardline(1))
                 .then(Doc::hardline(1))
-                .then(Doc::kw(Keyword::Sql))
-                .then(Doc::text(" "))
-                .then(Doc::kw(Keyword::Get))
-                .then(ctx.spd_doc(get, 1, true));
-        }
-        if let Some(list) = &self.list {
-            include = include
-                .then(Doc::hardline(1))
-                .then(Doc::hardline(1))
-                .then(Doc::kw(Keyword::Sql))
-                .then(Doc::text(" "))
-                .then(Doc::kw(Keyword::List))
-                .then(ctx.spd_doc(list, 1, true));
+                .then(ctx.spd_doc(stub, 1, true));
         }
 
         source_doc.then(ctx.block(include, 1))
@@ -768,31 +761,94 @@ impl<'src> ToDoc<'src> for PlainOldObjectBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for EnvBindingBlock<'src> {
+impl<'src> ToDoc<'src> for D1BindingBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let keyword = match self.kind {
-            EnvBindingBlockKind::D1 => Keyword::D1.as_str(),
-            EnvBindingBlockKind::R2 => Keyword::R2.as_str(),
-            EnvBindingBlockKind::Kv => Keyword::Kv.as_str(),
-            EnvBindingBlockKind::Var => Keyword::Vars.as_str(),
-        };
-
-        let mut inner = Doc::nil();
-        for symbol in &self.symbols {
-            inner = inner.then(ctx.sym_doc(symbol, 2, false));
+        if self.bindings.is_empty() {
+            return Doc::kw(Keyword::D1).then(Doc::text(" {}"));
         }
-
-        Doc::text(keyword).then(ctx.block(inner, 2))
+        let mut inner = Doc::nil();
+        for sym in &self.bindings {
+            inner = inner.then(ctx.sym_doc(sym, 1, false));
+        }
+        Doc::kw(Keyword::D1).then(ctx.block(inner, 1))
     }
 }
 
-impl<'src> ToDoc<'src> for EnvBlock<'src> {
+impl<'src> ToDoc<'src> for VarsBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        if self.vars.is_empty() {
+            return Doc::kw(Keyword::Vars).then(Doc::text(" {}"));
+        }
         let mut inner = Doc::nil();
-        for spd in &self.blocks {
+        for sym in &self.vars {
+            inner = inner.then(ctx.sym_doc(sym, 1, false));
+        }
+        Doc::kw(Keyword::Vars).then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for KvBindingTemplate<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
+        let key_format = Doc::hardline(2)
+            .then(Doc::text("\""))
+            .then(Doc::text(self.key_format))
+            .then(Doc::text("\""));
+        Doc::text(self.symbol.name)
+            .then(Doc::text("("))
+            .then(params)
+            .then(Doc::text(") -> "))
+            .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
+            .then(ctx.block(key_format, 2))
+    }
+}
+
+impl<'src> ToDoc<'src> for KvBindingBlock<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Kv);
+        if self.templates.is_empty() {
+            return doc.then(Doc::text(" {}"));
+        }
+        let mut inner = Doc::nil();
+        for spd in &self.templates {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
-        Doc::kw(Keyword::Env).then(ctx.block(inner, 1))
+        doc.then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
+        let paginated = if self.is_paginated {
+            Doc::text(" ").then(Doc::kw(Keyword::GPaginated))
+        } else {
+            Doc::nil()
+        };
+        let key_format = Doc::hardline(2)
+            .then(Doc::text("\""))
+            .then(Doc::text(self.key_format))
+            .then(Doc::text("\""));
+        Doc::text(self.symbol.name)
+            .then(Doc::text("("))
+            .then(params)
+            .then(Doc::text(")"))
+            .then(paginated)
+            .then(ctx.block(key_format, 2))
+    }
+}
+
+impl<'src> ToDoc<'src> for R2BindingBlock<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::R2);
+        if self.templates.is_empty() {
+            return doc.then(Doc::text(" {}"));
+        }
+        let mut inner = Doc::nil();
+        for spd in &self.templates {
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
+        }
+        doc.then(ctx.block(inner, 1))
     }
 }
 
@@ -806,12 +862,6 @@ impl<'src> ToDoc<'src> for InjectBlock<'src> {
             inner = inner.then(ctx.sym_doc(sym, 1, false));
         }
         Doc::kw(Keyword::Inject).then(ctx.block(inner, 1))
-    }
-}
-
-impl<'src> ToDoc<'src> for ForeignBlockNav<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::kw(Keyword::Nav).then(ctx.block(ctx.sym_doc(&self.symbol, 3, false), 3))
     }
 }
 

@@ -1,43 +1,35 @@
 use compiler_test::src_to_idl;
 use sqlx::{Row, SqlitePool};
 
-async fn create_tables(db: &SqlitePool, ddl: &str) {
-    for stmt in ddl.split(';').map(str::trim).filter(|s| !s.is_empty()) {
-        sqlx::query(stmt).execute(db).await.unwrap();
-    }
+async fn exec_batch(db: &SqlitePool, sql: &str) {
+    sqlx::raw_sql(sql).execute(db).await.unwrap();
 }
 
 #[sqlx::test]
-async fn default_data_sources(db: SqlitePool) {
-    // Act
+async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { kv_namespace }
-            r2 { r2_namespace }
+        d1 { db }
+
+        kv kv_namespace {
+            userCache(id: int) -> json {
+                "{id}"
+            }
         }
 
-        [use db]
-        model Profile {
+        r2 r2_namespace {
+            userDocuments(id: int) {
+                "{id}"
+            }
+        }
+
+        model Profile for db {
             primary {
                 id: int
             }
         }
 
-        [use db]
-        model Role {
-            primary {
-                id: int
-            }
-
-            nav(User::id) {
-                users
-            }
-        }
-
-        [use db]
-        model Order {
+        model Order for db {
             primary {
                 id: int
             }
@@ -47,111 +39,79 @@ async fn default_data_sources(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model User {
+        model User for db {
             primary {
                 id: int
             }
 
             foreign(Profile::id) {
                 profileId
-                nav { profile }
             }
 
-            nav(Order::userId) {
+            nav Profile::id(profileId) {
+                profile
+            }
+
+            nav Order::userId {
                 orders
             }
 
-            nav(Role::id) {
-                roles
+            kv kv_namespace::userCache(id) {
+                userCache
             }
 
-            kv(kv_namespace, "{id}") {
-                userCache: json
-            }
-
-            r2(r2_namespace, "{id}") {
+            r2 r2_namespace::userDocuments(id) {
                 userDocuments
             }
         }
     "#,
     );
 
-    // Assert
     let user = idl.models.get("User").unwrap();
     let default_ds = user
         .default_data_source()
         .expect("User should have default data source");
     let tree = &default_ds.tree;
 
-    assert!(
-        tree.0.contains_key("profile"),
-        "Default data source should include 1:1 relationship 'profile'"
-    );
-    assert!(
-        tree.0.contains_key("orders"),
-        "Default data source should include 1:M relationship 'orders'"
-    );
-    assert!(
-        tree.0.contains_key("roles"),
-        "Default data source should include M:M relationship 'roles'"
-    );
-    assert!(
-        tree.0.contains_key("userCache"),
-        "Default data source should include KV object 'userCache'"
-    );
-    assert!(
-        tree.0.contains_key("userDocuments"),
-        "Default data source should include R2 object 'userDocuments'"
-    );
-    assert!(
-        !default_ds.is_internal,
-        "Default data source should not be internal"
-    );
-    assert_eq!(
-        default_ds.name, "Default",
-        "Data source should be named 'default'"
-    );
+    for key in ["profile", "orders", "userCache", "userDocuments"] {
+        assert!(
+            tree.0.contains_key(key),
+            "Default data source should include '{key}'"
+        );
+    }
 
-    create_tables(
+    assert!(!default_ds.is_internal);
+    assert_eq!(default_ds.name, "Default");
+
+    assert!(!default_ds.get.is_stub);
+    assert!(!default_ds.list.is_stub);
+    assert!(!default_ds.save.is_stub);
+    assert!(default_ds.include_query.to_uppercase().contains("SELECT"));
+
+    exec_batch(
         &db,
         r#"CREATE TABLE Profile (id INTEGER PRIMARY KEY);
            CREATE TABLE Role (id INTEGER PRIMARY KEY);
            CREATE TABLE "Order" (id INTEGER PRIMARY KEY, userId INTEGER NOT NULL);
            CREATE TABLE User (id INTEGER PRIMARY KEY, profileId INTEGER NOT NULL);
-           CREATE TABLE RoleUser ("left" INTEGER NOT NULL, "right" INTEGER NOT NULL)"#,
+
+           INSERT INTO Profile (id) VALUES (1);
+           INSERT INTO Role (id) VALUES (10);
+           INSERT INTO User (id, profileId) VALUES (1, 1), (2, 1);
+           INSERT INTO "Order" (id, userId) VALUES (100, 1), (200, 1);"#,
     )
     .await;
 
-    sqlx::query("INSERT INTO Profile (id) VALUES (1)")
-        .execute(&db)
+    let rows = sqlx::query(&default_ds.get_query)
+        .bind(1)
+        .fetch_all(&db)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO Role (id) VALUES (10)")
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO User (id, profileId) VALUES (1, 1), (2, 1)")
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query(r#"INSERT INTO "Order" (id, userId) VALUES (100, 1), (200, 1)"#)
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query(r#"INSERT INTO RoleUser ("left", "right") VALUES (10, 1)"#)
-        .execute(&db)
-        .await
-        .unwrap();
-
-    let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(get_sql).bind(1).fetch_all(&db).await.unwrap();
     assert!(!rows.is_empty(), "GET query should return rows");
     assert_eq!(rows[0].get::<u32, _>("id"), 1);
     assert_eq!(rows[0].get::<u32, _>("profile.id"), 1);
 
-    let list_sql = &default_ds.list.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(list_sql)
+    let rows = sqlx::query(&default_ds.list_query)
         .bind(0) // lastSeen_id
         .bind(10) // limit
         .fetch_all(&db)
@@ -161,28 +121,29 @@ async fn default_data_sources(db: SqlitePool) {
 }
 
 #[test]
-fn default_data_source_methods() {
-    // Act
+fn default_data_source_present_on_every_d1_model() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-            kv { my_kv }
+        d1 { db }
+
+        kv my_kv {
+            cached(tag: string) -> json {
+                "{tag}"
+            }
         }
 
-        [use db]
         [crud get, list]
-        model Item {
+        model Item for db {
             primary {
                 id: int
             }
 
-            keyfield {
+            column {
                 tag: string
             }
 
-            kv(my_kv, "{tag}") {
-                cached: json
+            kv my_kv::cached(tag) {
+                cached
             }
         }
 
@@ -192,37 +153,28 @@ fn default_data_source_methods() {
     "#,
     );
 
-    // Assert
     let item = idl.models.get("Item").unwrap();
     let with_kv = item
         .data_sources
         .get("WithKv")
         .expect("WithKv data source should exist");
-    assert!(
-        with_kv.get.is_some(),
-        "WithKv should have a default get method"
-    );
-    assert!(
-        with_kv.list.is_some(),
-        "WithKv should have a default list method"
-    );
+    assert!(!with_kv.get.is_stub);
+    assert!(!with_kv.list.is_stub);
+    assert!(!with_kv.save.is_stub);
 
     let default_ds = item.default_data_source().expect("Should have default ds");
-    assert!(default_ds.get.is_some());
-    assert!(default_ds.list.is_some());
+    assert!(!default_ds.get.is_stub);
+    assert!(!default_ds.list.is_stub);
+    assert!(!default_ds.save.is_stub);
 }
 
 #[sqlx::test]
-async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
-    // Act
+async fn default_data_source_skips_nested_manys(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Grade {
+        model Grade for db {
             primary {
                 id: int
             }
@@ -232,8 +184,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Teacher {
+                model Teacher for db {
             primary {
                 id: int
             }
@@ -243,8 +194,7 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Student {
+        model Student for db {
             primary {
                 id: int
             }
@@ -260,54 +210,42 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
     "#,
     );
 
-    // Assert
     let teacher = idl.models.get("Teacher").unwrap();
     let default_ds = teacher
         .default_data_source()
         .expect("Teacher should have default data source");
     let tree = &default_ds.tree;
 
-    assert!(
-        tree.0.contains_key("students"),
-        "Default data source for Teacher should include 'students' relationship"
-    );
+    assert!(tree.0.contains_key("students"));
     let students_node = tree.0.get("students").unwrap();
     assert!(
         !students_node.0.contains_key("grades"),
-        "Default data source for Teacher should NOT include nested 'grades' under 'students'"
+        "Default data source should NOT recurse past 1:N"
     );
 
-    // Assert
-    create_tables(
+    exec_batch(
         &db,
         "CREATE TABLE Grade (id INTEGER PRIMARY KEY, studentId INTEGER NOT NULL);
          CREATE TABLE Teacher (id INTEGER PRIMARY KEY);
-         CREATE TABLE Student (id INTEGER PRIMARY KEY, teacherId INTEGER NOT NULL)",
+         CREATE TABLE Student (id INTEGER PRIMARY KEY, teacherId INTEGER NOT NULL);
+
+         INSERT INTO Teacher (id) VALUES (1);
+         INSERT INTO Student (id, teacherId) VALUES (10, 1), (20, 1);
+         INSERT INTO Grade (id, studentId) VALUES (100, 10);",
     )
     .await;
 
-    sqlx::query("INSERT INTO Teacher (id) VALUES (1)")
-        .execute(&db)
+    let rows = sqlx::query(&default_ds.get_query)
+        .bind(1)
+        .fetch_all(&db)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO Student (id, teacherId) VALUES (10, 1), (20, 1)")
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO Grade (id, studentId) VALUES (100, 10)")
-        .execute(&db)
-        .await
-        .unwrap();
-
-    let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(get_sql).bind(1).fetch_all(&db).await.unwrap();
     assert_eq!(rows.len(), 2, "GET should return 2 rows (1 per student)");
     assert_eq!(rows[0].get::<u32, _>("id"), 1);
     assert_eq!(rows[0].get::<u32, _>("students.id"), 10);
     assert_eq!(rows[1].get::<u32, _>("students.id"), 20);
 
-    let list_sql = &default_ds.list.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(list_sql)
+    let rows = sqlx::query(&default_ds.list_query)
         .bind(0)
         .bind(10)
         .fetch_all(&db)
@@ -317,16 +255,12 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
-    // Act
+async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Toy {
+        model Toy for db {
             primary {
                 id: int
             }
@@ -335,8 +269,7 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Dog {
+        model Dog for db {
             primary {
                 id: int
             }
@@ -346,12 +279,12 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
 
             foreign(Toy::id) {
                 toyId
-                nav { toy }
             }
+
+            nav Toy::id(toyId) { toy }
         }
 
-        [use db]
-        model Owner {
+        model Owner for db {
             primary {
                 id: int
             }
@@ -361,65 +294,46 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
 
             foreign(Dog::id) {
                 dogId
-                nav { dog }
             }
+
+            nav Dog::id(dogId) { dog }
         }
     "#,
     );
 
-    // Assert
     let owner = idl.models.get("Owner").unwrap();
-    let default_ds = owner
-        .default_data_source()
-        .expect("Owner should have default data source");
+    let default_ds = owner.default_data_source().unwrap();
     let tree = &default_ds.tree;
-    assert!(
-        tree.0.contains_key("dog"),
-        "Default data source for Owner should include 'dog' relationship"
-    );
 
-    let dog_node = tree.0.get("dog").unwrap();
-    assert!(
-        dog_node.0.contains_key("toy"),
-        "Default data source for Owner should include 'toy' relationship under 'dog'"
-    );
-
-    let toy_node = dog_node.0.get("toy").unwrap();
+    let dog_node = tree.0.get("dog").expect("includes 'dog'");
+    let toy_node = dog_node.0.get("toy").expect("includes 'dog.toy'");
     assert!(
         toy_node.0.is_empty(),
-        "Default data source for Owner should NOT include any nested relationships under 'toy'"
+        "Default include should not recurse past leaf 1:1"
     );
 
-    // Assert
-    create_tables(
+    exec_batch(
         &db,
         "CREATE TABLE Toy (id INTEGER PRIMARY KEY, color TEXT NOT NULL);
          CREATE TABLE Dog (id INTEGER PRIMARY KEY, breed TEXT NOT NULL, toyId INTEGER NOT NULL REFERENCES Toy(id));
-         CREATE TABLE Owner (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dogId INTEGER NOT NULL REFERENCES Dog(id))",
+         CREATE TABLE Owner (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dogId INTEGER NOT NULL REFERENCES Dog(id));
+
+         INSERT INTO Toy (id, color) VALUES (1, 'red');
+         INSERT INTO Dog (id, breed, toyId) VALUES (1, 'poodle', 1);
+         INSERT INTO Owner (id, name, dogId) VALUES (1, 'Alice', 1);",
     )
     .await;
 
-    sqlx::query("INSERT INTO Toy (id, color) VALUES (1, 'red')")
-        .execute(&db)
+    let row = sqlx::query(&default_ds.get_query)
+        .bind(1)
+        .fetch_one(&db)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO Dog (id, breed, toyId) VALUES (1, 'poodle', 1)")
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO Owner (id, name, dogId) VALUES (1, 'Alice', 1)")
-        .execute(&db)
-        .await
-        .unwrap();
-
-    let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let row = sqlx::query(get_sql).bind(1).fetch_one(&db).await.unwrap();
     assert_eq!(row.get::<String, _>("name"), "Alice");
     assert_eq!(row.get::<String, _>("dog.breed"), "poodle");
     assert_eq!(row.get::<String, _>("dog.toy.color"), "red");
 
-    let list_sql = &default_ds.list.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(list_sql)
+    let rows = sqlx::query(&default_ds.list_query)
         .bind(0)
         .bind(10)
         .fetch_all(&db)
@@ -430,16 +344,12 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
-    // Act
+async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Team {
+        model Team for db {
             primary {
                 id: int
             }
@@ -448,89 +358,69 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
             }
         }
 
-        [use db]
-        model Department {
+        model Department for db {
             primary {
                 id: int
             }
 
             foreign(Team::id) {
                 teamId
-                nav { team }
             }
+
+            nav Team::id(teamId) { team }
         }
 
-        [use db]
-        model Company {
+        model Company for db {
             primary {
                 id: int
             }
 
             foreign(Department::id) {
                 departmentId
-                nav { department }
             }
+
+            nav Department::id(departmentId) { department }
 
             foreign(Team::id) {
                 directTeamId
-                nav { team }
             }
+
+            nav Team::id(directTeamId) { team }
         }
     "#,
     );
 
-    // Assert
     let company = idl.models.get("Company").unwrap();
-    let default_ds = company
-        .default_data_source()
-        .expect("Company should have default data source");
+    let default_ds = company.default_data_source().unwrap();
     let tree = &default_ds.tree;
 
-    assert!(
-        tree.0.contains_key("department"),
-        "Default data source for Company should include 'department' relationship"
-    );
-    assert!(
-        tree.0.contains_key("team"),
-        "Default data source for Company should include 'team' relationship"
-    );
-
+    assert!(tree.0.contains_key("department"));
+    assert!(tree.0.contains_key("team"));
     let department_node = tree.0.get("department").unwrap();
-    assert!(
-        department_node.0.contains_key("team"),
-        "Default data source for Company should include 'team' under 'department'"
-    );
+    assert!(department_node.0.contains_key("team"));
 
-    // Assert
-    create_tables(
+    exec_batch(
         &db,
         "CREATE TABLE Team (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE Department (id INTEGER PRIMARY KEY, teamId INTEGER NOT NULL REFERENCES Team(id));
-         CREATE TABLE Company (id INTEGER PRIMARY KEY, departmentId INTEGER NOT NULL REFERENCES Department(id), directTeamId INTEGER NOT NULL REFERENCES Team(id))",
+         CREATE TABLE Company (id INTEGER PRIMARY KEY, departmentId INTEGER NOT NULL REFERENCES Department(id), directTeamId INTEGER NOT NULL REFERENCES Team(id));
+
+         INSERT INTO Team (id, name) VALUES (1, 'Alpha'), (2, 'Beta');
+         INSERT INTO Department (id, teamId) VALUES (1, 1);
+         INSERT INTO Company (id, departmentId, directTeamId) VALUES (1, 1, 2);",
     )
     .await;
 
-    sqlx::query("INSERT INTO Team (id, name) VALUES (1, 'Alpha'), (2, 'Beta')")
-        .execute(&db)
+    let row = sqlx::query(&default_ds.get_query)
+        .bind(1)
+        .fetch_one(&db)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO Department (id, teamId) VALUES (1, 1)")
-        .execute(&db)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO Company (id, departmentId, directTeamId) VALUES (1, 1, 2)")
-        .execute(&db)
-        .await
-        .unwrap();
-
-    let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let row = sqlx::query(get_sql).bind(1).fetch_one(&db).await.unwrap();
     assert_eq!(row.get::<u32, _>("id"), 1);
     assert_eq!(row.get::<String, _>("team.name"), "Beta");
     assert_eq!(row.get::<String, _>("department.team.name"), "Alpha");
 
-    let list_sql = &default_ds.list.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(list_sql)
+    let rows = sqlx::query(&default_ds.list_query)
         .bind(0)
         .bind(10)
         .fetch_all(&db)
@@ -540,16 +430,12 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn default_data_sources_composite_pk(db: SqlitePool) {
-    // Act
+async fn default_data_source_composite_pk(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model OrderItem {
+        model OrderItem for db {
             primary {
                 orderId: int
                 productId: int
@@ -561,19 +447,12 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
     "#,
     );
 
-    // Assert
-    create_tables(
+    exec_batch(
         &db,
-        "CREATE TABLE OrderItem (orderId INTEGER NOT NULL, productId INTEGER NOT NULL, qty INTEGER NOT NULL, PRIMARY KEY (orderId, productId))",
+        "CREATE TABLE OrderItem (orderId INTEGER NOT NULL, productId INTEGER NOT NULL, qty INTEGER NOT NULL, PRIMARY KEY (orderId, productId));
+         INSERT INTO OrderItem (orderId, productId, qty) VALUES (1, 1, 5), (1, 2, 3), (2, 1, 7);",
     )
     .await;
-
-    sqlx::query(
-        "INSERT INTO OrderItem (orderId, productId, qty) VALUES (1, 1, 5), (1, 2, 3), (2, 1, 7)",
-    )
-    .execute(&db)
-    .await
-    .unwrap();
 
     let ds = idl
         .models
@@ -583,8 +462,7 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
         .unwrap();
 
     // GET by composite PK
-    let get_sql = &ds.get.as_ref().unwrap().raw_sql;
-    let row = sqlx::query(get_sql)
+    let row = sqlx::query(&ds.get_query)
         .bind(1)
         .bind(2)
         .fetch_one(&db)
@@ -595,8 +473,7 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
     assert_eq!(row.get::<u32, _>("qty"), 3);
 
     // LIST with seek pagination
-    let list_sql = &ds.list.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(list_sql)
+    let rows = sqlx::query(&ds.list_query)
         .bind(0) // lastSeen_orderId
         .bind(0) // lastSeen_productId
         .bind(10) // limit
@@ -607,16 +484,12 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
 }
 
 #[test]
-fn resolve_sql_params() {
-    // Act
+fn custom_data_source_captures_stub_params_and_tags() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Item {
+        model Item for db {
             primary {
                 id: int
             }
@@ -627,128 +500,107 @@ fn resolve_sql_params() {
 
         source ById for Item {
             include {}
-            sql get(itemId: int) { "SELECT * FROM Item WHERE id = $itemId AND id != $itemId" }
+
+            get([instance] id: int)
         }
 
-        source ByPriceRange for Item {
+        source PaginatedSince for Item {
             include {}
-            sql list(minPrice: int, maxPrice: int, limit: int) {
-                "SELECT * FROM Item WHERE price >= $minPrice AND price <= $maxPrice LIMIT $limit"
-            }
-        }
 
-        source Prefix for Item {
-            include {}
-            sql get(id: int, id2: int) {
-                "SELECT * FROM Item WHERE id = $id AND other_id = $id2"
-            }
+            list(lastId: int, limit: int)
         }
     "#,
     );
 
-    // Assert
     let item = idl.models.get("Item").unwrap();
+
     let by_id = item.data_sources.get("ById").unwrap();
-    let get_sql = &by_id.get.as_ref().unwrap().raw_sql;
-    assert!(!get_sql.contains("$itemId"), "got: {get_sql}");
-    assert_eq!(get_sql.matches("?1").count(), 2, "got: {get_sql}");
+    assert!(by_id.get.is_stub, "ById's get should be a user stub");
+    assert_eq!(by_id.get.parameters.len(), 1);
+    assert_eq!(by_id.get.parameters[0].parameter.name, "id");
+    assert!(by_id.get.parameters[0].instance_field);
 
-    let by_range = item.data_sources.get("ByPriceRange").unwrap();
-    let list_sql = &by_range.list.as_ref().unwrap().raw_sql;
-    assert!(!list_sql.contains('$'), "got: {list_sql}");
-    let pos = |n: &str| list_sql.find(n).unwrap();
+    let paginated = item.data_sources.get("PaginatedSince").unwrap();
     assert!(
-        pos("?1") < pos("?2") && pos("?2") < pos("?3"),
-        "got: {list_sql}"
+        paginated.list.is_stub,
+        "PaginatedSince's list should be a user stub"
     );
-
-    // Prefix parameter names should not collide
-    let prefix = item.data_sources.get("Prefix").unwrap();
-    let prefix_sql = &prefix.get.as_ref().unwrap().raw_sql;
-    assert!(!prefix_sql.contains("$id"), "got: {prefix_sql}");
-    assert!(!prefix_sql.contains("$id2"), "got: {prefix_sql}");
-    assert_eq!(
-        prefix_sql.matches("?1").count(),
-        1,
-        "expected exactly one ?1, got: {prefix_sql}"
-    );
-    assert_eq!(
-        prefix_sql.matches("?2").count(),
-        1,
-        "expected exactly one ?2, got: {prefix_sql}"
-    );
+    assert_eq!(paginated.list.parameters.len(), 2);
+    assert_eq!(paginated.list.parameters[0].name, "lastId");
+    assert_eq!(paginated.list.parameters[1].name, "limit");
 }
 
-#[sqlx::test]
-async fn include_placeholder_expands_to_select(db: SqlitePool) {
-    // Arrange
+#[test]
+fn custom_data_source_save_stub() {
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Post {
+        model Item for db {
             primary {
                 id: int
             }
-            column {
-                title: string
-            }
         }
 
-        source Recent for Post {
+        source Audited for Item {
             include {}
-            sql get(id: int) { "$include WHERE Post.id = $id" }
+
+            save(item: partial<Item>)
         }
     "#,
     );
 
-    let ds = idl
+    let audited = idl
         .models
-        .get("Post")
+        .get("Item")
         .unwrap()
         .data_sources
-        .get("Recent")
+        .get("Audited")
         .unwrap();
+    assert!(audited.save.is_stub, "Audited's save should be a user stub");
+    assert_eq!(audited.save.parameters.len(), 1);
+    assert_eq!(audited.save.parameters[0].name, "item");
+}
 
-    let raw_sql = &ds.get.as_ref().unwrap().raw_sql;
+#[test]
+fn custom_data_source_inject_tag_is_captured() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
 
-    // $include should be gone and replaced with a SELECT statement
-    assert!(!raw_sql.contains("$include"), "got: {raw_sql}");
-    assert!(raw_sql.to_uppercase().contains("SELECT"), "got: {raw_sql}");
-    // $id should be resolved to ?1
-    assert!(!raw_sql.contains("$id"), "got: {raw_sql}");
-    assert!(raw_sql.contains("?1"), "got: {raw_sql}");
+        model Item for db {
+            primary {
+                id: int
+            }
+        }
 
-    // The expanded SQL should be executable
-    create_tables(
-        &db,
-        "CREATE TABLE Post (id INTEGER PRIMARY KEY, title TEXT NOT NULL)",
-    )
-    .await;
-    sqlx::query("INSERT INTO Post (id, title) VALUES (1, 'hello'), (2, 'world')")
-        .execute(&db)
-        .await
+        source WithDb for Item {
+            include {}
+
+            [inject db]
+            get(id: int)
+        }
+    "#,
+    );
+
+    let with_db = idl
+        .models
+        .get("Item")
+        .unwrap()
+        .data_sources
+        .get("WithDb")
         .unwrap();
-
-    let row = sqlx::query(raw_sql).bind(1).fetch_one(&db).await.unwrap();
-    assert_eq!(row.get::<u32, _>("id"), 1);
-    assert_eq!(row.get::<String, _>("title"), "hello");
+    assert!(with_db.get.is_stub, "WithDb's get should be a user stub");
+    assert_eq!(with_db.get.injected, vec!["db"]);
 }
 
 #[test]
 fn api_method_defaults_to_default_data_source() {
-    // Act
     let idl = src_to_idl(
         r#"
-        env {
-            d1 { db }
-        }
+        d1 { db }
 
-        [use db]
-        model Item {
+        model Item for db {
             primary {
                 id: int
             }
@@ -759,13 +611,8 @@ fn api_method_defaults_to_default_data_source() {
         }
 
         api Item {
-            // Non-static no explicit data source: defaults to "Default"
             get fetch(self) -> Item
-
-            // Non-static explicit data source: uses "Custom"
             post fetchCustom([source Custom] self) -> Item
-
-            // Static: no data source
             post create() -> Item
         }
     "#,
@@ -774,22 +621,11 @@ fn api_method_defaults_to_default_data_source() {
     let item = idl.models.get("Item").unwrap();
 
     let fetch = item.apis.iter().find(|m| m.name == "fetch").unwrap();
-    assert_eq!(
-        fetch.data_source,
-        Some("Default"),
-        "non-static method without explicit data source should default to 'Default'"
-    );
+    assert_eq!(fetch.data_source, Some("Default"));
 
     let fetch_custom = item.apis.iter().find(|m| m.name == "fetchCustom").unwrap();
-    assert_eq!(
-        fetch_custom.data_source,
-        Some("Custom"),
-        "non-static method with explicit data source should use it"
-    );
+    assert_eq!(fetch_custom.data_source, Some("Custom"));
 
     let create = item.apis.iter().find(|m| m.name == "create").unwrap();
-    assert_eq!(
-        create.data_source, None,
-        "static method should have no data source"
-    );
+    assert_eq!(create.data_source, None);
 }

@@ -1,7 +1,5 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
 poo PooA {
@@ -18,8 +16,7 @@ poo PooC {
     b: array<PooB>
 }
 
-[use db]
-model PooAcceptYield {
+model PooAcceptYield for db {
     primary {
         id: int
     }

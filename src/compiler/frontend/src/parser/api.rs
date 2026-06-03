@@ -81,9 +81,12 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
         .then(just(Token::Arrow).ignore_then(cidl_type()).or_not())
         .map_spanned(
             |((((tags, http_verb), symbol), parameters), return_type)| ApiBlockMethod {
-                symbol: Symbol { tags, ..symbol },
+                symbol: Symbol {
+                    tags,
+                    cidl_type: return_type.unwrap_or_default(),
+                    ..symbol
+                },
                 http_verb,
-                return_type: return_type.unwrap_or_default(),
                 parameters,
             },
         )

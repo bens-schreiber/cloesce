@@ -4,12 +4,70 @@ export class Weather {
   id: number;
   date: Date;
   isRaining: boolean;
+  static async isItRainingSomewhere(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<boolean>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5797/api/Weather/isItRainingSomewhere`
+    );
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async getCurrentDate(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Date>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5797/api/Weather/getCurrentDate`
+    );
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Date,
+      false
+    );
+  }
+  static async echo(
+    date: Date,
+    isRaining: boolean,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Weather>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5797/api/Weather/echo`
+    );
+    __$baseUrl.searchParams.append("date", date.toISOString());
+    __$baseUrl.searchParams.append("isRaining", String(isRaining));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Weather,
+      false
+    );
+  }
   static async $save(
     model: DeepPartial<Weather>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const __$baseUrl = new URL(
-      `http://localhost:5293/api/Weather/$save`
+      `http://localhost:5797/api/Weather/$save`
     );
     const __$payload: any = {};
     __$payload["model"] = model;
@@ -32,7 +90,7 @@ export class Weather {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const __$baseUrl = new URL(
-      `http://localhost:5293/api/Weather/$get`
+      `http://localhost:5797/api/Weather/$get`
     );
     __$baseUrl.searchParams.append("id", String(id));
 
@@ -47,8 +105,10 @@ export class Weather {
       false
     );
   }
+
   static fromJson(data: any): Weather {
     const __$res = Object.assign(new Weather(), data);
+    __$res.date &&= new Date(__$res.date);
     return __$res;
   }
 }

@@ -1,5 +1,5 @@
 {
-  "hash": 16379568330859829046,
+  "hash": 14039577506740097549,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -12,7 +12,6 @@
     "A": {
       "hash": 13694065073971378326,
       "name": "A",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -60,14 +59,15 @@
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "bId"
               ]
             }
           }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -134,7 +134,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithB",
@@ -159,7 +161,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithoutB",
@@ -184,7 +188,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -205,7 +211,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithB",
@@ -226,7 +234,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithoutB",
@@ -247,7 +257,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -271,7 +283,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -283,8 +299,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "A"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\", \"A_2\".\"id\" AS \"b.a.id\", \"A_2\".\"bId\" AS \"b.a.bId\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\" LEFT JOIN \"A\" AS \"A_2\" ON \"B_1\".\"id\" = \"A_2\".\"bId\"",
+          "get_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\", \"A_2\".\"id\" AS \"b.a.id\", \"A_2\".\"bId\" AS \"b.a.bId\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\" LEFT JOIN \"A\" AS \"A_2\" ON \"B_1\".\"id\" = \"A_2\".\"bId\" WHERE \"A\".\"id\" = ?1",
+          "list_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\", \"A_2\".\"id\" AS \"b.a.id\", \"A_2\".\"bId\" AS \"b.a.bId\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\" LEFT JOIN \"A\" AS \"A_2\" ON \"B_1\".\"id\" = \"A_2\".\"bId\" WHERE \"A\".\"id\" > ?1 ORDER BY \"A\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithB": {
@@ -307,7 +347,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -319,8 +363,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "A"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\"",
+          "get_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\" WHERE \"A\".\"id\" = ?1",
+          "list_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\", \"B_1\".\"id\" AS \"b.id\" FROM \"A\" LEFT JOIN \"B\" AS \"B_1\" ON \"A\".\"bId\" = \"B_1\".\"id\" WHERE \"A\".\"id\" > ?1 ORDER BY \"A\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithoutB": {
@@ -343,7 +411,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -355,8 +427,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "A"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\" FROM \"A\"",
+          "get_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\" FROM \"A\" WHERE \"A\".\"id\" = ?1",
+          "list_query": "SELECT \"A\".\"id\" AS \"id\", \"A\".\"bId\" AS \"bId\" FROM \"A\" WHERE \"A\".\"id\" > ?1 ORDER BY \"A\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -368,7 +464,6 @@
     "B": {
       "hash": 5976713688952143785,
       "name": "B",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -408,7 +503,8 @@
           }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -444,7 +540,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -465,7 +563,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -489,7 +589,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -501,8 +605,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "B"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"B\".\"id\" AS \"id\", \"A_1\".\"id\" AS \"a.id\", \"A_1\".\"bId\" AS \"a.bId\" FROM \"B\" LEFT JOIN \"A\" AS \"A_1\" ON \"B\".\"id\" = \"A_1\".\"bId\"",
+          "get_query": "SELECT \"B\".\"id\" AS \"id\", \"A_1\".\"id\" AS \"a.id\", \"A_1\".\"bId\" AS \"a.bId\" FROM \"B\" LEFT JOIN \"A\" AS \"A_1\" ON \"B\".\"id\" = \"A_1\".\"bId\" WHERE \"B\".\"id\" = ?1",
+          "list_query": "SELECT \"B\".\"id\" AS \"id\", \"A_1\".\"id\" AS \"a.id\", \"A_1\".\"bId\" AS \"a.bId\" FROM \"B\" LEFT JOIN \"A\" AS \"A_1\" ON \"B\".\"id\" = \"A_1\".\"bId\" WHERE \"B\".\"id\" > ?1 ORDER BY \"B\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -512,9 +640,8 @@
       ]
     },
     "Course": {
-      "hash": 16444759045496253105,
+      "hash": 7562159567723127520,
       "name": "Course",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -533,22 +660,29 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 12739965944511147108,
+          "hash": 3993764155862585038,
           "field": {
             "name": "students",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Student"
+                  "name": "CourseStudent"
                 }
               }
             }
           },
-          "model_reference": "Student",
-          "kind": "ManyToMany"
+          "model_reference": "CourseStudent",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "courseId"
+              ]
+            }
+          }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -573,7 +707,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -597,7 +733,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -609,8 +749,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Course"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Course\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"students.courseId\", \"CourseStudent_1\".\"studentId\" AS \"students.studentId\" FROM \"Course\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Course\".\"id\" = \"CourseStudent_1\".\"courseId\"",
+          "get_query": "SELECT \"Course\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"students.courseId\", \"CourseStudent_1\".\"studentId\" AS \"students.studentId\" FROM \"Course\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Course\".\"id\" = \"CourseStudent_1\".\"courseId\" WHERE \"Course\".\"id\" = ?1",
+          "list_query": "SELECT \"Course\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"students.courseId\", \"CourseStudent_1\".\"studentId\" AS \"students.studentId\" FROM \"Course\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Course\".\"id\" = \"CourseStudent_1\".\"courseId\" WHERE \"Course\".\"id\" > ?1 ORDER BY \"Course\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -621,7 +785,6 @@
     "Person": {
       "hash": 823242336505793948,
       "name": "Person",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -661,7 +824,8 @@
           }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -679,8 +843,8 @@
             {
               "name": "person",
               "cidl_type": {
-                "Object": {
-                  "name": "Person"
+                "Partial": {
+                  "object_name": "Person"
                 }
               },
               "validators": []
@@ -728,7 +892,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithDogs",
@@ -753,7 +919,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithoutDogs",
@@ -778,7 +946,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -799,7 +969,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithDogs",
@@ -820,7 +992,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithoutDogs",
@@ -841,7 +1015,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -865,7 +1041,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -877,8 +1057,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Person"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\"",
+          "get_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\" WHERE \"Person\".\"id\" = ?1",
+          "list_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\" WHERE \"Person\".\"id\" > ?1 ORDER BY \"Person\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithDogs": {
@@ -901,7 +1105,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -913,8 +1121,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Person"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\"",
+          "get_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\" WHERE \"Person\".\"id\" = ?1",
+          "list_query": "SELECT \"Person\".\"id\" AS \"id\", \"Dog_1\".\"id\" AS \"dogs.id\", \"Dog_1\".\"personId\" AS \"dogs.personId\" FROM \"Person\" LEFT JOIN \"Dog\" AS \"Dog_1\" ON \"Person\".\"id\" = \"Dog_1\".\"personId\" WHERE \"Person\".\"id\" > ?1 ORDER BY \"Person\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithoutDogs": {
@@ -937,7 +1169,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -949,8 +1185,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Person"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Person\".\"id\" AS \"id\" FROM \"Person\"",
+          "get_query": "SELECT \"Person\".\"id\" AS \"id\" FROM \"Person\" WHERE \"Person\".\"id\" = ?1",
+          "list_query": "SELECT \"Person\".\"id\" AS \"id\" FROM \"Person\" WHERE \"Person\".\"id\" > ?1 ORDER BY \"Person\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -960,9 +1220,8 @@
       ]
     },
     "Student": {
-      "hash": 7328299033105353133,
+      "hash": 5262831485580231479,
       "name": "Student",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -981,22 +1240,29 @@
       "r2_fields": [],
       "navigation_fields": [
         {
-          "hash": 11955272502636475546,
+          "hash": 10262812894688787283,
           "field": {
             "name": "courses",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Course"
+                  "name": "CourseStudent"
                 }
               }
             }
           },
-          "model_reference": "Course",
-          "kind": "ManyToMany"
+          "model_reference": "CourseStudent",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "studentId"
+              ]
+            }
+          }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -1014,8 +1280,8 @@
             {
               "name": "student",
               "cidl_type": {
-                "Object": {
-                  "name": "Student"
+                "Partial": {
+                  "object_name": "Student"
                 }
               },
               "validators": []
@@ -1063,7 +1329,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_None",
@@ -1088,7 +1356,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$save_WithCoursesStudentsCourses",
@@ -1113,7 +1383,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get",
@@ -1134,7 +1406,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_None",
@@ -1155,7 +1429,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         },
         {
           "name": "$get_WithCoursesStudentsCourses",
@@ -1176,7 +1452,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -1200,7 +1478,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -1212,8 +1494,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Student"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\"",
+          "get_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\" WHERE \"Student\".\"id\" = ?1",
+          "list_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\" WHERE \"Student\".\"id\" > ?1 ORDER BY \"Student\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "None": {
@@ -1236,7 +1542,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -1248,8 +1558,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Student"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Student\".\"id\" AS \"id\" FROM \"Student\"",
+          "get_query": "SELECT \"Student\".\"id\" AS \"id\" FROM \"Student\" WHERE \"Student\".\"id\" = ?1",
+          "list_query": "SELECT \"Student\".\"id\" AS \"id\" FROM \"Student\" WHERE \"Student\".\"id\" > ?1 ORDER BY \"Student\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         },
         "WithCoursesStudentsCourses": {
@@ -1272,7 +1606,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -1284,8 +1622,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Student"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\", \"Course_2\".\"id\" AS \"courses.course.id\", \"CourseStudent_3\".\"courseId\" AS \"courses.course.students.courseId\", \"CourseStudent_3\".\"studentId\" AS \"courses.course.students.studentId\", \"Student_4\".\"id\" AS \"courses.course.students.student.id\", \"CourseStudent_5\".\"courseId\" AS \"courses.course.students.student.courses.courseId\", \"CourseStudent_5\".\"studentId\" AS \"courses.course.students.student.courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\" LEFT JOIN \"Course\" AS \"Course_2\" ON \"CourseStudent_1\".\"courseId\" = \"Course_2\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_3\" ON \"Course_2\".\"id\" = \"CourseStudent_3\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_4\" ON \"CourseStudent_3\".\"studentId\" = \"Student_4\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_5\" ON \"Student_4\".\"id\" = \"CourseStudent_5\".\"studentId\"",
+          "get_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\", \"Course_2\".\"id\" AS \"courses.course.id\", \"CourseStudent_3\".\"courseId\" AS \"courses.course.students.courseId\", \"CourseStudent_3\".\"studentId\" AS \"courses.course.students.studentId\", \"Student_4\".\"id\" AS \"courses.course.students.student.id\", \"CourseStudent_5\".\"courseId\" AS \"courses.course.students.student.courses.courseId\", \"CourseStudent_5\".\"studentId\" AS \"courses.course.students.student.courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\" LEFT JOIN \"Course\" AS \"Course_2\" ON \"CourseStudent_1\".\"courseId\" = \"Course_2\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_3\" ON \"Course_2\".\"id\" = \"CourseStudent_3\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_4\" ON \"CourseStudent_3\".\"studentId\" = \"Student_4\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_5\" ON \"Student_4\".\"id\" = \"CourseStudent_5\".\"studentId\" WHERE \"Student\".\"id\" = ?1",
+          "list_query": "SELECT \"Student\".\"id\" AS \"id\", \"CourseStudent_1\".\"courseId\" AS \"courses.courseId\", \"CourseStudent_1\".\"studentId\" AS \"courses.studentId\", \"Course_2\".\"id\" AS \"courses.course.id\", \"CourseStudent_3\".\"courseId\" AS \"courses.course.students.courseId\", \"CourseStudent_3\".\"studentId\" AS \"courses.course.students.studentId\", \"Student_4\".\"id\" AS \"courses.course.students.student.id\", \"CourseStudent_5\".\"courseId\" AS \"courses.course.students.student.courses.courseId\", \"CourseStudent_5\".\"studentId\" AS \"courses.course.students.student.courses.studentId\" FROM \"Student\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_1\" ON \"Student\".\"id\" = \"CourseStudent_1\".\"studentId\" LEFT JOIN \"Course\" AS \"Course_2\" ON \"CourseStudent_1\".\"courseId\" = \"Course_2\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_3\" ON \"Course_2\".\"id\" = \"CourseStudent_3\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_4\" ON \"CourseStudent_3\".\"studentId\" = \"Student_4\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_5\" ON \"Student_4\".\"id\" = \"CourseStudent_5\".\"studentId\" WHERE \"Student\".\"id\" > ?1 ORDER BY \"Student\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
@@ -1297,7 +1659,6 @@
     "Dog": {
       "hash": 8677285544175970002,
       "name": "Dog",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -1343,14 +1704,15 @@
           "model_reference": "Person",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "personId"
               ]
             }
           }
         }
       ],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -1386,7 +1748,9 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db"
+          ]
         }
       ],
       "data_sources": {
@@ -1410,7 +1774,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -1422,14 +1790,198 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Dog"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"personId\" AS \"personId\", \"Person_1\".\"id\" AS \"person.id\", \"Dog_2\".\"id\" AS \"person.dogs.id\", \"Dog_2\".\"personId\" AS \"person.dogs.personId\" FROM \"Dog\" LEFT JOIN \"Person\" AS \"Person_1\" ON \"Dog\".\"personId\" = \"Person_1\".\"id\" LEFT JOIN \"Dog\" AS \"Dog_2\" ON \"Person_1\".\"id\" = \"Dog_2\".\"personId\"",
+          "get_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"personId\" AS \"personId\", \"Person_1\".\"id\" AS \"person.id\", \"Dog_2\".\"id\" AS \"person.dogs.id\", \"Dog_2\".\"personId\" AS \"person.dogs.personId\" FROM \"Dog\" LEFT JOIN \"Person\" AS \"Person_1\" ON \"Dog\".\"personId\" = \"Person_1\".\"id\" LEFT JOIN \"Dog\" AS \"Dog_2\" ON \"Person_1\".\"id\" = \"Dog_2\".\"personId\" WHERE \"Dog\".\"id\" = ?1",
+          "list_query": "SELECT \"Dog\".\"id\" AS \"id\", \"Dog\".\"personId\" AS \"personId\", \"Person_1\".\"id\" AS \"person.id\", \"Dog_2\".\"id\" AS \"person.dogs.id\", \"Dog_2\".\"personId\" AS \"person.dogs.personId\" FROM \"Dog\" LEFT JOIN \"Person\" AS \"Person_1\" ON \"Dog\".\"personId\" = \"Person_1\".\"id\" LEFT JOIN \"Dog\" AS \"Dog_2\" ON \"Person_1\".\"id\" = \"Dog_2\".\"personId\" WHERE \"Dog\".\"id\" > ?1 ORDER BY \"Dog\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
       "cruds": [
         "Save"
       ]
+    },
+    "CourseStudent": {
+      "hash": 514777369792557541,
+      "name": "CourseStudent",
+      "primary_columns": [
+        {
+          "hash": 4017708243728059354,
+          "field": {
+            "name": "courseId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Course",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 13925186158847468726,
+          "field": {
+            "name": "studentId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Student",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 18379099584526236388,
+          "field": {
+            "name": "course",
+            "cidl_type": {
+              "Object": {
+                "name": "Course"
+              }
+            }
+          },
+          "model_reference": "Course",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "courseId"
+              ]
+            }
+          }
+        },
+        {
+          "hash": 7279060420123900060,
+          "field": {
+            "name": "student",
+            "cidl_type": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "model_reference": "Student",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "studentId"
+              ]
+            }
+          }
+        }
+      ],
+      "route_fields": [],
+      "database_binding": "db",
+      "apis": [],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_courseId",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "lastSeen_studentId",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "courseId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              },
+              {
+                "parameter": {
+                  "name": "studentId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "CourseStudent"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"CourseStudent\".\"courseId\" AS \"courseId\", \"CourseStudent\".\"studentId\" AS \"studentId\", \"Course_1\".\"id\" AS \"course.id\", \"CourseStudent_2\".\"courseId\" AS \"course.students.courseId\", \"CourseStudent_2\".\"studentId\" AS \"course.students.studentId\", \"Student_3\".\"id\" AS \"student.id\", \"CourseStudent_4\".\"courseId\" AS \"student.courses.courseId\", \"CourseStudent_4\".\"studentId\" AS \"student.courses.studentId\" FROM \"CourseStudent\" LEFT JOIN \"Course\" AS \"Course_1\" ON \"CourseStudent\".\"courseId\" = \"Course_1\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_2\" ON \"Course_1\".\"id\" = \"CourseStudent_2\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_3\" ON \"CourseStudent\".\"studentId\" = \"Student_3\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_4\" ON \"Student_3\".\"id\" = \"CourseStudent_4\".\"studentId\"",
+          "get_query": "SELECT \"CourseStudent\".\"courseId\" AS \"courseId\", \"CourseStudent\".\"studentId\" AS \"studentId\", \"Course_1\".\"id\" AS \"course.id\", \"CourseStudent_2\".\"courseId\" AS \"course.students.courseId\", \"CourseStudent_2\".\"studentId\" AS \"course.students.studentId\", \"Student_3\".\"id\" AS \"student.id\", \"CourseStudent_4\".\"courseId\" AS \"student.courses.courseId\", \"CourseStudent_4\".\"studentId\" AS \"student.courses.studentId\" FROM \"CourseStudent\" LEFT JOIN \"Course\" AS \"Course_1\" ON \"CourseStudent\".\"courseId\" = \"Course_1\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_2\" ON \"Course_1\".\"id\" = \"CourseStudent_2\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_3\" ON \"CourseStudent\".\"studentId\" = \"Student_3\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_4\" ON \"Student_3\".\"id\" = \"CourseStudent_4\".\"studentId\" WHERE (\"CourseStudent\".\"courseId\", \"CourseStudent\".\"studentId\") = (?1, ?2)",
+          "list_query": "SELECT \"CourseStudent\".\"courseId\" AS \"courseId\", \"CourseStudent\".\"studentId\" AS \"studentId\", \"Course_1\".\"id\" AS \"course.id\", \"CourseStudent_2\".\"courseId\" AS \"course.students.courseId\", \"CourseStudent_2\".\"studentId\" AS \"course.students.studentId\", \"Student_3\".\"id\" AS \"student.id\", \"CourseStudent_4\".\"courseId\" AS \"student.courses.courseId\", \"CourseStudent_4\".\"studentId\" AS \"student.courses.studentId\" FROM \"CourseStudent\" LEFT JOIN \"Course\" AS \"Course_1\" ON \"CourseStudent\".\"courseId\" = \"Course_1\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_2\" ON \"Course_1\".\"id\" = \"CourseStudent_2\".\"courseId\" LEFT JOIN \"Student\" AS \"Student_3\" ON \"CourseStudent\".\"studentId\" = \"Student_3\".\"id\" LEFT JOIN \"CourseStudent\" AS \"CourseStudent_4\" ON \"Student_3\".\"id\" = \"CourseStudent_4\".\"studentId\" WHERE (\"CourseStudent\".\"courseId\", \"CourseStudent\".\"studentId\") > (?1, ?2) ORDER BY \"CourseStudent\".\"courseId\" ASC, \"CourseStudent\".\"studentId\" ASC LIMIT ?3",
+          "is_internal": false
+        }
+      },
+      "cruds": []
     }
   },
   "poos": {},

@@ -10,7 +10,6 @@ function createHydrateArgs() {
   return {
     idl: { models: {}, poos: {} } as Cidl,
     includeTree: null,
-    keyFields: {},
     env: {},
     promises: [],
   };
@@ -137,7 +136,7 @@ describe("hydrateType Tests", () => {
       const parentMeta = ModelBuilder.model("ParentModel")
         .idPk()
         .navP("child", "ChildModel", {
-          OneToOne: { columns: ["id"] },
+          OneToOne: { fields: ["id"] },
         })
         .build();
 
@@ -168,6 +167,74 @@ describe("hydrateType Tests", () => {
       expect(result.child.createdAt.toISOString()).toBe(iso);
     });
 
+    test("assembles a route model nav target from this model's route fields", () => {
+      // Arrange: a route model whose nav target is built entirely from route values.
+      const carMeta = ModelBuilder.model("RouteCar")
+        .routeField("ownerId", "Int")
+        .routeField("tenant", "String")
+        .build();
+
+      const ownerMeta = ModelBuilder.model("RouteOwner")
+        .routeField("id", "Int")
+        .routeField("org", "String")
+        .navP("car", "RouteCar", {
+          OneToOne: { fields: ["id", "org"] },
+        })
+        .build();
+
+      const idl = createIdl({ models: [ownerMeta, carMeta] });
+
+      const base = { id: 1, org: "acme" };
+
+      // Act
+      const result = hydrateType(
+        base,
+        { Object: { name: "RouteOwner" } },
+        {
+          ...createHydrateArgs(),
+          idl,
+          includeTree: null,
+        },
+      );
+
+      // Assert: car is assembled with ownerId <- id, tenant <- org.
+      expect(result.car).toEqual({ ownerId: 1, tenant: "acme" });
+    });
+
+    test("assembles a route model nav target from a D1 model's columns and primary key", () => {
+      // Arrange
+      const profileMeta = ModelBuilder.model("Profile")
+        .routeField("ownerId", "Int")
+        .routeField("tenant", "String")
+        .build();
+
+      const userMeta = ModelBuilder.model("User")
+        .defaultDb()
+        .idPk()
+        .col("org", "String")
+        .navP("profile", "Profile", {
+          OneToOne: { fields: ["id", "org"] },
+        })
+        .build();
+
+      const idl = createIdl({ models: [userMeta, profileMeta] });
+      const base = { id: 7, org: "acme" };
+
+      // Act
+      const result = hydrateType(
+        base,
+        { Object: { name: "User" } },
+        {
+          ...createHydrateArgs(),
+          idl,
+          includeTree: null,
+        },
+      );
+
+      // Assert
+      expect(result.profile).toEqual({ ownerId: 7, tenant: "acme" });
+    });
+
     test("does not hydrate navigation properties when exclude from include tree", () => {
       // Arrange
       const iso = "2024-03-10T08:00:00.000Z";
@@ -180,7 +247,7 @@ describe("hydrateType Tests", () => {
       const parentMeta = ModelBuilder.model("ParentModel2")
         .idPk()
         .navP("child", "ChildModel2", {
-          OneToOne: { columns: ["id"] },
+          OneToOne: { fields: ["id"] },
         })
         .build();
 
@@ -222,23 +289,17 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .keyField("configId")
-      .kvField("config/{configId}", "namespace1", "config", false, "Json")
-      .kvField("config/{configId}", "namespace1", "configStream", false, "Stream")
-      .kvField("config", "namespace1", "configList", true, "Json")
-      .kvField("emptyConfig", "namespace1", "emptyConfig", false, "Json")
-      .keyField("imageId")
-      .r2Field("images/{imageId}", "bucket1", "image", false)
-      .r2Field("images", "bucket1", "imageList", true)
-      .r2Field("emptyImage", "bucket1", "emptyImage", false)
+      .kvField("config/{id}", "namespace1", "config", "Json")
+      .kvField("config/{id}", "namespace1", "configStream", "Stream")
+      .kvField("config", "namespace1", "configList", { Paginated: "Json" })
+      .kvField("emptyConfig", "namespace1", "emptyConfig", "Json")
+      .r2Field("images/{id}", "bucket1", "image")
+      .r2Field("images", "bucket1", "imageList", { Paginated: "R2Object" })
+      .r2Field("emptyImage", "bucket1", "emptyImage")
       .build();
 
-    const configId = "some-config-id";
-    const imageId = "some-image-id";
     const base = {
       id: 1,
-      configId,
-      imageId,
     };
 
     const mf = new Miniflare({
@@ -256,8 +317,8 @@ describe("ORM Hydrate Tests", () => {
 
     const namespace1 = await mf.getKVNamespace("namespace1");
     const baseConfigKV = {
-      key: `config/${configId}`,
-      value: { setting: `${configId} value` },
+      key: `config/${base.id}`,
+      value: { setting: `${base.id} value` },
       metadata: { createdAt: Date.now() },
     };
     const otherConfigItem = {
@@ -271,8 +332,8 @@ describe("ORM Hydrate Tests", () => {
 
     const bucket1 = await mf.getR2Bucket("bucket1");
     const baseImageObject = {
-      key: `images/${imageId}`,
-      body: `image data for ${imageId}`,
+      key: `images/${base.id}`,
+      body: `image data for ${base.id}`,
     };
     const otherImageObject = {
       key: `images/0`,
@@ -299,7 +360,6 @@ describe("ORM Hydrate Tests", () => {
         {
           idl,
           includeTree: {},
-          keyFields: { configId, imageId },
           env,
           promises,
         },
@@ -339,7 +399,6 @@ describe("ORM Hydrate Tests", () => {
             imageList: {},
             emptyImage: {},
           },
-          keyFields: { configId, imageId },
           env,
           promises,
         },
@@ -395,7 +454,7 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("CursorModel")
       .idPk()
-      .kvField("cursor-test", "namespace1", "configList", true, "Json")
+      .kvField("cursor-test", "namespace1", "configList", { Paginated: "Json" })
       .build();
 
     const mf = new Miniflare({
@@ -426,7 +485,6 @@ describe("ORM Hydrate Tests", () => {
       {
         idl,
         includeTree: { configList: {} },
-        keyFields: {},
         env: { namespace1 },
         promises,
       },

@@ -1,10 +1,10 @@
 {
-  "hash": 16379568330859829046,
+  "hash": 14039577506740097549,
   "models": {
     "A": {
       "hash": 13694065073971378326,
       "name": "A",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -50,7 +50,7 @@
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "bId"
               ]
             }
@@ -61,7 +61,7 @@
     "B": {
       "hash": 5976713688952143785,
       "name": "B",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -101,9 +101,9 @@
       ]
     },
     "Course": {
-      "hash": 16444759045496253105,
+      "hash": 7562159567723127520,
       "name": "Course",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -120,26 +120,32 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 12739965944511147108,
+          "hash": 3993764155862585038,
           "field": {
             "name": "students",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Student"
+                  "name": "CourseStudent"
                 }
               }
             }
           },
-          "model_reference": "Student",
-          "kind": "ManyToMany"
+          "model_reference": "CourseStudent",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "courseId"
+              ]
+            }
+          }
         }
       ]
     },
     "Person": {
       "hash": 823242336505793948,
       "name": "Person",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -179,9 +185,9 @@
       ]
     },
     "Student": {
-      "hash": 7328299033105353133,
+      "hash": 5262831485580231479,
       "name": "Student",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -198,26 +204,32 @@
       "columns": [],
       "navigation_fields": [
         {
-          "hash": 11955272502636475546,
+          "hash": 10262812894688787283,
           "field": {
             "name": "courses",
             "cidl_type": {
               "Array": {
                 "Object": {
-                  "name": "Course"
+                  "name": "CourseStudent"
                 }
               }
             }
           },
-          "model_reference": "Course",
-          "kind": "ManyToMany"
+          "model_reference": "CourseStudent",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "studentId"
+              ]
+            }
+          }
         }
       ]
     },
     "Dog": {
       "hash": 8677285544175970002,
       "name": "Dog",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -261,8 +273,84 @@
           "model_reference": "Person",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "personId"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "CourseStudent": {
+      "hash": 514777369792557541,
+      "name": "CourseStudent",
+      "database_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 4017708243728059354,
+          "field": {
+            "name": "courseId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Course",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 13925186158847468726,
+          "field": {
+            "name": "studentId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Student",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_fields": [
+        {
+          "hash": 18379099584526236388,
+          "field": {
+            "name": "course",
+            "cidl_type": {
+              "Object": {
+                "name": "Course"
+              }
+            }
+          },
+          "model_reference": "Course",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "courseId"
+              ]
+            }
+          }
+        },
+        {
+          "hash": 7279060420123900060,
+          "field": {
+            "name": "student",
+            "cidl_type": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "model_reference": "Student",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "studentId"
               ]
             }
           }

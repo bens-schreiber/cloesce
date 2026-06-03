@@ -1,21 +1,309 @@
 {
-  "hash": 12541860684839478437,
+  "hash": 16455310751165633242,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [
-      "namespace",
-      "otherNamespace"
+      {
+        "name": "namespace",
+        "templates": [
+          {
+            "field": {
+              "name": "data",
+              "cidl_type": {
+                "KvObject": "Json"
+              },
+              "validators": []
+            },
+            "params": [
+              {
+                "name": "id",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "key_format": "path/to/data/{id}"
+          },
+          {
+            "field": {
+              "name": "paginatedData",
+              "cidl_type": {
+                "Paginated": {
+                  "KvObject": "Json"
+                }
+              },
+              "validators": []
+            },
+            "params": [],
+            "key_format": "path/to/data/"
+          }
+        ]
+      },
+      {
+        "name": "otherNamespace",
+        "templates": [
+          {
+            "field": {
+              "name": "otherData",
+              "cidl_type": {
+                "KvObject": "String"
+              },
+              "validators": []
+            },
+            "params": [
+              {
+                "name": "id",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "key_format": "path/to/other/{id}"
+          }
+        ]
+      }
     ],
     "r2_bindings": [],
     "vars": []
   },
   "models": {
-    "D1BackedModel": {
-      "hash": 6703974713046051109,
-      "name": "D1BackedModel",
-      "d1_binding": "db",
+    "KVOnly": {
+      "hash": 0,
+      "name": "KVOnly",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "someData",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "namespace",
+          "key_format": "path/to/data/{id}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 0,
+          "field": {
+            "name": "sibling",
+            "cidl_type": {
+              "Object": {
+                "name": "KVSibling"
+              }
+            }
+          },
+          "model_reference": "KVSibling",
+          "kind": {
+            "OneToOne": {
+              "fields": [
+                "id"
+              ]
+            }
+          }
+        }
+      ],
+      "route_fields": [
+        {
+          "name": "id",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "database_binding": null,
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnly"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace",
+            "otherNamespace"
+          ]
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnly"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "KVOnly"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace",
+            "otherNamespace"
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "KVOnly"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "Save"
+      ]
+    },
+    "KVSibling": {
+      "hash": 0,
+      "name": "KVSibling",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "siblingData",
+            "cidl_type": {
+              "KvObject": "String"
+            },
+            "validators": []
+          },
+          "binding": "otherNamespace",
+          "key_format": "path/to/other/{siblingId}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "siblingId",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "database_binding": null,
+      "apis": [],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "siblingId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "KVSibling"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": []
+    },
+    "ModelWithKv": {
+      "hash": 2176846329808501385,
+      "name": "ModelWithKv",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -56,185 +344,29 @@
       "kv_fields": [
         {
           "field": {
-            "name": "kvData",
+            "name": "someData",
             "cidl_type": {
               "KvObject": "Json"
             },
             "validators": []
           },
-          "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
-          "format_parameters": [
-            {
-              "name": "id",
-              "cidl_type": "Int"
-            },
-            {
-              "name": "keyParam",
-              "cidl_type": "String"
-            },
-            {
-              "name": "someColumn",
-              "cidl_type": "Real"
-            },
-            {
-              "name": "someOtherColumn",
-              "cidl_type": "String"
-            }
-          ],
           "binding": "namespace",
-          "list_prefix": false
-        }
-      ],
-      "r2_fields": [],
-      "navigation_fields": [],
-      "key_fields": [
-        {
-          "name": "keyParam",
-          "cidl_type": "String",
-          "validators": []
-        }
-      ],
-      "apis": [
-        {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": {
-              "name": "D1BackedModel"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": "Int",
-              "validators": []
-            },
-            {
-              "name": "keyParam",
-              "cidl_type": "String",
-              "validators": []
-            }
-          ],
-          "injected": []
+          "key_format": "path/to/data/{id}"
         },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Object": {
-              "name": "D1BackedModel"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "D1BackedModel"
-                }
-              },
-              "validators": []
-            }
-          ],
-          "injected": []
-        },
-        {
-          "name": "$list",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Array": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "lastSeen_id",
-              "cidl_type": "Int",
-              "validators": []
-            },
-            {
-              "name": "limit",
-              "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
-            }
-          ],
-          "injected": []
-        }
-      ],
-      "data_sources": {
-        "Default": {
-          "name": "Default",
-          "list": {
-            "parameters": [
-              {
-                "name": "lastSeen_id",
-                "cidl_type": "Int",
-                "validators": []
-              },
-              {
-                "name": "limit",
-                "cidl_type": "Int",
-                "validators": [
-                  {
-                    "GreaterThan": {
-                      "Int": 0
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          "get": {
-            "parameters": [
-              {
-                "parameter": {
-                  "name": "id",
-                  "cidl_type": "Int",
-                  "validators": []
-                },
-                "instance_field": true
-              }
-            ]
-          },
-          "is_internal": false
-        }
-      },
-      "cruds": [
-        "Get",
-        "Save",
-        "List"
-      ]
-    },
-    "PaginatedKVModel": {
-      "hash": 13757542679648203632,
-      "name": "PaginatedKVModel",
-      "d1_binding": null,
-      "primary_columns": [],
-      "columns": [],
-      "kv_fields": [
         {
           "field": {
-            "name": "items",
+            "name": "someOtherData",
+            "cidl_type": {
+              "KvObject": "String"
+            },
+            "validators": []
+          },
+          "binding": "otherNamespace",
+          "key_format": "path/to/other/{id}"
+        },
+        {
+          "field": {
+            "name": "paginatedItems",
             "cidl_type": {
               "Paginated": {
                 "KvObject": "Json"
@@ -242,21 +374,14 @@
             },
             "validators": []
           },
-          "format": "paginated/items/",
-          "format_parameters": [],
           "binding": "namespace",
-          "list_prefix": true
+          "key_format": "path/to/data/"
         }
       ],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [
-        {
-          "name": "id",
-          "cidl_type": "String",
-          "validators": []
-        }
-      ],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "acceptPaginated",
@@ -291,106 +416,22 @@
           "return_media": "Json",
           "return_type": {
             "Object": {
-              "name": "PaginatedKVModel"
+              "name": "ModelWithKv"
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "String",
+              "cidl_type": "Int",
               "validators": []
             }
           ],
-          "injected": []
-        }
-      ],
-      "data_sources": {
-        "Default": {
-          "name": "Default",
-          "list": null,
-          "get": null,
-          "is_internal": false
-        }
-      },
-      "cruds": [
-        "Get"
-      ]
-    },
-    "PureKVModel": {
-      "hash": 5491520551375615806,
-      "name": "PureKVModel",
-      "d1_binding": null,
-      "primary_columns": [],
-      "columns": [],
-      "kv_fields": [
-        {
-          "field": {
-            "name": "data",
-            "cidl_type": {
-              "KvObject": "Json"
-            },
-            "validators": []
-          },
-          "format": "path/to/data/{id}",
-          "format_parameters": [
-            {
-              "name": "id",
-              "cidl_type": "String"
-            }
-          ],
-          "binding": "namespace",
-          "list_prefix": false
-        },
-        {
-          "field": {
-            "name": "otherData",
-            "cidl_type": {
-              "KvObject": "String"
-            },
-            "validators": []
-          },
-          "format": "path/to/other/{id}",
-          "format_parameters": [
-            {
-              "name": "id",
-              "cidl_type": "String"
-            }
-          ],
-          "binding": "otherNamespace",
-          "list_prefix": false
-        }
-      ],
-      "r2_fields": [],
-      "navigation_fields": [],
-      "key_fields": [
-        {
-          "name": "id",
-          "cidl_type": "String",
-          "validators": []
-        }
-      ],
-      "apis": [
-        {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": {
-              "name": "PureKVModel"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": "String",
-              "validators": []
-            }
-          ],
-          "injected": []
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
         },
         {
           "name": "$save",
@@ -400,7 +441,7 @@
           "return_media": "Json",
           "return_type": {
             "Object": {
-              "name": "PureKVModel"
+              "name": "ModelWithKv"
             }
           },
           "parameters_media": "Json",
@@ -409,26 +450,133 @@
               "name": "model",
               "cidl_type": {
                 "Partial": {
-                  "object_name": "PureKVModel"
+                  "object_name": "ModelWithKv"
                 }
               },
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
+        },
+        {
+          "name": "$list",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "ModelWithKv"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "db",
+            "namespace",
+            "otherNamespace"
+          ]
         }
       ],
       "data_sources": {
         "Default": {
           "name": "Default",
-          "list": null,
-          "get": null,
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "ModelWithKv"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db",
+              "namespace",
+              "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\"",
+          "get_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\" WHERE \"ModelWithKv\".\"id\" = ?1",
+          "list_query": "SELECT \"ModelWithKv\".\"id\" AS \"id\", \"ModelWithKv\".\"someColumn\" AS \"someColumn\", \"ModelWithKv\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"ModelWithKv\" WHERE \"ModelWithKv\".\"id\" > ?1 ORDER BY \"ModelWithKv\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
       "cruds": [
         "Get",
-        "Save"
+        "Save",
+        "List"
       ]
     }
   },

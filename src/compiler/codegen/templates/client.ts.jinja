@@ -37,6 +37,12 @@
     }
 {%- else if self.is_blob(cidl_type) %}
     __$res.{{ name }} = b64ToU8(__$res.{{ name }});
+{%- else if self.is_date(cidl_type) && self.has_array(cidl_type) %}
+    for (let i = 0; i < __$res.{{ name }}?.length; i++) {
+      __$res.{{ name }}[i] = new Date(__$res.{{ name }}[i]);
+    }
+{%- else if self.is_date(cidl_type) %}
+    __$res.{{ name }} &&= new Date(__$res.{{ name }});
 {%- endif %}
 {%- endmacro %}
 
@@ -66,11 +72,11 @@ export class {{ model.name }} {
 {%- for col in &model.columns %}
   {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
 {%- endfor %}
+{%- for field in &model.route_fields %}
+  {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
+{%- endfor %}
 {%- for nav in &model.navigation_fields %}
   {{ nav.field.name }}: {{ self.nav_type(nav) }}{% if self.is_one_to_one(nav) %} | undefined{% endif %};
-{%- endfor %}
-{%- for field in &model.key_fields %}
-  {{ field.name }}: string;
 {%- endfor %}
 {%- for kv in &model.kv_fields %}
   {{ kv.field.name }}: {% if self.contains_stream(&kv.field.cidl_type) %}KValue<void>{% else %}{{ self.map_type(&kv.field.cidl_type) }}{% endif %};
@@ -102,9 +108,6 @@ export class {{ model.name }} {
       encodeURIComponent(String({{ p.parameter.name }})),
 {%- endif %}
 {%- endfor %}
-{%- for field in &model.key_fields %}
-      encodeURIComponent(String(this.{{ field.name }})),
-{%- endfor %}
     ].join("/");
 {%- endif %}
     const __$baseUrl = new URL(
@@ -116,7 +119,11 @@ export class {{ model.name }} {
 
 {%- for param in &api.parameters %}
 {%- if self.is_get_request(&api.http_verb) %}
+{%- if self.is_date(&param.cidl_type) %}
+    __$baseUrl.searchParams.append("{{ param.name }}", {{ param.name }}.toISOString());
+{%- else %}
     __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+{%- endif %}
 {%- else %}
     __$payload["{{ param.name }}"] = {{ param.name }};
 {%- endif %}
@@ -126,7 +133,6 @@ export class {{ model.name }} {
   }
 {%- endfor %}
 
-{%- if !model.is_dataless() %}
   static fromJson(data: any): {{ model.name }} {
     const __$res = Object.assign(new {{ model.name }}(), data);
 {%- for nav in &model.navigation_fields %}
@@ -139,6 +145,7 @@ export class {{ model.name }} {
 {%- endif %}
 {%- endfor %}
 {%- for col in &model.columns %}{{ deserialize_field(col.field.name, &col.field.cidl_type) }}{%- endfor %}
+{%- for field in &model.route_fields %}{{ deserialize_field(field.name, &field.cidl_type) }}{%- endfor %}
 {%- for kv in &model.kv_fields %}
 {%- if self.is_paginated(&kv.field.cidl_type) %}
     if (__$res.{{ kv.field.name }}?.results) {
@@ -167,7 +174,6 @@ export class {{ model.name }} {
 {%- endfor %}
     return __$res;
   }
-{%- endif %}
 }
 {%- endfor %}
 

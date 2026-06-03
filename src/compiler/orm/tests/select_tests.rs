@@ -22,12 +22,9 @@ async fn scalar_model(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -68,26 +65,23 @@ async fn one_to_one(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
 
                 foreign(Dog::id) {
                     dogId
-                    nav {
-                        dog
-                    }
+                }
+
+                nav Dog::id(dogId) {
+                    dog
                 }
             }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -122,15 +116,70 @@ async fn one_to_one(db: SqlitePool) {
 }
 
 #[sqlx::test]
+async fn one_to_one_worker_model_is_not_joined(db: SqlitePool) {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+            d1 { db }
+
+            model Person for db {
+                primary {
+                    id: int
+                }
+
+                column {
+                    name: string
+                }
+
+                nav Profile::ownerId(id) {
+                    profile
+                }
+            }
+
+            model Profile {
+                route {
+                    ownerId: int
+                }
+            }
+        "#,
+    );
+
+    let insert_query = r#"
+            INSERT INTO Person (id, name) VALUES (1, 'Alice');
+        "#
+    .to_string();
+
+    // Act
+    let select_stmt = SelectModel::query(
+        "Person",
+        None,
+        include(json!({"profile": {}})).as_ref(),
+        &idl,
+    )
+    .expect("SelectModel::query to work");
+
+    // Assert
+    expected_str!(
+        select_stmt,
+        r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
+    );
+
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+        .await
+        .expect("SQL to execute");
+
+    let value = &results[1][0];
+    assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
+    assert_eq!(value.try_get::<String, _>("name").unwrap(), "Alice");
+}
+
+#[sqlx::test]
 async fn one_to_many(db: SqlitePool) {
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Dog {
+            model Dog for db {
                 primary {
                     id: int
                 }
@@ -140,8 +189,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Cat {
+            model Cat for db {
                 primary {
                     id: int
                 }
@@ -151,8 +199,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }
@@ -170,8 +217,7 @@ async fn one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Boss {
+            model Boss for db {
                 primary {
                     id: int
                 }
@@ -240,80 +286,13 @@ async fn one_to_many(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn many_to_many(db: SqlitePool) {
-    // Arrange
-    let idl = src_to_idl(
-        r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Student {
-                primary {
-                    id: int
-                }
-
-                nav(Course::id) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    id: int
-                }
-
-                nav(Student::id) {
-                    students
-                }
-            }
-        "#,
-    );
-
-    let insert_query = r#"
-            INSERT INTO Student (id) VALUES (1), (2);
-            INSERT INTO Course (id) VALUES (1), (2);
-            INSERT INTO CourseStudent (left, right) VALUES (1, 1), (1, 2), (2, 1);
-        "#
-    .to_string();
-
-    // Act
-    let select_stmt = SelectModel::query(
-        "Student",
-        None,
-        include(json!({"courses": {}})).as_ref(),
-        &idl,
-    )
-    .expect("SelectModel::query to work");
-
-    // Assert
-    expected_str!(
-        select_stmt,
-        r#"SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id""#
-    );
-
-    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
-        .await
-        .expect("SQL to execute");
-
-    let value = &results[1][0];
-    assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
-    assert_eq!(value.try_get::<u32, _>("courses.id").unwrap(), 1);
-}
-
-#[sqlx::test]
 async fn composite_one_to_one(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Student {
+            model Student for db {
                 primary {
                     school_id: int
                     student_number: int
@@ -324,8 +303,7 @@ async fn composite_one_to_one(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Enrollment {
+            model Enrollment for db {
                 primary {
                     id: int
                 }
@@ -333,9 +311,10 @@ async fn composite_one_to_one(db: SqlitePool) {
                 foreign(Student::school_id, Student::student_number) {
                     school_id
                     student_number
-                    nav {
-                        student
-                    }
+                }
+
+                nav (Student::school_id(school_id), Student::student_number(student_number)) {
+                    student
                 }
 
                 column {
@@ -388,12 +367,9 @@ async fn composite_one_to_many(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Order {
+            model Order for db {
                 primary {
                     region_id: int
                     order_number: int
@@ -408,8 +384,7 @@ async fn composite_one_to_many(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model OrderItem {
+            model OrderItem for db {
                 primary {
                     id: int
                 }
@@ -473,101 +448,13 @@ async fn composite_one_to_many(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn composite_many_to_many(db: SqlitePool) {
-    // Arrange
-    let idl = src_to_idl(
-        r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Teacher {
-                primary {
-                    school_id: int
-                    employee_id: int
-                }
-
-                column {
-                    name: string
-                }
-
-                nav(Course::department_id, Course::course_code) {
-                    courses
-                }
-            }
-
-            [use db]
-            model Course {
-                primary {
-                    department_id: int
-                    course_code: int
-                }
-
-                column {
-                    title: string
-                }
-
-                nav(Teacher::school_id, Teacher::employee_id) {
-                    teachers
-                }
-            }
-        "#,
-    );
-
-    let insert_query = r#"
-            INSERT INTO Teacher (school_id, employee_id, name) VALUES (1, 123, 'Dr. Smith');
-            INSERT INTO Course (department_id, course_code, title) VALUES (10, 101, 'Intro to CS');
-            INSERT INTO CourseTeacher (left_department_id, left_course_code, right_school_id, right_employee_id)
-            VALUES (10, 101, 1, 123);
-        "#
-        .to_string();
-
-    // Act
-    let select_stmt = SelectModel::query(
-        "Teacher",
-        None,
-        include(json!({"courses": {}})).as_ref(),
-        &idl,
-    )
-    .expect("SelectModel::query to work");
-
-    // Assert
-    expected_str!(
-        select_stmt,
-        r#"SELECT "Teacher"."school_id" AS "school_id", "Teacher"."employee_id" AS "employee_id", "Teacher"."name" AS "name", "CourseTeacher_2"."left_department_id" AS "courses.department_id", "CourseTeacher_2"."left_course_code" AS "courses.course_code", "Course_1"."title" AS "courses.title" FROM "Teacher" LEFT JOIN "CourseTeacher" AS "CourseTeacher_2" ON "Teacher"."school_id" = "CourseTeacher_2"."right_school_id" AND "Teacher"."employee_id" = "CourseTeacher_2"."right_employee_id" LEFT JOIN "Course" AS "Course_1" ON "CourseTeacher_2"."left_department_id" = "Course_1"."department_id" AND "CourseTeacher_2"."left_course_code" = "Course_1"."course_code""#
-    );
-
-    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
-        .await
-        .expect("SQL to execute");
-
-    let value = &results[1][0];
-    assert_eq!(value.try_get::<u32, _>("school_id").unwrap(), 1);
-    assert_eq!(value.try_get::<u32, _>("employee_id").unwrap(), 123);
-    assert_eq!(value.try_get::<String, _>("name").unwrap(), "Dr. Smith");
-    assert_eq!(
-        value.try_get::<u32, _>("courses.department_id").unwrap(),
-        10
-    );
-    assert_eq!(value.try_get::<u32, _>("courses.course_code").unwrap(), 101);
-    assert_eq!(
-        value.try_get::<String, _>("courses.title").unwrap(),
-        "Intro to CS"
-    );
-}
-
-#[sqlx::test]
 async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Horse {
+            model Horse for db {
                 primary {
                     id: int
                 }
@@ -582,8 +469,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
                 }
             }
 
-            [use db]
-            model Match {
+            model Match for db {
                 primary {
                     id: int
                 }
@@ -594,9 +480,10 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
 
                 foreign(Horse::id) {
                     horseId2
-                    nav {
-                        horse2
-                    }
+                }
+
+                nav Horse::id(horseId2) {
+                    horse2
                 }
             }
         "#,
@@ -620,7 +507,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Assert
     expected_str!(
         sql,
-        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId1" = "Horse_2"."id""#
+        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId2" = "Horse_2"."id""#
     );
 
     let results = test_sql(idl, vec![(insert_query, vec![]), (sql, vec![])], db)
@@ -638,12 +525,9 @@ async fn custom_from(db: SqlitePool) {
     // Arrange
     let idl = src_to_idl(
         r#"
-            env {
-                d1 { db }
-            }
+            d1 { db }
 
-            [use db]
-            model Person {
+            model Person for db {
                 primary {
                     id: int
                 }

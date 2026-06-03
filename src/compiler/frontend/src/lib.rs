@@ -11,12 +11,6 @@
 //! The [Symbol] struct is used to represent any named entity in the source code, such as a model name, field name, API method name, etc.
 //! It contains the symbol's name, type, span, and any tags applied to it. Not all [Symbol]s will have a meaningful type, or any tags,
 //! but this struct is used for all named entities for consistency and ease of error reporting.
-//!
-//! ## Memory management
-//!
-//! All string data in the AST is borrowed from the original heap-allocated source string. The [Ast] is non-recursive at the node level
-//! (with the exception of [CidlType]). Child nodes are stored in flat [Vec]s rather than via recursive node-to-node ownership,
-//! so no arena or custom allocator is required.
 
 pub mod err;
 pub mod formatter;
@@ -61,9 +55,8 @@ contextual_keywords! {
     Primary => "primary",
     Optional => "optional",
     Unique => "unique",
-    Paginated => "paginated",
-    KeyField => "keyfield",
     Column => "column",
+    Route => "route",
     For => "for",
     Include => "include",
 
@@ -71,46 +64,23 @@ contextual_keywords! {
     Model => "model",
     Poo => "poo",
     Source => "source",
-    Env => "env",
     Inject => "inject",
     Api => "api",
-
-    // Sub-block / binding
+    Vars => "vars",
     D1 => "d1",
     R2 => "r2",
     Kv => "kv",
-    Vars => "vars",
-
-    // Tag
-    Use => "use",
-    Crud => "crud",
-    Internal => "internal",
-    Instance => "instance",
 
     // CRUD / SQL method
     Get => "get",
     List => "list",
     Save => "save",
-    Sql => "sql",
 
     // HTTP verb
     Post => "post",
     Put => "put",
     Patch => "patch",
     Delete => "delete",
-
-    // Validator tag (numerical)
-    LessThan => "lt",
-    LessThanOrEqual => "lte",
-    GreaterThan => "gt",
-    GreaterThanOrEqual => "gte",
-    Step => "step",
-
-    // Validator tag (string)
-    Len => "len",
-    MinLen => "minlen",
-    MaxLen => "maxlen",
-    Regex => "regex",
 
     // Generic type
     GOption => "option",
@@ -129,6 +99,24 @@ contextual_keywords! {
     TBlob => "blob",
     TStream => "stream",
     TR2Object => "r2object",
+
+    // Tag
+    Crud => "crud",
+    Internal => "internal",
+    Instance => "instance",
+
+    // Validator tag (numerical)
+    LessThan => "lt",
+    LessThanOrEqual => "lte",
+    GreaterThan => "gt",
+    GreaterThanOrEqual => "gte",
+    Step => "step",
+
+    // Validator tag (string)
+    Len => "len",
+    MinLen => "minlen",
+    MaxLen => "maxlen",
+    Regex => "regex",
 }
 
 pub fn fmt_cidl_type(ty: &CidlType) -> String {
@@ -142,7 +130,7 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
         CidlType::Stream => Keyword::TStream.as_str().into(),
         CidlType::Json => Keyword::TJson.as_str().into(),
         CidlType::R2Object => Keyword::TR2Object.as_str().into(),
-        CidlType::Object { name } | CidlType::UnresolvedReference { name } => name.to_string(),
+        CidlType::Object { name } => name.to_string(),
         CidlType::Partial { object_name } => {
             format!("{}<{}>", Keyword::GPartial.as_str(), object_name)
         }
@@ -203,9 +191,6 @@ pub enum ArgumentLiteral<'src> {
 
 #[derive(Debug, Clone)]
 pub enum Tag<'src> {
-    Use {
-        binding: Spd<&'src str>,
-    },
     Source {
         name: Spd<&'src str>,
     },
@@ -259,10 +244,11 @@ pub struct ApiBlock<'src> {
 
 pub struct ApiBlockMethod<'src> {
     /// The symbol for the method name, e.g. `getUser` in `post getUser(...) { ... }`
+    ///
+    /// The [CidlType] of this symbol represents the return type of the API method.
     pub symbol: Symbol<'src>,
 
     pub http_verb: HttpVerb,
-    pub return_type: CidlType<'src>,
     pub parameters: Vec<Spd<ApiBlockMethodParamKind<'src>>>,
 }
 
@@ -272,7 +258,9 @@ pub enum ApiBlockMethodParamKind<'src> {
 }
 
 pub struct DataSourceBlockMethod<'src> {
+    pub method: Symbol<'src>,
     pub parameters: Vec<Symbol<'src>>,
+    /// Always empty after proposal 7; retained until semantic crate drops it.
     pub raw_sql: &'src str,
 }
 
@@ -289,18 +277,36 @@ pub struct DataSourceBlock<'src> {
     pub tree: ParsedIncludeTree<'src>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
+    pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
+}
+
+pub struct NavAdj<'src> {
+    /// `AdjModel` in `AdjModel::field`
+    pub model: Symbol<'src>,
+
+    /// `field` in `AdjModel::field`
+    pub field: Symbol<'src>,
+
+    /// The local FK column on the current model: the `(localKey)` part.
+    /// `Some` => 1:1 entry, `None` => 1:M entry.
+    pub local_key: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {
-    // nav (AdjModel::field1, AdjModel::field2, ...)
-    pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
+    pub adj: Vec<NavAdj<'src>>,
 
     // { navName }
     pub nav: Spd<Symbol<'src>>,
 }
 
-pub struct ForeignBlockNav<'src> {
-    pub symbol: Symbol<'src>,
+impl<'src> NavigationBlock<'src> {
+    /// A nav is 1:1 iff it carries local keys
+    pub fn is_one_to_one(&self) -> bool {
+        self.adj
+            .first()
+            .map(|a| a.local_key.is_some())
+            .unwrap_or(false)
+    }
 }
 
 pub struct ForeignBlock<'src> {
@@ -310,45 +316,35 @@ pub struct ForeignBlock<'src> {
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
 
-    /// Nav field to the adjacent model, ex:
-    /// ```cloesce
-    /// foreign (...) {
-    ///     ...
-    ///     nav { navSymbol }
-    /// }
-    /// ```
-    pub nav: Option<Spd<ForeignBlockNav<'src>>>,
-
     pub is_optional: bool,
 }
 
-/// `kv(binding, "key/format/{id}") { name: type }`
-pub struct KvBlock<'src> {
-    /// The KV namespace binding name
-    pub env_binding: Symbol<'src>,
+pub struct KvFieldBlock<'src> {
+    /// The KV binding name (e.g. `UserMetadata`)
+    pub binding: Symbol<'src>,
 
-    /// The key format string, e.g. `"weather/data/{id}"`
-    pub key_format: &'src str,
+    /// The field on the KV binding being referenced
+    pub binding_template: Symbol<'src>,
 
-    /// The single identity field with its type
+    /// The model fields to be passed as arguments to the binding's field
+    pub args: Vec<Symbol<'src>>,
+
+    /// The local field on the model representing this binding field
     pub field: Symbol<'src>,
-
-    pub is_paginated: bool,
 }
 
-/// `r2(binding, "key/format/{id}") { name }`
-pub struct R2Block<'src> {
-    /// R2 bucket binding name
-    pub env_binding: Symbol<'src>,
+pub struct R2FieldBlock<'src> {
+    /// The R2 binding name
+    pub binding: Symbol<'src>,
 
-    /// bucket key format string, e.g. `"weather/photos/{id}.jpg"`
-    pub key_format: &'src str,
+    /// The field on the R2 binding being referenced
+    pub binding_template: Symbol<'src>,
 
-    /// has no type; validators are not applicable to R2 fields
+    /// The model fields to be passed as arguments to the binding's field
+    pub args: Vec<Symbol<'src>>,
+
+    /// The local field on the model representing this binding field
     pub field: Symbol<'src>,
-
-    // [paginated]
-    pub is_paginated: bool,
 }
 
 pub enum SqlBlockKind<'src> {
@@ -360,21 +356,19 @@ pub enum ModelBlockKind<'src> {
     Column(Vec<Symbol<'src>>),
     Foreign(ForeignBlock<'src>),
     Navigation(NavigationBlock<'src>),
-    Kv(KvBlock<'src>),
-    R2(R2Block<'src>),
+    Kv(KvFieldBlock<'src>),
+    R2(R2FieldBlock<'src>),
     Primary(Vec<Spd<SqlBlockKind<'src>>>),
-    KeyField(Vec<Symbol<'src>>),
+    Route(Vec<Symbol<'src>>),
     Unique(Vec<Symbol<'src>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
     /// Returns the field-declaration symbols introduced by this block.
-    ///
-    /// `Unique` is excluded because it only *references* existing fields rather than
-    /// declaring new ones.
     pub fn symbols(&self) -> Vec<&Symbol<'src>> {
         match self {
             ModelBlockKind::Column(symbols) => symbols.iter().collect(),
+            ModelBlockKind::Route(symbols) => symbols.iter().collect(),
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
             ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.inner],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
@@ -386,7 +380,6 @@ impl<'src> ModelBlockKind<'src> {
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
                 .collect(),
-            ModelBlockKind::KeyField(fields) => fields.iter().collect(),
             ModelBlockKind::Unique(_) => vec![],
         }
     }
@@ -395,6 +388,9 @@ impl<'src> ModelBlockKind<'src> {
 pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
+
+    /// Optional binding the model is backed by, e.g. `for SomeBinding` in `model M for SomeBinding { ... }`.
+    pub database_binding: Option<Symbol<'src>>,
 
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }
@@ -447,20 +443,53 @@ pub struct PlainOldObjectBlock<'src> {
     pub fields: Vec<Symbol<'src>>,
 }
 
-pub enum EnvBindingBlockKind {
-    D1,
-    R2,
-    Kv,
-    Var,
+pub struct D1BindingBlock<'src> {
+    pub bindings: Vec<Symbol<'src>>,
 }
 
-pub struct EnvBindingBlock<'src> {
-    pub symbols: Vec<Symbol<'src>>,
-    pub kind: EnvBindingBlockKind,
+pub struct VarsBlock<'src> {
+    pub vars: Vec<Symbol<'src>>,
 }
 
-pub struct EnvBlock<'src> {
-    pub blocks: Vec<Spd<EnvBindingBlock<'src>>>,
+pub struct KvBindingTemplate<'src> {
+    /// The symbol naming the field
+    ///
+    /// The [CidlType] of this symbol represents the return type of the binding field.
+    pub symbol: Symbol<'src>,
+
+    /// The parameters required to construct a key for this field.
+    pub params: Vec<Symbol<'src>>,
+
+    /// The key format string (e.g. `"metadata/{id}"`)
+    pub key_format: &'src str,
+}
+
+pub struct KvBindingBlock<'src> {
+    /// The binding name, e.g. `UserMetadata`.
+    pub symbol: Symbol<'src>,
+
+    pub templates: Vec<Spd<KvBindingTemplate<'src>>>,
+}
+
+pub struct R2BindingTemplate<'src> {
+    /// The symbol naming the field
+    pub symbol: Symbol<'src>,
+
+    /// The parameters required to construct a key for this field.
+    pub params: Vec<Symbol<'src>>,
+
+    /// The key format string (e.g. `"key/{id}"`)
+    pub key_format: &'src str,
+
+    /// If true, the field returns a `Paginated<R2Object>``
+    pub is_paginated: bool,
+}
+
+pub struct R2BindingBlock<'src> {
+    /// The binding name, e.g. `UserAvatars`.
+    pub symbol: Symbol<'src>,
+
+    pub templates: Vec<Spd<R2BindingTemplate<'src>>>,
 }
 
 pub struct InjectBlock<'src> {
@@ -473,11 +502,15 @@ pub enum AstBlockKind<'src> {
     DataSource(DataSourceBlock<'src>),
     Model(ModelBlock<'src>),
     PlainOldObject(PlainOldObjectBlock<'src>),
-    Env(EnvBlock<'src>),
+    D1Binding(D1BindingBlock<'src>),
+    KvBinding(KvBindingBlock<'src>),
+    R2Binding(R2BindingBlock<'src>),
+    Vars(VarsBlock<'src>),
     Inject(InjectBlock<'src>),
 }
 
-/// The raw parsed structure of a Cloesce source file, before semantic analysis and transformation into the IDL.
+/// The raw parsed structure of a Cloesce source file
+/// before semantic analysis and transformation into the IDL.
 #[derive(Default)]
 pub struct Ast<'src> {
     pub blocks: Vec<Spd<AstBlockKind<'src>>>,

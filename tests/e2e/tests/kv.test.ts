@@ -1,12 +1,6 @@
 import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  PureKVModel,
-  D1BackedModel,
-  PaginatedKVModel,
-  KValue,
-  Paginated,
-} from "../fixtures/kv/client";
+import { ModelWithKv, KVOnly, KValue, Paginated } from "../fixtures/kv/client";
 import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -19,98 +13,49 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("PureKVModel", () => {
-  const id = "test-id";
-  const data = { foo: "bar" };
-  const otherData = "some string data";
-
-  it("POST", async () => {
-    const res = await PureKVModel.$save({
-      id,
-      data: { raw: data },
-      otherData: { raw: otherData },
-    });
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-  });
-
-  it("GET", async () => {
-    const res = await PureKVModel.$get(id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-    expect(res.data).toBeDefined();
-    expect(res.data?.id).toBe(id);
-    expect(res.data?.data.value).toEqual(data);
-    expect(res.data?.otherData.value).toBe(otherData);
-  });
-});
-
-describe("D1BackedModel", () => {
-  const data = { nested: "data" };
-  const keyParam = "key1";
+describe("ModelWithKv", () => {
+  const id = 1;
+  const someData = { foo: "bar" };
+  const someOtherData = "some string data";
 
   it("POST", async () => {
     const model = {
-      keyParam,
+      id,
       someColumn: 42,
       someOtherColumn: "hello",
-      kvData: {
-        raw: data,
-      },
+      someData: { raw: someData },
+      someOtherData: { raw: someOtherData },
     };
-    const res = await D1BackedModel.$save(model);
+    const res = await ModelWithKv.$save(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });
 
   it("GET", async () => {
-    const res = await D1BackedModel.$get(1, keyParam);
+    const res = await ModelWithKv.$get(id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
-    expect(res.data?.id).toBe(1);
-    expect(res.data?.keyParam).toBe("key1");
-    expect(res.data?.kvData.value).toEqual(data);
+    expect(res.data?.id).toBe(id);
+    expect(res.data?.someData.value).toEqual(someData);
+    expect(res.data?.someOtherData.value).toBe(someOtherData);
   });
 
   it("LIST", async () => {
-    // D1BackedModel takes a key param and thus cannot list KV components
-    const res = await D1BackedModel.$list(0, 10);
-
+    const res = await ModelWithKv.$list(0, 10);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);
     const item = res.data![0];
     expect(item.id).toBeDefined();
-    expect(item.keyParam).toBeUndefined();
-    expect(item.kvData).toBeUndefined();
   });
-});
 
-describe("PaginatedKVModel", () => {
-  const id = "test-id";
-
-  it("GET with Paginated KV list returns paginated structure", async () => {
-    const res = await PaginatedKVModel.$get(id);
+  it("GET with paginated KV list returns paginated structure", async () => {
+    const res = await ModelWithKv.$get(id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
-    expect(res.data?.id).toBe(id);
 
-    // Verify the paginated structure
-    expect(res.data?.items).toBeDefined();
-    expect(res.data?.items.results).toBeDefined();
-    expect(Array.isArray(res.data?.items.results)).toBe(true);
-    expect(res.data?.items.cursor).toBe(null);
-    expect(res.data?.items.complete).toBeTypeOf("boolean");
-  });
-
-  it("paginated KV cursor can be used for next page", async () => {
-    const res = await PaginatedKVModel.$get(id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-
-    if (res.data?.items.cursor) {
-      // If there is a cursor, we can use it for pagination
-      // This verifies the cursor is a valid string that can be used with KVNamespace.list()
-      expect(typeof res.data.items.cursor).toBe("string");
-    } else {
-      // If there is no cursor, then all items fit in the first page
-      expect(res.data?.items.complete).toBe(true);
-    }
+    expect(res.data?.paginatedItems).toBeDefined();
+    expect(res.data?.paginatedItems.results).toBeDefined();
+    expect(Array.isArray(res.data?.paginatedItems.results)).toBe(true);
+    expect(res.data?.paginatedItems.complete).toBeTypeOf("boolean");
   });
 
   it("accepts a paginated structure in POST", async () => {
@@ -123,10 +68,41 @@ describe("PaginatedKVModel", () => {
       complete: false,
     };
 
-    const res = await PaginatedKVModel.acceptPaginated(paginatedData);
+    const res = await ModelWithKv.acceptPaginated(paginatedData);
 
     expect(res.ok, withRes("acceptPaginated should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data).toEqual(paginatedData);
+  });
+});
+
+describe("KVOnly (route model)", () => {
+  const id = 7;
+  const someData = { hello: "world" };
+  const siblingData = "sibling string data";
+
+  it("POST persists the route model's and its nav target's KV fields", async () => {
+    const model = {
+      id,
+      someData: { raw: someData },
+      sibling: {
+        siblingId: id,
+        siblingData: { raw: siblingData },
+      },
+    };
+    const res = await KVOnly.$save(model);
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+  });
+
+  it("GET hydrates KV and the assembled route nav with its KV", async () => {
+    const res = await KVOnly.$get(id);
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data?.id).toBe(id);
+    expect(res.data?.someData.value).toEqual(someData);
+
+    // The sibling is assembled from this model's route fields, then its KV hydrated.
+    expect(res.data?.sibling).toBeDefined();
+    expect(res.data?.sibling?.siblingId).toBe(id);
+    expect(res.data?.sibling?.siblingData.value).toBe(siblingData);
   });
 });

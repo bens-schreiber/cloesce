@@ -1,12 +1,9 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
 
-[use db]
 [crud save, get, list]
-model FailModel {
+model FailModel for db {
     primary {
         id: int
     }

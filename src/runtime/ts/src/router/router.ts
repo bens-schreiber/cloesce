@@ -1,6 +1,6 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, CrudKind, DataSource, ValidatedField } from "../cidl.js";
-import { CloesceError, CloesceResult, Either, InternalError } from "../common.js";
+import { Cidl, Model, ApiMethod, DataSource, Field } from "../cidl.js";
+import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
@@ -8,6 +8,7 @@ import { crudRoute } from "./crud.js";
 export type DependencyKey = { tag: string };
 
 /**
+ * @internal
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
  * Comes with the Wrangler environment pre-injected
@@ -16,17 +17,13 @@ export class DependencyContainer {
   private container = new Map<string, any>();
 
   /** @internal */
-  _set<T>(key: DependencyKey, instance: T) {
+  set<T>(key: DependencyKey, instance: T) {
     if (this.container.has(key.tag)) {
       console.warn(
         `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
       );
     }
     this.container.set(key.tag, instance);
-  }
-
-  set(value: { tag: string }) {
-    this._set({ tag: value.tag }, value);
   }
 
   get<T>(key: DependencyKey): T | undefined {
@@ -76,10 +73,6 @@ export class RuntimeContainer {
  */
 export type RequestParamMap = Record<string, unknown>;
 
-export type MiddlewareFn = (
-  di: DependencyContainer,
-) => Promise<HttpResult | void> | HttpResult | void;
-
 /**
  * States in which the router may exit.
  */
@@ -104,73 +97,18 @@ export class CloesceApp {
     return new CloesceApp();
   }
 
-  // Maps a model name to an instance containing the implementations of its API methods.
-  // Additionally, contains injected dependencies, mapped to their instance.
-  private apiRegistry: Map<string, unknown> = new Map();
+  // Maps a model name to its registered namespace object: API method impls,
+  // data source impls (under their DS name), and injected dependencies all live here.
+  private modelRegistry: Map<string, unknown> = new Map();
 
   /**
-   * Register an API implementation or Injected dependency with the router,
-   * making it available for routing and injection, respectively.
+   * Register a model namespace (produced by `Model.impl({...})`) or an injected
+   * dependency with the router, making API methods, data source stubs, and
+   * injections available for routing.
    */
-  public register(api: { readonly tag: string }): this {
-    this.apiRegistry.set(api.tag, api);
+  public register<T extends { readonly tag: string }>(model: T): this {
+    this.modelRegistry.set(model.tag, model);
     return this;
-  }
-
-  private onRouteMiddleware: MiddlewareFn[] = [];
-
-  /**
-   * Registers middleware than runs on every valid route.
-   *
-   * @param m - The middleware function to register.
-   */
-  public onRoute(m: MiddlewareFn) {
-    this.onRouteMiddleware.push(m);
-  }
-
-  private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
-
-  /**
-   * Registers middleware for a specific model namespace.
-   *
-   * Runs before request validation and method middleware.
-   *
-   * @param m - The middleware function to register.
-   */
-  public onNamespace(tag: string, m: MiddlewareFn) {
-    const existing = this.namespaceMiddleware.get(tag);
-    if (existing) {
-      existing.push(m);
-      return;
-    }
-    this.namespaceMiddleware.set(tag, [m]);
-  }
-
-  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> = new Map();
-
-  /**
-   * Registers middleware for a specific method on a namespace
-   *
-   * Runs after namespace middleware and request validation.
-   *
-   * @param key - The constructor function of the Model.
-   * @param method - The method name or CrudKind to register the middleware for.
-   * @param m - The middleware function to register.
-   */
-  public onMethod(tag: string, method: string | CrudKind, m: MiddlewareFn) {
-    let classMap = this.methodMiddleware.get(tag);
-    if (!classMap) {
-      classMap = new Map();
-      this.methodMiddleware.set(tag, classMap);
-    }
-
-    let methodArray = classMap.get(method);
-    if (!methodArray) {
-      methodArray = [];
-      classMap.set(method, methodArray);
-    }
-
-    methodArray.push(m);
   }
 
   private async router(
@@ -183,33 +121,17 @@ export class CloesceApp {
   ): Promise<HttpResult<unknown>> {
     // Inject all injectables
     for (const inject of idl.injects) {
-      if (this.apiRegistry.has(inject)) {
-        di._set({ tag: inject }, this.apiRegistry.get(inject) ?? undefined);
+      if (this.modelRegistry.has(inject)) {
+        di.set({ tag: inject }, this.modelRegistry.get(inject) ?? undefined);
       }
     }
 
     // Route match
-    const routeRes = matchRoute(request, idl, workerUrl, this.apiRegistry, env);
+    const routeRes = matchRoute(request, idl, workerUrl, this.modelRegistry);
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
     const route = routeRes.unwrap();
-
-    // Route middleware
-    for (const m of this.onRouteMiddleware) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
-    // Namespace middleware
-    for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
 
     // Request validation
     const validation = await validateRequest(request, wasm, idl, env, route);
@@ -218,16 +140,8 @@ export class CloesceApp {
     }
     const params = validation.unwrap();
 
-    // Method middleware
-    for (const m of this.methodMiddleware.get(route.namespace)?.get(route.method.name) ?? []) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
     // Hydration
-    const hydrated = await hydrate(di, route, env);
+    const hydrated = await hydrate(this.modelRegistry, di, route, env);
     if (hydrated?.isLeft()) {
       return hydrated.value;
     }
@@ -292,7 +206,6 @@ export type MatchedRoute = {
   namespace: string;
   method: ApiMethod;
   getParamValues: Record<string, unknown>;
-  keyFields: Record<string, unknown>;
   impl: ApiImplementation;
   dataSource?: DataSource;
   model: Model;
@@ -306,7 +219,6 @@ function matchRoute(
   idl: Cidl,
   workerUrl: string,
   registry: Map<string, any>,
-  env: any,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
@@ -325,7 +237,7 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // instantiated method route format: /{namespace}/{dataSourceGetParams}/{keyFields}/{method}
+  // instantiated method route format: /{namespace}/{dataSourceGetParams}/method}
   // static method route format: /{namespace}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
@@ -351,16 +263,16 @@ function matchRoute(
     }
   } else {
     dataSource = model.data_sources[method.data_source!];
-    numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
-    const numKeyFields = model.key_fields.length;
-    if (parts.length !== 2 + numGetParams + numKeyFields) {
+    numGetParams = dataSource.get.parameters.length;
+    if (parts.length !== 2 + numGetParams) {
       return notFound(RouterError.UnknownRoute);
     }
   }
 
-  let impl =
-    registry.get(model.name)?.[method.name] ??
-    (crudRoute(model, method, env) as ApiImplementation | undefined);
+  const userNamespace = registry.get(model.name);
+  const impl =
+    userNamespace?.[method.name] ??
+    (crudRoute(model, method, userNamespace) as ApiImplementation | undefined);
   if (!impl) {
     return notImplemented();
   }
@@ -371,21 +283,14 @@ function matchRoute(
       method,
       impl,
       getParamValues: {},
-      keyFields: {},
       model,
     });
   }
 
   const getParamValues: Record<string, unknown> = {};
   for (let i = 0; i < numGetParams; i++) {
-    const param = dataSource!.get!.parameters[i].parameter;
+    const param = dataSource!.get.parameters[i].parameter;
     getParamValues[param.name] = parts[1 + i];
-  }
-
-  const keyFields: Record<string, unknown> = {};
-  for (let i = 0; i < model.key_fields.length; i++) {
-    const field = model.key_fields[i];
-    keyFields[field.name] = parts[1 + numGetParams + i];
   }
 
   return Either.right({
@@ -393,7 +298,6 @@ function matchRoute(
     method,
     impl,
     getParamValues,
-    keyFields,
     dataSource,
     model,
   });
@@ -417,23 +321,19 @@ async function validateRequest(
 
   // Validate instantiated invocation
   if (!route.method.is_static) {
-    const model = route.model!;
+    const getParams = route.dataSource?.get?.parameters ?? [];
+    for (const param of getParams) {
+      if (!route.getParamValues[param.parameter.name]) {
+        return invalidRequest(
+          RouterError.InstantiatedMethodMissingGetParam,
+          `Missing get parameter ${param.parameter.name} for instantiated method.`,
+        );
+      }
 
-    // All data source get parameters must be present and valid
-    const dsErr = validateIds(
-      (route.dataSource?.get?.parameters ?? []).map((p) => p.parameter),
-      route.getParamValues,
-      RouterError.InstantiatedMethodMissingGetParam,
-    );
-    if (dsErr) return Either.left(dsErr);
-
-    // All key fields must be present and valid
-    const keyErr = validateIds(
-      model.key_fields,
-      route.keyFields,
-      RouterError.InstantiatedMethodMissingKeyParam,
-    );
-    if (keyErr) return Either.left(keyErr);
+      const res = validateField(param.parameter, route.getParamValues[param.parameter.name]);
+      if (res.isLeft()) return Either.left(res.unwrapLeft());
+      route.getParamValues[param.parameter.name] = res.unwrap();
+    }
   }
 
   const requiredParams = route.method.parameters;
@@ -489,7 +389,6 @@ async function validateRequest(
     const hydrated = hydrateType(validatedRaw, p.cidl_type, {
       idl: idl,
       includeTree: null,
-      keyFields: {},
       env,
       promises: [],
     });
@@ -498,7 +397,7 @@ async function validateRequest(
 
   return Either.right(params);
 
-  function validateField(field: ValidatedField, value: unknown): Either<HttpResult, unknown> {
+  function validateField(field: Field, value: unknown): Either<HttpResult, unknown> {
     // Path/query values arrive as raw strings; try JSON-parsing so int/bool/null reach
     // validate_type as their declared type. Falls back to the raw string when the
     // value is a plain string (e.g. for `string`-typed fields).
@@ -526,22 +425,6 @@ async function validateRequest(
     }
     return Either.right(JSON.parse(validateRes.unwrap()));
   }
-
-  function validateIds(
-    fields: ValidatedField[],
-    bag: Record<string, unknown>,
-    missingErr: RouterError,
-  ): HttpResult | null {
-    for (const field of fields) {
-      if (!(field.name in bag)) {
-        return invalidRequest(missingErr, `Missing ${field.name}`).unwrapLeft();
-      }
-      const res = validateField(field, bag[field.name]);
-      if (res.isLeft()) return res.unwrapLeft();
-      bag[field.name] = res.unwrap();
-    }
-    return null;
-  }
 }
 
 /**
@@ -549,6 +432,7 @@ async function validateRequest(
  * @returns 500 or the hydrated instance
  */
 async function hydrate(
+  registry: Map<string, any>,
   di: DependencyContainer,
   route: MatchedRoute,
   env: any,
@@ -559,10 +443,9 @@ async function hydrate(
   }
 
   const meta = route.model!;
-  const dataSource: DataSource = meta.data_sources[route.method.data_source ?? "Default"];
+  const dsName = route.method.data_source ?? "Default";
+  const dataSource: DataSource = meta.data_sources[dsName];
 
-  // Error state: If some outside force tweaked the database schema, or some outage caused the
-  // data store to return an error, hydration may fail.
   const hydrationFailed = (e: any) =>
     exit(
       500,
@@ -570,20 +453,44 @@ async function hydrate(
       `Error in hydration query: ${e instanceof Error ? e.message : String(e)}`,
     );
 
-  try {
-    let result = await dataSource.gen.get(
-      env,
-      ...Object.values(route.getParamValues),
-      ...Object.values(route.keyFields),
+  const dsNamespace = registry.get(meta.name)?.[dsName];
+  const stub = dsNamespace?.get;
+  if (typeof stub !== "function") {
+    return exit(
+      501,
+      RouterError.NotImplemented,
+      `${meta.name}.${dsName}.get is declared in the schema but no implementation was provided.`,
     );
+  }
 
-    if (result.errors.length > 0) {
-      return hydrationFailed(CloesceError.displayErrors(result as CloesceResult<never>));
+  try {
+    // [injected, ...get params]
+    const args = [];
+    if (dataSource.get.injected.length > 0) {
+      const injectedArgsRes = resolveInjectedArgs(di, env, dataSource.get.injected);
+      if (injectedArgsRes.isLeft()) {
+        return Either.left(injectedArgsRes.unwrapLeft());
+      }
+      args.push(injectedArgsRes.unwrap());
+    }
+    for (const param of dataSource.get.parameters) {
+      args.push(route.getParamValues[param.parameter.name]);
     }
 
-    // Result will only be null if the record does not exist for a D1 query
-    // (KV or R2 based models will just be empty, as that is a valid state).
-    if (result.value === null) {
+    const result = await stub.apply(dsNamespace, args);
+    if (result instanceof HttpResult) {
+      if (!result.ok) return Either.left(result);
+      if (result.data === null || result.data === undefined) {
+        return exit(
+          404,
+          RouterError.ModelNotFound,
+          `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
+        );
+      }
+      return Either.right(result.data);
+    }
+
+    if (result === null || result === undefined) {
       return exit(
         404,
         RouterError.ModelNotFound,
@@ -591,7 +498,7 @@ async function hydrate(
       );
     }
 
-    return Either.right(result.value);
+    return Either.right(result);
   } catch (e) {
     return hydrationFailed(JSON.stringify(e));
   }
@@ -611,7 +518,11 @@ async function methodDispatch(
   const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
   if (route.method.injected.length > 0) {
-    paramArray.push(resolveInjectedArgs(di, env, route.method.injected));
+    const injectedArgsRes = resolveInjectedArgs(di, env, route.method.injected);
+    if (injectedArgsRes.isLeft()) {
+      return injectedArgsRes.unwrapLeft();
+    }
+    paramArray.push(injectedArgsRes.unwrap());
   }
 
   for (const param of route.method.parameters) {
@@ -653,7 +564,7 @@ function resolveInjectedArgs(
   di: DependencyContainer,
   env: any,
   injectedNames: string[],
-): Record<string, unknown> {
+): Either<HttpResult, Record<string, unknown>> {
   const injected: Record<string, unknown> = {};
 
   for (const name of injectedNames) {
@@ -664,11 +575,11 @@ function resolveInjectedArgs(
 
     injected[name] = env?.[name];
     if (injected[name] === undefined) {
-      console.warn(`Unable to find injected dependency for ${name}. Leaving as undefined.`);
+      return exit(501, RouterError.NotImplemented, `Missing injected dependency: ${name}`);
     }
   }
 
-  return injected;
+  return Either.right(injected);
 }
 
 /**

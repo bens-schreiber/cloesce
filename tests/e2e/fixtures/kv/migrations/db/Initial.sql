@@ -1,5 +1,5 @@
 --- New Models
-CREATE TABLE IF NOT EXISTS "D1BackedModel" (
+CREATE TABLE IF NOT EXISTS "ModelWithKv" (
   "id" integer PRIMARY KEY,
   "someColumn" real NOT NULL,
   "someOtherColumn" text NOT NULL

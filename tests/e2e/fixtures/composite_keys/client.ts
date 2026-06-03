@@ -69,6 +69,7 @@ export class Course {
       false
     );
   }
+
   static fromJson(data: any): Course {
     const __$res = Object.assign(new Course(), data);
     for (let i = 0; i < __$res.studentCourses?.length; i++) {
@@ -220,6 +221,7 @@ export class Student {
       false
     );
   }
+
   static fromJson(data: any): Student {
     const __$res = Object.assign(new Student(), data);
     for (let i = 0; i < __$res.studentCourses?.length; i++) {
@@ -380,6 +382,7 @@ export class StudentCourse {
       false
     );
   }
+
   static fromJson(data: any): StudentCourse {
     const __$res = Object.assign(new StudentCourse(), data);
     __$res["student"] &&= Student.fromJson(__$res.student);

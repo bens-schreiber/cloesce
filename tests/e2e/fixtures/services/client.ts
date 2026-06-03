@@ -19,6 +19,11 @@ export class FooService {
       false
     );
   }
+
+  static fromJson(data: any): FooService {
+    const __$res = Object.assign(new FooService(), data);
+    return __$res;
+  }
 }
 function dsKey(args: object): string {
   return Object.keys(args)[0];

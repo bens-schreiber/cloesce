@@ -1,17 +1,15 @@
-env {
-    d1 {
-        db
-    }
+d1 {
+    db
 }
+
 // #region OneToOne
-[use db]
 [crud save, get]
-model B {
+model B for db {
     primary {
         id: int
     }
     
-    nav (A::bId) {
+    nav A::bId {
         a
     }
 }
@@ -20,19 +18,18 @@ api B {
     post testMethod(self)
 }
 
-[use db]
 [crud save, get]
-model A {
+model A for db{
     primary {
         id: int
     }
     
     foreign (B::id) optional  {
         bId
-        
-        nav {
-            b
-        }
+    }
+
+    nav B::id(bId) {
+        b
     }
 }
 
@@ -53,14 +50,13 @@ api A {
 }
 // #endregion
 // #region OneToMany
-[use db]
 [crud save, get]
-model Person {
+model Person for db {
     primary {
         id: int
     }
     
-    nav (Dog::personId) {
+    nav Dog::personId {
         dogs
     }
 }
@@ -77,23 +73,22 @@ source WithoutDogs for Person {
 
 api Person {
     [inject db]
-    post create(person: Person) -> Person
+    post create(person: partial<Person>) -> Person
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
-[use db]
 [crud save]
-model Dog {
+model Dog for db {
     primary {
         id: int
     }
     
     foreign (Person::id) {
         personId
-        
-        nav {
-            person
-        }
+    }
+
+    nav Person::id(personId) {
+        person
     }
 }
 
@@ -102,14 +97,13 @@ api Dog {
 }
 // #endregion
 // #region ManyToMany
-[use db]
 [crud save, get]
-model Student {
+model Student for db {
     primary {
         id: int
     }
     
-    nav (Course::id) {
+    nav CourseStudent::studentId {
         courses
     }
 }
@@ -117,8 +111,12 @@ model Student {
 source WithCoursesStudentsCourses for Student {
     include {
         courses {
-            students {
-                courses
+            course {
+                students {
+                    student {
+                        courses
+                    }
+                }
             }
         }
     }
@@ -130,18 +128,38 @@ source None for Student {
 
 api Student {
     [inject db]
-    post create(student: Student) -> Student
+    post create(student: partial<Student>) -> Student
     get none([source None] self) -> Student
 }
 
-[use db]
 [crud save]
-model Course {
+model Course for db {
     primary {
         id: int
     }
     
-    nav (Student::id) {
+    nav CourseStudent::courseId {
         students
     }
-}// #endregion
+}
+
+model CourseStudent for db {
+    primary {
+        foreign (Course::id) {
+            courseId
+        }
+
+        foreign (Student::id) {
+            studentId
+        }
+    }
+
+    nav Course::id(courseId) {
+        course
+    }
+
+    nav Student::id(studentId) {
+        student
+    }
+}
+// #endregion

@@ -3,20 +3,16 @@ source: src/compiler/frontend/tests/formatter_tests.rs
 expression: formatted
 ---
 // 0
-env {
+d1 {
     // 1
-    d1 {
-        // 2
-        db
-        // A
-    } // 3
-    // B
-}
+    db
+    // A
+} // 3
+// B
 
 // 4
-[use db] // 5
 // 6
-model BasicModel {
+model BasicModel for db {
     // C
     // 7
     primary {
@@ -35,11 +31,13 @@ model BasicModel {
         // E
         fk_to_model // 15
         // 16
-        nav {
-            // F
-            oneToOneNav // 18
-        } // G
     } // 19
+    
+    // F
+    nav OneToManyModel::id(fk_to_model) {
+        // G
+        oneToOneNav // 18
+    }
     // H
 } // 20
 

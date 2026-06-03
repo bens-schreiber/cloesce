@@ -25,7 +25,7 @@ pub fn map_sql(
             name: model_name.to_string(),
         }),
     };
-    if !model.has_d1() {
+    if model.database_binding.is_none() {
         fail!(OrmErrorKind::ModelMissingD1 {
             name: model_name.to_string(),
         })
@@ -75,11 +75,9 @@ pub fn map_sql(
                 }
             }
 
-            // Initialize OneToMany / ManyToMany arrays as empty
+            // Initialize OneToMany arrays as empty
             for nav in &model.navigation_fields {
-                if matches!(nav.kind, NavigationFieldKind::OneToMany { .. })
-                    || matches!(nav.kind, NavigationFieldKind::ManyToMany)
-                {
+                if matches!(nav.kind, NavigationFieldKind::OneToMany { .. }) {
                     m.insert(nav.field.name.to_string(), serde_json::Value::Array(vec![]));
                 }
             }
@@ -121,6 +119,11 @@ fn process_navigation_properties(
                 name: nav_prop.model_reference.to_string(),
             }),
         };
+
+        if nested_model.database_binding.is_none() {
+            // No actual SQL columns to map
+            continue;
+        }
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
         // Check all primary key columns for the nested model
@@ -174,9 +177,7 @@ fn process_navigation_properties(
 
         // Initialize navigation property arrays
         for nested_nav_prop in &nested_model.navigation_fields {
-            if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. })
-                || matches!(nested_nav_prop.kind, NavigationFieldKind::ManyToMany)
-            {
+            if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. }) {
                 nested_model_json
                     .insert(nested_nav_prop.field.name.to_string(), Value::Array(vec![]));
             }
@@ -201,9 +202,7 @@ fn process_navigation_properties(
             )?;
         }
 
-        if matches!(nav_prop.kind, NavigationFieldKind::OneToMany { .. })
-            || matches!(nav_prop.kind, NavigationFieldKind::ManyToMany)
-        {
+        if matches!(nav_prop.kind, NavigationFieldKind::OneToMany { .. }) {
             if let Value::Array(arr) = model_json.get_mut(nav_prop.field.name.as_ref()).unwrap() {
                 // Check if this nested object already exists by comparing all primary key values
                 let already_exists = arr.iter().any(|existing| {

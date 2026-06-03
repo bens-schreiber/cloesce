@@ -4,7 +4,7 @@
     "CrudHaver": {
       "hash": 3221090397089686579,
       "name": "CrudHaver",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -36,7 +36,7 @@
     "Parent": {
       "hash": 1579048073847534623,
       "name": "Parent",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -82,7 +82,7 @@
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "favoriteChildId"
               ]
             }
@@ -114,7 +114,7 @@
     "Child": {
       "hash": 5516230628474069556,
       "name": "Child",
-      "d1_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -158,7 +158,7 @@
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "parentId"
               ]
             }

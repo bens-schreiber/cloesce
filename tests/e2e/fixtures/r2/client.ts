@@ -4,15 +4,14 @@ export class D1BackedModel {
   id: number;
   someColumn: number;
   someOtherColumn: string;
-  keyParam: string;
-  r2Data: R2Object;
+  someData: R2Object;
+  someOtherData: R2Object;
   async uploadData(
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const __$id = [
       encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.keyParam)),
     ].join("/");
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/${__$id}/uploadData`
@@ -33,16 +32,40 @@ export class D1BackedModel {
       false
     );
   }
+  async uploadOtherData(
+    data: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const __$id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/D1BackedModel/${__$id}/uploadOtherData`
+    );
+    const __$payload: any = {};
+    __$payload["data"] = data;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
   static async $get(
     id: number,
-    keyParam: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const __$baseUrl = new URL(
       `http://localhost:5538/api/D1BackedModel/$get`
     );
     __$baseUrl.searchParams.append("id", String(id));
-    __$baseUrl.searchParams.append("keyParam", String(keyParam));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
@@ -100,16 +123,16 @@ export class D1BackedModel {
       true
     );
   }
+
   static fromJson(data: any): D1BackedModel {
     const __$res = Object.assign(new D1BackedModel(), data);
     return __$res;
   }
 }
-export class PureR2Model {
-  id: string;
-  data: R2Object;
-  otherData: R2Object;
-  allData: Paginated<R2Object>;
+export class R2Only {
+  id: number;
+  sibling: R2Sibling | undefined;
+  someData: R2Object;
   async uploadData(
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
@@ -118,33 +141,7 @@ export class PureR2Model {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__$id}/uploadData`
-    );
-    const __$payload: any = {};
-    __$payload["data"] = data;
-
-    const __$res = await fetchImpl(__$baseUrl, {
-      method: "PUT",
-      headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, __$payload),
-    });
-
-    return await HttpResult.fromResponse(
-      __$res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  async uploadOtherData(
-    data: Uint8Array,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const __$id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/${__$id}/uploadOtherData`
+      `http://localhost:5538/api/R2Only/${__$id}/uploadData`
     );
     const __$payload: any = {};
     __$payload["data"] = data;
@@ -163,11 +160,11 @@ export class PureR2Model {
     );
   }
   static async $get(
-    id: string,
+    id: number,
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureR2Model>> {
+  ): Promise<HttpResult<R2Only>> {
     const __$baseUrl = new URL(
-      `http://localhost:5538/api/PureR2Model/$get`
+      `http://localhost:5538/api/R2Only/$get`
     );
     __$baseUrl.searchParams.append("id", String(id));
 
@@ -178,17 +175,49 @@ export class PureR2Model {
     return await HttpResult.fromResponse(
       __$res,
       MediaType.Json,
-      PureR2Model,
+      R2Only,
       false
     );
   }
-  static fromJson(data: any): PureR2Model {
-    const __$res = Object.assign(new PureR2Model(), data);
-    if (__$res.allData?.results) {
-      for (let i = 0; i < __$res.allData.results.length; i++) {
-        __$res.allData.results[i] = Object.assign(new R2Object(), __$res.allData.results[i]);
-      }
-    }
+
+  static fromJson(data: any): R2Only {
+    const __$res = Object.assign(new R2Only(), data);
+    __$res["sibling"] &&= R2Sibling.fromJson(__$res.sibling);
+    return __$res;
+  }
+}
+export class R2Sibling {
+  siblingId: number;
+  siblingData: R2Object;
+  async uploadData(
+    data: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const __$id = [
+      encodeURIComponent(String(this.siblingId)),
+    ].join("/");
+    const __$baseUrl = new URL(
+      `http://localhost:5538/api/R2Sibling/${__$id}/uploadData`
+    );
+    const __$payload: any = {};
+    __$payload["data"] = data;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "PUT",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): R2Sibling {
+    const __$res = Object.assign(new R2Sibling(), data);
     return __$res;
   }
 }

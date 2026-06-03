@@ -24,7 +24,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
 };
 
-use idl::{CidlType, Column, MigrationsIdl, MigrationsModel, NavigationField, NavigationFieldKind};
+use idl::{CidlType, Column, MigrationsIdl, MigrationsModel};
 
 use indexmap::IndexMap;
 use sea_query::{
@@ -108,23 +108,13 @@ enum AlterKind<'a> {
     DropColumn {
         lm_col: &'a Column<'a>,
     },
-
-    AddManyToMany {
-        m2m_table_name: String,
-        model_name: &'a str,
-    },
-    DropManyToMany {
-        m2m_table_name: String,
-    },
 }
 
 struct MigrateTables;
 impl MigrateTables {
-    /// Takes in a list of models and junction tables, generating a list
-    /// of naive insert queries.
+    /// Takes in a list of models, generating a list of naive insert queries.
     fn create(
         sorted_models: Vec<&MigrationsModel>,
-        jcts: HashMap<String, (&MigrationsModel, &MigrationsModel)>,
         model_lookup: &IndexMap<String, MigrationsModel>,
     ) -> Vec<String> {
         let mut res = vec![];
@@ -246,62 +236,6 @@ impl MigrateTables {
             tracing::info!("Created table \"{}\"", model.name);
         }
 
-        for (id, jct) in jcts {
-            let mut table = Table::create();
-
-            let (left, right) = if jct.0.name < jct.1.name {
-                (jct.0, jct.1)
-            } else {
-                (jct.1, jct.0)
-            };
-
-            let left_join_cols = join_columns_for_side(left, "left");
-            let right_join_cols = join_columns_for_side(right, "right");
-
-            table.table(alias(&id)).if_not_exists();
-
-            for (join_col_name, pk) in left_join_cols.iter().chain(right_join_cols.iter()) {
-                let mut col = typed_column(join_col_name, &pk.field.cidl_type, false);
-                table.col(col.not_null());
-            }
-
-            let mut pk_index = Index::create();
-            for (join_col_name, _) in left_join_cols.iter().chain(right_join_cols.iter()) {
-                pk_index.col(alias(join_col_name.as_str()));
-            }
-            table.primary_key(&mut pk_index);
-
-            let mut left_fk = ForeignKey::create();
-            for (join_col_name, pk) in left_join_cols {
-                left_fk
-                    .from(alias(id.as_str()), alias(join_col_name))
-                    .to(alias(left.name.as_str()), alias(pk.field.name.as_ref()));
-            }
-            left_fk
-                .on_update(sea_query::ForeignKeyAction::Cascade)
-                .on_delete(sea_query::ForeignKeyAction::Restrict);
-            table.foreign_key(&mut left_fk);
-
-            let mut right_fk = ForeignKey::create();
-            for (join_col_name, pk) in right_join_cols {
-                right_fk
-                    .from(alias(id.as_str()), alias(join_col_name))
-                    .to(alias(right.name.as_str()), alias(pk.field.name.as_ref()));
-            }
-            right_fk
-                .on_update(sea_query::ForeignKeyAction::Cascade)
-                .on_delete(sea_query::ForeignKeyAction::Restrict);
-            table.foreign_key(&mut right_fk);
-
-            res.push(to_sqlite(table));
-            tracing::info!(
-                "Created junction table \"{}\" between models \"{}\" \"{}\"",
-                id,
-                left.name,
-                right.name
-            );
-        }
-
         res
     }
 
@@ -323,7 +257,6 @@ impl MigrateTables {
         const PRAGMA_FK_CHECK: &str = "PRAGMA foreign_keys_check;";
 
         let mut res = vec![];
-        let mut visited_m2ms = HashSet::new();
         let mut renamed = HashSet::new();
 
         for (model, lm_model) in alter_models {
@@ -388,41 +321,6 @@ impl MigrateTables {
                     AlterKind::DropColumn { lm_col } => {
                         needs_drop_intent.push(lm_col);
                     }
-                    AlterKind::AddManyToMany {
-                        m2m_table_name,
-                        model_name,
-                    } => {
-                        if !visited_m2ms.insert(m2m_table_name.clone()) {
-                            continue;
-                        }
-
-                        let mut jcts = HashMap::new();
-
-                        let join = model_lookup.get(model_name).unwrap();
-                        jcts.insert(m2m_table_name.clone(), (model, join));
-
-                        res.extend(Self::create(vec![], jcts, model_lookup));
-                        tracing::warn!(
-                            "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
-                            m2m_table_name,
-                            model.name,
-                            join.name
-                        );
-                    }
-                    AlterKind::DropManyToMany { m2m_table_name } => {
-                        if !visited_m2ms.insert(m2m_table_name.clone()) {
-                            continue;
-                        }
-
-                        res.push(to_sqlite(
-                            Table::drop()
-                                .table(alias(&m2m_table_name))
-                                .if_exists()
-                                .to_owned(),
-                        ));
-
-                        tracing::info!("Dropped a many to many table \"{}\"", m2m_table_name,);
-                    }
                     AlterKind::RebuildTable => {
                         let has_fk_col = {
                             let m = model
@@ -457,8 +355,7 @@ impl MigrateTables {
 
                         // Create the new model
                         {
-                            let create_stmts =
-                                Self::create(vec![model], HashMap::default(), model_lookup);
+                            let create_stmts = Self::create(vec![model], model_lookup);
                             for stmt in create_stmts {
                                 res.push(stmt);
                             }
@@ -675,65 +572,17 @@ impl MigrateTables {
                 });
             }
 
-            let mut lm_m2ms = lm_model
-                .navigation_fields
-                .iter()
-                .filter_map(|n| match &n.kind {
-                    NavigationFieldKind::ManyToMany => {
-                        Some((n.many_to_many_table_name(&lm_model.name), n))
-                    }
-                    _ => None,
-                })
-                .collect::<HashMap<String, &NavigationField>>();
-
-            for nav in &model.navigation_fields {
-                let NavigationFieldKind::ManyToMany = &nav.kind else {
-                    continue;
-                };
-
-                let m2m_table_name = nav.many_to_many_table_name(&model.name);
-                if lm_m2ms.remove(&m2m_table_name).is_none() {
-                    alterations.push(AlterKind::AddManyToMany {
-                        m2m_table_name,
-                        model_name: nav.model_reference,
-                    });
-                };
-            }
-
-            for (unvisited_m2m, _) in lm_m2ms.into_iter() {
-                alterations.push(AlterKind::DropManyToMany {
-                    m2m_table_name: unvisited_m2m,
-                });
-            }
-
             alterations
         }
     }
 
-    /// Takes in a vec of last migrated models and deletes all of their m2m tables and tables.
+    /// Takes in a vec of last migrated models and deletes all of their tables.
     fn drop(sorted_lm_models: Vec<&MigrationsModel>) -> Vec<String> {
         let mut res = vec![];
 
         // Insertion order is dependency before dependent, drop order
         // is dependent before dependency (reverse of insertion)
         for &lm_model in sorted_lm_models.iter().rev() {
-            // Drop M2M's
-            for m2m_id in lm_model
-                .navigation_fields
-                .iter()
-                .filter_map(|n| match &n.kind {
-                    NavigationFieldKind::ManyToMany => {
-                        Some(n.many_to_many_table_name(&lm_model.name))
-                    }
-                    _ => None,
-                })
-            {
-                res.push(to_sqlite(
-                    Table::drop().table(alias(&m2m_id)).if_exists().to_owned(),
-                ));
-                tracing::info!("Dropped a many to many table \"{}\"", m2m_id);
-            }
-
             // Drop table
             res.push(to_sqlite(
                 Table::drop()
@@ -758,9 +607,8 @@ impl MigrateTables {
         let lm_models = lm_idl.map(|a| &a.models).unwrap_or(&_empty);
 
         // Partition all models into three sets, discarding the rest.
-        let (creates, create_jcts, alters, drops) = {
+        let (creates, alters, drops) = {
             let mut creates = vec![];
-            let mut create_m2ms = HashMap::new();
             let mut alters = vec![];
             let mut drops = vec![];
 
@@ -771,23 +619,6 @@ impl MigrateTables {
                         alters.push((model, lm_model));
                     }
                     None => {
-                        for nav in &model.navigation_fields {
-                            let NavigationFieldKind::ManyToMany = &nav.kind else {
-                                continue;
-                            };
-
-                            let m2m_table_name = nav.many_to_many_table_name(&model.name);
-                            let jct_model = idl.models.get(nav.model_reference).unwrap();
-                            create_m2ms.insert(
-                                m2m_table_name,
-                                if jct_model.name > model.name {
-                                    (jct_model, model)
-                                } else {
-                                    (model, jct_model)
-                                },
-                            );
-                        }
-
                         creates.push(model);
                     }
                     _ => {
@@ -832,17 +663,14 @@ impl MigrateTables {
                 });
             }
 
-            (creates, create_m2ms, alters, drops)
+            (creates, alters, drops)
         };
 
         // Build query
         let mut res = String::new();
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(drops)),
-            (
-                "New Models",
-                &Self::create(creates, create_jcts, &idl.models),
-            ),
+            ("New Models", &Self::create(creates, &idl.models)),
             ("Altered Models", &Self::alter(alters, &idl.models, intent)),
         ] {
             if stmts.is_empty() {
@@ -881,21 +709,6 @@ fn is_same_primary_key(model: &MigrationsModel, lm_model: &MigrationsModel) -> b
                         .map(|b| (&b.model_name, &b.column_name))
                 && a.composite_id == b.composite_id
         })
-}
-
-fn join_columns_for_side<'a>(
-    model: &'a MigrationsModel,
-    side: &'a str,
-) -> Vec<(String, &'a Column<'a>)> {
-    if model.primary_columns.len() == 1 {
-        return vec![(side.into(), &model.primary_columns[0])];
-    }
-
-    model
-        .primary_columns
-        .iter()
-        .map(|pk| (format!("{side}_{}", pk.field.name), pk))
-        .collect()
 }
 
 // TODO: User made default types

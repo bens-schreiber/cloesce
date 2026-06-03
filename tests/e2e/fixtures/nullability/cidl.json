@@ -12,7 +12,6 @@
     "NullabilityChecks": {
       "hash": 9423267146512996101,
       "name": "NullabilityChecks",
-      "d1_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -55,7 +54,8 @@
       "kv_fields": [],
       "r2_fields": [],
       "navigation_fields": [],
-      "key_fields": [],
+      "route_fields": [],
+      "database_binding": "db",
       "apis": [
         {
           "name": "primitiveTypes",
@@ -204,7 +204,11 @@
                   }
                 ]
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
           "get": {
             "parameters": [
@@ -216,8 +220,32 @@
                 },
                 "instance_field": true
               }
-            ]
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
           },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "NullabilityChecks"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "db"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\"",
+          "get_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\" WHERE \"NullabilityChecks\".\"id\" = ?1",
+          "list_query": "SELECT \"NullabilityChecks\".\"id\" AS \"id\", \"NullabilityChecks\".\"notNullableString\" AS \"notNullableString\", \"NullabilityChecks\".\"nullableString\" AS \"nullableString\" FROM \"NullabilityChecks\" WHERE \"NullabilityChecks\".\"id\" > ?1 ORDER BY \"NullabilityChecks\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },

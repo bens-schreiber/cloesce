@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use indexmap::IndexMap;
 
 use crate::{
-    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, ParsedIncludeTree, Spd,
+    AstBlockKind, DataSourceBlock, DataSourceBlockMethod, Keyword, ParsedIncludeTree, Spd, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
@@ -12,10 +12,14 @@ use crate::{
 /// ```cloesce
 /// source SourceName for ModelName {
 ///     include { ... }
-///     sql get(ident: cidl_type, ...) { "..." }
-///     sql list(ident: cidl_type, ...) { "..." }
+///
+///     [inject Db]
+///     get(ident: cidl_type, ...)
+///
+///     list(ident: cidl_type, ...)
+///
+///     save(user: partial<User>)
 /// }
-/// ```
 pub fn data_source_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
     // ident | ident { ... }
@@ -40,7 +44,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             .boxed()
     });
 
-    // include { ... }
+    // include { include_entry* }
     let include_tree = kw!(Include).ignore_then(
         include_entry
             .repeated()
@@ -48,11 +52,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
-    // { "..." }
-    let sql_block = select! { Token::StringLit(sql) => sql }
-        .delimited_by(just(Token::LBrace), just(Token::RBrace));
-
-    // sql get(ident: cidl_type, ...) { "..." }
+    // ( ident: cidl_type, ... )
     let method_params = || {
         tagged_typed_symbol()
             .separated_by(just(Token::Comma))
@@ -61,27 +61,31 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             .delimited_by(just(Token::LParen), just(Token::RParen))
     };
 
-    // sql get(...) { ... }
-    let get_method = kw!(Sql)
-        .then_ignore(kw!(Get))
-        .ignore_then(method_params())
-        .then(sql_block.clone())
-        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
-            parameters,
-            raw_sql,
-        });
+    // [tags]* name(params)
+    let stub = |name: &'static str, token: Token<'src>| {
+        tags()
+            .then(just(token).map_with(|_, e| e.span()))
+            .then(method_params())
+            .map_spanned(
+                move |((leading_tags, name_span), parameters)| DataSourceBlockMethod {
+                    method: Symbol {
+                        name,
+                        span: name_span,
+                        tags: leading_tags,
+                        ..Default::default()
+                    },
+                    parameters,
+                    raw_sql: "",
+                },
+            )
+            .boxed()
+    };
 
-    // sql list(...) { ... }
-    let list_method = kw!(Sql)
-        .then_ignore(kw!(List))
-        .ignore_then(method_params())
-        .then(sql_block)
-        .map_spanned(|(parameters, raw_sql)| DataSourceBlockMethod {
-            parameters,
-            raw_sql,
-        });
+    let get_method = stub("get", Keyword::Get.into());
+    let list_method = stub("list", Keyword::List.into());
+    let save_method = stub("save", Keyword::Save.into());
 
-    // [tag]* source SourceName for ModelName { ... }
+    // [tags]* source SourceName for ModelName { include { ... } get? list? save? }
     let source_block = tags()
         .then_ignore(kw!(Source))
         .then(symbol())
@@ -91,21 +95,20 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             include_tree
                 .then(get_method.or_not())
                 .then(list_method.or_not())
+                .then(save_method.or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(
-            |(((leading_tags, mut symbol), model), ((include_entries, get), list))| {
-                let mut all_tags = leading_tags;
-                all_tags.append(&mut symbol.tags);
-                symbol.tags = all_tags;
+            |(((tags, symbol), model), (((include_entries, get), list), save))| {
                 let tree =
                     ParsedIncludeTree(include_entries.into_iter().collect::<IndexMap<_, _>>());
                 DataSourceBlock {
-                    symbol,
+                    symbol: Symbol { tags, ..symbol },
                     model,
                     tree,
                     get,
                     list,
+                    save,
                 }
             },
         );

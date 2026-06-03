@@ -158,6 +158,7 @@ export class FailModel {
       true
     );
   }
+
   static fromJson(data: any): FailModel {
     const __$res = Object.assign(new FailModel(), data);
     return __$res;
@@ -181,6 +182,11 @@ export class UnregisteredService {
       undefined,
       false
     );
+  }
+
+  static fromJson(data: any): UnregisteredService {
+    const __$res = Object.assign(new UnregisteredService(), data);
+    return __$res;
   }
 }
 function dsKey(args: object): string {

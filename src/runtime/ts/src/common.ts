@@ -34,10 +34,6 @@ export class Either<L, R> {
     return !this.inner.ok;
   }
 
-  isRight(): this is Either<never, R> {
-    return this.inner.ok;
-  }
-
   unwrap(): R {
     if (!this.inner.ok) {
       throw new Error("Tried to unwrap a Left value");
@@ -51,14 +47,6 @@ export class Either<L, R> {
     }
     return this.inner.left;
   }
-
-  map<B>(fn: (val: R) => B): Either<L, B> {
-    return this.inner.ok ? Either.right(fn(this.inner.right)) : Either.left(this.inner.left);
-  }
-
-  mapLeft<B>(fn: (val: L) => B): Either<B, R> {
-    return this.inner.ok ? Either.right(this.inner.right) : Either.left(fn(this.inner.left));
-  }
 }
 
 export type CloesceErrorKind =
@@ -71,9 +59,7 @@ export type CloesceResult<T> =
   | { value: T; errors: [] };
 
 /**
- * @internal
- *
- * An internal class to raise a user facing `CloesceResult`
+ * A class to raise a user-facing `CloesceResult`.
  */
 export class CloesceError {
   static drain<T>(results: CloesceResult<T>[]): CloesceResult<never> | void {
@@ -109,7 +95,7 @@ export class CloesceError {
     return { value: null, errors: [{ kind: "d1", result }] };
   }
 
-  static displayErrors(result: CloesceResult<never>): string {
+  static displayErrors(result: CloesceResult<unknown>): string {
     function display(v: unknown): string {
       try {
         return JSON.stringify(v);
