@@ -1,9 +1,9 @@
 # Proposal: Durable Objects
 
 - **Author(s):** Ben Schreiber
-- **Status:** **Draft** | Review | Accepted | Rejected | Implemented
+- **Status:** Draft*| **Review** | Accepted | Rejected | Implemented
 - **Created:** 2026-04-30
-- **Last Updated:** 2026-04-30
+- **Last Updated:** 2026-06-03
 
 ---
 
@@ -11,9 +11,7 @@
 
 This proposal brings [Durable Objects](https://developers.cloudflare.com/durable-objects/) into Cloesce as first-class citizens. DOs open up a whole class of use cases that D1 just can't reach on its own: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
 
-The gist: a new `durable` binding in the schema, the ability to back a Model with a DO (so the Model gets to play with that instance's storage and SQLite database), automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
-
-Additionally, a handful of older schema constructs (`keyfield`, the `env` block, the `paginated` infix keyword, the `use` tag) are getting retired in favor of bindings that own their own key and value structure, plus a new `for` keyword for pinning a Model to its backing store.
+The gist: a new `durable` binding in the schema, the ability to back a Model with a DO (so the Model gets to use that instance's storage and SQLite database), automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
 
 ---
 
@@ -29,13 +27,13 @@ Durable Objects offer a different model entirely. Instead of one database, you g
 
 ## Strong consistency
 
-D1 (and most distributed databases) provides eventual consistency. A value must be updated atomically to ensure a valid state. Transactions do not exist.
+D1 provides eventual consistency. A value must be updated atomically to ensure a valid state. Transactions do not exist.
 
-Durable Objects, on the other hand, are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, counters, collaborative editing state, rate limiters, and similar workloads.
+Durable Objects on the other hand are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, collaborative editing state, rate limiters, and similar workloads.
 
 ## Real-time communication
 
-Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients.
+Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients. This proposal will not cover WebSocket support in this initial iteration, but will lay the groundwork for a future proposal that adds first-class WebSocket support to DO-backed Models.
 
 ---
 
@@ -55,18 +53,20 @@ Because a DO instance is a persistent, long-lived object (not a stateless functi
 ## Non-Goals
 
 - Middleware for DO instance creation
-- WebSocket RPC support (later!)
+- WebSocket RPC support
+- Cross-shard relationships between DO-backed Models
 
 ---
 
 # Design
 
-Several axioms underlie the design of this proposal:
+Five axioms underlie the design of this proposal:
 
 1. A Durable Object is not a Model.
 2. A Model can only be backed by one Durable Object, but a Durable Object can back multiple Models.
-3. If a Model is backed by a Durable Object, every single instance of that Durable Object is capable of hydrating that Model.
-4. Given a serialized Model backed by a Durable Object, the client should be able to transparently invoke API methods on the same DO instance.
+3. Every shard of a Durable Object shares the exact same schema.
+4. Given a serialized Model backed by a Durable Object, the client should be able to transparently invoke API methods on the same DO instance (RPC).
+5. A Models relationships exist within each shard of a Durable Object, and cannot span across shards.
 
 ## Durable Object Bindings
 
@@ -90,15 +90,15 @@ durable CounterDo {
 
 A Durable Object binding is similar to KV, where it can define its own key and value fields. These are stored within the DO's instance storage.
 
-Under the `shard` block, the DO can define a key structure for generating DO IDs. This allows a DO to be sharded by a specific key. Cloesce will generate a DO ID using fields from `shard`, which can be composite or omitted entirely.
+Under the `shard` block, the DO can define a key structure for generating DO IDs. This allows a DO to be sharded by a specific key. Cloesce will generate a DO ID using fields from `shard`, which can specify any number of fields, or none at all (in which case the DO is global and not sharded).
 
 The pattern for seeding a DO ID will follow `BINDING` followed by the `/` delimited concatenation of all shard fields. For example, the previous `CounterDo` would generate a DO ID like `CounterDo/{id}`.
 
 ## Backing a Model with a Durable Object
 
-To "back" a Model with a Durable Object means that the Model exists within the context of a DO instance, and has access to the DO instance's storage and SQLite database. This also means that in order to hydrate an instance of the Model, we must obtain an instance of the DO.
+To "back" a Model with a Durable Object means that the Model exists within the context of a DO shard, and has access to that shards storage and SQLite database. This also means that in order to hydrate an instance of the Model, we must obtain an instance of the DO.
 
-By default, every value defined under the DO binding's `shard` block will exist as a field on that Model, prefixed with a `$`. Additionally, a Model that is backed by a DO can access all of the DO's storage fields by referencing them in the schema with the `kv` syntax.
+When a Model is backed by a DO, it has access to any fields and KV templates defined on the DO. For example:
 
 For example:
 
@@ -113,18 +113,76 @@ durable CounterDo {
     }
 }
 
+kv Namespace {
+    durableObjectRegistry(id: string) -> bool {
+        "dos/{id}"
+    }
+}
+
 model Counter for CounterDo {
     kv CounterDo::count() {
         count
     }
+
+    kv Namespace::durableObjectRegistry(CounterDo::id) {
+        isRegistered
+    }
 }
 ```
 
-The above code defines a `CounterDo` which is sharded by an `id` string. The Model `Counter` is backed by `CounterDo`, which means it has access to the DO's instance storage, as well as the `id` field of the DO (serialized as `$id` on the Model).
+The `Counter` Model is backed by the `CounterDo` Durable Object, which means that each instance of `Counter` is associated with a specific instance of `CounterDo`. The `Counter` Model can access the DO's storage via the `count` template, and can also access the `CounterDo::id` field to look itself up in the `durableObjectRegistry` KV namespace.
+
+In practice, the shard fields of a DO will be added to each model with the prefix `$` such that they cannot be confused with regular fields. For example, the `Counter` Model when generated to TypeScript would look like:
+
+```ts
+interface Self {
+    $id: string; // from CounterDo::id
+    // ...other fields
+}
+```
+
+### KV
+
+As shown in the above example, a Model backed by a Durable Object can access that DO's storage via the `kv` template.
+
+Unlike D1, just because a Model is backed by a DO does not necessarily mean that it has to define some set of `primary` keys as a SQLite table.
+
+A Durable Object backed Model can use `route` fields just like a Worker backed Model:
+
+```cloesce
+durable CounterDo {
+    shard {
+        id: string
+    }
+
+    count(id: string) -> int {
+        "count/{id}"
+    }
+}
+
+model Counter for CounterDo {
+    route {
+        counterId: string
+        otherCounterId: string
+    }
+
+    kv CounterDo::count(counterId) {
+        count
+    }
+
+    nav Counter::otherCounterId(otherCounterId) {
+        otherCounter
+    }
+}
+```
+
+Here, the `Counter` Model has route fields `counterId` and `otherCounterId`, which must be provided to hydrate an instance of `Counter`. The `otherCounterId` field is used to navigate to another `Counter` instance.
+
+It is assumed that `otherCounter` is inside of the same shard as `Counter`, and it will be hydrated as such.
 
 ### SQLite
 
-A Model backed by a Durable Object can also represent a SQLite table in the DO instance's database. This allows the Model to define relationships to other Models backed by the same DO.
+A Model backed by a Durable Object can also represent a SQLite table in the DO instance's database:
 
 ```cloesce
 durable BlogDo {
@@ -167,9 +225,11 @@ model BlogComment for BlogDo {
 
 In this schema, each Blog has its own `BlogDo` instance, which means each Blog has its own isolated SQLite database. The `BlogPost` and `BlogComment` Models are tables that exist within that database, and the relationship between them is defined by the `nav` and `foreign` fields as usual.
 
+Again, it is assumed that these relationships are all within the same shard.
+
 ## API Methods in a Durable Object
 
-API Methods in Cloesce utilize the Cloesce Router, a lightweight router that simply follows what the schema defines, given some request. For example, a static method on some Model `Person` would be routed by the Cloesce Router like so:
+API Methods in Cloesce utilize the Cloesce Router. For example, a static method `foo` on some Model `Person` would be routed by the Cloesce Router like so:
 
 ```
 Request (GET /Person/foo)
@@ -187,56 +247,42 @@ Request (GET /Person/123/foo)
             -> person.foo(...)
 ```
 
-An important feature of Durable Objects is that they execute in a separate context from the Worker. That means that in order to route a request to some code capable of using the DO's storage or SQLite database, the request must be forwarded from the Worker to that DO instance.
+An important feature of Durable Objects is that they execute in a separate context from the Worker. In order to route a request to some code capable of using the DO's storage or SQLite database, the request must be forwarded from the Worker to that DO instance.
 
-Static methods on a Model backed by a DO will be routed to the DO instance, and have access to the DO's storage and SQLite database. Instance methods will also be routed to the DO instance, but they will additionally have access to the hydrated Model instance.
+Once an instance is located, the request must be forwarded to that instance. This means that every DO will need its own Cloesce Router to handle incoming requests forwarded from the Worker.
 
-```cloesce
-durable BlogDo {
-    shard {
-        id: string
-    }
-}
+### Static Methods
 
-model BlogPost for BlogDo {
-    primary {
-        id: int
-    }
+A static method on a Model backed by a DO will still execute inside of the DO instance, which means it can access the DO's storage and SQLite database.
 
-    column {
-        title: string
-        content: string
-        created_at: date
-    }
-}
+A key difference here is that if the DO is sharded, the static method will be forced to provide the shard fields as parameters in order for Cloesce to route the request to the correct DO instance.
 
-api BlogPost {
-    post create(title: string, content: string) -> BlogPost
-    post update(self, title: string, content: string) -> BlogPost
-}
-```
+For example, if a DO is sharded by an `id` field, then any static method on a Model backed by that DO must provide the `id` parameter.
 
-The above `BlogPost` Model describes two methods:
-
-- `create`: A static method that executes inside of the DO instance, which means it can access the DO's storage and SQLite database.
-- `update`: An instance method that executes inside of the DO instance, which means it can access the DO's storage and SQLite database, as well as the hydrated `BlogPost` instance.
-
-The routing for these methods would look like this:
+The routing for a static method `foo` on a DO-backed Model `Person` would look like this:
 
 ```
-Request (POST /BlogPost/{doId}/create)
+Request (GET /Person/{id}/foo)
+    -> Worker
+        -> Router -> Match Route -> Validate Body -> Forward to DO Instance
+            -> Router -> Match Route -> Validate Body -> Dispatch Method
+                -> Person.foo(...)
+```
+
+### Instance Methods
+
+An instance method on a Model backed by a DO will also execute inside of the DO instance, which means it can access the DO's storage and SQLite database, as well as the hydrated Model instance.
+
+Just like static methods, if the DO is sharded, the instance method will be forced to provide the shard fields as parameters in order for Cloesce to route the request to the correct DO instance. These shard fields will be declared as `instance` fields on the Model, and such will not be explicitly passed in the generated API method signature.
+
+The routing for an instance method `bar` on a DO-backed Model `Person` would look like this:
+
+```
+Request (GET /Person/{id}/{personId}/bar)
     -> Worker
         -> Router -> Match Route -> Validate Body -> Forward to DO Instance
             -> Router -> Match Route -> Validate Body -> Hydrate Model -> Dispatch Method
-                -> BlogPost.create(...)
-```
-
-```
-Request (POST /BlogPost/{doId}/{blogPostId}/update)
-    -> Worker
-        -> Router -> Match Route -> Validate Body -> Forward to DO Instance
-            -> Router -> Match Route -> Validate Body -> Hydrate Model -> Dispatch Method
-                -> blogPost.update(...)
+                -> person.bar(...)
 ```
 
 ### Router
@@ -298,10 +344,10 @@ Any instance method of a Model backed by a Durable Object will be given the DO i
 
 ```ts
 abstract class BlogDo extends DurableObject {
-    $id: string;
-    constructor(ctx: DurableObjectState, env: Env, $id: string) {
+    id: string;
+    constructor(ctx: DurableObjectState, env: Env, id: string) {
         super(ctx, env);
-        this.$id = $id;
+        this.id = id;
     }
 }
 
