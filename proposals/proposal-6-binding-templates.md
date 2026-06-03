@@ -1,4 +1,15 @@
+# Proposal: Binding Templates
+
+- **Author(s):** Ben Schreiber
+- **Status:** Draft | Review | Accepted | Rejected | **Implemented**
+- **Created:** 2026-05-13
+- **Last Updated:** 2026-06-03
+
+---
+
 # Summary
+
+Two additions to make R2/KV keys reusable and Models composable. **Binding templates** move key construction onto the binding itself, so the same key logic can be shared instead of repeated as string literals on every Model. **Worker backed Models** are Models that hydrate from API route params instead of D1, and can hold 1:1 relationships to other Models.
 
 ---
 
@@ -38,16 +49,16 @@ model User {
 
 This has several problems:
 
-1. Some other Model cannot compose a `User` Model because there is no way to know how to hydrate it's `keyfield`
+1. Some other Model cannot compose a `User` Model because there is no way to know how to hydrate its `keyfield`.
 
-2. If another Model was to use the same key literals for its own R2 or KV fields, it must repeat the same literals on its own declarations.
+2. If another Model were to use the same key literals for its own R2 or KV fields, it would have to repeat the same literals on its own declarations.
 
-3. CRUD methods like `list` cannot be generated for `User` because there is no way to know how to generate the keys for listing all `User`s
+3. CRUD methods like `list` cannot be generated for `User` because there is no way to know how to generate the keys for listing all `User`s.
 
 To address these problems, we will introduce two new concepts:
 
 - **Binding templates**: A reusable template for constructing keys for R2 and KV fields, declared within the environment binding itself.
-- **Worker backed Models**: A Model that is not backed by D but can have 1:1 relationships to other Models
+- **Worker backed Models**: A Model that is not backed by D1, but can hydrate itself from API route parameters
 
 ---
 
@@ -60,8 +71,8 @@ A Worker backed Model is a Model capable of having fields that exist on the API 
 Worker backed Models have the following constraints:
 
 - Cannot have one-to-many relationships to other Models
-- Can only store primitive types in it's `route` block
-- Has no SQL representation to them
+- Can only store primitive types in their `route` block
+- Have no SQL representation
 
 For example:
 
@@ -91,7 +102,7 @@ In this example, `Person` is a Worker backed Model. It has a `route` field `id` 
 
 `Person` has a one-to-one relationship to `Dog`, navigable by the `id` field on `Person` and the `ownerId` field on `Dog`. Unlike in a D1 Model where some `JOIN` must occur, here no call needs to be made to resolve the relationship. The runtime can simply take the value of `id` from the `Person` route, and use it to retrieve the corresponding `Dog`.
 
-The relationship between `Person` and `Dog` is cyclical, but this is not a problem because Cloesce will utilize the Default `Include Tree` and user defined `Include Tree`s to prevent infinite recursion when resolving relationships.
+The relationship between `Person` and `Dog` is cyclical, but this is not a problem because Cloesce will utilize the default `Include Tree` and user-defined `Include Tree`s to prevent infinite recursion when resolving relationships.
 
 Either of these Models could be referenced in a D1 backed Model, or compose a D1 backed Model, but they cannot have a one-to-many relationship to any other Model.
 
@@ -127,7 +138,7 @@ model Person {
 }
 ```
 
-Here, `User` is a D1 backed Model that has a one-to-one relationship to the Worker backed Model `Person`. `Person` has `route` field `id`, which is used to navigate to `User`, as well as retrieve the `avatar` from R2 and the `meta` from KV.
+Here, `User` is a D1 backed Model that has a one-to-one relationship to the Worker backed Model `Person`. `Person` has a `route` field `id`, which is used to navigate to `User`, as well as to retrieve the `avatar` from R2 and the `meta` from KV.
 
 ## Modifying D1 Backed Models Syntax
 
@@ -231,7 +242,7 @@ kv UserMetadata {
 }
 ```
 
-Here, `meta` is a template that takes an `id` parameter and returns a `json` value. The `metas` template returns a paginated list of `json` values.
+Here, `meta` is a template that takes an `id` parameter and returns a `json` value, and the `metas` template returns a paginated list of `json` values.
 
 ## Referencing Binding Templates
 
