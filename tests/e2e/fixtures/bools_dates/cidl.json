@@ -56,6 +56,54 @@
       "database_binding": "db",
       "apis": [
         {
+          "name": "isItRainingSomewhere",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "Boolean",
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": []
+        },
+        {
+          "name": "getCurrentDate",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "DateIso",
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": []
+        },
+        {
+          "name": "echo",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Weather"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "date",
+              "cidl_type": "DateIso",
+              "validators": []
+            },
+            {
+              "name": "isRaining",
+              "cidl_type": "Boolean",
+              "validators": []
+            }
+          ],
+          "injected": []
+        },
+        {
           "name": "$save",
           "is_static": true,
           "data_source": null,

@@ -60,12 +60,12 @@ export namespace DefaultOverride {
         };
     }
     export namespace Default {
-        export interface Stubs {
+        export interface Crud {
             get(env: { db: Env["db"] }): ApiResult<Self>;
             list(env: { db: Env["db"] }): ApiResult<Self[]>;
         }
-        export type Impl = typeof GeneratedSource.Default & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.Default & I>): typeof GeneratedSource.Default & I {
+        export type Impl = typeof GeneratedSource.Default & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.Default & I>): typeof GeneratedSource.Default & I {
             return _implDs(GeneratedSource.Default, implObj);
         }
     }
@@ -301,29 +301,29 @@ export namespace Hamburger {
         };
     }
     export namespace BurgersWithLettuceOrdered {
-        export interface Stubs {
+        export interface Crud {
             list(env: { db: Env["db"] }, lastId: number, limit: number): ApiResult<Self[]>;
         }
-        export type Impl = typeof GeneratedSource.BurgersWithLettuceOrdered & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.BurgersWithLettuceOrdered & I>): typeof GeneratedSource.BurgersWithLettuceOrdered & I {
+        export type Impl = typeof GeneratedSource.BurgersWithLettuceOrdered & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.BurgersWithLettuceOrdered & I>): typeof GeneratedSource.BurgersWithLettuceOrdered & I {
             return _implDs(GeneratedSource.BurgersWithLettuceOrdered, implObj);
         }
     }
     export namespace NoLettuce {
-        export interface Stubs {
+        export interface Crud {
             get(env: { db: Env["db"] }, id: number): ApiResult<Self>;
         }
-        export type Impl = typeof GeneratedSource.NoLettuce & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.NoLettuce & I>): typeof GeneratedSource.NoLettuce & I {
+        export type Impl = typeof GeneratedSource.NoLettuce & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.NoLettuce & I>): typeof GeneratedSource.NoLettuce & I {
             return _implDs(GeneratedSource.NoLettuce, implObj);
         }
     }
     export namespace OnlyBacon {
-        export interface Stubs {
+        export interface Crud {
             get(env: { db: Env["db"] }, id: number): ApiResult<Self>;
         }
-        export type Impl = typeof GeneratedSource.OnlyBacon & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.OnlyBacon & I>): typeof GeneratedSource.OnlyBacon & I {
+        export type Impl = typeof GeneratedSource.OnlyBacon & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.OnlyBacon & I>): typeof GeneratedSource.OnlyBacon & I {
             return _implDs(GeneratedSource.OnlyBacon, implObj);
         }
     }

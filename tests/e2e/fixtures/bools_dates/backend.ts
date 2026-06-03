@@ -10,25 +10,25 @@ export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 export interface Env {
     db: D1Database;
 }
-export abstract class InjectedThing {
-    readonly tag = "InjectedThing";
-}
-export namespace Foo {
-    export const Tag = "Foo" as const;
-    export const Meta = cidl.models.Foo as any;
+export namespace Weather {
+    export const Tag = "Weather" as const;
+    export const Meta = cidl.models.Weather as any;
 
     export interface Self {
-        id: string;
+        id: number;
+        date: Date;
+        isRaining: boolean;
     }
 
     export interface Api {
-        blockedMethod(
-        ): ApiResult<void>;
-        getInjectedThing(
-            env: {
-                InjectedThing: InjectedThing,
-            },
-        ): ApiResult<string>;
+        isItRainingSomewhere(
+        ): ApiResult<boolean>;
+        getCurrentDate(
+        ): ApiResult<Date>;
+        echo(
+            date: Date,
+            isRaining: boolean,
+        ): ApiResult<Weather.Self>;
     }
     export const _api = undefined as unknown as Api;
 
@@ -38,20 +38,20 @@ export namespace Foo {
     export namespace GeneratedSource {
         export const Default = {
             tree: {},
-            selectQueryRaw: `SELECT "Foo"."id" AS "id" FROM "Foo"`,
-            getQueryRaw: `SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`,
-            listQueryRaw: `SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" > ?1 ORDER BY "Foo"."id" ASC LIMIT ?2`,
+            selectQueryRaw: `SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather"`,
+            getQueryRaw: `SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" = ?1`,
+            listQueryRaw: `SELECT "Weather"."id" AS "id", "Weather"."date" AS "date", "Weather"."isRaining" AS "isRaining" FROM "Weather" WHERE "Weather"."id" > ?1 ORDER BY "Weather"."id" ASC LIMIT ?2`,
 
             selectQuery(env: { db: Env["db"] }): D1PreparedStatement {
                 return env.db.prepare(this.selectQueryRaw);
             },
-            getQuery(env: { db: Env["db"] }, id: string): D1PreparedStatement {
+            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(this.getQueryRaw).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: string, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(this.listQueryRaw).bind(lastSeen_id, limit);
             },
-            async get(env: { db: Env["db"] }, id: string): Promise<HttpResult<Self | null>> {
+            async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
                 if (res.errors.length > 0) {
@@ -62,7 +62,7 @@ export namespace Foo {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async list(env: { db: Env["db"] }, lastSeen_id: string, limit: number): Promise<HttpResult<Self[]>> {
+            async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
                 if (res.errors.length > 0) {
@@ -89,7 +89,7 @@ export namespace Foo {
     }
 
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
-        return _impl("Foo", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+        return _impl("Weather", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
     export namespace Orm {
@@ -102,7 +102,7 @@ export namespace Foo {
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Foo.Self[]>> {
+        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Weather.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -142,7 +142,7 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 import cidl from "./cidl.json" with { type: "json" };
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5560/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5797/api")
 }
 
 // Default entrypoint for a Cloesce app.

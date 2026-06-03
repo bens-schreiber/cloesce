@@ -16,7 +16,7 @@ const CoursesOrderedDescending = Student.CoursesOrderedDescending.impl({
     if (res.errors.length > 0) {
       return HttpResult.fail(400, JSON.stringify(res.errors));
     }
-    return HttpResult.ok(200, res.value);
+    return HttpResult.ok(200, res.value!);
   },
 });
 

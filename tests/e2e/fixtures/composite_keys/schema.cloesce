@@ -13,18 +13,10 @@ model Student for db {
         favoriteColor: string
     }
     
+    // Composite 1:M navigation to StudentCourse join table
     nav (StudentCourse::studentId, StudentCourse::studentName) {
         studentCourses
     }
-}
-
-source CoursesOrderedDescending for Student {
-    include {
-        studentCourses
-    }
-
-    [inject db]
-    list(lastId: int, lastName: string, limit: int)
 }
 
 [crud get, list, save]
@@ -42,9 +34,12 @@ model Course for db {
     }
 }
 
+// A join table with a composite foreign key to Student 
+// and a foreign key to Course
 [crud get, list, save]
 model StudentCourse for db{
     primary {
+        // Composite foreign key to Student
         foreign (Student::id, Student::name) {
             studentId
             studentName
@@ -55,6 +50,7 @@ model StudentCourse for db{
         }
     }
 
+    // Navigations to Student and Course using the foreign keys
     nav (Student::id(studentId), Student::name(studentName)) {
         student
     }
@@ -62,6 +58,15 @@ model StudentCourse for db{
     nav Course::id(courseId) {
         course
     }
+}
+
+source CoursesOrderedDescending for Student {
+    include {
+        studentCourses
+    }
+
+    [inject db]
+    list(lastId: int, lastName: string, limit: int)
 }
 
 source Default for StudentCourse {

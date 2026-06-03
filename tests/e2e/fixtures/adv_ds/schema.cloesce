@@ -2,21 +2,7 @@ d1 {
     db
 }
 
-[crud save]
-model Topping for db {
-    primary {
-        id: int
-    }
-
-    column {
-        name: string
-    }
-
-    nav HamburgerTopping::toppingId {
-        hamburgers
-    }
-}
-
+//#region: Hamburger and Topping Many to Many relationship
 [crud save, list]
 model Hamburger for db {
     primary {
@@ -27,11 +13,34 @@ model Hamburger for db {
         name: string
     }
 
+    // Uses the HamburgerTopping join table to get the toppings for a hamburger
     nav HamburgerTopping::hamburgerId {
         toppings
     }
 }
 
+api Hamburger {
+    get noLettuceToppings([source NoLettuce] self) -> array<Topping>
+    get onlyBaconToppings([source OnlyBacon] self) -> array<Topping>
+}
+
+[crud save]
+model Topping for db {
+    primary {
+        id: int
+    }
+
+    column {
+        name: string
+    }
+
+    // Uses the HamburgerTopping join table to get the hamburgers for a topping
+    nav HamburgerTopping::toppingId {
+        hamburgers
+    }
+}
+
+// Join table for the many-to-many relationship between Hamburger and Topping
 model HamburgerTopping for db {
     primary {
         foreign (Hamburger::id) {
@@ -86,12 +95,9 @@ source OnlyBacon for Hamburger {
     [inject db]
     get([instance] id: int)
 }
+//#endregion
 
-api Hamburger {
-    get noLettuceToppings([source NoLettuce] self) -> array<Topping>
-    get onlyBaconToppings([source OnlyBacon] self) -> array<Topping>
-}
-
+// Exists to show how the Default data source can be overriden 
 [crud save, get, list]
 model DefaultOverride for db {
     primary {
@@ -99,6 +105,9 @@ model DefaultOverride for db {
     }
 }
 
+// Overrides the Default data source for DefaultOverride with custom `get` and
+// `list` implementations. `save` will still use the default implementation since 
+// it's not overridden here.
 source Default for DefaultOverride {
     include {}
 
@@ -107,6 +116,4 @@ source Default for DefaultOverride {
 
     [inject db]
     list()
-
-    // note: no stubs for save
 }

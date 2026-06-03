@@ -37,6 +37,12 @@
     }
 {%- else if self.is_blob(cidl_type) %}
     __$res.{{ name }} = b64ToU8(__$res.{{ name }});
+{%- else if self.is_date(cidl_type) && self.has_array(cidl_type) %}
+    for (let i = 0; i < __$res.{{ name }}?.length; i++) {
+      __$res.{{ name }}[i] = new Date(__$res.{{ name }}[i]);
+    }
+{%- else if self.is_date(cidl_type) %}
+    __$res.{{ name }} &&= new Date(__$res.{{ name }});
 {%- endif %}
 {%- endmacro %}
 
@@ -113,7 +119,11 @@ export class {{ model.name }} {
 
 {%- for param in &api.parameters %}
 {%- if self.is_get_request(&api.http_verb) %}
+{%- if self.is_date(&param.cidl_type) %}
+    __$baseUrl.searchParams.append("{{ param.name }}", {{ param.name }}.toISOString());
+{%- else %}
     __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+{%- endif %}
 {%- else %}
     __$payload["{{ param.name }}"] = {{ param.name }};
 {%- endif %}

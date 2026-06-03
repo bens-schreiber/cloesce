@@ -1,0 +1,22 @@
+d1 {
+    db
+}
+
+// Exists to tests that date and bool columns are properly parsed and serialized by Cloesce
+[crud save, get]
+model Weather for db {
+    primary {
+        id: int
+    }
+    
+    column {
+        date: date
+        isRaining: bool
+    }
+}
+
+api Weather {
+    get isItRainingSomewhere() -> bool
+    get getCurrentDate() -> date
+    get echo(date: date, isRaining: bool) -> Weather
+}

@@ -3,11 +3,16 @@ d1 {
 }
 
 model BlobService {}
-
 api BlobService {
+    // A simple post endpoint that takes in the blob, adds 1 to each byte, 
+    // and returns the resulting blob
     post incrementBlob(b: blob) -> blob
 }
 
+// A model who has two blob columns
+//
+// Blobs are stored as base64 encoded strings in SQLite, decoded to 
+// Uint8Arrays in the backend
 [crud save, get, list]
 model BlobHaver for db {
     primary {
@@ -22,6 +27,10 @@ model BlobHaver for db {
 
 api BlobHaver {
     get getBlob1(self) -> blob
+
+    // Takes in a stream of bytes, which is not read or validated by Cloesce
     post inputStream(s: stream)
+
+    // Directly returns some stream of bytes which may or may not be buffered in memory by Cloesce
     get yieldStream(self) -> stream
 }

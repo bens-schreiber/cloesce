@@ -226,11 +226,11 @@ export namespace Student {
         };
     }
     export namespace CoursesOrderedDescending {
-        export interface Stubs {
+        export interface Crud {
             list(env: { db: Env["db"] }, lastId: number, lastName: string, limit: number): ApiResult<Self[]>;
         }
-        export type Impl = typeof GeneratedSource.CoursesOrderedDescending & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.CoursesOrderedDescending & I>): typeof GeneratedSource.CoursesOrderedDescending & I {
+        export type Impl = typeof GeneratedSource.CoursesOrderedDescending & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.CoursesOrderedDescending & I>): typeof GeneratedSource.CoursesOrderedDescending & I {
             return _implDs(GeneratedSource.CoursesOrderedDescending, implObj);
         }
     }

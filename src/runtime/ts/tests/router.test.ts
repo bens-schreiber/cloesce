@@ -1,11 +1,6 @@
-import { describe, test, expect, vi, afterEach } from "vitest";
-import {
-  MatchedRoute,
-  RouterError,
-  RuntimeContainer,
-  _cloesceInternal,
-} from "../src/router/router";
-import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
+import { describe, test, expect, vi } from "vitest";
+import { MatchedRoute, RouterError, _cloesceInternal } from "../src/router/router";
+import { HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, createIdl } from "./builder";
 import { Model } from "../src/cidl";
 
@@ -30,15 +25,6 @@ function createRegistry(...namespaces: Model[]) {
   return map;
 }
 
-function mockWranglerEnv() {
-  return {
-    db: {
-      prepare: vi.fn(),
-      exec: vi.fn(),
-    } as any,
-  };
-}
-
 function createDi() {
   return new DependencyContainer();
 }
@@ -55,11 +41,10 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/does/not/match");
     const idl = createIdl();
-    const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -71,11 +56,10 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
     const idl = createIdl();
-    const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -89,11 +73,10 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().build()],
     });
-    const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -107,11 +90,10 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Delete", [], "Void").build()],
     });
-    const env = mockWranglerEnv();
     const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -125,11 +107,10 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Post", [], "Void").build()],
     });
-    const env = mockWranglerEnv();
     const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.unwrap()).toEqual({
@@ -153,11 +134,10 @@ describe("Match Route", () => {
           .build(),
       ],
     });
-    const env = mockWranglerEnv();
     const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.unwrap()).toEqual({
@@ -186,11 +166,10 @@ describe("Match Route", () => {
           .build(),
       ],
     });
-    const env = mockWranglerEnv();
     const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry, env);
+    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
 
     // Assert
     expect(res.unwrap()).toEqual({
@@ -201,41 +180,6 @@ describe("Match Route", () => {
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
     });
-  });
-});
-
-describe("Namespace Middleware", () => {
-  afterEach(() => {
-    _cloesceInternal.RuntimeContainer.dispose();
-  });
-
-  test("Exits early", async () => {
-    // Arrange
-    const env = mockWranglerEnv();
-    const idl = createIdl({
-      models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
-    });
-
-    await RuntimeContainer.init(idl, api);
-    const app = new CloesceApp();
-    app.register({
-      tag: "Foo",
-      method: mockImpl,
-    } as any);
-
-    const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const di = createDi();
-
-    app.onNamespace("Foo", async () => {
-      return HttpResult.fail(500, "oogly boogly");
-    });
-
-    // Act
-    const res = await (app as any).router(request, env, idl, undefined, di, api);
-
-    // Assert
-    expect(res.status).toBe(500);
-    expect(res.message).toBe("oogly boogly");
   });
 });
 
@@ -295,42 +239,6 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.RequestMissingBody);
-  });
-});
-
-describe("Method Middleware", () => {
-  afterEach(() => {
-    _cloesceInternal.RuntimeContainer.dispose();
-  });
-
-  test("Exits early", async () => {
-    // Arrange
-    const env = mockWranglerEnv();
-    const idl = createIdl({
-      models: [ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build()],
-    });
-
-    await RuntimeContainer.init(idl, api);
-    const app = new CloesceApp();
-    app.register({
-      tag: "Foo",
-      method: mockImpl,
-    } as any);
-
-    const request = createRequest("http://foo.com/api/Foo/method", "POST", JSON.stringify({}));
-
-    const di = createDi();
-
-    app.onMethod("Foo", "method", async () => {
-      return HttpResult.fail(500, "oogly boogly");
-    });
-
-    // Act
-    const res = await (app as any).router(request, env, idl, undefined, di, api);
-
-    // Assert
-    expect(res.status).toBe(500);
-    expect(res.message).toBe("oogly boogly");
   });
 });
 
@@ -434,7 +342,7 @@ describe("Method Dispatch", () => {
     const di = createDi();
     const injectedObject = { tag: "YouTubeApi", key: "secret" };
     const db = { prepare: vi.fn() };
-    di._set({ tag: "YouTubeApi" }, injectedObject);
+    di.set({ tag: "YouTubeApi" }, injectedObject);
 
     const model = ModelBuilder.model("Foo")
       .idPk()

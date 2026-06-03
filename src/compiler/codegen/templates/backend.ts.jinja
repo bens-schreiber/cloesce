@@ -221,7 +221,7 @@ export namespace {{ model.name }} {
 {%- for ds in model.data_sources.values() %}
 {%- if ds.has_stubs() %}
     export namespace {{ ds.name }} {
-        export interface Stubs {
+        export interface Crud {
 {%- if ds.get.is_stub %}
             get({% if !ds.get.injected.is_empty() %}env: {{ inject_env(ds.get.injected) }}{% endif %}{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ self.map_type(&param.parameter.cidl_type) }}{% endfor %}): ApiResult<Self>;
 {%- endif %}
@@ -232,8 +232,8 @@ export namespace {{ model.name }} {
             save({% if !ds.save.injected.is_empty() %}env: {{ inject_env(ds.save.injected) }}{% endif %}{% for param in ds.save.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self>;
 {%- endif %}
         }
-        export type Impl = typeof GeneratedSource.{{ ds.name }} & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.{{ ds.name }} & I>): typeof GeneratedSource.{{ ds.name }} & I {
+        export type Impl = typeof GeneratedSource.{{ ds.name }} & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.{{ ds.name }} & I>): typeof GeneratedSource.{{ ds.name }} & I {
             return _implDs(GeneratedSource.{{ ds.name }}, implObj);
         }
     }

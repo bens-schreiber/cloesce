@@ -134,6 +134,8 @@ export class HasSqlColumnTypes {
 
   static fromJson(data: any): HasSqlColumnTypes {
     const __$res = Object.assign(new HasSqlColumnTypes(), data);
+    __$res.dat &&= new Date(__$res.dat);
+    __$res.dateNull &&= new Date(__$res.dateNull);
     return __$res;
   }
 }

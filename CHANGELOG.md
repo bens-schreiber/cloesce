@@ -14,6 +14,10 @@
 - Removed many to many relationship support in favor of manual join tables using composite keys
 - Changed syntax of `nav` fields
 
+### Fixed
+
+- A bug with `date` serialization and deserialization using improper ISO strings
+
 # [0.4.1] - 2026-5-20
 
 ### Added

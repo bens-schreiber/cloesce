@@ -1,5 +1,5 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, CrudKind, DataSource, Field } from "../cidl.js";
+import { Cidl, Model, ApiMethod, DataSource, Field } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -8,6 +8,7 @@ import { crudRoute } from "./crud.js";
 export type DependencyKey = { tag: string };
 
 /**
+ * @internal
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
  * Comes with the Wrangler environment pre-injected
@@ -16,17 +17,13 @@ export class DependencyContainer {
   private container = new Map<string, any>();
 
   /** @internal */
-  _set<T>(key: DependencyKey, instance: T) {
+  set<T>(key: DependencyKey, instance: T) {
     if (this.container.has(key.tag)) {
       console.warn(
         `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
       );
     }
     this.container.set(key.tag, instance);
-  }
-
-  set(value: { tag: string }) {
-    this._set({ tag: value.tag }, value);
   }
 
   get<T>(key: DependencyKey): T | undefined {
@@ -76,10 +73,6 @@ export class RuntimeContainer {
  */
 export type RequestParamMap = Record<string, unknown>;
 
-export type MiddlewareFn = (
-  di: DependencyContainer,
-) => Promise<HttpResult | void> | HttpResult | void;
-
 /**
  * States in which the router may exit.
  */
@@ -113,65 +106,9 @@ export class CloesceApp {
    * dependency with the router, making API methods, data source stubs, and
    * injections available for routing.
    */
-  public register(model: { readonly tag: string }): this {
+  public register<T extends { readonly tag: string }>(model: T): this {
     this.modelRegistry.set(model.tag, model);
     return this;
-  }
-
-  private onRouteMiddleware: MiddlewareFn[] = [];
-
-  /**
-   * Registers middleware than runs on every valid route.
-   *
-   * @param m - The middleware function to register.
-   */
-  public onRoute(m: MiddlewareFn) {
-    this.onRouteMiddleware.push(m);
-  }
-
-  private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
-
-  /**
-   * Registers middleware for a specific model namespace.
-   *
-   * Runs before request validation and method middleware.
-   *
-   * @param m - The middleware function to register.
-   */
-  public onNamespace(tag: string, m: MiddlewareFn) {
-    const existing = this.namespaceMiddleware.get(tag);
-    if (existing) {
-      existing.push(m);
-      return;
-    }
-    this.namespaceMiddleware.set(tag, [m]);
-  }
-
-  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> = new Map();
-
-  /**
-   * Registers middleware for a specific method on a namespace
-   *
-   * Runs after namespace middleware and request validation.
-   *
-   * @param key - The constructor function of the Model.
-   * @param method - The method name or CrudKind to register the middleware for.
-   * @param m - The middleware function to register.
-   */
-  public onMethod(tag: string, method: string | CrudKind, m: MiddlewareFn) {
-    let classMap = this.methodMiddleware.get(tag);
-    if (!classMap) {
-      classMap = new Map();
-      this.methodMiddleware.set(tag, classMap);
-    }
-
-    let methodArray = classMap.get(method);
-    if (!methodArray) {
-      methodArray = [];
-      classMap.set(method, methodArray);
-    }
-
-    methodArray.push(m);
   }
 
   private async router(
@@ -185,7 +122,7 @@ export class CloesceApp {
     // Inject all injectables
     for (const inject of idl.injects) {
       if (this.modelRegistry.has(inject)) {
-        di._set({ tag: inject }, this.modelRegistry.get(inject) ?? undefined);
+        di.set({ tag: inject }, this.modelRegistry.get(inject) ?? undefined);
       }
     }
 
@@ -196,36 +133,12 @@ export class CloesceApp {
     }
     const route = routeRes.unwrap();
 
-    // Route middleware
-    for (const m of this.onRouteMiddleware) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
-    // Namespace middleware
-    for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
     // Request validation
     const validation = await validateRequest(request, wasm, idl, env, route);
     if (validation.isLeft()) {
       return validation.value;
     }
     const params = validation.unwrap();
-
-    // Method middleware
-    for (const m of this.methodMiddleware.get(route.namespace)?.get(route.method.name) ?? []) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
 
     // Hydration
     const hydrated = await hydrate(this.modelRegistry, di, route, env);
@@ -551,19 +464,20 @@ async function hydrate(
   }
 
   try {
-    const args =
-      dataSource.get.injected.length > 0
-        ? [
-            resolveInjectedArgs(di, env, dataSource.get.injected),
-            ...Object.values(route.getParamValues),
-          ]
-        : Object.values(route.getParamValues);
-    // Bind `this` to the data source namespace so the generated default impl can
-    // reach `this.tree` / `this.getQuery` / `this.listQuery`.
-    const result = await stub.apply(dsNamespace, args);
+    // [injected, ...get params]
+    const args = [];
+    if (dataSource.get.injected.length > 0) {
+      const injectedArgsRes = resolveInjectedArgs(di, env, dataSource.get.injected);
+      if (injectedArgsRes.isLeft()) {
+        return Either.left(injectedArgsRes.unwrapLeft());
+      }
+      args.push(injectedArgsRes.unwrap());
+    }
+    for (const param of dataSource.get.parameters) {
+      args.push(route.getParamValues[param.parameter.name]);
+    }
 
-    // Generated default impls return HttpResult; user stubs may return raw values
-    // or HttpResults too. Treat any HttpResult as authoritative.
+    const result = await stub.apply(dsNamespace, args);
     if (result instanceof HttpResult) {
       if (!result.ok) return Either.left(result);
       if (result.data === null || result.data === undefined) {
@@ -604,7 +518,11 @@ async function methodDispatch(
   const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
   if (route.method.injected.length > 0) {
-    paramArray.push(resolveInjectedArgs(di, env, route.method.injected));
+    const injectedArgsRes = resolveInjectedArgs(di, env, route.method.injected);
+    if (injectedArgsRes.isLeft()) {
+      return injectedArgsRes.unwrapLeft();
+    }
+    paramArray.push(injectedArgsRes.unwrap());
   }
 
   for (const param of route.method.parameters) {
@@ -646,7 +564,7 @@ function resolveInjectedArgs(
   di: DependencyContainer,
   env: any,
   injectedNames: string[],
-): Record<string, unknown> {
+): Either<HttpResult, Record<string, unknown>> {
   const injected: Record<string, unknown> = {};
 
   for (const name of injectedNames) {
@@ -657,11 +575,11 @@ function resolveInjectedArgs(
 
     injected[name] = env?.[name];
     if (injected[name] === undefined) {
-      console.warn(`Unable to find injected dependency for ${name}. Leaving as undefined.`);
+      return exit(501, RouterError.NotImplemented, `Missing injected dependency: ${name}`);
     }
   }
 
-  return injected;
+  return Either.right(injected);
 }
 
 /**

@@ -1180,11 +1180,11 @@ export namespace ModelWithCustomDs {
         };
     }
     export namespace Custom {
-        export interface Stubs {
+        export interface Crud {
             get(, id: number, externalParam: string): ApiResult<Self>;
         }
-        export type Impl = typeof GeneratedSource.Custom & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.Custom & I>): typeof GeneratedSource.Custom & I {
+        export type Impl = typeof GeneratedSource.Custom & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.Custom & I>): typeof GeneratedSource.Custom & I {
             return _implDs(GeneratedSource.Custom, implObj);
         }
     }
@@ -1425,12 +1425,12 @@ export namespace ModelWithCruds {
         };
     }
     export namespace ByName {
-        export interface Stubs {
+        export interface Crud {
             get(, name: string): ApiResult<Self>;
             list(, name: string, limit: number): ApiResult<Self[]>;
         }
-        export type Impl = typeof GeneratedSource.ByName & Stubs;
-        export function impl<I extends Stubs>(implObj: I & ThisType<typeof GeneratedSource.ByName & I>): typeof GeneratedSource.ByName & I {
+        export type Impl = typeof GeneratedSource.ByName & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.ByName & I>): typeof GeneratedSource.ByName & I {
             return _implDs(GeneratedSource.ByName, implObj);
         }
     }

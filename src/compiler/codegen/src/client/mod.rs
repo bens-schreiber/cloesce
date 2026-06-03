@@ -95,6 +95,10 @@ impl ClientTemplate<'_> {
         matches!(ty.root_type(), CidlType::Blob)
     }
 
+    fn is_date(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::DateIso)
+    }
+
     fn is_object(&self, ty: &CidlType<'_>) -> bool {
         matches!(
             ty.root_type(),
