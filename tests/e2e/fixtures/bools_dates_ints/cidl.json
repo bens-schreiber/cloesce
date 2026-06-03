@@ -53,7 +53,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "$save",

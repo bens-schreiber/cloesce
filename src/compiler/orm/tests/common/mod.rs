@@ -10,6 +10,7 @@ pub async fn test_sql(
         let CloesceIdl { models, hash, .. } = ast;
         let migrations_models = models
             .into_iter()
+            .filter(|(_, model)| model.database_binding.is_some())
             .map(|(name, model)| {
                 (
                     name.to_string(),

@@ -47,89 +47,7 @@ This has several problems:
 To address these problems, we will introduce two new concepts:
 
 - **Binding templates**: A reusable template for constructing keys for R2 and KV fields, declared within the environment binding itself.
-- **Worker backed Models**: A Model that is not backed by D1 and cannot have relationships to D1 backed Models, but can have relationships to other Worker backed Models.
-
-```cloesce
-model Foo {
-    // Declares that Foo::personId is foreign to Person::id
-    foreign Person::id {
-        personId
-
-        // Declares that the Person object can be accessed by navigating from Foo to Person via the id field
-        nav {
-            person
-        }
-    }
-
-    // Declares that Foo::bar has many Bar's joined on Bar::barId's foreign key relationship to Foo
-    // Translates to an array of Bar objects
-    nav Bar::barId {
-        bars
-    }
-}
-
-// new proposed syntax
-model Foo {
-    // same as before, but cannot have a `nav` block inside anymore
-    foreign Person::id {
-        personId
-    }
-
-    // 1:1 relationship to Person, navigable by `personId`
-    nav Person::id(personId) {
-        person
-    }
-
-    // 1:many relationship to Bar, navigable by `barId`
-    nav Bar::barId {
-        bars
-    }
-}
-
-// new proposed syntax for navigation properties with route based models
-model User {
-    route {
-        id: int
-    }
-
-    nav Dog::ownerId(id) {
-        dog
-    }
-}
-
-model Dog {
-    route {
-        ownerId: int
-    }
-
-    nav User::id(ownerId) {
-        owner
-    }
-}
-
-// composite keys example
-model User {
-    route {
-        id: int
-        tenant: int
-    }
-
-    nav Dog::ownerId(id) {
-        dog
-    }
-}
-
-model Dog {
-    route {
-        ownerId: int
-        tenant: int
-    }
-
-    nav (User::id(ownerId), User::tenant(tenant)) {
-        owner
-    }
-}
-```
+- **Worker backed Models**: A Model that is not backed by D but can have 1:1 relationships to other Models
 
 ---
 
@@ -141,10 +59,9 @@ A Worker backed Model is a Model capable of having fields that exist on the API 
 
 Worker backed Models have the following constraints:
 
-- Cannot have relationships to D1 backed Models (yet!)
-- Cannot have one-to-many relationships
+- Cannot have one-to-many relationships to other Models
 - Can only store primitive types in it's `route` block
-- Have no SQL representation to them
+- Has no SQL representation to them
 
 For example:
 
@@ -175,6 +92,42 @@ In this example, `Person` is a Worker backed Model. It has a `route` field `id` 
 `Person` has a one-to-one relationship to `Dog`, navigable by the `id` field on `Person` and the `ownerId` field on `Dog`. Unlike in a D1 Model where some `JOIN` must occur, here no call needs to be made to resolve the relationship. The runtime can simply take the value of `id` from the `Person` route, and use it to retrieve the corresponding `Dog`.
 
 The relationship between `Person` and `Dog` is cyclical, but this is not a problem because Cloesce will utilize the Default `Include Tree` and user defined `Include Tree`s to prevent infinite recursion when resolving relationships.
+
+Either of these Models could be referenced in a D1 backed Model, or compose a D1 backed Model, but they cannot have a one-to-many relationship to any other Model.
+
+For example:
+
+```cloesce
+model User for Db {
+    primary {
+        id: int
+    }
+
+    nav Person::id(id) {
+        person
+    }
+}
+
+model Person {
+    route {
+        id: int
+    }
+
+    r2 Avatars::avatar(id) {
+        avatar
+    }
+
+    kv Metadata::meta(id) {
+        meta
+    }
+
+    nav User::id(id) {
+        user
+    }
+}
+```
+
+Here, `User` is a D1 backed Model that has a one-to-one relationship to the Worker backed Model `Person`. `Person` has `route` field `id`, which is used to navigate to `User`, as well as retrieve the `avatar` from R2 and the `meta` from KV.
 
 ## Modifying D1 Backed Models Syntax
 
@@ -376,109 +329,3 @@ export class UserAvatars {
 This way, any Model or API can generate keys for the `avatar` template by referencing `UserAvatars::avatar(id)`.
 
 Note that this is separate from the actual binding code that is inside the `Env` interface. The `UserAvatars` class is a generated helper for constructing keys, while the `UserAvatars` binding in the `Env` interface is used for retrieving data from R2.
-
-## Field Accessors
-
-Parameters to a binding template can access fields of objects that are passed in as arguments. For example:
-
-```cloesce
-model User {
-    route {
-        userId: int
-    }
-}
-
-poo Friend {
-    user: User
-}
-
-kv UserMetadata {
-    meta(user: User, friend: Friend) -> json {
-        "metadata/{user::userId}/{friend::user::userId}"
-    }
-}
-```
-
-Given that the object passed in is a valid object in the schema, the `userId` field of the `user` parameter and the `userId` field of the `friend` parameter will be accessible within the template body using the `{param::field}` syntax.
-
-The accepted types of a parameter in a binding template can be:
-
-- Primitive types (e.g. `int`, `string`, etc.)
-- Models (e.g. `User`)
-- Plain Old Objects (POOs) (e.g. `Friend`)
-- Partial object types (where a missing field is serialized to `"null"`)
-
-Types that cannot be represented in the schema would be:
-
-- `KValue<T>`
-- `R2Object`
-- `stream`
-- `array<T>`
-- `paginated<T>`
-
-## Chaining KV/R2 Retrievals
-
-It may be desirable to retrieve a value from KV, and then use that value to construct the key for another retrieval from KV. For example, Durable Objects often store data within their own KV namespace, but some value in that metadata may be needed to construct the key for retrieving the actual data.
-
-A schema that requires "chaining" might look like this:
-
-```cloesce
-kv UserMetadata {
-    meta(id: int) -> Metadata {
-        "metadata/{id}"
-    }
-
-    settings(meta: Metadata) -> Settings {
-        "data/{meta::metaId}"
-    }
-}
-
-r2 UserAvatars {
-    avatar(settings: Settings) {
-        "avatars/{settings::avatarId}"
-    }
-}
-
-model User for Db {
-    primary {
-        userId: int
-    }
-
-    kv UserMetadata::meta(userId) {
-        meta
-    }
-
-    kv UserMetadata::settings(meta) {
-        settings
-    }
-
-    r2 UserAvatars::avatar(settings) {
-        avatar
-    }
-}
-```
-
-In order to retrieve `avatar` for a `User`, we need first retrieve `settings`, which requires retrieving `meta`, which requires retrieving `userId` from the `User` table in D1.
-
-Currently, Cloesce is only capable of retrieving `User` from D1, followed by `meta` from KV, but there is no way to express further dependencies. Further, `meta` and `settings` are `KValue<T>`'s which means they are not accepted as parameters to other templates.
-
-In order to support this kind of retrieval chaining, we will need to:
-
-1. Allow templates to implicitly destructure `KValue<T>` into `T` when passed as parameters to other templates.
-2. Modify the `map` ORM method to return a **plan**, a list of retrieval operations that the runtime can execute in order
-3. Modify the runtime to be able to execute a plan, including handling errors and blocking dependent retrievals if a retrieval fails.
-
-### `map` Plan Generation
-
-The current sequence of steps to fully hydrate a Model is:
-
-1. Execute the `select` query to retrieve the SQL Model from D1
-2. Input SQL rows into the `map` function, which generates a JSON object that matches the shape of the Model, without any KV or R2 fields resolved.
-3. Call the `hydrate` method (which does not exist in the ORM, runtime specific) to retrieve KV and R2 fields, as well as any fields that require hydration (e.g. `date`, `blob`, etc.)
-4. Return the fully hydrated Model instance
-
-Rather than having the runtime `hydrate` function be responsible for figuring out which fields to retrieve and in which order (which has to be implemented in every language runtime separately), we will modify `map` to return not only the JSON object, but also a plan for how to retrieve the remaining fields from KV and R2.
-
-The returned plan can be interpreted and executed by the runtime, leaving only the actual fetching of data to be implemented in the runtime.
-
-TODO

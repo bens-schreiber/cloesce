@@ -4,7 +4,7 @@
     "DB2Model": {
       "hash": 122024037709630579,
       "name": "DB2Model",
-      "backing_binding": "db2",
+      "database_binding": "db2",
       "primary_columns": [
         {
           "hash": 6397878138472974760,

@@ -520,8 +520,96 @@ fn route_model_valid() {
 }
 
 #[test]
-fn route_model_errors() {
-    // Arrange: every way a route model or route navigation can be invalid.
+fn d1_model_navigates_to_worker_model() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+
+            column {
+                org: string
+            }
+
+            nav (Person::id(id), Person::tenant(org)) { person }
+        }
+
+        model Person {
+            route {
+                tenant: string
+                id: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let user = result.models.get("User").unwrap();
+    assert_eq!(user.database_binding, Some("my_d1"));
+
+    let person_nav = user.navigation_fields.first().unwrap();
+    assert_eq!(person_nav.field.name, "person");
+    assert_eq!(person_nav.model_reference, "Person");
+    assert_eq!(
+        person_nav.field.cidl_type,
+        CidlType::Object { name: "Person" }
+    );
+
+    let NavigationFieldKind::OneToOne { fields } = &person_nav.kind else {
+        unreachable!()
+    };
+    assert_eq!(fields, &vec!["org", "id"]);
+}
+
+#[test]
+fn d1_model_route_navigation_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+
+            nav Person::id { people }      // 1:M not allowed to a route model
+            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
+        }
+
+        model Person {
+            route { id: int }
+        }
+
+        model Partial {
+            route {
+                a: int
+                b: int
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
+        2
+    );
+}
+
+#[test]
+fn worker_model_errors() {
+    // Arrange
     let src = &with_env(
         r#"
         [crud get, list]

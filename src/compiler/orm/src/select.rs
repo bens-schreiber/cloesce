@@ -100,6 +100,12 @@ impl<'a> SelectModel<'a> {
             };
 
             let child = self.idl.models.get(&nav.model_reference).unwrap();
+
+            if child.database_binding.is_none() {
+                // No actual SQL columns to select
+                continue;
+            }
+
             let child_alias = self.id(child.name);
 
             match &nav.kind {

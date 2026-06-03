@@ -116,6 +116,64 @@ async fn one_to_one(db: SqlitePool) {
 }
 
 #[sqlx::test]
+async fn one_to_one_worker_model_is_not_joined(db: SqlitePool) {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+            d1 { db }
+
+            model Person for db {
+                primary {
+                    id: int
+                }
+
+                column {
+                    name: string
+                }
+
+                nav Profile::ownerId(id) {
+                    profile
+                }
+            }
+
+            model Profile {
+                route {
+                    ownerId: int
+                }
+            }
+        "#,
+    );
+
+    let insert_query = r#"
+            INSERT INTO Person (id, name) VALUES (1, 'Alice');
+        "#
+    .to_string();
+
+    // Act
+    let select_stmt = SelectModel::query(
+        "Person",
+        None,
+        include(json!({"profile": {}})).as_ref(),
+        &idl,
+    )
+    .expect("SelectModel::query to work");
+
+    // Assert
+    expected_str!(
+        select_stmt,
+        r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
+    );
+
+    let results = test_sql(idl, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+        .await
+        .expect("SQL to execute");
+
+    let value = &results[1][0];
+    assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
+    assert_eq!(value.try_get::<String, _>("name").unwrap(), "Alice");
+}
+
+#[sqlx::test]
 async fn one_to_many(db: SqlitePool) {
     let idl = src_to_idl(
         r#"

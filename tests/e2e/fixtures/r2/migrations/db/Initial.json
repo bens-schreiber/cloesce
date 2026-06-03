@@ -4,7 +4,7 @@
     "D1BackedModel": {
       "hash": 6703974713046051109,
       "name": "D1BackedModel",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,

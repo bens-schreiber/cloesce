@@ -4,7 +4,7 @@
     "CrudHaver": {
       "hash": 3221090397089686579,
       "name": "CrudHaver",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -36,7 +36,7 @@
     "Parent": {
       "hash": 1579048073847534623,
       "name": "Parent",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -114,7 +114,7 @@
     "Child": {
       "hash": 5516230628474069556,
       "name": "Child",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,

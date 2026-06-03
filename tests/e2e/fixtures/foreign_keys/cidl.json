@@ -67,7 +67,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -504,7 +504,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -682,7 +682,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -825,7 +825,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -1262,7 +1262,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -1712,7 +1712,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -1900,7 +1900,7 @@
         }
       ],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [],
       "data_sources": {
         "Default": {

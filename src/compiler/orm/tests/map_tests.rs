@@ -111,6 +111,53 @@ fn flat() {
     assert_eq!(horse.get("name"), Some(&json!("Lightning")));
 }
 
+#[test]
+fn one_to_one_worker_model_is_skipped() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Person for db {
+            primary {
+                id: int
+            }
+
+            column {
+                name: string
+            }
+
+            nav Profile::ownerId(id) {
+                profile
+            }
+        }
+
+        model Profile {
+            route {
+                ownerId: int
+            }
+        }
+    "#,
+    );
+
+    let row = vec![
+        ("id".to_string(), json!(1)),
+        ("name".to_string(), json!("Alice")),
+    ]
+    .into_iter()
+    .collect::<Map<String, Value>>();
+
+    // Act
+    let result = map_sql("Person", vec![row], include(json!({ "profile": {} })), &idl)
+        .expect("map_sql to succeed");
+
+    // Assert
+    let person = result.first().unwrap().as_object().unwrap();
+    assert_eq!(person.get("id"), Some(&json!(1)));
+    assert_eq!(person.get("name"), Some(&json!("Alice")));
+    assert_eq!(person.get("profile"), None);
+}
+
 #[sqlx::test]
 async fn one_to_one(db: SqlitePool) {
     let idl = || {

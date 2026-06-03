@@ -120,6 +120,11 @@ fn process_navigation_properties(
             }),
         };
 
+        if nested_model.database_binding.is_none() {
+            // No actual SQL columns to map
+            continue;
+        }
+
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
         // Check all primary key columns for the nested model
         let mut nested_pk_values = Vec::new();

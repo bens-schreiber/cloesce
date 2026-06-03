@@ -42,7 +42,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "throwingMethod",
@@ -336,7 +336,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": null,
+      "database_binding": null,
       "apis": [
         {
           "name": "unregistered",

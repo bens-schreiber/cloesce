@@ -114,7 +114,7 @@
           "validators": []
         }
       ],
-      "backing_binding": null,
+      "database_binding": null,
       "apis": [
         {
           "name": "$get",
@@ -250,7 +250,7 @@
           "validators": []
         }
       ],
-      "backing_binding": null,
+      "database_binding": null,
       "apis": [],
       "data_sources": {
         "Default": {
@@ -381,7 +381,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "acceptPaginated",

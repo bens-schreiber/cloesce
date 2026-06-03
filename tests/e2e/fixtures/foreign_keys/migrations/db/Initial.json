@@ -4,7 +4,7 @@
     "A": {
       "hash": 13694065073971378326,
       "name": "A",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -61,7 +61,7 @@
     "B": {
       "hash": 5976713688952143785,
       "name": "B",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -103,7 +103,7 @@
     "Course": {
       "hash": 7562159567723127520,
       "name": "Course",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -145,7 +145,7 @@
     "Person": {
       "hash": 823242336505793948,
       "name": "Person",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -187,7 +187,7 @@
     "Student": {
       "hash": 5262831485580231479,
       "name": "Student",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -229,7 +229,7 @@
     "Dog": {
       "hash": 8677285544175970002,
       "name": "Dog",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -284,7 +284,7 @@
     "CourseStudent": {
       "hash": 514777369792557541,
       "name": "CourseStudent",
-      "backing_binding": "db",
+      "database_binding": "db",
       "primary_columns": [
         {
           "hash": 4017708243728059354,

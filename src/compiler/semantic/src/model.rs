@@ -12,8 +12,8 @@ use idl::{
     Model, NavigationField, NavigationFieldKind, R2Field, ValidatedField, WranglerEnv,
 };
 use indexmap::IndexMap;
-use std::collections::BTreeMap;
 use std::collections::HashSet;
+use std::{collections::BTreeMap, ops::Not};
 
 pub struct ModelAnalysis<'src, 'p, 'sem> {
     env: &'sem WranglerEnv<'src>,
@@ -511,7 +511,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         field: &'p Symbol<'src>,
         table: &SymbolTable<'src, 'p>,
     ) {
-        // 1:1 (local key present) and 1:M (no local key) entries cannot mix.
+        // 1:1 and 1:M entries cannot mix.
         let keyed = adj.first().map(|a| a.local_key.is_some()).unwrap_or(false);
         if adj.iter().any(|a| a.local_key.is_some() != keyed) {
             ma.sink
@@ -521,40 +521,110 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         // Validate all referenced fields exist on the same adj model
         let mut referenced_field_names = Vec::new();
-        {
-            let mut all_valid = true;
-            let adj_model_sym = &adj.first().unwrap().model;
-            for entry in adj {
-                if entry.model.name != adj_model_sym.name {
-                    ma.sink.push(SemanticError::InconsistentModelAdjacency {
-                        first_model: adj_model_sym,
-                        second_model: &entry.model,
-                    });
-                    all_valid = false;
-                    continue;
-                }
-
-                if table.local.contains_key(&LocalSymbolKind::ModelField {
-                    model: adj_model_sym.name,
-                    name: entry.field.name,
-                }) {
-                    referenced_field_names.push(entry.field.name);
-                    continue;
-                }
-
-                ma.sink.push(SemanticError::UnresolvedSymbol {
-                    symbol: &entry.field,
+        let adj_model_sym = &adj.first().unwrap().model;
+        for entry in adj {
+            if entry.model.name != adj_model_sym.name {
+                ma.sink.push(SemanticError::InconsistentModelAdjacency {
+                    first_model: adj_model_sym,
+                    second_model: &entry.model,
                 });
-                all_valid = false;
-            }
-            if !all_valid {
                 return;
             }
+
+            if table.local.contains_key(&LocalSymbolKind::ModelField {
+                model: adj_model_sym.name,
+                name: entry.field.name,
+            }) {
+                referenced_field_names.push(entry.field.name);
+                continue;
+            }
+
+            ma.sink.push(SemanticError::UnresolvedSymbol {
+                symbol: &entry.field,
+            });
+            return;
         }
 
         let adj_model_block = table.models.get(adj.first().unwrap().model.name).unwrap();
 
-        // Must share the same backing (same D1 database, or both Worker backed)
+        // If a model has no primary key columns, it cannot be the target of a SQL-backed navigation,
+        // and must be worker backed.
+        let adj_is_worker_backed = adj_model_block
+            .blocks
+            .inners()
+            .any(|b| matches!(b, ModelBlockKind::Primary(_)))
+            .not();
+        if adj_is_worker_backed {
+            if !keyed {
+                ma.sink.push(SemanticError::RouteNavigationInvalid {
+                    field,
+                    reason: "route navigations must be 1:1; declare the local key, e.g. `nav T::f(localKey)`",
+                });
+                return;
+            }
+
+            // Each adj entry maps a target route field to one of this model's local fields.
+            for entry in adj {
+                let local_key = entry.local_key.as_ref().unwrap();
+
+                let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
+                    model: self.name,
+                    name: local_key.name,
+                }) else {
+                    ma.sink
+                        .push(SemanticError::UnresolvedSymbol { symbol: local_key });
+                    return;
+                };
+                let adj_field = table
+                    .local
+                    .get(&LocalSymbolKind::ModelField {
+                        model: adj_model_block.symbol.name,
+                        name: entry.field.name,
+                    })
+                    .unwrap();
+
+                if local_field.cidl_type != adj_field.cidl_type {
+                    ma.sink.push(SemanticError::RouteNavigationInvalid {
+                    field,
+                    reason: "local route field type does not match the referenced route field type",
+                });
+                    return;
+                }
+            }
+
+            // The target must have all of its route fields supplied
+            let target_route_fields = adj_model_block.blocks.inners().find_map(|b| match b {
+                ModelBlockKind::Route(symbols) => Some(symbols),
+                _ => None,
+            });
+            let mut fields = Vec::new();
+            for route_field in target_route_fields.into_iter().flatten() {
+                let Some(entry) = adj.iter().find(|a| a.field.name == route_field.name) else {
+                    ma.sink.push(SemanticError::RouteNavigationInvalid {
+                        field,
+                        reason: "a route navigation must supply every route field of the target model",
+                    });
+                    return;
+                };
+                fields.push(entry.local_key.as_ref().unwrap().name);
+            }
+
+            self.navigation_fields.push(NavigationField {
+                hash: 0,
+                field: Field {
+                    name: field.name.into(),
+                    cidl_type: CidlType::Object {
+                        name: adj_model_block.symbol.name,
+                    },
+                },
+                model_reference: adj_model_block.symbol.name,
+                kind: NavigationFieldKind::OneToOne { fields },
+            });
+            return;
+        }
+
+        // Otherwise, the adjacent model is D1 backed, and navigations to it must
+        // reference the same D1 binding
         let adj_binding = adj_model_block.database_binding.as_ref().map(|s| s.name);
         if adj_binding != binding {
             ma.sink
@@ -562,31 +632,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
-        // Worker backed models resolve navigations by fetching the sibling model, not via SQL.
-        if binding.is_none() {
-            let adj_is_route = adj_model_block
-                .blocks
-                .inners()
-                .any(|b| matches!(b, ModelBlockKind::Route(_)));
-            self.route_nav(ma, table, adj, field, adj_model_block, adj_is_route, keyed);
-            return;
-        }
-
-        // For 1:M: check if `model` has a FK pointing to `name` whose local fields match adj field names
-        let matching_fk_by_local_fields = |model: &'p ModelBlock<'src>, name: &'src str| {
-            model.foreign_blocks().find(|fb| {
-                let references_model = fb.adj.first().map(|(m, _)| m.name == name).unwrap_or(false);
-
-                let local_fields_match = fb.fields.len() == adj.len()
-                    && fb
-                        .fields
-                        .iter()
-                        .zip(adj)
-                        .all(|(local_field, nav)| local_field.name == nav.field.name);
-
-                references_model && local_fields_match
-            })
-        };
         // A nav is 1:1 iff it carries local keys
         if keyed {
             let local_keys = adj
@@ -642,7 +687,29 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
-        if matching_fk_by_local_fields(adj_model_block, self.name).is_none() {
+        // For 1:M: check if `model` has a FK pointing to `name` whose local fields match
+        // adj field names
+        let matching_fk_by_local_fields = adj_model_block
+            .foreign_blocks()
+            .find(|fb| {
+                let references_model = fb
+                    .adj
+                    .first()
+                    .map(|(m, _)| m.name == self.name)
+                    .unwrap_or(false);
+
+                let local_fields_match = fb.fields.len() == adj.len()
+                    && fb
+                        .fields
+                        .iter()
+                        .zip(adj)
+                        .all(|(local_field, nav)| local_field.name == nav.field.name);
+
+                references_model && local_fields_match
+            })
+            .is_none();
+
+        if matching_fk_by_local_fields {
             ma.sink.push(SemanticError::NavigationMissingForeignKey {
                 field,
                 model_reference: adj_model_block.symbol.name,
@@ -662,99 +729,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             kind: NavigationFieldKind::OneToMany {
                 columns: referenced_field_names,
             },
-        });
-    }
-
-    /// Validates a navigation declared on a Worker backed model. These must be 1:1
-    /// relationships to a route model whose entire route is supplied by this model's
-    /// fields, so the target can be assembled during hydration with no extra lookup.
-    ///
-    /// The emitted `columns` are this model's local field names, ordered to match the
-    /// target's route field declaration order, so the runtime can build the target as
-    /// `{ target.route_fields[i]: value[columns[i]] }`.
-    #[allow(clippy::too_many_arguments)]
-    fn route_nav(
-        &mut self,
-        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
-        table: &SymbolTable<'src, 'p>,
-        adj: &'p [NavAdj<'src>],
-        field: &'p Symbol<'src>,
-        adj_model_block: &'p ModelBlock<'src>,
-        adj_is_route: bool,
-        keyed: bool,
-    ) {
-        if !keyed {
-            ma.sink.push(SemanticError::RouteNavigationInvalid {
-                field,
-                reason: "route navigations must be 1:1; declare the local key, e.g. `nav T::f(localKey)`",
-            });
-            return;
-        }
-
-        if !adj_is_route {
-            ma.sink.push(SemanticError::RouteNavigationInvalid {
-                field,
-                reason: "route navigations must reference a route model",
-            });
-            return;
-        }
-
-        // Each adj entry maps a target route field to one of this model's local fields.
-        for entry in adj {
-            let local_key = entry.local_key.as_ref().unwrap();
-
-            let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
-                model: self.name,
-                name: local_key.name,
-            }) else {
-                ma.sink
-                    .push(SemanticError::UnresolvedSymbol { symbol: local_key });
-                return;
-            };
-            let adj_field = table
-                .local
-                .get(&LocalSymbolKind::ModelField {
-                    model: adj_model_block.symbol.name,
-                    name: entry.field.name,
-                })
-                .unwrap();
-
-            if local_field.cidl_type != adj_field.cidl_type {
-                ma.sink.push(SemanticError::RouteNavigationInvalid {
-                    field,
-                    reason: "local route field type does not match the referenced route field type",
-                });
-                return;
-            }
-        }
-
-        // The target must have all of its route fields supplied, in their declaration order.
-        let target_route_fields = adj_model_block.blocks.inners().find_map(|b| match b {
-            ModelBlockKind::Route(symbols) => Some(symbols),
-            _ => None,
-        });
-        let mut fields = Vec::new();
-        for route_field in target_route_fields.into_iter().flatten() {
-            let Some(entry) = adj.iter().find(|a| a.field.name == route_field.name) else {
-                ma.sink.push(SemanticError::RouteNavigationInvalid {
-                    field,
-                    reason: "a route navigation must supply every route field of the target model",
-                });
-                return;
-            };
-            fields.push(entry.local_key.as_ref().unwrap().name);
-        }
-
-        self.navigation_fields.push(NavigationField {
-            hash: 0,
-            field: Field {
-                name: field.name.into(),
-                cidl_type: CidlType::Object {
-                    name: adj_model_block.symbol.name,
-                },
-            },
-            model_reference: adj_model_block.symbol.name,
-            kind: NavigationFieldKind::OneToOne { fields },
         });
     }
 

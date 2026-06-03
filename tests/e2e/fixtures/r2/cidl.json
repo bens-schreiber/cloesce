@@ -117,7 +117,7 @@
       ],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db",
+      "database_binding": "db",
       "apis": [
         {
           "name": "uploadData",
@@ -366,7 +366,7 @@
           "validators": []
         }
       ],
-      "backing_binding": null,
+      "database_binding": null,
       "apis": [
         {
           "name": "uploadData",
@@ -486,7 +486,7 @@
           "validators": []
         }
       ],
-      "backing_binding": null,
+      "database_binding": null,
       "apis": [
         {
           "name": "uploadData",

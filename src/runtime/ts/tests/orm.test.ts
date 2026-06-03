@@ -201,6 +201,40 @@ describe("hydrateType Tests", () => {
       expect(result.car).toEqual({ ownerId: 1, tenant: "acme" });
     });
 
+    test("assembles a route model nav target from a D1 model's columns and primary key", () => {
+      // Arrange
+      const profileMeta = ModelBuilder.model("Profile")
+        .routeField("ownerId", "Int")
+        .routeField("tenant", "String")
+        .build();
+
+      const userMeta = ModelBuilder.model("User")
+        .defaultDb()
+        .idPk()
+        .col("org", "String")
+        .navP("profile", "Profile", {
+          OneToOne: { fields: ["id", "org"] },
+        })
+        .build();
+
+      const idl = createIdl({ models: [userMeta, profileMeta] });
+      const base = { id: 7, org: "acme" };
+
+      // Act
+      const result = hydrateType(
+        base,
+        { Object: { name: "User" } },
+        {
+          ...createHydrateArgs(),
+          idl,
+          includeTree: null,
+        },
+      );
+
+      // Assert
+      expect(result.profile).toEqual({ ownerId: 7, tenant: "acme" });
+    });
+
     test("does not hydrate navigation properties when exclude from include tree", () => {
       // Arrange
       const iso = "2024-03-10T08:00:00.000Z";

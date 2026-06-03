@@ -43,7 +43,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db1",
+      "database_binding": "db1",
       "apis": [
         {
           "name": "$get",
@@ -237,7 +237,7 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "backing_binding": "db2",
+      "database_binding": "db2",
       "apis": [
         {
           "name": "$get",
