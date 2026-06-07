@@ -101,8 +101,12 @@ The pattern for seeding a DO ID will follow `BINDING` followed by the `/` delimi
 ```ts
 // GENERATED BACKEND TS CODE
 export abstract class CounterDo implements DurableObject {
-    protected app: CloesceApp;
-    constructor(public state: DurableObjectState, private env: Env) {}
+    protected id: string;
+
+    constructor(public state: DurableObjectState, private env: Env) {
+        const [, id] = state.id.toString().split("/");
+        this.id = id;
+    }
 
     static readonly Shard = {
         key: (id: string) => `CounterDo/${id}`,
@@ -119,8 +123,6 @@ export abstract class CounterDo implements DurableObject {
         key: (user_id: number) => `metadata/${user_id}`,
         get: async (state: DurableObjectState, user_id: number) => await state.storage.get(CounterDo.metadata.key(user_id));
     };
-
-    abstract fetch(request: Request): Promise<Response>;
 }
 ```
 
@@ -141,31 +143,20 @@ durable CounterDo {
     }
 }
 
-kv Namespace {
-    durableObjectRegistry(id: string) -> bool {
-        "dos/{id}"
-    }
-}
-
 model Counter for CounterDo {
     kv CounterDo::count() {
         count
     }
-
-    kv Namespace::durableObjectRegistry(doId) {
-        isRegistered
-    }
 }
 ```
 
-The `Counter` Model is backed by the `CounterDo` Durable Object, which means that each instance of `Counter` is associated with a specific instance of `CounterDo`. The `Counter` Model can access the DO's storage via the `count` template, and can also access the `CounterDo::doId` field to look itself up in the `durableObjectRegistry` KV namespace.
+The `Counter` Model is backed by the `CounterDo` Durable Object, which means that each instance of `Counter` is associated with a specific instance of `CounterDo`. The `Counter` Model can access the DO's storage via the `count` template.
 
-Semantic analysis will ensure that no field on `Counter` conflicts with a shard field on `CounterDo`.
-
+In order to maintain the invariant that a Model backed by a DO must be associated with a specific DO instance, the `Self` interface of the Model will contain all shard fields of the DO.
 
 ```ts
 interface Self {
-    doId: string; // from CounterDo::doId
+    $doId: string; // from CounterDo::doId
     // ...other fields
 }
 ```
@@ -271,29 +262,35 @@ Person.foo(...) -> Request GET /Person/foo
 An instance method `bar` on some Model `Person` would be routed like so:
 
 ```
-person.bar(...) -> Request GET /Person/123/bar
+person.bar(...) -> Request GET /Person/:personId/bar
     -> Worker -> Router -> Match Route -> Validate Body -> Hydrate Model -> Dispatch
             -> person.bar(...)
 ```
 
-A Model that is backed by a Durable Object will have one extra step in routing: forward the request from the Worker to the DO instance. This will occur for both static and instance methods, meaning every method of a DO-backed Model will execute inside of the DO instance, giving it access to the DO's storage and SQLite database, and ensuring strong consistency for all operations.
+The key feature of a static method is that it does not require hydration of a Model instance, and therefore does not require access to a DO instance. Static methods will not be executed inside of a DO instance, using the Worker's compute context instead.
 
-For example, if `Person` is backed by a DO, the routing for a static method `foo` would look like this:
+Instance methods on the other hand require hydration of a Model instance, which in turn requires access to a DO instance (since the Model is backed by a DO). Therefore, instance methods will be executed inside of a DO instance, using the DO's compute context instead of the Worker's.
+
+For example, if `Person` is backed by a DO, the routing for an instance method `bar` would look like this:
 
 ```
-Person.foo(...) -> Request GET /Person/{id}/foo
-    -> Worker -> Router -> Match Route -> Forward to DO Instance
-        -> Router -> Match Route -> Validate Body -> Dispatch
-            -> Person.foo(...)
+person.bar(...) -> Request GET /Person/:doId/:personId/bar
+    -> Worker -> Router -> Match Route -> Validate Body -> Hydrate stub -> Dispatch to stub
+        -> Match Method -> Hydrate Model -> Dispatch
+            -> person.bar(...)
 ```
 
-In order for this forwarding to work, all DOs must implement the `fetch` method, and subsequently call the Cloesce Router within that method to handle incoming requests forwarded from the Worker. Additionally, because methods of a DO-backed Model are intended to run within a DO instance, every API method will receive an injected `state` parameter, which is the `DurableObjectState` of the DO instance. This allows API methods to access the DO's storage and SQLite database.
 
 ```ts
 // .cloesce/backend.ts
 export abstract class PersonDo implements DurableObject {
     protected app: CloesceApp;
-    constructor(public state: DurableObjectState, private env: Env) {}
+    protected id: string;
+
+    constructor(public state: DurableObjectState, private env: Env) {
+        const [, id] = state.id.toString().split("/");
+        this.id = id;
+    }
 
     static readonly Shard = {
          key: (id: string) => `PersonDo/${id}`,
@@ -307,7 +304,9 @@ export abstract class PersonDo implements DurableObject {
         // ... initialize the cloesce app
     }
 
-    abstract fetch(request: Request): Promise<Response>;
+    private async route(model: string, method: string, payload: any): Promise<Response> {
+        return await this.app.handle(model, method, payload);
+    }
 }
 
 export namespace Person {
@@ -331,10 +330,6 @@ export class PersonDo extends clo.PersonDo {
     constructor(state, env) {
         super(state, env);
         this.app = super.cloesce({ Person });
-    }
-
-    async fetch(request: Request): Promise<Response> {
-        return await this.app.run(request);
     }
 }
 ```
