@@ -451,8 +451,8 @@ In order to support DO execution contexts, we will need to augment the flow to i
 4. Router validates the request parameters against `Leaderboard::topScores`
 5. Router forwards to `LeaderboardDo(tenantId)` instance
 6. The DO instance invokes its own Cloesce Router with the same request
-7. Router matches the request to `LeaderboardDo::topScores`
-8. Router dispatches the request to the `LeaderboardDo::topScores` method implementation
+7. Router matches the request to `Leaderboard::topScores`
+8. Router dispatches the request to the `Leaderboard::topScores` method implementation
 
 Note that in this sequence, the DO's Cloesce Router will skip the parameter validation step, since the Worker will have already validated the parameters before forwarding the request to the DO. The DO's Router will only be responsible for matching the request to the correct API method and dispatching it.
 
