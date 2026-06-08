@@ -406,10 +406,10 @@ On the backend, a class will be generated for each DO:
 ```ts
 export abstract class LeaderboardDo implements DurableObject {
     static readonly Shard = {
-        template: (tenantId: int) => `LeaderboardDo/${tenantId}`,
-        id: (tenantId: int, env: Env) => env.LeaderboardDo.idFromName(LeaderboardDo.Shard.template(tenantId)),
-        instance: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) 
-            => namespace.get(LeaderboardDo.Shard.id(tenantId, env))
+        template: (tenantId: number) => `LeaderboardDo/${tenantId}`,
+        id: (tenantId: number, namespace: DurableObjectNamespace<LeaderboardDo>) => namespace.idFromName(LeaderboardDo.Shard.template(tenantId)),
+        instance: (tenantId: number, namespace: DurableObjectNamespace<LeaderboardDo>) =>
+            namespace.get(LeaderboardDo.Shard.id(tenantId, namespace)),
     }
 
     static readonly topEntryCache = {
