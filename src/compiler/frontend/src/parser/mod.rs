@@ -100,6 +100,7 @@ fn parser<'tokens, 'src: 'tokens>()
         env::d1_binding_block().map_spanned(|b| b),
         env::kv_binding_block().map_spanned(|b| b),
         env::r2_binding_block().map_spanned(|b| b),
+        env::durable_binding_block().map_spanned(|b| b),
         env::vars_block().map_spanned(|b| b),
         api::api_block().map_spanned(|b| b),
         poo_block().map_spanned(|b| b),

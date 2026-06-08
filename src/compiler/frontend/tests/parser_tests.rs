@@ -144,6 +144,95 @@ fn top_level_bindings() {
 }
 
 #[test]
+fn durable_binding_block() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        durable LeaderboardDo {
+            shard {
+                [gt 0]
+                tenantId: int
+                region: string
+            }
+
+            topEntryCache() -> json {
+                "top"
+            }
+
+            topEntryCacheWithDate(date: string) -> json {
+                "top/{date}"
+            }
+        }
+
+        durable GlobalDo {
+            config() -> json {
+                "config"
+            }
+        }
+        "#,
+    );
+
+    let durables = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.inner {
+            AstBlockKind::DurableBinding(b) => Some(b),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(durables.len(), 2);
+
+    // Sharded DO
+    let leaderboard = durables
+        .iter()
+        .find(|b| b.symbol.name == "LeaderboardDo")
+        .expect("LeaderboardDo to be present");
+
+    assert_eq!(leaderboard.shard_blocks.len(), 1);
+    let shard_fields = &leaderboard.shard_blocks[0].inner.fields;
+    assert_eq!(shard_fields.len(), 2);
+    let tenant = &shard_fields[0];
+    assert_eq!(tenant.name, "tenantId");
+    assert_eq!(tenant.cidl_type, CidlType::Int);
+    assert!(
+        tenant.tags.iter().any(|t| matches!(
+            &t.inner,
+            Tag::Validator {
+                name: Keyword::GreaterThan,
+                argument: ArgumentLiteral::Int("0"),
+            }
+        )),
+        "tenantId should carry a [gt 0] validator tag"
+    );
+    let region = &shard_fields[1];
+    assert_eq!(region.name, "region");
+    assert_eq!(region.cidl_type, CidlType::String);
+
+    assert_eq!(leaderboard.templates.len(), 2);
+    let cache = &leaderboard.templates[0].inner;
+    assert_eq!(cache.symbol.name, "topEntryCache");
+    assert_eq!(cache.symbol.cidl_type, CidlType::Json);
+    assert_eq!(cache.key_format, "top");
+    assert!(cache.params.is_empty());
+
+    let cache_with_date = &leaderboard.templates[1].inner;
+    assert_eq!(cache_with_date.symbol.name, "topEntryCacheWithDate");
+    assert_eq!(cache_with_date.key_format, "top/{date}");
+    assert_eq!(cache_with_date.params.len(), 1);
+    assert_eq!(cache_with_date.params[0].name, "date");
+    assert_eq!(cache_with_date.params[0].cidl_type, CidlType::String);
+
+    // Global DO (no shard block)
+    let global = durables
+        .iter()
+        .find(|b| b.symbol.name == "GlobalDo")
+        .expect("GlobalDo to be present");
+    assert!(global.shard_blocks.is_empty());
+    assert_eq!(global.templates.len(), 1);
+    assert_eq!(global.templates[0].inner.symbol.name, "config");
+}
+
+#[test]
 fn poo_block() {
     // Act
     let ast = lex_and_ast(

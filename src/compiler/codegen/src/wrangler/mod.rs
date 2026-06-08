@@ -1,3 +1,7 @@
+// TODO: This module sucks. Can't think of a pattern here that would
+// both avoid the variant-specific code in generate() and not introduce
+// even more boilerplate, so I'm just doing no pattern at all.
+
 use std::path::Path;
 
 use idl::{CidlType, CloesceIdl, D1Database, KVNamespace, WranglerSpec};
@@ -167,6 +171,40 @@ impl WranglerGenerator {
                     }
                 }
 
+                if let Some(durable_objects) = &spec.durable_objects
+                    && !durable_objects.bindings.is_empty()
+                {
+                    let dos = target
+                        .entry("durable_objects".to_string())
+                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
+                        .as_object_mut()
+                        .expect("durable_objects must be an object");
+
+                    let arr = dos
+                        .entry("bindings".to_string())
+                        .or_insert_with(|| JsonValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("durable_objects.bindings must be an array");
+
+                    for binding in &durable_objects.bindings {
+                        let name = binding.name.as_deref();
+
+                        if let Some(JsonValue::Object(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("name").and_then(|b| b.as_str()) == name)
+                        {
+                            if let Some(class_name) = &binding.class_name {
+                                existing.insert(
+                                    "class_name".into(),
+                                    serde_json::to_value(class_name).expect("JSON to serialize"),
+                                );
+                            }
+                        } else {
+                            arr.push(serde_json::to_value(binding).unwrap());
+                        }
+                    }
+                }
+
                 if !spec.vars.is_empty() {
                     target.insert(
                         "vars".into(),
@@ -280,6 +318,40 @@ impl WranglerGenerator {
                             }
                         } else {
                             arr.push(TomlValue::try_from(bucket).unwrap());
+                        }
+                    }
+                }
+
+                if let Some(durable_objects) = &spec.durable_objects
+                    && !durable_objects.bindings.is_empty()
+                {
+                    let dos = target
+                        .entry("durable_objects")
+                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
+                        .as_table_mut()
+                        .expect("durable_objects must be a table");
+
+                    let arr = dos
+                        .entry("bindings")
+                        .or_insert_with(|| TomlValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("durable_objects.bindings must be an array");
+
+                    for binding in &durable_objects.bindings {
+                        let name = binding.name.as_deref();
+
+                        if let Some(TomlValue::Table(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("name").and_then(|b| b.as_str()) == name)
+                        {
+                            if let Some(class_name) = &binding.class_name {
+                                existing.insert(
+                                    "class_name".to_string(),
+                                    TomlValue::String(class_name.clone()),
+                                );
+                            }
+                        } else {
+                            arr.push(TomlValue::try_from(binding).unwrap());
                         }
                     }
                 }
@@ -523,6 +595,32 @@ impl WranglerDefault {
                         "R2 Bucket with binding {} was missing, added a default. See https://developers.cloudflare.com/r2/get-started/",
                         name
                     );
+                }
+            }
+        }
+
+        for durable_binding in &idl.wrangler_env.durable_bindings {
+            let name = durable_binding.name;
+            let durable_objects = spec
+                .durable_objects
+                .get_or_insert_with(idl::DurableObjects::default);
+
+            let existing = durable_objects
+                .bindings
+                .iter_mut()
+                .find(|b| b.name.as_deref() == Some(name));
+
+            match existing {
+                Some(binding) => {
+                    if binding.class_name.is_none() {
+                        binding.class_name = Some(name.to_string());
+                    }
+                }
+                None => {
+                    durable_objects.bindings.push(idl::DurableObjectBinding {
+                        name: Some(name.to_string()),
+                        class_name: Some(name.to_string()),
+                    });
                 }
             }
         }

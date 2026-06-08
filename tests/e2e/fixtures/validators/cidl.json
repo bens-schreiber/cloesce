@@ -37,6 +37,7 @@
       }
     ],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {

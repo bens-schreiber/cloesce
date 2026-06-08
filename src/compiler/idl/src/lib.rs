@@ -482,6 +482,17 @@ pub struct Binding<'src> {
     pub templates: Vec<BindingTemplate<'src>>,
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct DurableBinding<'src> {
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub shard_fields: Vec<ValidatedField<'src>>,
+
+    #[serde(borrow)]
+    pub templates: Vec<BindingTemplate<'src>>,
+}
+
 #[derive(Deserialize, Serialize, Default)]
 pub struct WranglerEnv<'src> {
     /// Contains each d1 binding name
@@ -493,6 +504,9 @@ pub struct WranglerEnv<'src> {
 
     #[serde(borrow)]
     pub r2_bindings: Vec<Binding<'src>>,
+
+    #[serde(borrow, default)]
+    pub durable_bindings: Vec<DurableBinding<'src>>,
 
     #[serde(borrow)]
     pub vars: Vec<Field<'src>>,
@@ -617,6 +631,18 @@ pub struct R2Bucket {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct DurableObjectBinding {
+    pub name: Option<String>,
+    pub class_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct DurableObjects {
+    #[serde(default)]
+    pub bindings: Vec<DurableObjectBinding>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
     pub compatibility_date: Option<String>,
@@ -630,6 +656,9 @@ pub struct WranglerSpec {
 
     #[serde(default)]
     pub r2_buckets: Vec<R2Bucket>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub durable_objects: Option<DurableObjects>,
 
     #[serde(default)]
     pub vars: HashMap<String, Value>,

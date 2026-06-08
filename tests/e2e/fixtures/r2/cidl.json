@@ -53,6 +53,7 @@
         ]
       }
     ],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {

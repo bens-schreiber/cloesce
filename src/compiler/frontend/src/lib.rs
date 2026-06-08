@@ -70,6 +70,8 @@ contextual_keywords! {
     D1 => "d1",
     R2 => "r2",
     Kv => "kv",
+    Durable => "durable",
+    Shard => "shard",
 
     // CRUD / SQL method
     Get => "get",
@@ -492,6 +494,21 @@ pub struct R2BindingBlock<'src> {
     pub templates: Vec<Spd<R2BindingTemplate<'src>>>,
 }
 
+pub struct DurableShardBlock<'src> {
+    pub fields: Vec<Symbol<'src>>,
+}
+
+pub struct DurableBindingBlock<'src> {
+    /// The binding name, e.g. `LeaderboardDo`.
+    pub symbol: Symbol<'src>,
+
+    pub shard_blocks: Vec<Spd<DurableShardBlock<'src>>>,
+
+    /// Identical in shape to [KvBindingTemplate] since DO storage
+    /// mirrors KV semantics.
+    pub templates: Vec<Spd<KvBindingTemplate<'src>>>,
+}
+
 pub struct InjectBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
 }
@@ -505,6 +522,7 @@ pub enum AstBlockKind<'src> {
     D1Binding(D1BindingBlock<'src>),
     KvBinding(KvBindingBlock<'src>),
     R2Binding(R2BindingBlock<'src>),
+    DurableBinding(DurableBindingBlock<'src>),
     Vars(VarsBlock<'src>),
     Inject(InjectBlock<'src>),
 }

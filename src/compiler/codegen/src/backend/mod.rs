@@ -1,5 +1,7 @@
 use askama::Template;
-use idl::{CidlType, CloesceIdl, IncludeTree, Model, ValidatedField, model_bindings};
+use idl::{
+    CidlType, CloesceIdl, DurableBinding, IncludeTree, Model, ValidatedField, model_bindings,
+};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
@@ -27,6 +29,15 @@ impl<'src> BackendTemplate<'src> {
     fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {
         let names = params.iter().map(|p| p.name.as_ref());
         self.mapper.interpolate_format(format, names)
+    }
+
+    fn shard_template(&self, binding: &DurableBinding<'_>) -> String {
+        let mut format = binding.name.to_string();
+        for field in &binding.shard_fields {
+            format.push_str(&format!("/{{{}}}", field.name));
+        }
+        let names = binding.shard_fields.iter().map(|f| f.name.as_ref());
+        self.mapper.interpolate_format(&format, names)
     }
 
     fn model_bindings(

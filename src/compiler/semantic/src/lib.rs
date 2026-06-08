@@ -21,8 +21,8 @@
 
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock,
-    DataSourceBlock, InjectBlock, KvBindingBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock,
-    Spd, SpdSlice, Symbol, Tag, VarsBlock,
+    DataSourceBlock, DurableBindingBlock, InjectBlock, KvBindingBlock, ModelBlock,
+    PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, VarsBlock,
 };
 use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
@@ -176,6 +176,10 @@ enum LocalSymbolKind<'src> {
         template: &'src str,
         name: &'src str,
     },
+    ShardField {
+        binding: &'src str,
+        name: &'src str,
+    },
     ModelField {
         model: &'src str,
         name: &'src str,
@@ -212,6 +216,7 @@ struct SymbolTable<'src, 'p> {
     d1_bindings: Vec<&'p D1BindingBlock<'src>>,
     kv_bindings: BTreeMap<&'src str, &'p KvBindingBlock<'src>>,
     r2_bindings: BTreeMap<&'src str, &'p R2BindingBlock<'src>>,
+    durable_bindings: BTreeMap<&'src str, &'p DurableBindingBlock<'src>>,
     vars_blocks: Vec<&'p VarsBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
@@ -384,6 +389,45 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::R2Binding(block) => {
                     if insert_global(sink, &block.symbol) {
                         st.r2_bindings.insert(block.symbol.name, block);
+
+                        for field in block.templates.inners() {
+                            insert_local(
+                                sink,
+                                &field.symbol,
+                                LocalSymbolKind::BindingTemplate {
+                                    binding: block.symbol.name,
+                                    name: field.symbol.name,
+                                },
+                            );
+
+                            for param in &field.params {
+                                insert_local(
+                                    sink,
+                                    param,
+                                    LocalSymbolKind::BindingTemplateParam {
+                                        binding: block.symbol.name,
+                                        template: field.symbol.name,
+                                        name: param.name,
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
+                AstBlockKind::DurableBinding(block) => {
+                    if insert_global(sink, &block.symbol) {
+                        st.durable_bindings.insert(block.symbol.name, block);
+
+                        for field in block.shard_blocks.inners().flat_map(|s| &s.fields) {
+                            insert_local(
+                                sink,
+                                field,
+                                LocalSymbolKind::ShardField {
+                                    binding: block.symbol.name,
+                                    name: field.name,
+                                },
+                            );
+                        }
 
                         for field in block.templates.inners() {
                             insert_local(

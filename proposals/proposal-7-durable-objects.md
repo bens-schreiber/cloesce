@@ -8,6 +8,7 @@
 ---
 
 ## Summary
+
 This proposal brings Durable Objects into Cloesce as first-class citizens. DOs open up a whole class of use cases that D1 just can't reach on its own: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
 
 The gist: a new durable binding in the schema, the ability to back a Model with a DO, injecting the DO instance into API methods and utilizing its context, automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
@@ -29,7 +30,6 @@ Durable Objects are easily the most powerful product on the Cloudflare Workers p
 - Back a Model against a Durable Object
 - Generate migrations for Durable Object backed Models
 - Execute API methods in a Durable Object
-
 
 ### Non-Goals
 
@@ -74,12 +74,11 @@ where the order of the shard values is determined by the order of the shard fiel
 
 #### Storage Templates
 
-Just like with KV and R2 binding templates, a Durable Object binding can declare some storage templates to be fetched from the Durable Object's storage. 
+Just like with KV and R2 binding templates, a Durable Object binding can declare some storage templates to be fetched from the Durable Object's storage.
 
 These are declared as methods on the Durable Object binding, and they can be used in any Model **backed by that Durable Object** (Models with different backings CANNOT use these storage templates).
 
 Storage templates follow the same syntax as KV templates, even using the same `kv` keyword. Templates will **not** be able to use `shard` fields, because there is no real use case (storage is already inside that specific DO).
-
 
 #### Shard Field Validators
 
@@ -188,11 +187,11 @@ A shard field declared on a DO is directly placed on any Model that is backed by
 
 ```json
 {
-    "id": 123,
-    "tenantId": 1,
-    "entries": [
-        // ...
-    ]
+  "id": 123,
+  "tenantId": 1,
+  "entries": [
+    // ...
+  ]
 }
 ```
 
@@ -245,7 +244,7 @@ api Leaderboard {
     }
 
     // `postScore` takes the `self` keyword, meaning it by default will have an
-    // instantiated `LeaderboardDo` from `Leaderboard::shard` 
+    // instantiated `LeaderboardDo` from `Leaderboard::shard`
     //
     // The method is instantiated, executes IN a DO
     post postScore(self) {}
@@ -322,16 +321,14 @@ An example migration:
 ```ts
 // <binding>/<timestamp>_<migration name>.ts
 async function up(db) {
-    await db.prepare(
-        `ALTER TABLE users ADD COLUMN age INTEGER ...`
-    );
+  await db.prepare(`ALTER TABLE users ADD COLUMN age INTEGER ...`);
 }
 export default {
-    name: "migrationName",
-    timestamp: 1234567890,
-    id: "migrationName_timestamp",
-    up
-}
+  name: "migrationName",
+  timestamp: 1234567890,
+  id: "migrationName_timestamp",
+  up,
+};
 ```
 
 Cloesce will not provide a runner for migrations (at least, not in this initial proposal), leaving it to the developer to decide how and when to run migrations on their DO instances.
@@ -375,7 +372,7 @@ Implementation can be broken into several phases:
 
 1. Durable Object Bindings
 2. API Method Execution in Durable Objects
-3. Backing Models with Durable Objects 
+3. Backing Models with Durable Objects
 4. Migrations
 5. Instantiated API Methods in Durable Objects
 
@@ -384,9 +381,11 @@ Implementation can be broken into several phases:
 This phase will focus on adding the Durable Object binding syntax to the schema, and generating the corresponding Wrangler configuration and backend class for each Durable Object binding.
 
 **Generated Wrangler Config**:
+
 - For each Durable Object binding, a Wrangler configuration will be generated with a `durable_objects` entry for that DO (JSON + TOML support)
 
 **Backend Class**:
+
 - Generate a TypeScript backend class for each DO binding
 - Add static properties to access storage templates (key retrieval and value retrieval)
 - Add a static `Shard` property with accessors for the template, DO ID, and DO instance for the DO's shard fields.
@@ -405,23 +404,24 @@ On the backend, a class will be generated for each DO:
 
 ```ts
 export abstract class LeaderboardDo implements DurableObject {
-    static readonly Shard = {
-        template: (tenantId: int) => `LeaderboardDo/${tenantId}`,
-        id: (tenantId: int, env: Env) => env.LeaderboardDo.idFromName(LeaderboardDo.Shard.template(tenantId)),
-        instance: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) 
-            => namespace.get(LeaderboardDo.Shard.id(tenantId, env))
-    }
+  static readonly Shard = {
+    template: (tenantId: int) => `LeaderboardDo/${tenantId}`,
+    id: (tenantId: int, env: Env) =>
+      env.LeaderboardDo.idFromName(LeaderboardDo.Shard.template(tenantId)),
+    instance: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) =>
+      namespace.get(LeaderboardDo.Shard.id(tenantId, env)),
+  };
 
-    static readonly topEntryCache = {
-        template: () => "top",
-        value: (storage: DurableObjectStorage) => storage.get("top")
-    }
+  static readonly topEntryCache = {
+    template: () => "top",
+    value: (storage: DurableObjectStorage) => storage.get("top"),
+  };
 
-    // or if some arguments were needed:
-    static readonly topEntryCacheWithDate = {
-        template: (date: string) => `top/${date}`,
-        value: (storage: DurableObjectStorage, date: string) => storage.get(`top/${date}`)
-    }
+  // or if some arguments were needed:
+  static readonly topEntryCacheWithDate = {
+    template: (date: string) => `top/${date}`,
+    value: (storage: DurableObjectStorage, date: string) => storage.get(`top/${date}`),
+  };
 }
 ```
 
@@ -434,6 +434,7 @@ This phase will add the syntax for executing API methods in the context of a DO,
 In order for an API method to be executed in a DO, it must be forwarded to that DO instance from a Worker.
 
 The lifetime of a request for a static invocation from the Worker through the Cloesce Router can be modeled by these states:
+
 1. Client sends request to Worker (GET /api/Person/speak)
 2. Worker invokes the Cloesce Router
 3. Router matches the request to `Person::speak`
@@ -463,27 +464,27 @@ An implementation for the `LeaderboardDo` class would look like this:
 ```ts
 // main.ts
 const Leaderboard = clo.Leaderboard.impl({
-    // types can be omitted but are included here for clarity
-    async topScores(tenantId: int, env: { LeaderboardDo: clo.LeaderboardDo }) {
-        // Since there is an instance of `LeaderboardDo`, we must be inside of the DO's execution context,
-        // and can access the DO's storage templates and shard fields directly.
-    }
-})
+  // types can be omitted but are included here for clarity
+  async topScores(tenantId: int, env: { LeaderboardDo: clo.LeaderboardDo }) {
+    // Since there is an instance of `LeaderboardDo`, we must be inside of the DO's execution context,
+    // and can access the DO's storage templates and shard fields directly.
+  },
+});
 
 export class LeaderboardDo extends clo.LeaderboardDo {
-    constructor (state: DurableObjectState, env: clo.Env) {
-        super(state, env);
+  constructor(state: DurableObjectState, env: clo.Env) {
+    super(state, env);
 
-        state.blockConcurrencyWhile(async () => {
-            this.app = await super.cloesce(env);
-            app.register(Leaderboard);
-        });
-    }
+    state.blockConcurrencyWhile(async () => {
+      this.app = await super.cloesce(env);
+      app.register(Leaderboard);
+    });
+  }
 
-    async fetch(request: Request) {
-        // Developer can do any pre/post-processing here
-        return await this.app.run(request)
-    }
+  async fetch(request: Request) {
+    // Developer can do any pre/post-processing here
+    return await this.app.run(request);
+  }
 }
 ```
 

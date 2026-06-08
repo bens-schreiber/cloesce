@@ -141,6 +141,7 @@ export interface WranglerEnv {
   d1_bindings: string[];
   kv_bindings: unknown[];
   r2_bindings: unknown[];
+  durable_bindings: unknown[];
   vars: Field[];
 }
 

@@ -1,8 +1,8 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, D1BindingBlock, KvBindingBlock, KvBindingTemplate, R2BindingBlock,
-    R2BindingTemplate, Symbol, VarsBlock,
+    AstBlockKind, D1BindingBlock, DurableBindingBlock, DurableShardBlock, KvBindingBlock,
+    KvBindingTemplate, R2BindingBlock, R2BindingTemplate, Spd, Symbol, VarsBlock,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol, tags},
 };
@@ -47,25 +47,11 @@ pub fn vars_block<'tokens, 'src: 'tokens>()
         .map(|vars| AstBlockKind::Vars(VarsBlock { vars }))
 }
 
-/// Parses a top-level KV binding block of the form:
-///
-/// ```cloesce
-/// kv UserMetadata {
-///     // template for fetching a single metadata object by id
-///     meta(id: int) -> json {
-///         "metadata/{id}"
-///     }
-///     
-///     // template for fetching all metadata objects with a common prefix
-///     metas() -> paginated<json> {
-///         "metadata/"
-///     }
-/// }
-/// ```
-pub fn kv_binding_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // `[tag]* name(params) -> type { "format" }`
-    let template = tags()
+/// Parses a single storage template of the form `[tag]* name(params) -> type { "format" }`.
+fn kv_template<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<KvBindingTemplate<'src>>, Extra<'tokens, 'src>>
+{
+    tags()
         .then(symbol())
         .then(
             tagged_typed_symbol()
@@ -79,8 +65,8 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
             select! { Token::StringLit(value) => value }
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(|((((value_tags, sym), params), return_type), key_format)| {
-            KvBindingTemplate {
+        .map_spanned(
+            |((((value_tags, sym), params), return_type), key_format)| KvBindingTemplate {
                 symbol: Symbol {
                     cidl_type: return_type,
                     tags: value_tags,
@@ -88,13 +74,31 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
                 },
                 params,
                 key_format,
-            }
-        });
+            },
+        )
+}
 
+/// Parses a top-level KV binding block of the form:
+///
+/// ```cloesce
+/// kv UserMetadata {
+///     // template for fetching a single metadata object by id
+///     meta(id: int) -> json {
+///         "metadata/{id}"
+///     }
+///
+///     // template for fetching all metadata objects with a common prefix
+///     metas() -> paginated<json> {
+///         "metadata/"
+///     }
+/// }
+/// ```
+pub fn kv_binding_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     kw!(Kv)
         .ignore_then(symbol())
         .then(
-            template
+            kv_template()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -150,4 +154,49 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|(symbol, templates)| AstBlockKind::R2Binding(R2BindingBlock { symbol, templates }))
+}
+
+/// Parses a top-level Durable Object binding block of the form:
+///
+/// ```cloesce
+/// durable MyDurableObject {
+///     shard {
+///         shardField1: cidl_type
+///         shardField2: cidl_type
+///    }
+///
+///    storageTemplate1(params) -> returnType {
+///         "keyFormat"
+///    }
+/// }
+/// ```
+///
+/// Shard block is optional.
+pub fn durable_binding_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
+    let shard_block = kw!(Shard)
+        .ignore_then(
+            tagged_typed_symbol()
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map_spanned(|fields| DurableShardBlock { fields });
+
+    let body = shard_block
+        .repeated()
+        .collect::<Vec<_>>()
+        .then(kv_template().repeated().collect::<Vec<_>>())
+        .delimited_by(just(Token::LBrace), just(Token::RBrace));
+
+    kw!(Durable)
+        .ignore_then(symbol())
+        .then(body)
+        .map(|(symbol, (shard_blocks, templates))| {
+            AstBlockKind::DurableBinding(DurableBindingBlock {
+                symbol,
+                shard_blocks,
+                templates,
+            })
+        })
 }

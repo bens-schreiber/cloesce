@@ -1,0 +1,77 @@
+{
+  "hash": 0,
+  "wrangler_env": {
+    "d1_bindings": [],
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "durable_bindings": [
+      {
+        "name": "GlobalDo",
+        "shard_fields": [],
+        "templates": [
+          {
+            "field": {
+              "name": "config",
+              "cidl_type": {
+                "KvObject": "Json"
+              },
+              "validators": []
+            },
+            "params": [],
+            "key_format": "config"
+          }
+        ]
+      },
+      {
+        "name": "LeaderboardDo",
+        "shard_fields": [
+          {
+            "name": "tenantId",
+            "cidl_type": "Int",
+            "validators": [
+              {
+                "GreaterThan": {
+                  "Int": 0
+                }
+              }
+            ]
+          }
+        ],
+        "templates": [
+          {
+            "field": {
+              "name": "topEntryCache",
+              "cidl_type": {
+                "KvObject": "Json"
+              },
+              "validators": []
+            },
+            "params": [],
+            "key_format": "top"
+          },
+          {
+            "field": {
+              "name": "topEntryCacheWithDate",
+              "cidl_type": {
+                "KvObject": "Json"
+              },
+              "validators": []
+            },
+            "params": [
+              {
+                "name": "date",
+                "cidl_type": "String",
+                "validators": []
+              }
+            ],
+            "key_format": "top/{date}"
+          }
+        ]
+      }
+    ],
+    "vars": []
+  },
+  "models": {},
+  "poos": {},
+  "injects": []
+}

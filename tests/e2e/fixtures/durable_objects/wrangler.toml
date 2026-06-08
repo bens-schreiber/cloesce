@@ -1,0 +1,11 @@
+compatibility_date = "2025-10-02"
+main = "workers.ts"
+name = "cloesce"
+
+[[durable_objects.bindings]]
+class_name = "GlobalDo"
+name = "GlobalDo"
+
+[[durable_objects.bindings]]
+class_name = "LeaderboardDo"
+name = "LeaderboardDo"

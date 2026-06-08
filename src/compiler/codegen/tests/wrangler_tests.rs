@@ -155,6 +155,115 @@ fn generates_default_kv_wrangler_values() {
 }
 
 #[test]
+fn generates_default_durable_object_wrangler_values() {
+    // Arrange
+    let src = r#"
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+
+            topEntryCache() -> json {
+                "top"
+            }
+        }
+
+        durable GlobalDo {
+            config() -> json {
+                "config"
+            }
+        }
+    "#;
+    let idl = src_to_idl(src);
+
+    // Act
+    let specs = vec![
+        {
+            let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
+                .as_spec(None)
+                .unwrap();
+            WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
+            spec
+        },
+        {
+            let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                .as_spec(None)
+                .unwrap();
+            WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
+            spec
+        },
+    ];
+
+    // Assert
+    for spec in specs {
+        let durable_objects = spec
+            .durable_objects
+            .as_ref()
+            .expect("durable_objects should be populated");
+        assert_eq!(durable_objects.bindings.len(), 2);
+
+        let leaderboard = durable_objects
+            .bindings
+            .iter()
+            .find(|b| b.name.as_deref() == Some("LeaderboardDo"))
+            .expect("LeaderboardDo binding should exist");
+        assert_eq!(leaderboard.class_name.as_deref(), Some("LeaderboardDo"));
+
+        let global = durable_objects
+            .bindings
+            .iter()
+            .find(|b| b.name.as_deref() == Some("GlobalDo"))
+            .expect("GlobalDo binding should exist");
+        assert_eq!(global.class_name.as_deref(), Some("GlobalDo"));
+    }
+}
+
+#[test]
+fn durable_objects_serialize_to_correct_wrangler_format() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+        }
+    "#,
+    );
+
+    // Act: TOML
+    let mut toml_gen = WranglerGenerator::Toml(toml::from_str("").unwrap());
+    let mut toml_spec = toml_gen.as_spec(None).unwrap();
+    WranglerDefault::set_defaults(&mut toml_spec, &idl, "migrations");
+    let toml_out = toml_gen.generate(toml_spec, None);
+
+    // Act: JSON
+    let mut json_gen = WranglerGenerator::Json(serde_json::from_str("{}").unwrap());
+    let mut json_spec = json_gen.as_spec(None).unwrap();
+    WranglerDefault::set_defaults(&mut json_spec, &idl, "migrations");
+    let json_out = json_gen.generate(json_spec, None);
+
+    // Assert: TOML uses [[durable_objects.bindings]]
+    assert!(
+        toml_out.contains("[[durable_objects.bindings]]"),
+        "expected durable_objects.bindings table in TOML output:\n{toml_out}"
+    );
+    assert!(toml_out.contains("name = \"LeaderboardDo\""));
+    assert!(toml_out.contains("class_name = \"LeaderboardDo\""));
+
+    // Assert: JSON uses durable_objects.bindings array
+    let json_val: serde_json::Value = serde_json::from_str(&json_out).unwrap();
+    assert_eq!(
+        json_val["durable_objects"]["bindings"][0]["name"],
+        "LeaderboardDo"
+    );
+    assert_eq!(
+        json_val["durable_objects"]["bindings"][0]["class_name"],
+        "LeaderboardDo"
+    );
+}
+
+#[test]
 fn handles_d1_database_with_missing_values() {
     // Arrange
     let toml_with_incomplete_d1 = r#"

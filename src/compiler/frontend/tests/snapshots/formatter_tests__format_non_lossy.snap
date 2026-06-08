@@ -43,6 +43,27 @@ r2 MyR2 {
     }
 }
 
+durable LeaderboardDo {
+    shard {
+        [gt 0]
+        tenantId: int
+    }
+    
+    topEntryCache() -> json {
+        "top"
+    }
+    
+    topEntryCacheWithDate(date: string) -> json {
+        "top/{date}"
+    }
+}
+
+durable GlobalDo {
+    config() -> json {
+        "config"
+    }
+}
+
 vars {
     // Comment again
     MY_VAR: string // More comments
