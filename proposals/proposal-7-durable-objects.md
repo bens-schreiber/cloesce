@@ -476,7 +476,7 @@ export class LeaderboardDo extends clo.LeaderboardDo {
 
         state.blockConcurrencyWhile(async () => {
             this.app = await super.cloesce(env);
-            app.register(Leaderboard);
+            this.app.register(Leaderboard);
         });
     }
 
