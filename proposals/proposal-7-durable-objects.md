@@ -1,344 +1,319 @@
 # Proposal: Durable Objects
 
 - **Author(s):** Ben Schreiber
-- **Status:** Draft | Review | Accepted | Rejected | Implemented
+- **Status:** Draft | **Review** | Accepted | Rejected | Implemented
 - **Created:** 2026-04-30
 - **Last Updated:** 2026-06-03
 
 ---
 
-# Summary
+## Summary
+This proposal brings Durable Objects into Cloesce as first-class citizens. DOs open up a whole class of use cases that D1 just can't reach on its own: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
 
-This proposal brings [Durable Objects](https://developers.cloudflare.com/durable-objects/) into Cloesce as first-class citizens. DOs open up a whole class of use cases that D1 just can't reach on its own: per-object isolated SQLite databases, strongly consistent state, and real-time WebSocket connections.
-
-The gist: a new `durable` binding in the schema, the ability to back a Model with a DO (so the Model gets to use that instance's storage and SQLite database), automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
+The gist: a new durable binding in the schema, the ability to back a Model with a DO, injecting the DO instance into API methods and utilizing its context, automatic Worker-to-DO request forwarding for API methods, and generation for both Wrangler and SQL migrations.
 
 ---
 
-# Motivation
+## Motivation
 
 Durable Objects are easily the most powerful product on the Cloudflare Workers platform, but they are also the hardest to use correctly. Without framework support, a developer must manually wire up routing, state initialization, migrations, and the Worker-to-DO request handoff, all before writing any application logic. This proposal aims to eliminate that boilerplate by integrating Durable Objects as first-class citizens in Cloesce's schema and code generation.
 
-## The limits of D1
-
-Cloesce currently supports D1 as its relational backend. D1 works well for many applications, but it has a fundamental architectural constraint: it is a single, globally shared database capped at 10 GB. This makes it a poor fit for applications where data is naturally partitioned by tenant, user, session, or resource (cases where you want the database to scale horizontally rather than vertically).
-
-Durable Objects offer a different model entirely. Instead of one database, you get arbitrarily many. Each DO instance has its own isolated SQLite database, its own KV store, and its own compute context. A multi-tenant SaaS application, for example, can give each organization its own DO instance, with full data isolation and no shared contention.
-
-## Strong consistency
-
-D1 provides eventual consistency. A value must be updated atomically to ensure a valid state. Transactions do not exist.
-
-Durable Objects on the other hand are strongly consistent: all requests to a given DO instance are processed sequentially, in order, on a single thread. This makes it straightforward to implement operations that would otherwise require careful locking or conflict resolution, like leaderboards, collaborative editing state, rate limiters, and similar workloads.
-
-## Real-time communication
-
-Because a DO instance is a persistent, long-lived object (not a stateless function invocation), it can hold open WebSocket connections and act as a coordination point between multiple clients. This proposal will not cover WebSocket support in this initial iteration, but will lay the groundwork for a future proposal that adds first-class WebSocket support to DO-backed Models.
-
 ---
 
-# Goals and Non-Goals
+## Goals and Non-Goals
 
-## Goals
+### Goals
 
-- Define a Durable Object Binding
-  - Generate Wrangler configuration for DO bindings declared in the schema
+- Define Durable Object bindings
+- Generate a Wrangler Configuration for each Durable Object binding
+- Back a Model against a Durable Object
+- Generate migrations for Durable Object backed Models
+- Execute API methods in a Durable Object
 
-- Back a Model with a Durable Object
-  - Give a Model access to a Durable Object instance's storage and SQLite database
-  - Execute a Model's REST API methods in the context of a Durable Object instance
-  - Allow a Model to represent a SQLite table in a DO instance's database
-  - Generate SQLite migrations
 
-## Non-Goals
+### Non-Goals
 
-- Middleware for DO instance creation
 - WebSocket RPC generation
-- Cross-shard relationships between DO-backed Models
-- Cross-DO relationships between any Models (e.g. a Worker-backed Model using the KV of a DO instance)
 
 ---
 
-# Design
+## Design
 
-Five axioms underlie the design of this proposal:
+### Durable Object Bindings
 
-1. A Durable Object is not a Model.
-2. A Model can only be backed by one Durable Object, but a Durable Object can back multiple Models.
-3. Every shard of a Durable Object shares the exact same schema.
-4. Given a serialized Model backed by a Durable Object, a client should be able to transparently invoke API methods on the same DO instance.
-5. A Models relationships exist within each shard of a Durable Object, and cannot span across shards.
+In order to introduce Durable Objects to a Cloesce schema, you first need to define some Durable Object binding. This will be done via the `durable` keyword:
 
-## Durable Object Bindings
+```cloesce
+durable LeaderboardDo {
+    shard {
+        tenantId: int
+    }
+
+    kv topEntryCache() -> array<LeaderboardEntry> {
+        "top"
+    }
+}
+```
+
+#### Sharding
+
+Any number of shards (or instances) of a Durable Object can be created from some Durable Object binding. Cloesce requires the method of locating/creating a shard to be explicitly stated in the schema: "`LeaderboardDo` is sharded by its `tenantId`". Multiple shards can be used, and they can be of any non-object serializable type.
+
+If a binding is declared without a `shard` block, it is considered to be "global", meaning it has only a single instance and it is not sharded.
+
+Cloesce will take an opinionated approach to creating the seed for the Durable Object's ID, always following the form:
+
+```
+{BINDING_NAME}/{SHARD_VALUE_1}/{SHARD_VALUE_2}/.../{SHARD_VALUE_N}
+```
+
+where the order of the shard values is determined by the order of the shard fields in the schema.
 
 > [!NOTE]
-> Durable Object shard fields cannot be interpolated into KV templates
+> Cloesce will not provide a way to migrate from one set of shard fields to another.
 
-To declare a Durable Object binding, a new `durable` block will be added to the schema:
+#### Storage Templates
 
-```cloesce
-durable CounterDo {
-    shard {
-        id: string
-    }
+Just like with KV and R2 binding templates, a Durable Object binding can declare some storage templates to be fetched from the Durable Object's storage. 
 
-    count() -> int {
-        "count"
-    }
+These are declared as methods on the Durable Object binding, and they can be used in any Model **backed by that Durable Object** (Models with different backings CANNOT use these storage templates).
 
-    metadata(user_id: int) -> json {
-        "metadata/{user_id}"
-    }
-}
-```
+Storage templates follow the same syntax as KV templates, even using the same `kv` keyword. Templates will **not** be able to use `shard` fields, because there is no real use case (storage is already inside that specific DO).
 
-A Durable Object binding is similar to KV, where it can define its own key and value fields. These are stored within the DO's instance storage.
 
-Under the `shard` block, the DO can define a key structure for generating DO IDs. This allows a DO to be sharded by a specific key. Cloesce will generate a DO ID using fields from `shard`, which can specify any number of fields, or none at all (in which case the DO is global and not sharded).
+#### Shard Field Validators
 
-The pattern for seeding a DO ID will follow `BINDING` followed by the `/` delimited concatenation of all shard fields. For example, the previous `CounterDo` would generate a DO ID like `CounterDo/{id}`.
-
-```ts
-// GENERATED BACKEND TS CODE
-export abstract class CounterDo implements DurableObject {
-    protected id: string;
-
-    constructor(public state: DurableObjectState, private env: Env) {
-        const [, id] = state.id.toString().split("/");
-        this.id = id;
-    }
-
-    static readonly Shard = {
-        key: (id: string) => `CounterDo/${id}`,
-        id: (namespace: DurableObjectNamespace, id: string) => namespace.idFromName(CounterDo.Shard.key(id)),
-        get: (namespace: DurableObjectNamespace, id: string) => namespace.get(CounterDo.Shard.id(namespace, id)),
-    }
-
-    static readonly count = {
-        key: () => "count",
-        get: async (state: DurableObjectState) => await state.storage.get(CounterDo.count.key());
-    };
-
-    static readonly metadata = {
-        key: (user_id: number) => `metadata/${user_id}`,
-        get: async (state: DurableObjectState, user_id: number) => await state.storage.get(CounterDo.metadata.key(user_id));
-    };
-}
-```
-
-## Backing a Model with a Durable Object
-
-To "back" a Model with a Durable Object means that the Model exists within a DO, and has access to the storage and SQLite database of that particular DO shard. This also means that in order to hydrate an instance of the Model, we must obtain an instance of the DO.
-
-When a Model is backed by a DO, it has access to any fields and KV templates defined on the DO. For example:
+Shard fields can declare any number of validator tags:
 
 ```cloesce
-durable CounterDo {
+durable LeaderboardDo {
     shard {
-        doId: string
-    }
-
-    count() -> int {
-        "count"
-    }
-}
-
-model Counter for CounterDo {
-    kv CounterDo::count() {
-        count
+        [gt 0]
+        tenantId: int
     }
 }
 ```
 
-The `Counter` Model is backed by the `CounterDo` Durable Object, which means that each instance of `Counter` is associated with a specific instance of `CounterDo`. The `Counter` Model can access the DO's storage via the `count` template.
+These tags will be inherited by any Model that is backed by the Durable Object.
 
-In order to maintain the invariant that a Model backed by a DO must be associated with a specific DO instance, the `Self` interface of the Model will contain all shard fields of the DO.
+### Backing Models
 
-```ts
-interface Self {
-    $doId: string; // from CounterDo::doId
-    // ...other fields
-}
-```
+If a Model is "backed by" a Durable Object, it is capable of hydrating itself from that Durable Object's KV and SQLite storage.
 
-### KV
-
-As shown in the above example, a Model backed by a Durable Object can access that DO's storage via the `kv` template.
-
-Unlike D1, just because a Model is backed by a DO does not necessarily mean that it has to define some set of `primary` keys as a SQLite table.
-
-A Durable Object backed Model can use `route` fields just like a Worker backed Model:
+For example:
 
 ```cloesce
-durable CounterDo {
+durable LeaderboardDo {
     shard {
-        id: string
+        tenantId: int
     }
 
-    count(id: string) -> int {
-        "count/{id}"
+    kv topEntryCache() -> array<LeaderboardEntry> {
+        "top"
     }
 }
 
-model Counter for CounterDo {
-    route {
-        counterId: string
-        otherCounterId: string
-    }
-
-    kv CounterDo::count(counterId) {
-        count
-    }
-
-    nav Counter::otherCounterId(otherCounterId) {
-        otherCounter
+model Leaderboard for LeaderboardDo(shard) {
+    kv LeaderboardDo::topEntryCache {
+        top
     }
 }
 ```
 
-Here, the `Counter` Model has route fields `counterId` and `otherCounterId`, which must be provided to hydrate an instance of `Counter`. The `otherCounterId` field is used to navigate to another `Counter` instance.
+Here, `Leaderboard` is backed by `LeaderboardDo`, and it is able to use the `topEntryCache` storage template declared on `LeaderboardDo` as a field.
 
-It is assumed that `otherCounter` is inside the same shard as `Counter`, and it will be hydrated as such.
+In order to declare that a Model is backed by a Durable Object, the shard fields of that Durable Object must be bound to that Model. In the above case, `LeaderboardDo::tenantId` is bound to `Leaderboard::shard`. This means that whenever a `Leaderboard` instance is hydrated, it will use the value of `tenantId` from its shard to know which DO instance to hydrate from, aliased as `shard` in the Model.
 
-### SQLite
+#### SQLite Backing
 
-A Model backed by a Durable Object can also represent a SQLite table in the DO instance's database:
+A Model backed by a DO can also represent a table in that DO's SQLite storage, with the same patterns as D1 backing:
 
 ```cloesce
-durable BlogDo {
-    shard {
-        doId: string
-    }
-}
+// ...using the previous `LeaderboardDo` and `Leaderboard` declarations...
 
-model BlogPost for BlogDo {
+model LeaderboardEntry for LeaderboardDo(tenantId) {
     primary {
         id: int
     }
 
     column {
-        title: string
-        content: string
-        created_at: datetime
+        playerName: string
+        score: int
+    }
+}
+```
+
+Since `LeaderboardEntry` is backed by the same DO as `Leaderboard`, it can be hydrated with the same shard field, and thus have access to the same DO instance and its SQLite storage. `LeaderboardEntry` declares a primary key and some columns, so it will be able to use the generated SQLite access methods to interact with that table in the DO's SQLite database.
+
+#### Relationships between DO-Backed Models
+
+When a Model is backed by a DO and it has a relationship to another Model (via the `nav` keyword), that other Model must be backed by the same DO.
+
+Cloesce will then assume that the related Model exists in the same shard as the original Model, and will access that original Model's storage to hydrate the related Model. For example:
+
+```cloesce
+// ...using the previous `LeaderboardDo`
+
+model Leaderboard for LeaderboardDo(tenantId) {
+    primary {
+        id: int
     }
 
-    nav (BlogComment::blog_post_id) {
-        comments
+    nav LeaderboardEntry::leaderboardId {
+        entries
     }
 }
 
-model BlogComment for BlogDo {
+model LeaderboardEntry for LeaderboardDo(tenantId) {
     primary {
         id: int
     }
 
     column {
-        content: string
-        created_at: datetime
+        playerName: string
+        score: int
     }
 
-    foreign (BlogPost::id) {
-        blog_post_id
-    }
-}
-```
-
-In this schema, each Blog has its own `BlogDo` instance, which means each Blog has its own isolated SQLite database. The `BlogPost` and `BlogComment` Models are tables that exist within that database, and the relationship between them is defined by the `nav` and `foreign` fields as usual.
-
-Again, it is assumed that these relationships are all within the same shard.
-
-## API Methods
-
-When a client invokes an API method on a Model, the request is received by a Worker instance (via HTTP), which then invokes the Cloesce Router.
-
-For example, a static method `foo` on some Model `Person` would be routed like so:
-
-```
-Person.foo(...) -> Request GET /Person/foo
-    -> Worker -> Router -> Match Route -> Validate Body -> Dispatch
-            -> Person.foo(...)
-```
-
-An instance method `bar` on some Model `Person` would be routed like so:
-
-```
-person.bar(...) -> Request GET /Person/:personId/bar
-    -> Worker -> Router -> Match Route -> Validate Body -> Hydrate Model -> Dispatch
-            -> person.bar(...)
-```
-
-The key feature of a static method is that it does not require hydration of a Model instance, and therefore does not require access to a DO instance. Static methods will not be executed inside of a DO instance, using the Worker's compute context instead.
-
-Instance methods on the other hand require hydration of a Model instance, which in turn requires access to a DO instance (since the Model is backed by a DO). Therefore, instance methods will be executed inside of a DO instance, using the DO's compute context instead of the Worker's.
-
-For example, if `Person` is backed by a DO, the routing for an instance method `bar` would look like this:
-
-```
-person.bar(...) -> Request GET /Person/:doId/:personId/bar
-    -> Worker -> Router -> Match Route -> Validate Body -> Hydrate stub -> Dispatch to stub
-        -> Match Method -> Hydrate Model -> Dispatch
-            -> person.bar(...)
-```
-
-
-```ts
-// .cloesce/backend.ts
-export abstract class PersonDo implements DurableObject {
-    protected app: CloesceApp;
-    protected id: string;
-
-    constructor(public state: DurableObjectState, private env: Env) {
-        const [, id] = state.id.toString().split("/");
-        this.id = id;
-    }
-
-    static readonly Shard = {
-         key: (id: string) => `PersonDo/${id}`,
-         id: (namespace: DurableObjectNamespace, id: string) => namespace.idFromName(PersonDo.Shard.key(id)),
-         get: (namespace: DurableObjectNamespace, id: string) => namespace.get(PersonDo.Shard.id(namespace, id)),
-    }
-
-    protected cloesce({
-        Person:   // ...typed such that only PersonDo-backed Models can be registered here
-    }) {
-        // ... initialize the cloesce app
-    }
-
-    private async route(model: string, method: string, payload: any): Promise<Response> {
-        return await this.app.handle(model, method, payload);
-    }
-}
-
-export namespace Person {
-    export interface Self {
-        id: string; // from PersonDo::id
-        // ...other fields
-    }
-
-    export interface Api {
-        foo(env: { state: DurableObjectState }): ApiResult<void>
-        bar(self: Self, env: { state: DurableObjectState }): ApiResult<void>;
-    }
-}
-
-// main.ts
-const Person = clo.Person.impl({
-    // ...implementation of Person API methods
-});
-
-export class PersonDo extends clo.PersonDo {
-    constructor(state, env) {
-        super(state, env);
-        this.app = super.cloesce({ Person });
+    foreign Leaderboard::id {
+        leaderboardId
     }
 }
 ```
 
-## Migrations
+If two shards of `LeaderboardDo` exist with `tenantId` 1 and 2, and we hydrate a `Leaderboard` with `tenantId` 1, Cloesce will only find `LeaderboardEntry` instances that are in `tenantId` 1's shard, and it will not find any `LeaderboardEntry` instances that are in `tenantId` 2's shard.
+
+#### Inheriting Shard Fields
+
+A shard field declared on a DO is directly placed on any Model that is backed by that DO. For example, the `Leaderboard` Model in the above example would serialize to:
+
+```json
+{
+    "id": 123,
+    "tenantId": 1,
+    "entries": [
+        // ...
+    ]
+}
+```
+
+This allows Cloesce to fulfill the RPC contract of having all the information needed to route to the correct DO instance in the API method parameters, without requiring the API method to have any DO-specific parameters.
+
+All validators of the DO's shard fields will also be inherited by the Model.
+
+### APIs and Execution Context
+
+Cloesce currently executes all API methods within the Worker where the `CloesceApp` is invoked. However, DOs have their own execution context, and in order to interact with their storage, API methods need to be executed within that context.
+
+We will allow any API method of any Model to be executed in the context of a DO via `inject` blocks:
+
+```cloesce
+durable LeaderboardDo {
+    shard {
+        tenantId: int
+    }
+
+    kv topEntryCache() -> array<LeaderboardEntry> {
+        "top"
+    }
+}
+
+model Leaderboard for LeaderboardDo(shard) {
+    kv LeaderboardDo::topEntryCache {
+        top
+    }
+}
+
+api Leaderboard {
+    // `topScores` injects `LeaderboardDo` and instantiates it,
+    // thus `topScores` is executed INSIDE a DO
+    //
+    // static method, executes IN a DO
+    get topScores(tenantId: int) -> array<LeaderboardEntry> {
+        inject {
+            LeaderboardDo(tenantId)
+        }
+    }
+
+    // `allLeaderboards` injects LeaderboardDo WITHOUT instantiating it,
+    // meaning it just gets a DurableObjectNamespace<LeaderboardDo>.
+    //
+    // The method is static, executes IN a WORKER
+    get allLeaderboards() -> array<Leaderboard> {
+        inject {
+            LeaderboardDo
+        }
+    }
+
+    // `postScore` takes the `self` keyword, meaning it by default will have an
+    // instantiated `LeaderboardDo` from `Leaderboard::shard` 
+    //
+    // The method is instantiated, executes IN a DO
+    post postScore(self) {}
+}
+
+model HasNoBacking {}
+api HasNoBacking {
+
+    // Even though `HasNoBacking` is not backed by `LeaderboardDo`,
+    // it can still inject and thus be executed inside of `LeaderboardDo`
+    //
+    // Static method, executes IN a DO
+    get leaderboard(tenantId: int) {
+        inject {
+            LeaderboardDo(tenantId)
+        }
+    }
+}
+```
+
+In the above code, several different execution contexts are demonstrated.
+
+- `topScores` is a static method of `Leaderboard`, but it injects an instantiated `LeaderboardDo`, so it will be executed inside of a DO.
+
+- `allLeaderboards` is a static method of `Leaderboard`, and it injects the `LeaderboardDo` binding without instantiating it, so it will be executed in the Worker.
+
+- `postScore` is an instance method of `Leaderboard`, and since `Leaderboard` is backed by `LeaderboardDo`, it will have an instantiated `LeaderboardDo` injected by default, so it will be executed inside of a DO.
+
+- `leaderboard` is a static method of `HasNoBacking`, but it injects an instantiated `LeaderboardDo`, so it will be executed inside of a DO, even though `HasNoBacking` itself is not backed by that DO.
+
+#### Semantic Errors
+
+1. A method that injects a DO binding with shard fields must provide arguments for those shard fields of the correct type.
+2. Arguments provided for shard fields must exist as API method parameters
+3. Multiple DO instantiations in the same inject block are not allowed.
+4. An instantiated method backed by a DO cannot inject any DO, as it implicitly injects the DO it is backed by (rule 3).
+
+#### Inheriting Validators
+
+In the case:
+
+```cloesce
+durable LeaderboardDo {
+    shard {
+        [gt 0]
+        tenantId: int
+    }
+}
+
+// ...
+api Leaderboard {
+    get leaderboard(tenantId: int) {
+        inject {
+            LeaderboardDo(tenantId)
+        }
+    }
+}
+```
+
+`LeaderboardDo::tenantId` has a validator that states it must be greater than 0. Since `tenantId` is an argument to the injected `LeaderboardDo`, the same validator will be applied to the `tenantId` parameter of the `leaderboard` method.
+
+This allows validators to be declared once on shard fields, and then be inherited by any API method that injects that DO with those shard fields as arguments.
+
+### Migrations
 
 A Durable Object can be migrated in two ways: changes to the DO class's underlying Wrangler configuration, and changes to the DO's SQLite schema.
 
-### SQL
+#### SQL
 
 SQL migrations cannot be applied to a DO via a Wrangler CLI command (unlike a D1 database). This means that migrations for a DO cannot be purely SQL: they must transpile to HLL code that runs on the DO instance itself, which applies the necessary SQL changes to the DO's SQLite database.
 
@@ -361,7 +336,7 @@ export default {
 
 Cloesce will not provide a runner for migrations (at least, not in this initial proposal), leaving it to the developer to decide how and when to run migrations on their DO instances.
 
-### Wrangler
+#### Wrangler
 
 A Durable Object class can evolve in four ways:
 
@@ -391,3 +366,143 @@ renamed_classes = [
 tag = "v4"
 deleted_classes = ["OrgDO"]
 ```
+
+---
+
+## Implementation
+
+Implementation can be broken into several phases:
+
+1. Durable Object Bindings
+2. API Method Execution in Durable Objects
+3. Backing Models with Durable Objects 
+4. Migrations
+5. Instantiated API Methods in Durable Objects
+
+### Durable Object Bindings
+
+This phase will focus on adding the Durable Object binding syntax to the schema, and generating the corresponding Wrangler configuration and backend class for each Durable Object binding.
+
+**Generated Wrangler Config**:
+- For each Durable Object binding, a Wrangler configuration will be generated with a `durable_objects` entry for that DO (JSON + TOML support)
+
+**Backend Class**:
+- Generate a TypeScript backend class for each DO binding
+- Add static properties to access storage templates (key retrieval and value retrieval)
+- Add a static `Shard` property with accessors for the template, DO ID, and DO instance for the DO's shard fields.
+
+#### Generated Code
+
+Each DO will translate to a Wrangler Config such as:
+
+```toml
+[[durable_objects]]
+name = "LeaderboardDo"
+class_name = "LeaderboardDo"
+```
+
+On the backend, a class will be generated for each DO:
+
+```ts
+export abstract class LeaderboardDo implements DurableObject {
+    static readonly Shard = {
+        template: (tenantId: int) => `LeaderboardDo/${tenantId}`,
+        id: (tenantId: int, env: Env) => env.LeaderboardDo.idFromName(LeaderboardDo.Shard.template(tenantId)),
+        instance: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) 
+            => namespace.get(LeaderboardDo.Shard.id(tenantId, env))
+    }
+
+    static readonly topEntryCache = {
+        template: () => "top",
+        value: (storage: DurableObjectStorage) => storage.get("top")
+    }
+
+    // or if some arguments were needed:
+    static readonly topEntryCacheWithDate = {
+        template: (date: string) => `top/${date}`,
+        value: (storage: DurableObjectStorage, date: string) => storage.get(`top/${date}`)
+    }
+}
+```
+
+### API Method Execution in Durable Objects
+
+This phase will add the syntax for executing API methods in the context of a DO, via `inject` blocks (removing the old `inject` tag syntax). Then, it will add semantic analysis for the rules around DO injection and execution contexts. Finally, it will be responsible for ensuring the runtime is actually capable of executing API methods in a DO context, with the correct injected DO instances.
+
+#### Augmenting the Cloesce Router
+
+In order for an API method to be executed in a DO, it must be forwarded to that DO instance from a Worker.
+
+The lifetime of a request for a static invocation from the Worker through the Cloesce Router can be modeled by these states:
+1. Client sends request to Worker (GET /api/Person/speak)
+2. Worker invokes the Cloesce Router
+3. Router matches the request to `Person::speak`
+4. Router validates the request parameters against `Person::speak`
+5. Router dispatches the request to the `Person::speak` method implementation
+6. Return result response to client
+
+An instance Model method invocation would have the extra step of hydration before step 5, but the rest of the flow would be the same.
+
+In order to support DO execution contexts, we will need to augment the flow to include a DO forwarding step. The new flow would look like this:
+
+1. Client sends request to Worker (GET /api/Leaderboard/topScores?tenantId=1)
+2. Worker invokes the Cloesce Router
+3. Router matches the request to `LeaderboardDo::topScores`
+4. Router validates the request parameters against `LeaderboardDo::topScores`
+5. Router forwards to `LeaderboardDo(tenantId)` instance
+6. The DO instance invokes its own Cloesce Router with the same request
+7. Router matches the request to `LeaderboardDo::topScores`
+8. Router dispatches the request to the `LeaderboardDo::topScores` method implementation
+
+Note that in this sequence, the DO's Cloesce Router will skip the parameter validation step, since the Worker will have already validated the parameters before forwarding the request to the DO. The DO's Router will only be responsible for matching the request to the correct API method and dispatching it.
+
+If the API method is an instance method, the DO's Router will also be responsible for hydrating the instance before dispatching the request to the method implementation (discussed further in the next phase).
+
+An implementation for the `LeaderboardDo` class would look like this:
+
+```ts
+// main.ts
+const Leaderboard = clo.Leaderboard.impl({
+    // types can be omitted but are included here for clarity
+    async topScores(tenantId: int, env: { LeaderboardDo: clo.LeaderboardDo }) {
+        // Since there is an instance of `LeaderboardDo`, we must be inside of the DO's execution context,
+        // and can access the DO's storage templates and shard fields directly.
+    }
+})
+
+export class LeaderboardDo extends clo.LeaderboardDo {
+    constructor (state: DurableObjectState, env: clo.Env) {
+        super(state, env);
+
+        state.blockConcurrencyWhile(async () => {
+            this.app = await super.cloesce(env);
+            app.register(Leaderboard);
+        });
+    }
+
+    async fetch(request: Request) {
+        // Developer can do any pre/post-processing here
+        return await this.app.run(request)
+    }
+}
+```
+
+Each DO's backing class will be given a `cloesce(env)` method which creates a `CloesceApp` marked explicitly to **not forward requests**, such that we cannot accidentally create an infinite forwarding loop.
+
+### Backing Models with Durable Objects
+
+This phase will add the syntax for backing a Model with a Durable Object, with the ability to use any KV storage templates declared on that DO as fields in the Model. Additionally, it will add semantic analysis for the shard field inheritance, DO-specific storage template usage, and rules with `self` and `inject` in API methods of DO-backed Models.
+
+Code generation of Data Sources and CRUD methods, along with runtime support will be added in a later phase.
+
+### Migrations
+
+This phase will cover the generation of migration files for DO-backed Models, and the necessary runtime support for applying those migrations to the DO's SQLite database. Additionally, it will cover the generation of Wrangler configuration migrations for changes to DO bindings.
+
+### Instantiated API Methods in Durable Objects
+
+Finally, this phase will cover the ability for instance methods of DO-backed Models to be executed in the context of a DO, by adding:
+
+- `CRUD` Data Source method generation
+- Automatic injection of the DO instance for API methods of DO-backed Models, via the `self` keyword
+- Runtime support for hydrating DO-backed Model instances in the DO's execution context, with the correct injected DO instance and access to that DO's storage templates.
