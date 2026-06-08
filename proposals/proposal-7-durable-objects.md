@@ -447,8 +447,8 @@ In order to support DO execution contexts, we will need to augment the flow to i
 
 1. Client sends request to Worker (GET /api/Leaderboard/topScores?tenantId=1)
 2. Worker invokes the Cloesce Router
-3. Router matches the request to `LeaderboardDo::topScores`
-4. Router validates the request parameters against `LeaderboardDo::topScores`
+3. Router matches the request to `Leaderboard::topScores`
+4. Router validates the request parameters against `Leaderboard::topScores`
 5. Router forwards to `LeaderboardDo(tenantId)` instance
 6. The DO instance invokes its own Cloesce Router with the same request
 7. Router matches the request to `LeaderboardDo::topScores`
