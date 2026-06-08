@@ -464,7 +464,7 @@ An implementation for the `LeaderboardDo` class would look like this:
 // main.ts
 const Leaderboard = clo.Leaderboard.impl({
     // types can be omitted but are included here for clarity
-    async topScores(tenantId: int, env: { LeaderboardDo: clo.LeaderboardDo }) {
+    async topScores(tenantId: number, env: { LeaderboardDo: clo.LeaderboardDo }) {
         // Since there is an instance of `LeaderboardDo`, we must be inside of the DO's execution context,
         // and can access the DO's storage templates and shard fields directly.
     }
