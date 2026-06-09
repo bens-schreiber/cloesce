@@ -1,5 +1,5 @@
 {
-  "hash": 0,
+  "hash": 4801091108252205024,
   "wrangler_env": {
     "d1_bindings": [],
     "kv_bindings": [],
@@ -40,38 +40,159 @@
         "templates": [
           {
             "field": {
-              "name": "topEntryCache",
+              "name": "score",
               "cidl_type": {
-                "KvObject": "Json"
+                "KvObject": "Int"
               },
               "validators": []
             },
             "params": [],
-            "key_format": "top"
-          },
-          {
-            "field": {
-              "name": "topEntryCacheWithDate",
-              "cidl_type": {
-                "KvObject": "Json"
-              },
-              "validators": []
-            },
-            "params": [
-              {
-                "name": "date",
-                "cidl_type": "String",
-                "validators": []
-              }
-            ],
-            "key_format": "top/{date}"
+            "key_format": "score"
           }
         ]
       }
     ],
     "vars": []
   },
-  "models": {},
+  "models": {
+    "Global": {
+      "hash": 10767074612196930669,
+      "name": "Global",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [],
+      "database_binding": null,
+      "apis": [
+        {
+          "name": "setConfig",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "value",
+              "cidl_type": "Json",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "GlobalDo",
+            "shard_args": []
+          }
+        },
+        {
+          "name": "getConfig",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "Json",
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "GlobalDo",
+            "shard_args": []
+          }
+        }
+      ],
+      "data_sources": {},
+      "cruds": []
+    },
+    "Leaderboard": {
+      "hash": 17039160295291214661,
+      "name": "Leaderboard",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [],
+      "database_binding": null,
+      "apis": [
+        {
+          "name": "setScore",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "score",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        },
+        {
+          "name": "getScore",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": "Int",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        }
+      ],
+      "data_sources": {},
+      "cruds": []
+    }
+  },
   "poos": {},
   "injects": []
 }

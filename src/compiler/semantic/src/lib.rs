@@ -696,6 +696,10 @@ fn resolve_injects<'src, 'p>(
     let mut injected: Vec<&'src str> = Vec::new();
 
     for tag in &method.tags {
+        if matches!(tag.inner, Tag::Context { .. }) {
+            continue;
+        }
+
         let Tag::Inject { bindings } = &tag.inner else {
             sink.push(SemanticError::TagInvalidInContext {
                 tag,

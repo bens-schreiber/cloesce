@@ -16,8 +16,8 @@ export const PooAcceptYieldImpl = PooAcceptYield.impl({
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
+    const app = cloesce(env);
     app.register(PooAcceptYieldImpl);
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

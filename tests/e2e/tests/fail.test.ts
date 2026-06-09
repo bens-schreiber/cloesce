@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { FailModel, UnregisteredService } from "../fixtures/fail/client";
 import config from "../fixtures/fail/cloesce.jsonc" with { type: "jsonc" };
 
@@ -19,7 +19,7 @@ let saved: FailModel;
 describe("Cloesce Router fail cases", () => {
   it("setup: save a FailModel for instantiated-method tests", async () => {
     const res = await FailModel.$save({ id: 1, name: "alpha" });
-    expect(res.ok, withRes("save should succeed", res)).toBe(true);
+    expectHttpResult(res, "save should succeed");
     saved = res.data!;
   });
 
@@ -72,7 +72,7 @@ describe("Cloesce Router fail cases", () => {
 
     it("NotImplemented: service method whose impl was never registered -> 501", async () => {
       const res = await UnregisteredService.unregistered();
-      expect(res.ok, withRes("Expected 501", res)).toBe(false);
+      expect(res.ok, `Expected 501\n\n${JSON.stringify(res)}`).toBe(false);
       expect(res.status).toBe(501);
     });
   });
@@ -160,7 +160,7 @@ describe("Cloesce Router fail cases", () => {
         validBase.lteField,
         validBase.stepField,
       );
-      expect(res.ok, withRes("Expected success", res)).toBe(true);
+      expectHttpResult(res, "Expected success");
     });
 
     it("[gt 10] fails when value equals the bound -> 400", async () => {
@@ -239,7 +239,7 @@ describe("Cloesce Router fail cases", () => {
         valid.maxLenField,
         valid.regexField,
       );
-      expect(res.ok, withRes("Expected success", res)).toBe(true);
+      expectHttpResult(res, "Expected success");
     });
 
     it("[len 4] fails when length differs -> 400", async () => {

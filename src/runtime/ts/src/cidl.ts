@@ -73,6 +73,17 @@ export interface R2Field {
 
 export type MediaType = "Json" | "Octet";
 
+/**
+ * Durable Object context is implicitly injected to API methods under
+ * this key.
+ */
+export const CONTEXT_INJECT_KEY = "$ctx";
+
+export interface DurableTarget {
+  binding: string;
+  shard_args: string[];
+}
+
 export interface ApiMethod {
   name: string;
   is_static: boolean;
@@ -83,6 +94,7 @@ export interface ApiMethod {
   parameters: ValidatedField[];
   data_source: string | null;
   injected: string[];
+  durable_target?: DurableTarget | null;
 }
 
 export interface Model {

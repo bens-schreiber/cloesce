@@ -1495,3 +1495,123 @@ fn inject_tag_dedupes() {
         .unwrap();
     assert_eq!(api.injected, vec!["db"]);
 }
+
+#[test]
+fn context_tag_valid() {
+    // Arrange
+    let src = r#"
+        durable LeaderboardDo {
+            shard {
+                [gt 0]
+                tenantId: int
+            }
+        }
+
+        durable GlobalDo {}
+
+        model Leaderboard {}
+
+        api Leaderboard {
+            [context LeaderboardDo(tenantId)]
+            get topScores(tenantId: int) -> json
+
+            [context GlobalDo]
+            get config() -> json
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let apis = &result.models.get("Leaderboard").unwrap().apis;
+
+    let top = apis.iter().find(|a| a.name == "topScores").unwrap();
+    let target = top.durable_target.as_ref().expect("durable target");
+    assert_eq!(target.binding, "LeaderboardDo");
+    assert_eq!(target.shard_args, vec!["tenantId"]);
+    assert!(top.injected.contains(&idl::CONTEXT_INJECT_KEY));
+
+    // The shard field's `[gt 0]` validator is inherited onto the matching param.
+    let tenant = top
+        .parameters
+        .iter()
+        .find(|p| p.name == "tenantId")
+        .unwrap();
+    assert_eq!(tenant.validators.len(), 1);
+    assert!(matches!(
+        tenant.validators[0],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let config = apis.iter().find(|a| a.name == "config").unwrap();
+    let target = config.durable_target.as_ref().expect("durable target");
+    assert_eq!(target.binding, "GlobalDo");
+    assert!(target.shard_args.is_empty());
+}
+
+#[test]
+fn context_tag_errors() {
+    // Arrange
+    let src = r#"
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+        }
+
+        durable GlobalDo {}
+
+        model Leaderboard {}
+
+        api Leaderboard {
+            [context NotADo(tenantId)]          // unknown binding
+            get unknownBinding(tenantId: int) -> json
+
+            [context LeaderboardDo]             // missing shard arg
+            get argCount(tenantId: int) -> json
+
+            [context LeaderboardDo(nope)]       // arg is not a param
+            get unknownParam(tenantId: int) -> json
+
+            [context LeaderboardDo(tenantId)]   // param type mismatch (string vs int)
+            get typeMismatch(tenantId: string) -> json
+
+            [context LeaderboardDo(tenantId)]   // multiple context tags
+            [context GlobalDo]
+            get multiple(tenantId: int) -> json
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    let unresolved: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::UnresolvedSymbol { symbol } => Some(symbol.name),
+            _ => None,
+        })
+        .collect();
+    assert!(unresolved.contains(&"NotADo"), "got: {unresolved:?}");
+    assert!(unresolved.contains(&"nope"), "got: {unresolved:?}");
+
+    let (field, expected, got) = expect_err!(errors,
+        SemanticError::ArgCountMismatch { field, expected, got } => (*field, *expected, *got)
+    );
+    assert_eq!(field.name, "LeaderboardDo");
+    assert_eq!(expected, 1);
+    assert_eq!(got, 0);
+
+    let arg = expect_err!(errors,
+        SemanticError::ArgTypeMismatch { arg, .. } => arg
+    );
+    assert_eq!(arg.name, "tenantId");
+
+    expect_err!(errors, SemanticError::TagInvalidInContext { .. });
+}

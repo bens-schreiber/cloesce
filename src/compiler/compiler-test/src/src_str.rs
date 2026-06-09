@@ -303,6 +303,12 @@ api BasicService {
     post instanceMethod(input: int) -> int
     get staticMethod(input: string) -> string
     post uploadData(data: stream) -> bool
+
+    [context LeaderboardDo(tenantId)]
+    get topScores(tenantId: int) -> json
+
+    [context GlobalDo]
+    get globalConfig() -> json
 }
 
 poo BasicPoo {

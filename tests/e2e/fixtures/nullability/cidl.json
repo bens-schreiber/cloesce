@@ -84,7 +84,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "modelTypes",
@@ -113,7 +114,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "injectableTypes",
@@ -124,7 +126,8 @@
           "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "arrayTypes",
@@ -162,7 +165,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "httpResultTypes",
@@ -181,7 +185,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         }
       ],
       "data_sources": {

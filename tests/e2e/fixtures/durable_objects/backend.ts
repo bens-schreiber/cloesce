@@ -9,49 +9,112 @@ export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
 export interface Env {
-    GlobalDo: DurableObjectNamespace<GlobalDo>;
-    LeaderboardDo: DurableObjectNamespace<LeaderboardDo>;
+    GlobalDo: DurableObjectNamespace;
+    LeaderboardDo: DurableObjectNamespace;
 }
+// @ts-ignore
 export abstract class GlobalDo extends DurableObject<Env> {
+    constructor(public state: DurableObjectState, env: Env) {
+        super(state, env);
+    }
+
     static readonly Shard = {
         template: (): string =>
             `GlobalDo`,
-        id: (namespace: DurableObjectNamespace<GlobalDo>): DurableObjectId =>
+        id: (namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName(GlobalDo.Shard.template()),
-        instance: (namespace: DurableObjectNamespace<GlobalDo>): DurableObjectStub<GlobalDo> =>
+        instance: (namespace: DurableObjectNamespace): DurableObjectStub =>
             namespace.get(GlobalDo.Shard.id(namespace)),
     };
 
-    static readonly config = {
+    readonly config = {
         template: (): string =>
             `config`,
-        value: (storage: DurableObjectStorage) =>
-            storage.get(GlobalDo.config.template()),
+        get: (): unknown | null | undefined =>
+            this.state.storage.kv.get(this.config.template()),
+        put: ( value: unknown) =>
+            this.state.storage.kv.put(this.config.template(), value),
     };
+
+    protected cloesce(env: Env): CloesceApp {
+        // @ts-expect-error
+        return new CloesceApp(cidl as any, "http://localhost:5843/api", env, this);
+    }
 }
+// @ts-ignore
 export abstract class LeaderboardDo extends DurableObject<Env> {
+    constructor(public state: DurableObjectState, env: Env) {
+        super(state, env);
+    }
+
     static readonly Shard = {
         template: (tenantId: number): string =>
             `LeaderboardDo/${tenantId}`,
-        id: (tenantId: number, namespace: DurableObjectNamespace<LeaderboardDo>): DurableObjectId =>
+        id: (tenantId: number, namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName(LeaderboardDo.Shard.template(tenantId)),
-        instance: (tenantId: number, namespace: DurableObjectNamespace<LeaderboardDo>): DurableObjectStub<LeaderboardDo> =>
+        instance: (tenantId: number, namespace: DurableObjectNamespace): DurableObjectStub =>
             namespace.get(LeaderboardDo.Shard.id(tenantId, namespace)),
     };
 
-    static readonly topEntryCache = {
+    readonly score = {
         template: (): string =>
-            `top`,
-        value: (storage: DurableObjectStorage) =>
-            storage.get(LeaderboardDo.topEntryCache.template()),
+            `score`,
+        get: (): number | null | undefined =>
+            this.state.storage.kv.get(this.score.template()),
+        put: ( value: number) =>
+            this.state.storage.kv.put(this.score.template(), value),
     };
 
-    static readonly topEntryCacheWithDate = {
-        template: (date: string): string =>
-            `top/${date}`,
-        value: (storage: DurableObjectStorage, date: string) =>
-            storage.get(LeaderboardDo.topEntryCacheWithDate.template(date)),
-    };
+    protected cloesce(env: Env): CloesceApp {
+        // @ts-expect-error
+        return new CloesceApp(cidl as any, "http://localhost:5843/api", env, this);
+    }
+}
+export namespace Global {
+    export const Tag = "Global" as const;
+
+    export interface Api {
+        setConfig(
+            env: {
+                $ctx: GlobalDo,
+            },
+            value: unknown,
+        ): ApiResult<void>;
+        getConfig(
+            env: {
+                $ctx: GlobalDo,
+            },
+        ): ApiResult<unknown>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
+        return _impl("Global", {}, implObj);
+    }
+}
+export namespace Leaderboard {
+    export const Tag = "Leaderboard" as const;
+
+    export interface Api {
+        setScore(
+            env: {
+                $ctx: LeaderboardDo,
+            },
+            tenantId: number,
+            score: number,
+        ): ApiResult<void>;
+        getScore(
+            env: {
+                $ctx: LeaderboardDo,
+            },
+            tenantId: number,
+        ): ApiResult<number>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
+        return _impl("Leaderboard", {}, implObj);
+    }
 }
 
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
@@ -74,15 +137,16 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5843/api")
+export function cloesce(env: Env): CloesceApp {
+    // @ts-expect-error
+    return new CloesceApp(cidl as any, "http://localhost:5843/api", env);
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
-        const app = await cloesce();
-        return await app.run(request, env);
+        const app = cloesce(env);
+        return await app.run(request);
     }
 }

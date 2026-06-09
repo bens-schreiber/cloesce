@@ -106,6 +106,7 @@ contextual_keywords! {
     Crud => "crud",
     Internal => "internal",
     Instance => "instance",
+    Context => "context",
 
     // Validator tag (numerical)
     LessThan => "lt",
@@ -192,6 +193,12 @@ pub enum ArgumentLiteral<'src> {
 }
 
 #[derive(Debug, Clone)]
+pub struct DurableInitializer<'src> {
+    pub symbol: Symbol<'src>,
+    pub args: Vec<Symbol<'src>>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Tag<'src> {
     Source {
         name: Spd<&'src str>,
@@ -203,6 +210,9 @@ pub enum Tag<'src> {
     },
     Inject {
         bindings: Vec<Symbol<'src>>,
+    },
+    Context {
+        initializer: DurableInitializer<'src>,
     },
     Validator {
         name: Keyword,

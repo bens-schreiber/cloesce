@@ -67,7 +67,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -94,7 +95,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -130,7 +132,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -261,7 +264,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -288,7 +292,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -324,7 +329,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

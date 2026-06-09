@@ -4,6 +4,10 @@ import kill from "tree-kill";
 
 // const DEBUG_PORT = 9230;
 
+/**
+ * Buffers all console output per Wrangler process and flushes it on demand.
+ * Allows us to capture logs without interleaving them with other test output.
+ */
 class ConsoleBuffer {
   private logs: string[] = [];
   private readonly original = {
@@ -40,8 +44,14 @@ class ConsoleBuffer {
   }
 }
 
-export function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res)}`;
+import { expect } from "vitest";
+export function expectHttpResult(
+  res: {
+    ok: boolean;
+  },
+  message: string = "expect to be OK",
+) {
+  expect(res.ok, `${message}\n\n${JSON.stringify(res)}`).toBe(true);
 }
 
 export async function startWrangler(fixturesPath: string, workersUrl: string) {
@@ -52,18 +62,24 @@ export async function startWrangler(fixturesPath: string, workersUrl: string) {
   try {
     wranglerProcess = await _startWrangler(fixturesPath, workersUrl, buffer);
   } catch (err) {
-    if (wranglerProcess) kill(wranglerProcess.pid!, "SIGTERM");
+    if (wranglerProcess?.pid) {
+      await killTree(wranglerProcess.pid);
+    }
     buffer.capture("err", err instanceof Error ? err.message : String(err));
     buffer.flush();
     throw err;
   }
 
   return async () => {
-    await new Promise<void>((resolve, reject) => {
-      kill(wranglerProcess!.pid!, "SIGTERM", (err) => (err ? reject(err) : resolve()));
-    });
+    await killTree(wranglerProcess.pid!);
     buffer.flush();
   };
+}
+
+function killTree(pid: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    kill(pid, "SIGTERM", () => resolve());
+  });
 }
 
 async function _startWrangler(
@@ -103,16 +119,43 @@ async function _startWrangler(
     { cwd: fixturesPath, stdio: "pipe" },
   );
 
+  let exited: { code: number | null } | null = null;
   wranglerProcess.stdout?.on("data", (data) => buffer.capture("wrangler", data.toString()));
   wranglerProcess.stderr?.on("data", (data) => buffer.capture("wrangler", data.toString()));
-  wranglerProcess.on("exit", (code) =>
-    buffer.capture("wrangler", `⚠️ Wrangler process exited with code ${code}`),
-  );
+  wranglerProcess.on("exit", (code) => {
+    exited = { code };
+    buffer.capture("wrangler", `⚠️ Wrangler process exited with code ${code}`);
+  });
 
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  await waitForServer(workersUrl, () => exited);
   console.log("Wrangler server ready ✅\n");
 
   return wranglerProcess;
+}
+
+async function waitForServer(
+  workersUrl: string,
+  exited: () => { code: number | null } | null,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const origin = new URL(workersUrl).origin;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const dead = exited();
+    if (dead) {
+      throw new Error(`Wrangler exited before becoming ready (code ${dead.code})`);
+    }
+    try {
+      // Any HTTP response means the listener is up
+      await fetch(origin, { signal: AbortSignal.timeout(1000) });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  throw new Error(`Wrangler did not become ready within ${timeoutMs}ms at ${origin}`);
 }
 
 async function getD1Bindings(fixturesPath: string): Promise<string[]> {

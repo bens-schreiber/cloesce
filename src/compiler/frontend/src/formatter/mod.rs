@@ -468,6 +468,20 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Inject { bindings: symbols } => Doc::kw(Keyword::Inject)
                 .then(Doc::text(" "))
                 .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
+            Tag::Context { initializer } => {
+                let head = Doc::kw(Keyword::Context)
+                    .then(Doc::text(" "))
+                    .then(ctx.sym_doc(&initializer.symbol, 0, true));
+                if initializer.args.is_empty() {
+                    head
+                } else {
+                    head.then(Doc::text("("))
+                        .then(comma_separated(&initializer.args, |arg| {
+                            ctx.sym_doc(arg, 0, true)
+                        }))
+                        .then(Doc::text(")"))
+                }
+            }
         };
 
         Doc::text("[").then(inner).then(Doc::text("]"))

@@ -139,7 +139,8 @@
           "injected": [
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -167,7 +168,8 @@
           "injected": [
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -407,7 +409,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -432,7 +435,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -461,7 +465,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -499,7 +504,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

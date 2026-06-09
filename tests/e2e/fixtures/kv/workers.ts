@@ -11,10 +11,10 @@ const KVSiblingImpl = KVSibling.impl({});
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
+    const app = cloesce(env);
     app.register(ModelWithKvImpl);
     app.register(KVOnlyImpl);
     app.register(KVSiblingImpl);
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

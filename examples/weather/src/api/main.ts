@@ -30,9 +30,9 @@ export default {
         }
 
         // Run Cloesce app
-        const app = (await clo.cloesce())
+        const app = (clo.cloesce(env))
             .register(Weather);
-        const result = await app.run(request, env);
+        const result = await app.run(request);
 
         // attach CORS headers
         result.headers.set("Access-Control-Allow-Origin", "*");

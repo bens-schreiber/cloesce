@@ -205,6 +205,13 @@ impl WranglerGenerator {
                     }
                 }
 
+                if !spec.migrations.is_empty() {
+                    target.insert(
+                        "migrations".into(),
+                        serde_json::to_value(&spec.migrations).expect("JSON to serialize"),
+                    );
+                }
+
                 if !spec.vars.is_empty() {
                     target.insert(
                         "vars".into(),
@@ -354,6 +361,13 @@ impl WranglerGenerator {
                             arr.push(TomlValue::try_from(binding).unwrap());
                         }
                     }
+                }
+
+                if !spec.migrations.is_empty() {
+                    target.insert(
+                        "migrations".into(),
+                        TomlValue::try_from(&spec.migrations).expect("TOML to serialize"),
+                    );
                 }
 
                 if !spec.vars.is_empty() {
@@ -623,6 +637,20 @@ impl WranglerDefault {
                     });
                 }
             }
+        }
+
+        // Placeholder migration registering each DO's SQLite class so the runtime
+        // can instantiate it. Full migration tracking arrives in Proposal 7 Phase 4.
+        if !idl.wrangler_env.durable_bindings.is_empty() && spec.migrations.is_empty() {
+            spec.migrations.push(idl::DurableObjectMigration {
+                tag: "v1".to_string(),
+                new_sqlite_classes: idl
+                    .wrangler_env
+                    .durable_bindings
+                    .iter()
+                    .map(|b| b.name.to_string())
+                    .collect(),
+            });
         }
 
         // Generate default vars from the IDL's WranglerEnv

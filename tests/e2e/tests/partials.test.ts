@@ -1,4 +1,4 @@
-import { startWrangler, withRes } from "../src/setup.js";
+import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Dog } from "../fixtures/partials/client";
 import config from "../fixtures/partials/cloesce.jsonc" with { type: "jsonc" };
@@ -21,7 +21,7 @@ describe("Dog", () => {
       age: 100,
     });
 
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toEqual({
       id: 1,
       name: "fido",
@@ -38,7 +38,7 @@ describe("Dog", () => {
       age: 100,
     });
 
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toEqual({
       id: 2,
       name: "fido",
@@ -48,7 +48,7 @@ describe("Dog", () => {
 
   it("Get Partial Self", async () => {
     const res = await dog!.getPartialSelf();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toEqual({
       name: "fido",
     });

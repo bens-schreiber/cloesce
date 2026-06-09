@@ -453,6 +453,66 @@ fn api_block() {
 }
 
 #[test]
+fn api_context_tag() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        model Leaderboard {}
+
+        api Leaderboard {
+            [context LeaderboardDo(tenantId)]
+            get topScores(tenantId: int) -> array<string>
+
+            [context GlobalDo]
+            get config() -> json
+        }
+        "#,
+    );
+
+    // Assert
+    let api = ast
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::Api(a) if a.symbol.name == "Leaderboard" => Some(a),
+            _ => None,
+        })
+        .expect("Leaderboard api block");
+
+    let context_of = |method: &str| -> (String, Vec<String>) {
+        let m = api
+            .methods
+            .iter()
+            .find(|m| m.inner.symbol.name == method)
+            .unwrap();
+        m.inner
+            .symbol
+            .tags
+            .iter()
+            .find_map(|t| match &t.inner {
+                Tag::Context { initializer } => Some((
+                    initializer.symbol.name.to_string(),
+                    initializer
+                        .args
+                        .iter()
+                        .map(|a| a.name.to_string())
+                        .collect(),
+                )),
+                _ => None,
+            })
+            .expect("context tag")
+    };
+
+    let (sharded_do, sharded_args) = context_of("topScores");
+    assert_eq!(sharded_do, "LeaderboardDo");
+    assert_eq!(sharded_args, vec!["tenantId"]);
+
+    let (global_do, global_args) = context_of("config");
+    assert_eq!(global_do, "GlobalDo");
+    assert!(global_args.is_empty());
+}
+
+#[test]
 fn model_primary_unique_optional_foreign() {
     let ast = lex_and_ast(
         r#"

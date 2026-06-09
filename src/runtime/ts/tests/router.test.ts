@@ -1,8 +1,10 @@
 import { describe, test, expect, vi } from "vitest";
-import { MatchedRoute, RouterError, _cloesceInternal } from "../src/router/router";
-import { HttpResult, DependencyContainer } from "../src/ui/backend";
+import { MatchedRoute, _cloesceInternal } from "../src/router/router";
+import { HttpResult } from "../src/ui/backend";
 import { ModelBuilder, createIdl } from "./builder";
 import { Model } from "../src/cidl";
+
+const { RouterError, DependencyContainer } = _cloesceInternal;
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -23,10 +25,6 @@ function createRegistry(...namespaces: Model[]) {
     map.set(ns.name, methodMap);
   }
   return map;
-}
-
-function createDi() {
-  return new DependencyContainer();
 }
 
 function extractErrorCode(str: string | undefined): number | null {
@@ -118,6 +116,7 @@ describe("Match Route", () => {
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       model: idl.models["Model"],
       namespace: "Model",
+      forward: false,
       impl: mockImpl,
     });
   });
@@ -143,6 +142,7 @@ describe("Match Route", () => {
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
       getParamValues: { id: "0" },
+      forward: false,
       impl: mockImpl,
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
@@ -174,6 +174,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
+      forward: false,
       impl: mockImpl,
       getParamValues: { orgId: "acme", userId: "user123" },
       model: idl.models["Model"],
@@ -200,6 +201,7 @@ describe("Request Validation", () => {
       getParamValues: {},
       dataSource: model.data_sources["ds"],
       impl: mockImpl,
+      forward: false,
     };
 
     const wasmMock = {} as any;
@@ -227,6 +229,7 @@ describe("Request Validation", () => {
       getParamValues: {},
       impl: mockImpl,
       model,
+      forward: false,
     };
 
     const wasmMock = {} as any;
@@ -245,8 +248,6 @@ describe("Request Validation", () => {
 describe("Method Dispatch", () => {
   test("Void Return Type => 200, no data", async () => {
     // Arrange
-
-    const di = createDi();
     const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
@@ -255,10 +256,11 @@ describe("Method Dispatch", () => {
       impl: () => {},
       getParamValues: {},
       model,
+      forward: false,
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
@@ -267,8 +269,6 @@ describe("Method Dispatch", () => {
 
   test("Directly returns HttpResult", async () => {
     // Arrange
-    const di = createDi();
-
     const model = ModelBuilder.model("Foo").idPk().method("testMethod", "Get", [], "Void").build();
 
     const route: MatchedRoute = {
@@ -277,10 +277,11 @@ describe("Method Dispatch", () => {
       impl: () => HttpResult.ok(123, "foo"),
       getParamValues: {},
       model,
+      forward: false,
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
@@ -288,8 +289,6 @@ describe("Method Dispatch", () => {
 
   test("Indirectly returns HttpResult", async () => {
     // Arrange
-    const di = createDi();
-
     const model = ModelBuilder.model("Foo")
       .idPk()
       .method("testMethod", "Get", [], "String")
@@ -301,10 +300,11 @@ describe("Method Dispatch", () => {
       impl: () => "neigh",
       getParamValues: {},
       model,
+      forward: false,
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
@@ -325,12 +325,11 @@ describe("Method Dispatch", () => {
       },
       getParamValues: {},
       model,
+      forward: false,
     };
 
-    const di = createDi();
-
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
@@ -339,7 +338,7 @@ describe("Method Dispatch", () => {
 
   test("passes bundled explicit injected values", async () => {
     // Arrange
-    const di = createDi();
+    const di = new DependencyContainer();
     const injectedObject = { tag: "YouTubeApi", key: "secret" };
     const db = { prepare: vi.fn() };
     di.set({ tag: "YouTubeApi" }, injectedObject);
@@ -359,6 +358,7 @@ describe("Method Dispatch", () => {
       impl,
       getParamValues: {},
       model,
+      forward: false,
     };
 
     // Act
@@ -367,5 +367,65 @@ describe("Method Dispatch", () => {
     // Assert
     expect(res.status).toBe(200);
     expect(impl).toHaveBeenCalledWith({ DB_1: db, YouTubeApi: injectedObject }, "ben");
+  });
+});
+
+describe("Forwarding", () => {
+  function createDurableIdl() {
+    const method = {
+      ...ModelBuilder.model("Leaderboard")
+        .method("topScores", "Get", [], "Json")
+        .build()
+        .apis.find((m) => m.name === "topScores")!,
+      durable_target: { binding: "LeaderboardDo", shard_args: ["tenantId"] },
+    };
+    const model = ModelBuilder.model("Leaderboard").build();
+    model.apis = [method];
+    return createIdl({ models: [model] });
+  }
+
+  function createRequest(forwarded: boolean) {
+    const headers = forwarded ? { "cloesce-forwarded": "true" } : undefined;
+    return new Request("http://foo.com/api/Leaderboard/topScores", { method: "GET", headers });
+  }
+
+  test("no local impl is marked for forwarding", () => {
+    // Arrange
+    const idl = createDurableIdl();
+    const registry = createRegistry();
+
+    // Act
+    const res = _cloesceInternal.matchRoute(createRequest(false), idl, api, registry);
+
+    // Assert
+    expect(res.isLeft()).toBe(false);
+    expect(res.unwrap().forward).toBe(true);
+  });
+
+  test("an already-forwarded request is not forwarded again and needs a local impl", () => {
+    // Arrange
+    const idl = createDurableIdl();
+    const registry = createRegistry(idl.models["Leaderboard"]);
+
+    // Act
+    const res = _cloesceInternal.matchRoute(createRequest(true), idl, api, registry);
+
+    // Assert
+    expect(res.isLeft()).toBe(false);
+    expect(res.unwrap().forward).toBe(false);
+    expect(res.unwrap().impl).toBe(mockImpl);
+  });
+
+  test("an already-forwarded request with no impl => 501", () => {
+    // Arrange
+    const idl = createDurableIdl();
+    const registry = createRegistry();
+
+    // Act
+    const res = _cloesceInternal.matchRoute(createRequest(true), idl, api, registry);
+
+    // Assert
+    expect(res.isLeft()).toBe(true);
+    expect(res.unwrapLeft().status).toBe(501);
   });
 });

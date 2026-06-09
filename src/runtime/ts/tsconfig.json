@@ -2,9 +2,10 @@
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["@cloudflare/workers-types"],
+    "lib": ["ES2024"],
     "rootDir": "src",
-    "target": "ES2022",
+    "target": "ES2024",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,

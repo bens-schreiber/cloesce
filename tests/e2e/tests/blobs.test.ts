@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { BlobHaver, BlobService } from "../fixtures/blobs/client";
 import config from "../fixtures/blobs/cloesce.jsonc" with { type: "jsonc" };
 
@@ -16,7 +16,7 @@ afterAll(async () => {
 describe("BlobService", () => {
   it("Receives, modifies and returns Uint8Array", async () => {
     const res = await BlobService.incrementBlob(new Uint8Array([1, 2, 3, 4]));
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toStrictEqual(new Uint8Array([2, 3, 4, 5]));
   });
 });
@@ -24,7 +24,7 @@ describe("BlobService", () => {
 describe("BlobHaver", () => {
   it("POST Stream", async () => {
     const res = await BlobHaver.inputStream(new Uint8Array([1, 2, 3, 4, 5]));
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
   });
 
   let blobHaver: BlobHaver;
@@ -34,7 +34,7 @@ describe("BlobHaver", () => {
       blob2: new Uint8Array([5, 6, 7, 8]),
     });
 
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toStrictEqual(
       Object.assign(new BlobHaver(), {
         id: 1,
@@ -47,19 +47,19 @@ describe("BlobHaver", () => {
 
   it("GET Blob", async () => {
     const res = await blobHaver.getBlob1();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toStrictEqual(new Uint8Array([1, 2, 3, 4]));
   });
 
   it("LIST Blobs", async () => {
     const res = await BlobHaver.$list(0, 100);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "LIST should be OK");
     expect(res.data).toStrictEqual([blobHaver]);
   });
 
   it("GET Stream", async () => {
     const res = await blobHaver.yieldStream();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
 
     const got = new Uint8Array(await res.data!.arrayBuffer());
     const expected = [1, 2, 3, 4];

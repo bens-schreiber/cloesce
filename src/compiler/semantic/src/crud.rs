@@ -51,6 +51,7 @@ impl CrudExpansion {
                         .map(|p| p.parameter.clone())
                         .collect(),
                     injected: ds.get.injected.clone(),
+                    durable_target: None,
                 })
                 .collect(),
             CrudKind::List => sources
@@ -64,6 +65,7 @@ impl CrudExpansion {
                     parameters_media: MediaType::Json,
                     parameters: ds.list.parameters.clone(),
                     injected: ds.list.injected.clone(),
+                    durable_target: None,
                 })
                 .collect(),
             CrudKind::Save => sources
@@ -77,6 +79,7 @@ impl CrudExpansion {
                     parameters_media: MediaType::Json,
                     parameters: ds.save.parameters.clone(),
                     injected: ds.save.injected.clone(),
+                    durable_target: None,
                 })
                 .collect(),
         }

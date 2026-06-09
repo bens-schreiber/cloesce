@@ -15,10 +15,10 @@ export const FooServiceImpl = FooService.impl({
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
+    const app = cloesce(env);
     app.register(new InjectedThingImpl());
     app.register(FooServiceImpl);
 
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

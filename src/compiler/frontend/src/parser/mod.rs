@@ -10,8 +10,8 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, Span, Spd,
-    Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, DurableInitializer, InjectBlock, Keyword,
+    PlainOldObjectBlock, Span, Spd, Symbol, Tag,
 };
 
 /// Converts a [Keyword] to a `just` [Token] parser
@@ -210,6 +210,26 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|bindings| Tag::Inject { bindings });
 
+    // [context DurableDo(arg1, arg2)] | [context GlobalDo]
+    let context_tag = just(Token::LBracket)
+        .then(kw!(Context))
+        .ignore_then(symbol())
+        .then(
+            symbol()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LParen), just(Token::RParen))
+                .or_not(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|(symbol, args)| Tag::Context {
+            initializer: DurableInitializer {
+                symbol,
+                args: args.unwrap_or_default(),
+            },
+        });
+
     // [internal]
     let internal_tag = just(Token::LBracket)
         .then(kw!(Internal))
@@ -233,6 +253,7 @@ fn tags<'tokens, 'src: 'tokens>()
         validator,
         crud_tag,
         inject_tag,
+        context_tag,
         internal_tag,
         instance_tag,
         source_tag,

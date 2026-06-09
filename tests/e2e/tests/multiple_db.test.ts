@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { DB1Model, DB2Model } from "../fixtures/multiple_db/client";
 import config from "../fixtures/multiple_db/cloesce.jsonc" with { type: "jsonc" };
 
@@ -18,14 +18,14 @@ describe("Multiple DBs", () => {
     const save = await DB1Model.$save({
       someColumn: "test",
     });
-    expect(save.ok, withRes("POST should be OK", save)).toBe(true);
+    expectHttpResult(save, "POST should be OK");
     expect(save.data).toEqual({
       id: 1,
       someColumn: "test",
     });
 
     const $get = await DB1Model.$get(save.data!.id);
-    expect($get.ok, withRes("$get should be OK", $get)).toBe(true);
+    expectHttpResult($get, "$get should be OK");
     expect($get.data).toEqual({
       id: 1,
       someColumn: "test",
@@ -33,7 +33,7 @@ describe("Multiple DBs", () => {
 
     const list = await DB1Model.$list(0, 10);
 
-    expect(list.ok, withRes("$list should be OK", list)).toBe(true);
+    expectHttpResult(list, "$list should be OK");
     expect(list.data).toEqual([
       {
         id: 1,
@@ -46,21 +46,21 @@ describe("Multiple DBs", () => {
     const save = await DB2Model.$save({
       someColumn: "test2",
     });
-    expect(save.ok, withRes("POST should be OK", save)).toBe(true);
+    expectHttpResult(save, "POST should be OK");
     expect(save.data).toEqual({
       id: 1,
       someColumn: "test2",
     });
 
     const get = await DB2Model.$get(save.data!.id);
-    expect(get.ok, withRes("$get should be OK", get)).toBe(true);
+    expectHttpResult(get, "$get should be OK");
     expect(get.data).toEqual({
       id: 1,
       someColumn: "test2",
     });
 
     const list = await DB2Model.$list(0, 10);
-    expect(list.ok, withRes("$list should be OK", list)).toBe(true);
+    expectHttpResult(list, "$list should be OK");
     expect(list.data).toEqual([
       {
         id: 1,

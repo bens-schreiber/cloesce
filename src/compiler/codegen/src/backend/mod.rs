@@ -1,6 +1,7 @@
 use askama::Template;
 use idl::{
-    CidlType, CloesceIdl, DurableBinding, IncludeTree, Model, ValidatedField, model_bindings,
+    ApiMethod, CidlType, CloesceIdl, DurableBinding, IncludeTree, Model, ValidatedField,
+    model_bindings,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -22,8 +23,12 @@ impl<'src> BackendTemplate<'src> {
         name.starts_with('$')
     }
 
-    fn is_env_injected(&self, name: &str) -> bool {
-        !self.idl.injects.contains(&name)
+    fn inject_type(&self, name: &str) -> String {
+        self.mapper.inject_type(self.idl, name)
+    }
+
+    fn api_injected_type(&self, api: &ApiMethod, name: &str) -> String {
+        self.mapper.api_injected_type(self.idl, api, name)
     }
 
     fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {

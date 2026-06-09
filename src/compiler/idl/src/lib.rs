@@ -90,6 +90,13 @@ impl<'src> CidlType<'src> {
         }
     }
 
+    pub fn unwrap_kv(&self) -> &CidlType<'src> {
+        match self {
+            CidlType::KvObject(inner) => inner,
+            _ => unreachable!("unwrap_kv_object called on non-KvObject type"),
+        }
+    }
+
     pub fn is_nullable(&self) -> bool {
         matches!(self, CidlType::Nullable(_))
     }
@@ -357,6 +364,24 @@ pub enum MediaType {
     Octet,
 }
 
+/// A key that signifies an [ApiMethod::durable_target] should be injected.
+pub const CONTEXT_INJECT_KEY: &str = "$ctx";
+
+/// A Durable Object execution target for an API method.
+///
+/// When present, the method runs inside the named DO's context: the Worker
+/// forwards the request to the DO instance located by [Self::shard_args].
+#[derive(Deserialize, Serialize)]
+pub struct DurableTarget<'src> {
+    #[serde(borrow)]
+    pub binding: &'src str,
+
+    /// The API method parameter names supplying the DO's shard values,
+    /// in shard-field order. Empty for a global (unsharded) DO.
+    #[serde(borrow)]
+    pub shard_args: Vec<&'src str>,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct ApiMethod<'src> {
     #[serde(borrow)]
@@ -366,6 +391,7 @@ pub struct ApiMethod<'src> {
     /// Static methods require no hydration or data source.
     pub is_static: bool,
 
+    #[serde(borrow)]
     pub data_source: Option<&'src str>,
 
     pub http_verb: HttpVerb,
@@ -384,6 +410,10 @@ pub struct ApiMethod<'src> {
 
     #[serde(borrow)]
     pub injected: Vec<&'src str>,
+
+    /// If present, the method executes inside this Durable Object's context.
+    #[serde(borrow)]
+    pub durable_target: Option<DurableTarget<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
@@ -642,6 +672,15 @@ pub struct DurableObjects {
     pub bindings: Vec<DurableObjectBinding>,
 }
 
+/// Placeholder until full DO migration support (Proposal 7 Phase 4).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct DurableObjectMigration {
+    pub tag: String,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub new_sqlite_classes: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
@@ -659,6 +698,9 @@ pub struct WranglerSpec {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub durable_objects: Option<DurableObjects>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub migrations: Vec<DurableObjectMigration>,
 
     #[serde(default)]
     pub vars: HashMap<String, Value>,

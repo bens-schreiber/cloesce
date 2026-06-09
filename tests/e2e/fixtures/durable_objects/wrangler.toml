@@ -9,3 +9,10 @@ name = "GlobalDo"
 [[durable_objects.bindings]]
 class_name = "LeaderboardDo"
 name = "LeaderboardDo"
+
+[[migrations]]
+new_sqlite_classes = [
+    "GlobalDo",
+    "LeaderboardDo",
+]
+tag = "v1"

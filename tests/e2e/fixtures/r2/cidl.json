@@ -137,7 +137,8 @@
           ],
           "injected": [
             "bucket1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "uploadOtherData",
@@ -156,7 +157,8 @@
           ],
           "injected": [
             "bucket1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -180,7 +182,8 @@
           "injected": [
             "bucket1",
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -208,7 +211,8 @@
           "injected": [
             "bucket1",
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -245,7 +249,8 @@
           "injected": [
             "bucket1",
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -386,7 +391,8 @@
           ],
           "injected": [
             "bucket1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -409,7 +415,8 @@
           ],
           "injected": [
             "bucket1"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -506,7 +513,8 @@
           ],
           "injected": [
             "bucket1"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

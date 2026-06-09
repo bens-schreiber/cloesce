@@ -113,6 +113,44 @@ export class BasicService {
       false
     );
   }
+  static async topScores(
+    tenantId: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<unknown>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/BasicService/topScores`
+    );
+    __$baseUrl.searchParams.append("tenantId", String(tenantId));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async globalConfig(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<unknown>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/BasicService/globalConfig`
+    );
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
 
   static fromJson(data: any): BasicService {
     const __$res = Object.assign(new BasicService(), data);
