@@ -243,11 +243,24 @@ api Leaderboard {
         }
     }
 
-    // `postScore` takes the `self` keyword, meaning it by default will have an
-    // instantiated `LeaderboardDo` from `Leaderboard::shard`
+    // `postScore` takes the `self` keyword, meaning it will do whatever
+    // it's Data Source `get` method does. The default `get` implementation
+    // for a DO-Bakced model is to run in the DO's execution context.
     //
     // The method is instantiated, executes IN a DO
     post postScore(self) {}
+
+    // `doSomething` is an instance method that uses `self` with the source `OutsideOfDo`, 
+    // whose `get` method does not inject a DO instance. This means that `doSomething` will execute outside of the DO
+    //
+    // The method is instantiated, executes IN a WORKER
+    post doSomething([source OutsideOfDo] self)
+}
+
+source OutsideOfDo for Leaderboard {
+    include {}
+
+    get(param: int)
 }
 
 model HasNoBacking {}
@@ -271,7 +284,9 @@ In the above code, several different execution contexts are demonstrated.
 
 - `allLeaderboards` is a static method of `Leaderboard`, and it injects the `LeaderboardDo` binding without instantiating it, so it will be executed in the Worker.
 
-- `postScore` is an instance method of `Leaderboard`, and since `Leaderboard` is backed by `LeaderboardDo`, it will have an instantiated `LeaderboardDo` injected by default, so it will be executed inside of a DO.
+- `postScore` is an instance method of `Leaderboard`. It will carry over the execution context of whatever its Data Source `get` method does. By default, the `get` method for a DO-backed Model will be to inject and instantiate that DO, so `postScore` will be executed inside of a DO.
+
+- `doSomething` is an instance method of `Leaderboard` that uses a custom source `OutsideOfDo`. Since `OutsideOfDo` does not inject a DO instance, `doSomething` will be executed in the Worker, even though it is an instance method of a DO-backed Model.
 
 - `leaderboard` is a static method of `HasNoBacking`, but it injects an instantiated `LeaderboardDo`, so it will be executed inside of a DO, even though `HasNoBacking` itself is not backed by that DO.
 
@@ -280,7 +295,39 @@ In the above code, several different execution contexts are demonstrated.
 1. A method that injects a DO binding with shard fields must provide arguments for those shard fields of the correct type.
 2. Arguments provided for shard fields must exist as API method parameters
 3. Multiple DO instantiations in the same inject block are not allowed.
-4. An instantiated method backed by a DO cannot inject any DO, as it implicitly injects the DO it is backed by (rule 3).
+4. An instantiated method whose `get` Data Source injects a DO cannot inject any DO (rule 3).
+
+#### Default Data Source
+
+The default data source for the `Leaderboard` Model in the above example would be:
+
+```cloesce
+source Default for Leaderboard {
+    include {
+        top
+    }
+
+    get([instance] shard: int) {
+        inject {
+            LeaderboardDo(shard)
+        }
+    }
+
+    list(shard: int) {
+        inject {
+            LeaderboardDo(shard)
+        }
+    }
+
+    save(shard: int) {
+        inject {
+            LeaderboardDo(shard)
+        }
+    }
+}
+```
+
+Note that the `get`, `list`, and `save` methods all inject an instantiated `LeaderboardDo`, meaning they will all execute in the context of a DO.
 
 #### Inheriting Validators
 
