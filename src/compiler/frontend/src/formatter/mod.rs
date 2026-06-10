@@ -425,6 +425,13 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
                 .then(Doc::kw(Keyword::For))
                 .then(Doc::text(" "))
                 .then(ctx.sym_doc(binding, 0, true));
+
+            if let Some(shard_args) = &self.shard_args {
+                doc = doc
+                    .then(Doc::text("("))
+                    .then(comma_separated(shard_args, |sym| ctx.sym_doc(sym, 0, true)))
+                    .then(Doc::text(")"));
+            }
         }
 
         if self.blocks.is_empty() {

@@ -115,14 +115,14 @@ fn d1_model_basic_errors() {
 
     // Assert
     let model = expect_err!(errors,
-        SemanticError::D1ModelMissingPrimaryKey { model } => model
+        SemanticError::ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
 
-    expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
+    expect_err!(errors, SemanticError::ModelInvalidBinding { .. });
 
     let model = expect_err!(errors,
-        SemanticError::D1ModelMissingD1Binding { model } => model
+        SemanticError::ModelMissingDatabaseBinding { model } => model
     );
     assert_eq!(model.name, "Comment");
 }
@@ -196,7 +196,7 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 9);
+    assert_eq!(errors.len(), 10);
 
     let column = expect_err!(errors,
         SemanticError::NullablePrimaryKey { column } => column
@@ -488,7 +488,7 @@ fn route_model_valid() {
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
     let person = result.models.get("Person").unwrap();
-    assert!(person.database_binding.is_none());
+    assert!(person.backing.is_none());
     let route_fields: Vec<&str> = person
         .route_fields
         .iter()
@@ -553,7 +553,8 @@ fn d1_model_navigates_to_worker_model() {
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
     let user = result.models.get("User").unwrap();
-    assert_eq!(user.database_binding, Some("my_d1"));
+    assert!(user.is_d1_backed());
+    assert_eq!(user.backing.as_ref().unwrap().binding, "my_d1");
 
     let person_nav = user.navigation_fields.first().unwrap();
     assert_eq!(person_nav.field.name, "person");
@@ -661,8 +662,8 @@ fn worker_model_errors() {
         2 // 1:M nav, and the nav missing a target route field
     );
     assert_eq!(
-        count_errs!(errors, SemanticError::RouteModelInvalidBlock { .. }),
-        2 // `for` binding, and the SQL column block
+        count_errs!(errors, SemanticError::ModelMixesRoutesAndSql { .. }),
+        1
     );
     let crud = expect_err!(errors,
         SemanticError::UnsupportedCrudOperation { crud, .. } => crud
@@ -1614,4 +1615,279 @@ fn context_tag_errors() {
     assert_eq!(arg.name, "tenantId");
 
     expect_err!(errors, SemanticError::TagInvalidInContext { .. });
+}
+
+#[test]
+fn durable_backing_valid() {
+    // Arrange
+    let src = r#"
+        durable LeaderboardDo {
+            shard {
+                [gt 0]
+                tenantId: int
+            }
+
+            topEntryCache() -> json {
+                "top"
+            }
+
+            tenantScoped(tenantId: int) -> json {
+                "scoped/{tenantId}"
+            }
+        }
+
+        durable GlobalDo {
+            config() -> json {
+                "config"
+            }
+        }
+
+        model Leaderboard for LeaderboardDo(org) {
+            kv LeaderboardDo::topEntryCache {
+                top
+            }
+
+            kv LeaderboardDo::tenantScoped(org) {
+                scoped
+            }
+        }
+
+        model Settings for GlobalDo {
+            kv GlobalDo::config {
+                config
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let leaderboard = result.models.get("Leaderboard").unwrap();
+    assert!(leaderboard.is_durable_backed());
+    let backing = leaderboard.backing.as_ref().expect("durable backing");
+    assert_eq!(backing.binding, "LeaderboardDo");
+    assert_eq!(backing.fields, vec!["org"]);
+
+    let org = leaderboard
+        .route_fields
+        .iter()
+        .find(|f| f.name == "org")
+        .expect("org route field (aliased shard field)");
+    assert_eq!(org.cidl_type, CidlType::Int);
+    assert_eq!(org.validators.len(), 1);
+    assert!(matches!(
+        org.validators[0],
+        Validator::GreaterThan(Number::Int(0))
+    ));
+
+    let top_entry = leaderboard
+        .kv_fields
+        .iter()
+        .find(|kv| kv.field.name == "top")
+        .expect("top kv field");
+    assert_eq!(top_entry.binding, "LeaderboardDo");
+
+    let scoped = leaderboard
+        .kv_fields
+        .iter()
+        .find(|kv| kv.field.name == "scoped")
+        .expect("scoped kv field");
+    assert_eq!(scoped.binding, "LeaderboardDo");
+    assert_eq!(scoped.key_format, "scoped/{org}");
+
+    let settings = result.models.get("Settings").unwrap();
+    assert!(settings.is_durable_backed());
+    let backing = settings.backing.as_ref().expect("durable backing");
+    assert_eq!(backing.binding, "GlobalDo");
+    assert!(backing.fields.is_empty());
+    assert!(settings.route_fields.is_empty());
+}
+
+#[test]
+fn durable_backing_errors() {
+    // Arrange
+    let src = r#"
+        d1 {
+            my_d1
+        }
+
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+
+            topEntryCache() -> json {
+                "top"
+            }
+        }
+
+        durable OtherDo {
+            other() -> json {
+                "other"
+            }
+        }
+
+        // Shard arg count mismatch: DO has one shard field, model supplies none.
+        model MissingShard for LeaderboardDo {}
+
+        // Shard args supplied for a non-DO (D1) binding.
+        model ShardOnD1 for my_d1(tenantId) {
+            primary {
+                id: int
+            }
+        }
+
+        // Uses a storage template of a DO that is not this model's backing.
+        model ForeignTemplate for LeaderboardDo(tenantId) {
+            kv OtherDo::other {
+                other
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    let (field, expected, got) = expect_err!(errors,
+        SemanticError::ArgCountMismatch { field, expected, got } => (*field, *expected, *got)
+    );
+    assert_eq!(field.name, "LeaderboardDo");
+    assert_eq!(expected, 1);
+    assert_eq!(got, 0);
+
+    let unresolved = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::UnresolvedSymbol { symbol } => Some(symbol.name),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(unresolved.contains(&"OtherDo"), "got: {unresolved:?}");
+
+    let invalid_d1 = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::ModelInvalidBinding { model, .. } => Some(model.name),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(invalid_d1.contains(&"ShardOnD1"), "got: {invalid_d1:?}");
+}
+
+#[test]
+fn route_model_durable_backing() {
+    let src = r#"
+        durable GlobalDo {
+            config() -> json {
+                "config"
+            }
+        }
+
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+        }
+
+        model RouteGlobal for GlobalDo {
+            route {
+                id: int
+            }
+
+            kv GlobalDo::config {
+                config
+            }
+        }
+
+        // A sharded DO backing: `tenantId` is inherited from the shard, `rank` is explicit.
+        model RouteSharded for LeaderboardDo(tenantId) {
+            route {
+                rank: int
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let route_global = result.models.get("RouteGlobal").unwrap();
+    assert!(route_global.is_durable_backed());
+    assert_eq!(route_global.backing.as_ref().unwrap().binding, "GlobalDo");
+
+    let route_fields: Vec<&str> = route_global
+        .route_fields
+        .iter()
+        .map(|f| f.name.as_ref())
+        .collect();
+    assert_eq!(route_fields, vec!["id"]);
+    assert!(
+        route_global
+            .kv_fields
+            .iter()
+            .any(|kv| kv.field.name == "config")
+    );
+
+    let route_sharded = result.models.get("RouteSharded").unwrap();
+    assert!(route_sharded.is_durable_backed());
+    assert_eq!(
+        route_sharded.backing.as_ref().unwrap().fields,
+        vec!["tenantId"]
+    );
+    let mut sharded_fields: Vec<&str> = route_sharded
+        .route_fields
+        .iter()
+        .map(|f| f.name.as_ref())
+        .collect();
+    sharded_fields.sort();
+    assert_eq!(sharded_fields, vec!["rank", "tenantId"]);
+}
+
+#[test]
+fn route_model_durable_backing_errors() {
+    let src = r#"
+        d1 {
+            my_d1
+        }
+
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+        }
+
+        // A route model cannot be backed by a D1 database.
+        model RouteD1 for my_d1 {
+            route {
+                id: int
+            }
+        }
+
+        // A route field cannot redeclare an inherited shard field (caught as a duplicate).
+        model RouteShardCollision for LeaderboardDo(tenantId) {
+            route {
+                tenantId: int
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    expect_err!(errors, SemanticError::ModelMixesRoutesAndSql { .. });
+    let dup = expect_err!(errors,
+        SemanticError::DuplicateSymbol { second, .. } => second
+    );
+    assert_eq!(dup.name, "tenantId");
 }

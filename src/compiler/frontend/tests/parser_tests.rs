@@ -233,6 +233,72 @@ fn durable_binding_block() {
 }
 
 #[test]
+fn model_durable_backing() {
+    let ast = lex_and_ast(
+        r#"
+        model Leaderboard for LeaderboardDo(tenantId, region) {
+            kv LeaderboardDo::topEntryCache {
+                top
+            }
+
+            kv LeaderboardDo::topEntryCacheWithDate(date) {
+                topWithDate
+            }
+        }
+
+        model Global for GlobalDo {}
+        "#,
+    );
+
+    let leaderboard = find_model(&ast, "Leaderboard");
+    assert_eq!(
+        leaderboard.database_binding.as_ref().map(|s| s.name),
+        Some("LeaderboardDo")
+    );
+    let shard_args = leaderboard
+        .shard_args
+        .as_ref()
+        .expect("Leaderboard to carry shard args");
+    assert_eq!(
+        shard_args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["tenantId", "region"]
+    );
+
+    let top_entry_cache = leaderboard
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) => Some(kv),
+            _ => None,
+        })
+        .expect("Leaderboard to have a kv field");
+    assert_eq!(top_entry_cache.binding.name, "LeaderboardDo");
+    assert_eq!(top_entry_cache.binding_template.name, "topEntryCache");
+    assert!(top_entry_cache.args.is_empty());
+    assert_eq!(top_entry_cache.field.name, "top");
+
+    let top_entry_cache_with_date = leaderboard
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) if kv.binding_template.name == "topEntryCacheWithDate" => {
+                Some(kv)
+            }
+            _ => None,
+        })
+        .expect("Leaderboard to have a topEntryCacheWithDate kv field");
+    assert_eq!(top_entry_cache_with_date.binding.name, "LeaderboardDo");
+    assert_eq!(top_entry_cache_with_date.args.len(), 1,);
+
+    let global = find_model(&ast, "Global");
+    assert_eq!(
+        global.database_binding.as_ref().map(|s| s.name),
+        Some("GlobalDo")
+    );
+    assert!(global.shard_args.is_none());
+}
+
+#[test]
 fn poo_block() {
     // Act
     let ast = lex_and_ast(

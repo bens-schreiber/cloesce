@@ -1,10 +1,14 @@
 {
-  "hash": 16093517306524961070,
+  "hash": 1485928650438980974,
   "models": {
     "FailModel": {
-      "hash": 8168459232680355642,
+      "hash": 12056437209279385934,
       "name": "FailModel",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,

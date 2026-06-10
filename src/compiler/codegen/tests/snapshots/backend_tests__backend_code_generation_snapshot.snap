@@ -21,32 +21,64 @@ export interface Env {
     MY_VAR: string;
 }
 export class MyKv {
-    static someValue(id1: string, id2: number): string {
-        return `${id1}/${id2}`;
-    }
-    static manyValues(): string {
-        return ``;
-    }
-    static streamValue(id1: string, id2: number): string {
-        return `${id1}/${id2}`;
-    }
+    static readonly someValue = {
+        template: (id1: string, id2: number): string =>
+            `${id1}/${id2}`,
+        get: (ns: KVNamespace, id1: string, id2: number): Promise<unknown | null> =>
+            ns.get(MyKv.someValue.template(id1, id2)) as any,
+        put: (ns: KVNamespace, id1: string, id2: number, value: unknown): Promise<void> =>
+            ns.put(MyKv.someValue.template(id1, id2), value as any),
+    };
+    static readonly manyValues = {
+        template: (): string =>
+            ``,
+    };
+    static readonly streamValue = {
+        template: (id1: string, id2: number): string =>
+            `${id1}/${id2}`,
+        get: (ns: KVNamespace, id1: string, id2: number): Promise<CfReadableStream | null> =>
+            ns.get(MyKv.streamValue.template(id1, id2)) as any,
+        put: (ns: KVNamespace, id1: string, id2: number, value: CfReadableStream): Promise<void> =>
+            ns.put(MyKv.streamValue.template(id1, id2), value as any),
+    };
 }
 export class MyR2 {
-    static fileData(id: string): string {
-        return `${id}`;
-    }
-    static manyFileDatas(id: string): string {
-        return `${id}/files`;
-    }
-    static metadata(ownerId: string, modelYear: number): string {
-        return `${ownerId}/${modelYear}`;
-    }
-    static photoData(modelYear: number): string {
-        return `${modelYear}/photos`;
-    }
-    static customDsData(id: number): string {
-        return `${id}/data`;
-    }
+    static readonly fileData = {
+        template: (id: string): string =>
+            `${id}`,
+        get: (bucket: R2Bucket, id: string): Promise<R2ObjectBody | null> =>
+            bucket.get(MyR2.fileData.template(id)),
+        put: (bucket: R2Bucket, id: string, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(MyR2.fileData.template(id), value),
+    };
+    static readonly manyFileDatas = {
+        template: (id: string): string =>
+            `${id}/files`,
+    };
+    static readonly metadata = {
+        template: (ownerId: string, modelYear: number): string =>
+            `${ownerId}/${modelYear}`,
+        get: (bucket: R2Bucket, ownerId: string, modelYear: number): Promise<R2ObjectBody | null> =>
+            bucket.get(MyR2.metadata.template(ownerId, modelYear)),
+        put: (bucket: R2Bucket, ownerId: string, modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(MyR2.metadata.template(ownerId, modelYear), value),
+    };
+    static readonly photoData = {
+        template: (modelYear: number): string =>
+            `${modelYear}/photos`,
+        get: (bucket: R2Bucket, modelYear: number): Promise<R2ObjectBody | null> =>
+            bucket.get(MyR2.photoData.template(modelYear)),
+        put: (bucket: R2Bucket, modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(MyR2.photoData.template(modelYear), value),
+    };
+    static readonly customDsData = {
+        template: (id: number): string =>
+            `${id}/data`,
+        get: (bucket: R2Bucket, id: number): Promise<R2ObjectBody | null> =>
+            bucket.get(MyR2.customDsData.template(id)),
+        put: (bucket: R2Bucket, id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(MyR2.customDsData.template(id), value),
+    };
 }
 // @ts-ignore
 export abstract class GlobalDo extends DurableObject<Env> {
@@ -159,6 +191,66 @@ export namespace BasicService {
         return _impl("BasicService", {}, implObj);
     }
 }
+export namespace GlobalSettings {
+    export const Tag = "GlobalSettings" as const;
+    export const Meta = cidl.models.GlobalSettings as any;
+
+    export interface Self {
+        config: KValue<unknown>;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"config":{}},
+            async get(env: { $ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }): Promise<HttpResult<Self | null>> {
+                const base = {  } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { $ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }, model: DeepPartial<GlobalSettings.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("GlobalSettings", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+
+        export async function save(ctx: GlobalDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: GlobalDo, args: { include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = {  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: GlobalDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
 export namespace HasSqlColumnTypes {
     export const Tag = "HasSqlColumnTypes" as const;
     export const Meta = cidl.models.HasSqlColumnTypes as any;
@@ -252,6 +344,67 @@ export namespace HasSqlColumnTypes {
 
         export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace Leaderboard {
+    export const Tag = "Leaderboard" as const;
+    export const Meta = cidl.models.Leaderboard as any;
+
+    export interface Self {
+        tenantId: number;
+        topEntries: KValue<unknown>;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"topEntries":{}},
+            async get(env: { $ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number): Promise<HttpResult<Self | null>> {
+                const base = { tenantId } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { $ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, model: DeepPartial<Leaderboard.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("Leaderboard", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+
+        export async function save(ctx: LeaderboardDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: LeaderboardDo, args: { tenantId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { tenantId: args.tenantId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }

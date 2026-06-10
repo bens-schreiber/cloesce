@@ -1,5 +1,5 @@
 {
-  "hash": 6288574505062725002,
+  "hash": 4837763849636801285,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "Course": {
-      "hash": 3886618121582101491,
+      "hash": 15350045299932412082,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Course",
       "primary_columns": [
         {
@@ -65,7 +70,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get",
@@ -230,7 +234,12 @@
       ]
     },
     "Student": {
-      "hash": 9911641945952268111,
+      "hash": 509565385708070536,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Student",
       "primary_columns": [
         {
@@ -296,7 +305,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get_CoursesOrderedDescending",
@@ -648,7 +656,12 @@
       ]
     },
     "StudentCourse": {
-      "hash": 5636406891270849129,
+      "hash": 14843247351436001423,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "StudentCourse",
       "primary_columns": [
         {
@@ -739,7 +752,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get",

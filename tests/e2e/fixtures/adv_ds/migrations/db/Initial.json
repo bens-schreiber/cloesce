@@ -1,10 +1,14 @@
 {
-  "hash": 18434063000749143771,
+  "hash": 8316329841862264374,
   "models": {
     "DefaultOverride": {
-      "hash": 3283447504166446726,
+      "hash": 7623099930840325705,
       "name": "DefaultOverride",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -22,9 +26,13 @@
       "navigation_fields": []
     },
     "Hamburger": {
-      "hash": 14624565934395245746,
+      "hash": 10900287864015129530,
       "name": "Hamburger",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -76,9 +84,13 @@
       ]
     },
     "Topping": {
-      "hash": 2310149034276584210,
+      "hash": 4637861392215237397,
       "name": "Topping",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -130,9 +142,13 @@
       ]
     },
     "HamburgerTopping": {
-      "hash": 4024964836951031313,
+      "hash": 2191875105602707450,
       "name": "HamburgerTopping",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 15597455802024041115,

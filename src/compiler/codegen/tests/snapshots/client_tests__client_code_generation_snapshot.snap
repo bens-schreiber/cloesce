@@ -157,6 +157,15 @@ export class BasicService {
     return __$res;
   }
 }
+export class GlobalSettings {
+  config: KValue<unknown>;
+
+  static fromJson(data: any): GlobalSettings {
+    const __$res = Object.assign(new GlobalSettings(), data);
+    if (__$res.config) __$res.config = Object.assign(new KValue(), __$res.config);
+    return __$res;
+  }
+}
 export class HasSqlColumnTypes {
   id: number;
   str: string;
@@ -174,6 +183,61 @@ export class HasSqlColumnTypes {
     const __$res = Object.assign(new HasSqlColumnTypes(), data);
     __$res.dat &&= new Date(__$res.dat);
     __$res.dateNull &&= new Date(__$res.dateNull);
+    return __$res;
+  }
+}
+export class Leaderboard {
+  tenantId: number;
+  topEntries: KValue<unknown>;
+  static async $get(
+    tenantId: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Leaderboard>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/Leaderboard/$get`
+    );
+    __$baseUrl.searchParams.append("tenantId", String(tenantId));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Leaderboard,
+      false
+    );
+  }
+  static async $save(
+    tenantId: number,
+    model: DeepPartial<Leaderboard>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Leaderboard>> {
+    const __$baseUrl = new URL(
+      `http://example.com/path/to/api/Leaderboard/$save`
+    );
+    const __$payload: any = {};
+    __$payload["tenantId"] = tenantId;
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      Leaderboard,
+      false
+    );
+  }
+
+  static fromJson(data: any): Leaderboard {
+    const __$res = Object.assign(new Leaderboard(), data);
+    if (__$res.topEntries) __$res.topEntries = Object.assign(new KValue(), __$res.topEntries);
     return __$res;
   }
 }

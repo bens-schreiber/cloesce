@@ -13,15 +13,26 @@ export interface Env {
     bucket1: R2Bucket;
 }
 export class bucket1 {
-    static data(id: number): string {
-        return `path/to/data/${id}`;
-    }
-    static otherData(id: number): string {
-        return `path/to/other/${id}`;
-    }
-    static allData(): string {
-        return `path/`;
-    }
+    static readonly data = {
+        template: (id: number): string =>
+            `path/to/data/${id}`,
+        get: (bucket: R2Bucket, id: number): Promise<R2ObjectBody | null> =>
+            bucket.get(bucket1.data.template(id)),
+        put: (bucket: R2Bucket, id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(bucket1.data.template(id), value),
+    };
+    static readonly otherData = {
+        template: (id: number): string =>
+            `path/to/other/${id}`,
+        get: (bucket: R2Bucket, id: number): Promise<R2ObjectBody | null> =>
+            bucket.get(bucket1.otherData.template(id)),
+        put: (bucket: R2Bucket, id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put(bucket1.otherData.template(id), value),
+    };
+    static readonly allData = {
+        template: (): string =>
+            `path/`,
+    };
 }
 export namespace D1BackedModel {
     export const Tag = "D1BackedModel" as const;

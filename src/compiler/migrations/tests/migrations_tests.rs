@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use idl::{CloesceIdl, MigrationsIdl, MigrationsModel};
+use idl::{CloesceIdl, MigrationsIdl, MigrationsModel, ModelBacking};
 
 use compiler_test::{expected_str, src_to_idl};
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
@@ -38,7 +38,11 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name.to_string(),
-                database_binding: Some("db".into()),
+                backing: Some(ModelBacking {
+                    kind: idl::BackingKind::D1,
+                    binding: "db",
+                    fields: vec![],
+                }),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
                 navigation_fields: model.navigation_fields,

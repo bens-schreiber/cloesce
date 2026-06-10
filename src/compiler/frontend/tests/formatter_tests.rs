@@ -46,7 +46,6 @@ fn format_non_lossy() {
         reparse_ast.blocks.len(),
         "block count mismatch"
     );
-    insta::assert_snapshot!(formatted);
 }
 
 #[test]

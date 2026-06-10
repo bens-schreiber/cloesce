@@ -274,6 +274,17 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             },
                         );
                     }
+
+                    for arg in model_block.shard_args.iter().flatten() {
+                        insert_local(
+                            sink,
+                            arg,
+                            LocalSymbolKind::ModelField {
+                                model: model_block.symbol.name,
+                                name: arg.name,
+                            },
+                        );
+                    }
                 }
                 AstBlockKind::PlainOldObject(plain_old_object_block) => {
                     insert_global(sink, &plain_old_object_block.symbol);

@@ -1,5 +1,5 @@
 {
-  "hash": 3048163358009312556,
+  "hash": 0,
   "wrangler_env": {
     "d1_bindings": [],
     "kv_bindings": [],
@@ -9,7 +9,8 @@
   },
   "models": {
     "FooService": {
-      "hash": 2742409012207128302,
+      "hash": 0,
+      "backing": null,
       "name": "FooService",
       "primary_columns": [],
       "columns": [],
@@ -17,7 +18,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": null,
       "apis": [
         {
           "name": "method",

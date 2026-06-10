@@ -97,9 +97,17 @@ export interface ApiMethod {
   durable_target?: DurableTarget | null;
 }
 
+export type BackingKind = "D1" | "DurableObject";
+
+export interface ModelBacking {
+  binding: string;
+  fields: string[];
+  kind: BackingKind;
+}
+
 export interface Model {
   name: string;
-  database_binding: string | null;
+  backing?: ModelBacking | null;
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
@@ -109,6 +117,14 @@ export interface Model {
   apis: ApiMethod[];
   cruds: CrudKind[];
   data_sources: Record<string, DataSource>;
+}
+
+export function isDurableBacked(model: Model): boolean {
+  return model.backing?.kind === "DurableObject";
+}
+
+export function isD1Backed(model: Model): boolean {
+  return model.backing?.kind === "D1";
 }
 
 export interface PlainOldObject {

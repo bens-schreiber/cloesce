@@ -31,6 +31,27 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.api_injected_type(self.idl, api, name)
     }
 
+    fn ds_injected_type(&self, model: &Model<'_>, name: &str) -> String {
+        match &model.backing {
+            Some(backing) if model.is_durable_backed() && name == idl::CONTEXT_INJECT_KEY => {
+                backing.binding.to_string()
+            }
+            _ => self.mapper.inject_type(self.idl, name),
+        }
+    }
+
+    fn backing_binding(&self, model: &Model<'_>) -> String {
+        model
+            .backing
+            .as_ref()
+            .map(|b| b.binding.to_string())
+            .unwrap_or_default()
+    }
+
+    fn context_inject_key(&self) -> &'static str {
+        idl::CONTEXT_INJECT_KEY
+    }
+
     fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {
         let names = params.iter().map(|p| p.name.as_ref());
         self.mapper.interpolate_format(format, names)

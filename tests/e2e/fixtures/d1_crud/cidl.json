@@ -1,5 +1,5 @@
 {
-  "hash": 2584065736982692040,
+  "hash": 2353086570416310838,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "CrudHaver": {
-      "hash": 3221090397089686579,
+      "hash": 674920388718621568,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "CrudHaver",
       "primary_columns": [
         {
@@ -43,7 +48,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "notCrud",
@@ -220,7 +224,12 @@
       ]
     },
     "Parent": {
-      "hash": 1579048073847534623,
+      "hash": 5024253572106450643,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Parent",
       "primary_columns": [
         {
@@ -298,7 +307,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -616,7 +624,12 @@
       ]
     },
     "Child": {
-      "hash": 5516230628474069556,
+      "hash": 1213073710517185681,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Child",
       "primary_columns": [
         {
@@ -671,7 +684,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [],
       "data_sources": {
         "Default": {

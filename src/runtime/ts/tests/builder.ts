@@ -14,6 +14,7 @@ import {
   KvField,
   R2Field,
   ValidatedField,
+  ModelBacking,
 } from "../src/cidl";
 
 export function createIdl(args?: { models?: Model[] }): Cidl {
@@ -38,6 +39,7 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
       d1_bindings: [],
       kv_bindings: [],
       r2_bindings: [],
+      durable_bindings: [],
       vars: [],
     },
     models: modelsMap,
@@ -71,7 +73,7 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private database_binding: string | null = null;
+  private backing: ModelBacking | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: Column[] = [];
@@ -92,12 +94,19 @@ export class ModelBuilder {
   }
 
   d1(binding: string): this {
-    this.database_binding = binding;
+    this.backing = { binding, fields: [], kind: "D1" };
     return this;
   }
 
   defaultDb(): this {
-    this.database_binding = "d1";
+    return this.d1("d1");
+  }
+
+  durable(binding: string, fields: string[] = []): this {
+    this.backing = { binding, fields, kind: "DurableObject" };
+    for (const name of fields) {
+      this.route_fields.push({ name, cidl_type: "Int", validators: [] });
+    }
     return this;
   }
 
@@ -238,7 +247,7 @@ export class ModelBuilder {
 
     return {
       name: this.name,
-      database_binding: this.database_binding,
+      backing: this.backing,
       primary_columns,
       columns: mutableColumns,
       route_fields: this.route_fields,

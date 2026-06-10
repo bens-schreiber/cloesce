@@ -1,6 +1,6 @@
 import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Leaderboard, Global } from "../fixtures/durable_objects/client";
+import { Leaderboard, Global, LeaderboardEntry } from "../fixtures/durable_objects/client";
 import config from "../fixtures/durable_objects/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -56,5 +56,42 @@ describe("Global Durable Object", () => {
 
     const get = await Global.getConfig();
     expectHttpResult(get, "getConfig should be OK");
+  });
+});
+
+describe("Durable Object-backed model", () => {
+  it("a single $save fans out KV writes to the DO storage and a Worker KV namespace", async () => {
+    const saved = await LeaderboardEntry.$save(1, 5, {
+      tenantId: 1,
+      rank: 5,
+      score: { raw: 250 },
+      meta: { raw: "gold" },
+    });
+    expectHttpResult(saved, "$save should be OK");
+
+    // $get forwards into the same DO and hydrates `score` from DO storage and `meta`
+    // from the Worker KV namespace.
+    const got = await LeaderboardEntry.$get(1, 5);
+    expectHttpResult(got, "$get should be OK");
+    expect(got.data!.tenantId).toBe(1);
+    expect(got.data!.rank).toBe(5);
+    expect(got.data!.score.value).toBe(250);
+    expect(got.data!.meta.value).toBe("gold");
+  });
+
+  it("different tenants resolve to isolated DO instances", async () => {
+    await LeaderboardEntry.$save(3, 1, {
+      tenantId: 3,
+      rank: 1,
+      score: { raw: 70 },
+      meta: { raw: "bronze" },
+    });
+
+    const tenant3 = await LeaderboardEntry.$get(3, 1);
+    expect(tenant3.data!.score.value).toBe(70);
+
+    // tenant 1 is unaffected by tenant 3's write.
+    const tenant1 = await LeaderboardEntry.$get(1, 5);
+    expect(tenant1.data!.score.value).toBe(250);
   });
 });

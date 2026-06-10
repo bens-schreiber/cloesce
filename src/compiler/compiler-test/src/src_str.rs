@@ -311,6 +311,19 @@ api BasicService {
     get globalConfig() -> json
 }
 
+[crud get, save]
+model Leaderboard for LeaderboardDo(tenantId) {
+    kv LeaderboardDo::topEntryCache {
+        topEntries
+    }
+}
+
+model GlobalSettings for GlobalDo {
+    kv GlobalDo::config {
+        config
+    }
+}
+
 poo BasicPoo {
     field1: string
     field2: int

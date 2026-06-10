@@ -89,7 +89,7 @@ impl<'a> UpsertModel<'a> {
         )?;
 
         let model = idl.models.get(model_name).expect("Model to exist");
-        if model.database_binding.is_some() {
+        if model.uses_sqlite() {
             // Final select to return the upserted model
             let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
@@ -194,8 +194,8 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        if model.database_binding.is_none() {
-            // Route models have no SQL. Their navigation targets are sibling route models
+        if !model.uses_sqlite() {
+            // Worker backed models have no SQL. Their navigation targets are sibling route models
             // assembled from this model's route fields, so persist their KV/R2 by recursing.
             for nav in &model.navigation_fields {
                 let Some(Value::Object(nested_tree)) = include_tree.get(nav.field.name.as_ref())

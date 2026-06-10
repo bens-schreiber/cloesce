@@ -15,6 +15,12 @@ durable GlobalDo {
     }
 }
 
+kv EntryMeta {
+    label(tenantId: int, rank: int) -> string {
+        "entry/{tenantId}/{rank}"
+    }
+}
+
 model Leaderboard {}
 
 api Leaderboard {
@@ -33,4 +39,25 @@ api Global {
 
     [context GlobalDo]
     get getConfig() -> json
+}
+
+// A model BACKED BY a Durable Object: it hydrates its `score` field from the DO's
+// own KV storage, and its generated CRUD routes run inside the DO. It inherits
+// `tenantId` from the DO's shard and declares an extra `rank` route field.
+//
+// `meta` is bound to a regular Worker KV namespace, so a single upsert fans out to
+// two destinations: `score` to the DO storage, `meta` to Worker KV.
+[crud get, save]
+model LeaderboardEntry for LeaderboardDo(tenantId) {
+    route {
+        rank: int
+    }
+
+    kv LeaderboardDo::score {
+        score
+    }
+
+    kv EntryMeta::label(tenantId, rank) {
+        meta
+    }
 }

@@ -1,10 +1,14 @@
 {
-  "hash": 14039577506740097549,
+  "hash": 3659956248672565578,
   "models": {
     "A": {
-      "hash": 13694065073971378326,
+      "hash": 1303172740734510662,
       "name": "A",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -59,9 +63,13 @@
       ]
     },
     "B": {
-      "hash": 5976713688952143785,
+      "hash": 10635246349852312340,
       "name": "B",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -101,9 +109,13 @@
       ]
     },
     "Course": {
-      "hash": 7562159567723127520,
+      "hash": 12932233359836810835,
       "name": "Course",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -143,9 +155,13 @@
       ]
     },
     "Person": {
-      "hash": 823242336505793948,
+      "hash": 10142848541173516075,
       "name": "Person",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -185,9 +201,13 @@
       ]
     },
     "Student": {
-      "hash": 5262831485580231479,
+      "hash": 5337292872625529486,
       "name": "Student",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -227,9 +247,13 @@
       ]
     },
     "Dog": {
-      "hash": 8677285544175970002,
+      "hash": 6550663264689982777,
       "name": "Dog",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -282,9 +306,13 @@
       ]
     },
     "CourseStudent": {
-      "hash": 514777369792557541,
+      "hash": 6047280902844329700,
       "name": "CourseStudent",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 4017708243728059354,

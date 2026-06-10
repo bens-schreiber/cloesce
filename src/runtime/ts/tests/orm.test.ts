@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
-import { ModelBuilder, createIdl } from "./builder";
+import { ModelBuilder, createIdl } from "./builder.js";
 import { _cloesceInternal } from "../src/router/router.js";
 import { hydrateType } from "../src/router/orm";
 import { Cidl } from "../src/cidl.js";
@@ -11,7 +11,25 @@ function createHydrateArgs() {
     idl: { models: {}, poos: {} } as Cidl,
     includeTree: null,
     env: {},
+    durable: null,
     promises: [],
+  };
+}
+
+function mockDurableContext() {
+  const store = new Map<string, any>();
+  return {
+    store,
+    ctx: {
+      state: {
+        storage: {
+          kv: {
+            get: (key: string) => store.get(key),
+            put: (key: string, value: any) => store.set(key, value),
+          },
+        },
+      },
+    },
   };
 }
 
@@ -361,6 +379,7 @@ describe("ORM Hydrate Tests", () => {
           idl,
           includeTree: {},
           env,
+          durable: null,
           promises,
         },
       );
@@ -400,6 +419,7 @@ describe("ORM Hydrate Tests", () => {
             emptyImage: {},
           },
           env,
+          durable: null,
           promises,
         },
       );
@@ -486,6 +506,7 @@ describe("ORM Hydrate Tests", () => {
         idl,
         includeTree: { configList: {} },
         env: { namespace1 },
+        durable: null,
         promises,
       },
     );
@@ -514,4 +535,36 @@ describe("ORM Hydrate Tests", () => {
       expect(firstPageKeys.has(key.name)).toBe(false);
     }
   }, 30000);
+
+  test("reads a Durable Object-backed model's KV field from the DO's own storage", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Leaderboard")
+      .durable("LeaderboardDo", ["tenantId"])
+      .kvField("score/{tenantId}", "LeaderboardDo", "score", "Int")
+      .build();
+
+    const idl = createIdl({ models: [modelMeta] });
+    const { ctx, store } = mockDurableContext();
+    store.set("score/7", 42);
+
+    // Act
+    const promises: Promise<CloesceResult<void>>[] = [];
+    const result = hydrateType(
+      { tenantId: 7 },
+      { Object: { name: "Leaderboard" } },
+      {
+        ...createHydrateArgs(),
+        idl,
+        includeTree: { score: {} },
+        durable: ctx,
+        promises,
+      },
+    );
+
+    await Promise.all(promises);
+
+    // Assert
+    expect(result.score.key).toBe("score/7");
+    expect(result.score.raw).toBe(42);
+  });
 });

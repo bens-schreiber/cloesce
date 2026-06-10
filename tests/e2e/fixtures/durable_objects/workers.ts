@@ -11,6 +11,8 @@ const Leaderboard = clo.Leaderboard.impl({
   },
 });
 
+const LeaderboardEntry = clo.LeaderboardEntry.impl({});
+
 const Global = clo.Global.impl({
   setConfig(env, value) {
     env.$ctx.config.put(value);
@@ -27,6 +29,7 @@ export class LeaderboardDo extends clo.LeaderboardDo {
     super(ctx, env);
     this.app = this.cloesce(env);
     this.app.register(Leaderboard);
+    this.app.register(LeaderboardEntry);
   }
 
   async fetch(request: Request): Promise<Response> {

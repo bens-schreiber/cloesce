@@ -25,10 +25,9 @@ pub fn map_sql(
             name: model_name.to_string(),
         }),
     };
-    if model.database_binding.is_none() {
-        fail!(OrmErrorKind::ModelMissingD1 {
-            name: model_name.to_string(),
-        })
+    if !model.uses_sqlite() {
+        // Fail silently
+        return Ok(vec![]);
     }
 
     let mut result_map = IndexMap::new();
@@ -120,7 +119,7 @@ fn process_navigation_properties(
             }),
         };
 
-        if nested_model.database_binding.is_none() {
+        if !nested_model.uses_sqlite() {
             // No actual SQL columns to map
             continue;
         }

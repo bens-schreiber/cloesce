@@ -9,7 +9,17 @@ import type {
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import { Model, CidlType, Cidl, getNavigationCidlType, KvField } from "../cidl.js";
+import {
+  Model,
+  CidlType,
+  Cidl,
+  getNavigationCidlType,
+  KvField,
+  R2Field,
+  isD1Backed,
+  isDurableBacked,
+  CONTEXT_INJECT_KEY,
+} from "../cidl.js";
 import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
@@ -17,8 +27,29 @@ type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
   env: any;
+  durable: DurableContext | null;
   promises: Promise<CloesceResult<void>>[];
 };
+
+type DurableContext = {
+  state: {
+    storage: {
+      kv: { get(key: string): any; put(key: string, value: any): void };
+    };
+  };
+};
+
+interface KvRepository {
+  /** Reads `key` as the single value or full page the field's type calls for. */
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>>;
+
+  put(key: string, value: any, metadata?: unknown): Promise<void> | void;
+}
+
+interface R2Repository {
+  /** Reads `key` as the single object or full page the field's type calls for. */
+  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>>;
+}
 
 type KvUpload = {
   namespace_binding: string;
@@ -34,10 +65,14 @@ type UpsertResult = {
 };
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(
+    private env: any,
+    private durable: DurableContext | null,
+  ) {}
 
-  static fromEnv(env: unknown): Orm {
-    return new Orm(env);
+  static fromEnv(env: any): Orm {
+    const durable = env[CONTEXT_INJECT_KEY] as DurableContext | undefined;
+    return new Orm(env, durable ?? null);
   }
 
   /**
@@ -83,10 +118,6 @@ export class Orm {
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
-    if (!meta.database_binding) {
-      return "";
-    }
-
     const { wasm } = RuntimeContainer.get();
     const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
     const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
@@ -126,6 +157,7 @@ export class Orm {
       idl,
       includeTree,
       env,
+      durable: this.durable,
       promises,
     });
 
@@ -135,6 +167,10 @@ export class Orm {
     }
 
     return { value: hydrated, errors: [] };
+  }
+
+  private kvRepositoryFor(meta: Model, binding: string): KvRepository {
+    return kvRepositoryFor(meta, binding, { env: this.env, durable: this.durable });
   }
 
   /**
@@ -183,28 +219,23 @@ export class Orm {
     }
     const upsertRes = JSON.parse(upsertQueryRes.unwrap()) as UpsertResult;
 
-    // Collect all KV uploads that can be performed concurrently with the SQL upsert
-    const kvUploadPromises = upsertRes.kv_uploads.map(async (upload) => {
-      const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
-      if (!namespace) {
-        throw new InternalError(
-          `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
-        );
-      }
+    // Collect all KV uploads that can be performed concurrently with the SQL upsert.
+    // Each upload is routed to its destination (a Worker KV namespace, or this model's
+    // own Durable Object storage) by its binding.
+    const kvUploadPromises = upsertRes.kv_uploads.map((upload) =>
+      CloesceError.catchGeneric(async () => {
+        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
+        await repo.put(upload.key, upload.value, upload.metadata);
+      }),
+    );
 
-      return CloesceError.catchGeneric(
-        async () =>
-          await namespace.put(upload.key, JSON.stringify(upload.value), {
-            metadata: upload.metadata,
-          }),
-      );
-    });
-
-    // If there are any SQL queries to execute, collect them as [D1PreparedStatement]s
-    const db: D1Database | undefined = meta.database_binding
-      ? (this.env as any)[meta.database_binding]
+    // The SQL upsert runs against the model's backing database. A DO-backed model's
+    // SQLite store is reached through the DO context (no Worker D1 binding); that path
+    // is a no-op until DO SQLite upserts land in a later phase.
+    const db: D1Database | undefined = isD1Backed(meta)
+      ? (this.env as any)[meta.backing!.binding]
       : undefined;
-    const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
+    const queries = db ? upsertRes.sql.map((s) => db.prepare(s.query).bind(...s.values)) : [];
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
@@ -212,7 +243,7 @@ export class Orm {
       ...kvUploadPromises,
     ]);
 
-    let base = {};
+    let base: any = newModel;
 
     // Ensure all queries succeeded, then map the result of the final SELECT statement to the Model
     if (queries.length > 0) {
@@ -266,7 +297,7 @@ export class Orm {
 
     // Execute all delayed KV uploads that depended on SQL results
     const delayedUploadResults = await Promise.all(
-      upsertRes.kv_delayed_uploads.map(async (upload): Promise<CloesceResult<void>> => {
+      upsertRes.kv_delayed_uploads.map((upload): Promise<CloesceResult<void>> => {
         let current: any = base;
         for (const pathPart of upload.path) {
           current = current[pathPart];
@@ -277,13 +308,6 @@ export class Orm {
           }
         }
 
-        const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
-        if (!namespace) {
-          throw new InternalError(
-            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
-          );
-        }
-
         const key = resolveKey(upload.key, current);
         if (!key) {
           throw new InternalError(
@@ -291,11 +315,10 @@ export class Orm {
           );
         }
 
-        return CloesceError.catchGeneric(() =>
-          namespace.put(key, JSON.stringify(upload.value), {
-            metadata: upload.metadata,
-          }),
-        );
+        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
+        return CloesceError.catchGeneric(async () => {
+          await repo.put(key, upload.value, upload.metadata);
+        });
       }),
     );
 
@@ -304,7 +327,6 @@ export class Orm {
       return delayedUploadErrors;
     }
 
-    // Hydrate and return the upserted model
     return await this.hydrate(meta, base, includeTree);
   }
 
@@ -319,7 +341,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T | null>> {
-    if (!query || !meta.database_binding) {
+    if (!query) {
       // No query provided, hydrate any non-SQL fields
       return await this.hydrate(meta, {}, includeTree);
     }
@@ -347,7 +369,7 @@ export class Orm {
     query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query || !meta.database_binding) {
+    if (!query) {
       return { value: [], errors: [] };
     }
 
@@ -367,21 +389,6 @@ export class Orm {
     }
 
     return { value: hydratedResults.map((r) => r.value as T), errors: [] };
-  }
-}
-
-/**
- * @returns null if any parameter could not be resolved
- */
-function resolveKey(format: string, current: any): string | null {
-  try {
-    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-      const paramValue = current[paramName];
-      if (paramValue === undefined) throw null;
-      return String(paramValue);
-    });
-  } catch {
-    return null;
   }
 }
 
@@ -469,7 +476,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       const target = args.idl.models[nav.model_reference];
       if (
         value[nav.field.name] === undefined &&
-        !target.database_binding &&
+        !target.backing &&
         target.route_fields.length > 0 &&
         typeof nav.kind === "object" &&
         "OneToOne" in nav.kind
@@ -491,56 +498,32 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
 
     for (const kv of modelMeta.kv_fields) {
       const key = resolveKey(kv.key_format, value);
-      const isPaginated =
-        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        if (isPaginated) {
-          value[kv.field.name] = {
-            results: [],
-            cursor: null,
-            complete: true,
-          } as Paginated<KValue<unknown>>;
-        }
+        const empty = emptyHydration(kv.field.cidl_type);
+        if (empty) value[kv.field.name] = empty;
         continue;
       }
-      const namespace: KVNamespace = args.env[kv.binding]!;
+
+      const repo = kvRepositoryFor(modelMeta, kv.binding, args);
       args.promises.push(
-        isPaginated
-          ? hydrateKVList(namespace, key, kv, value)
-          : hydrateKVSingle(namespace, key, kv, value),
+        CloesceError.catchGeneric(async () => {
+          value[kv.field.name] = await repo.hydrate(kv, key);
+        }),
       );
     }
 
     for (const r2 of modelMeta.r2_fields) {
       const key = resolveKey(r2.key_format, value);
-      const isPaginated =
-        typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        if (isPaginated) {
-          value[r2.field.name] = {
-            results: [],
-            cursor: null,
-            complete: true,
-          } as Paginated<R2ObjectBody>;
-        }
+        const empty = emptyHydration(r2.field.cidl_type);
+        if (empty) value[r2.field.name] = empty;
         continue;
       }
-      const bucket: R2Bucket = args.env[r2.binding]!;
+      const repo = r2RepositoryFor(r2.binding, args.env);
       args.promises.push(
-        isPaginated
-          ? CloesceError.catchGeneric(async () => {
-              const list = await bucket.list({ prefix: key });
-              const results = await Promise.all(list.objects.map((obj) => bucket.get(obj.key)));
-              const cursor = list.truncated ? (list.cursor ?? null) : null;
-              value[r2.field.name] = {
-                results,
-                cursor,
-                complete: !cursor,
-              } as Paginated<R2ObjectBody>;
-            })
-          : CloesceError.catchGeneric(async () => {
-              value[r2.field.name] = await bucket.get(key);
-            }),
+        CloesceError.catchGeneric(async () => {
+          value[r2.field.name] = await repo.hydrate(r2, key);
+        }),
       );
     }
 
@@ -557,61 +540,147 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
   }
 }
 
-function hydrateKVList(
-  namespace: KVNamespace,
-  key: string,
-  kv: KvField,
-  current: any,
-): Promise<CloesceResult<void>> {
-  return CloesceError.catchGeneric(async () => {
-    const res = await namespace.list({ prefix: key });
+class WorkerKvRepository implements KvRepository {
+  constructor(private namespace: KVNamespace) {}
+
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
+    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
+  }
+
+  private async get(kv: KvField, key: string): Promise<KValue<unknown>> {
+    // KV Fields are capable of holding a `Stream` of data, which must be retrieved
+    // with the `type: "stream"` option and cannot be JSON-parsed.
+    //
+    // A field is a `Stream` if the root type is of `Stream`.
+    const isStreamField = (kv: KvField) => {
+      const inner =
+        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
+          ? kv.field.cidl_type.Paginated
+          : kv.field.cidl_type;
+      return inner === "Stream";
+    };
+
+    if (isStreamField(kv)) {
+      return new KValue(key, await this.namespace.get(key, { type: "stream" }), null);
+    }
+
+    const { value: raw, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
+    return new KValue(key, raw, metadata);
+  }
+
+  private async list(kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
+    const res = await this.namespace.list({ prefix });
     const cursor = !res.list_complete ? (res.cursor ?? null) : null;
     const complete = res.list_complete || !cursor;
 
-    const inner =
-      typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
-        ? kv.field.cidl_type.Paginated
-        : kv.field.cidl_type;
+    const results = await Promise.all(res.keys.map((k: any) => this.get(kv, k.name)));
+    return { results, cursor, complete };
+  }
 
-    if (inner === "Stream") {
-      const results = await Promise.all(
-        res.keys.map(
-          async (k: any) =>
-            new KValue(k.name, await namespace.get(k.name, { type: "stream" }), null),
-        ),
-      );
-      current[kv.field.name] = {
-        results,
-        cursor,
-        complete,
-      } as unknown as Paginated<KValue<ReadableStream>>;
-      return;
-    }
-
-    const results = await Promise.all(
-      res.keys.map(async (k: any) => {
-        const { value: raw, metadata } = await namespace.getWithMetadata(k.name, { type: "json" });
-        return new KValue(k.name, raw, metadata);
-      }),
-    );
-    current[kv.field.name] = { results, cursor, complete } as Paginated<KValue<unknown>>;
-  });
+  put(key: string, value: any, metadata: unknown): Promise<void> {
+    return this.namespace.put(key, JSON.stringify(value), { metadata });
+  }
 }
 
-function hydrateKVSingle(
-  namespace: KVNamespace,
-  key: string,
-  kv: KvField,
-  current: any,
-): Promise<CloesceResult<void>> {
-  return CloesceError.catchGeneric(async () => {
-    if (kv.field.cidl_type === "Stream") {
-      current[kv.field.name] = new KValue(key, await namespace.get(key, { type: "stream" }), null);
-      return;
-    }
-    const { value: raw, metadata } = await namespace.getWithMetadata(key, {
-      type: "json",
+class DurableKvRepository implements KvRepository {
+  constructor(private ctx: DurableContext) {}
+
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
+    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
+  }
+
+  private async get(_kv: KvField, key: string): Promise<KValue<unknown>> {
+    const raw = this.ctx.state.storage.kv.get(key);
+    return new KValue(key, raw ?? null, null);
+  }
+
+  // DO storage exposes only single-key gets; a prefix list resolves to the single
+  // value at `prefix`.
+  // TODO: SQL-backed DO storage will support true prefix scans.
+  private async list(kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
+    const value = await this.get(kv, prefix);
+    return {
+      results: value.raw === null ? [] : [value],
+      cursor: null,
+      complete: true,
+    };
+  }
+
+  put(key: string, value: any): void {
+    this.ctx.state.storage.kv.put(key, value);
+  }
+}
+
+class WorkerR2Repository implements R2Repository {
+  constructor(private bucket: R2Bucket) {}
+
+  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>> {
+    return isPaginated(r2.field.cidl_type) ? this.list(key) : this.get(key);
+  }
+
+  private get(key: string): Promise<R2ObjectBody | null> {
+    return this.bucket.get(key);
+  }
+
+  private async list(prefix: string): Promise<Paginated<R2ObjectBody>> {
+    const res = await this.bucket.list({ prefix });
+    const results = await Promise.all(res.objects.map((obj) => this.bucket.get(obj.key)));
+    const cursor = res.truncated ? (res.cursor ?? null) : null;
+    return { results, cursor, complete: !cursor } as Paginated<R2ObjectBody>;
+  }
+}
+
+/**
+ * @returns null if any parameter could not be resolved
+ */
+function resolveKey(format: string, current: any): string | null {
+  try {
+    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
+      const paramValue = current[paramName];
+      if (paramValue === undefined) throw null;
+      return String(paramValue);
     });
-    current[kv.field.name] = new KValue(key, raw, metadata);
-  });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @returns a `KvRepository` instance based on the provided model metadata and binding,
+ * routing to either a Worker KV namespace or Durable Object storage as appropriate.
+ */
+function kvRepositoryFor(
+  meta: Model,
+  binding: string,
+  ctx: { env: any; durable: DurableContext | null },
+): KvRepository {
+  if (ctx.durable && isDurableBacked(meta) && binding === meta.backing!.binding) {
+    return new DurableKvRepository(ctx.durable);
+  }
+
+  const namespace: KVNamespace | undefined = ctx.env?.[binding];
+  if (!namespace) {
+    throw new InternalError(`KV Namespace binding "${binding}" not found.`);
+  }
+
+  return new WorkerKvRepository(namespace);
+}
+
+/**
+ * @returns an `R2Repository` instance based on the provided binding, routing to a Worker R2 bucket.
+ */
+function r2RepositoryFor(binding: string, env: any): R2Repository {
+  const bucket: R2Bucket | undefined = env?.[binding];
+  if (!bucket) {
+    throw new InternalError(`R2 Bucket binding "${binding}" not found.`);
+  }
+  return new WorkerR2Repository(bucket);
+}
+
+function isPaginated(cidlType: CidlType): boolean {
+  return typeof cidlType === "object" && "Paginated" in cidlType;
+}
+
+function emptyHydration(cidlType: CidlType): Paginated<never> | undefined {
+  return isPaginated(cidlType) ? { results: [], cursor: null, complete: true } : undefined;
 }

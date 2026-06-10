@@ -1,5 +1,5 @@
 {
-  "hash": 14113549040013838164,
+  "hash": 7884496493624852865,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "Weather": {
-      "hash": 10306382131681195126,
+      "hash": 13409753493227586003,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Weather",
       "primary_columns": [
         {
@@ -54,7 +59,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "isItRainingSomewhere",

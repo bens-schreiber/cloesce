@@ -13,9 +13,14 @@ export interface Env {
     store: KVNamespace;
 }
 export class store {
-    static data(email: string): string {
-        return `some_crap/${email}`;
-    }
+    static readonly data = {
+        template: (email: string): string =>
+            `some_crap/${email}`,
+        get: (ns: KVNamespace, email: string): Promise<string | null> =>
+            ns.get(store.data.template(email)) as any,
+        put: (ns: KVNamespace, email: string, value: string): Promise<void> =>
+            ns.put(store.data.template(email), value as any),
+    };
 }
 export namespace Validator {
     export const Tag = "Validator" as const;

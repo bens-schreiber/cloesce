@@ -1,5 +1,5 @@
 {
-  "hash": 16460799960641342993,
+  "hash": 7067317677216389298,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -58,7 +58,12 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 6703974713046051109,
+      "hash": 7622394338550115836,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "D1BackedModel",
       "primary_columns": [
         {
@@ -118,7 +123,6 @@
       ],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "uploadData",
@@ -330,6 +334,7 @@
     },
     "R2Only": {
       "hash": 0,
+      "backing": null,
       "name": "R2Only",
       "primary_columns": [],
       "columns": [],
@@ -372,7 +377,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [
         {
           "name": "uploadData",
@@ -472,6 +476,7 @@
     },
     "R2Sibling": {
       "hash": 0,
+      "backing": null,
       "name": "R2Sibling",
       "primary_columns": [],
       "columns": [],
@@ -494,7 +499,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [
         {
           "name": "uploadData",

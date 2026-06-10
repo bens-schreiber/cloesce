@@ -11,6 +11,10 @@ import { DurableObject } from "cloudflare:workers";
 { {% for (i, name) in injected.iter().enumerate() %}{{ name }}: {{ inject_type(name) }}{% if i + 1 < injected.len() %}, {% endif %}{% endfor %} }
 {%- endmacro %}
 
+{%- macro ds_inject_env(model, injected) -%}
+{ {% for (i, name) in injected.iter().enumerate() %}{{ name }}: {{ ds_injected_type(model, name) }}{% if i + 1 < injected.len() %}, {% endif %}{% endfor %} }
+{%- endmacro %}
+
 {%- macro api_signature(api, namespace_name) %}
         {{ api.name }}(
 {%- if !api.is_static %}
@@ -55,9 +59,16 @@ export interface Env {
 {%- for binding in &idl.wrangler_env.kv_bindings %}
 export class {{ binding.name }} {
 {%- for template in &binding.templates %}
-    static {{ template.field.name }}({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string {
-        return {{ interpolate_key_format(template.key_format, &template.params) }};
-    }
+    static readonly {{ template.field.name }} = {
+        template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
+            {{ interpolate_key_format(template.key_format, &template.params) }},
+{%- if template.field.cidl_type.is_kv_object() %}
+        get: (ns: KVNamespace{% for param in &template.params %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): Promise<{{ map_type(&template.field.cidl_type.unwrap_kv()) }} | null> =>
+            ns.get({{ binding.name }}.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %})) as any,
+        put: (ns: KVNamespace{% for param in &template.params %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}, value: {{ map_type(&template.field.cidl_type.unwrap_kv()) }}): Promise<void> =>
+            ns.put({{ binding.name }}.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %}), value as any),
+{%- endif %}
+    };
 {%- endfor %}
 }
 {%- endfor %}
@@ -65,9 +76,16 @@ export class {{ binding.name }} {
 {%- for binding in &idl.wrangler_env.r2_bindings %}
 export class {{ binding.name }} {
 {%- for template in &binding.templates %}
-    static {{ template.field.name }}({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string {
-        return {{ interpolate_key_format(template.key_format, &template.params) }};
-    }
+    static readonly {{ template.field.name }} = {
+        template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
+            {{ interpolate_key_format(template.key_format, &template.params) }},
+{%- if !template.field.cidl_type.is_paginated() %}
+        get: (bucket: R2Bucket{% for param in &template.params %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): Promise<R2ObjectBody | null> =>
+            bucket.get({{ binding.name }}.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %})),
+        put: (bucket: R2Bucket{% for param in &template.params %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+            bucket.put({{ binding.name }}.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %}), value),
+{%- endif %}
+    };
 {%- endfor %}
 }
 {%- endfor %}
@@ -122,7 +140,7 @@ export interface {{ poo.name }} {
 {%- endfor %}
 
 {%- for (_key, model) in &idl.models %}
-{%- if model.database_binding.is_none() && model.route_fields.is_empty() %}
+{%- if model.backing.is_none() && model.route_fields.is_empty() %}
 export namespace {{ model.name }} {
     export const Tag = "{{ model.name }}" as const;
 
@@ -186,14 +204,15 @@ export namespace {{ model.name }} {
 {%- for ds in model.data_sources.values() %}
         export const {{ ds.name }} = {
             tree: {{ mapper.include_tree(&ds.tree) }},
-{%- if model.database_binding.is_some() %}
+{%- if model.is_d1_backed() %}
+{%- let db = backing_binding(model) %}
             selectQuery: `{{ ds.include_query }}`,
 
-            getQuery(env: { {{ model.database_binding.unwrap() }}: Env["{{ model.database_binding.unwrap() }}"] }{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): D1PreparedStatement {
-                return env.{{ model.database_binding.unwrap() }}.prepare(`{{ ds.get_query }}`).bind({% for (i, param) in ds.get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endfor %});
+            getQuery(env: { {{ db }}: Env["{{ db }}"] }{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): D1PreparedStatement {
+                return env.{{ db }}.prepare(`{{ ds.get_query }}`).bind({% for (i, param) in ds.get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endfor %});
             },
-            listQuery(env: { {{ model.database_binding.unwrap() }}: Env["{{ model.database_binding.unwrap() }}"] }{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): D1PreparedStatement {
-                return env.{{ model.database_binding.unwrap() }}.prepare(`{{ ds.list_query }}`).bind({% for (i, param) in ds.list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endfor %});
+            listQuery(env: { {{ db }}: Env["{{ db }}"] }{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): D1PreparedStatement {
+                return env.{{ db }}.prepare(`{{ ds.list_query }}`).bind({% for (i, param) in ds.list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endfor %});
             },
 {%- if !ds.get.is_stub %}
             async get(env: {{ inject_env(ds.get.injected) }}{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): Promise<HttpResult<Self | null>> {
@@ -218,6 +237,29 @@ export namespace {{ model.name }} {
                 return HttpResult.ok(200, res.value!);
             },
 {%- endif %}
+{%- else if model.is_durable_backed() %}
+{%- if !ds.get.is_stub %}
+            async get(env: {{ ds_inject_env(model, ds.get.injected) }}{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): Promise<HttpResult<Self | null>> {
+                const base = { {% for (i, param) in ds.get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endfor %} } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+{%- endif %}
+{%- if !ds.save.is_stub %}
+            async save(env: {{ ds_inject_env(model, ds.save.injected) }}{% for param in ds.save.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+{%- endif %}
 {%- else %}
 {%- if !ds.get.is_stub %}
             async get(env: {{ inject_env(ds.get.injected) }}{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): Promise<HttpResult<Self | null>> {
@@ -230,7 +272,7 @@ export namespace {{ model.name }} {
             },
 {%- endif %}
 {%- endif %}
-{%- if !ds.save.is_stub %}
+{%- if !model.is_durable_backed() && !ds.save.is_stub %}
             async save(env: {{ inject_env(ds.save.injected) }}, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -273,12 +315,28 @@ export namespace {{ model.name }} {
     }
 
     export namespace Orm {
+{%- if model.is_durable_backed() %}
+{% let ctx_type = backing_binding(model) %}
+        export async function save(ctx: {{ ctx_type }}, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ {{ context_inject_key() }}: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: {{ ctx_type }}, args: { {% for field in &model.route_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { {% for field in &model.route_fields %}{{ field.name }}: args.{{ field.name }}, {% endfor %} } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ {{ context_inject_key() }}: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: {{ ctx_type }}, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ {{ context_inject_key() }}: ctx }).hydrate<Self>(Meta, base, include);
+        }
+{%- else %}
 {%- let orm_bindings = model_bindings(model, None) %}
         export async function save(env: {{ env_type(orm_bindings) }}, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-{%- if model.database_binding.is_some() %}
+{%- if model.is_d1_backed() %}
 
         export async function get(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
@@ -304,6 +362,7 @@ export namespace {{ model.name }} {
         export async function hydrate(env: {{ env_type(orm_bindings) }}, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
+{%- endif %}
     }
 }
 {%- endif %}

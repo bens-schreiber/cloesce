@@ -1,5 +1,5 @@
 {
-  "hash": 16455310751165633242,
+  "hash": 4942585655006904544,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -70,6 +70,7 @@
   "models": {
     "KVOnly": {
       "hash": 0,
+      "backing": null,
       "name": "KVOnly",
       "primary_columns": [],
       "columns": [],
@@ -115,7 +116,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [
         {
           "name": "$get",
@@ -228,6 +228,7 @@
     },
     "KVSibling": {
       "hash": 0,
+      "backing": null,
       "name": "KVSibling",
       "primary_columns": [],
       "columns": [],
@@ -253,7 +254,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [],
       "data_sources": {
         "Default": {
@@ -305,7 +305,12 @@
       "cruds": []
     },
     "ModelWithKv": {
-      "hash": 2176846329808501385,
+      "hash": 1348455096908926699,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "ModelWithKv",
       "primary_columns": [
         {
@@ -384,7 +389,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "acceptPaginated",

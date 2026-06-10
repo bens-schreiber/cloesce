@@ -250,7 +250,7 @@ api Leaderboard {
     // The method is instantiated, executes IN a DO
     post postScore(self) {}
 
-    // `doSomething` is an instance method that uses `self` with the source `OutsideOfDo`, 
+    // `doSomething` is an instance method that uses `self` with the source `OutsideOfDo`,
     // whose `get` method does not inject a DO instance. This means that `doSomething` will execute outside of the DO
     //
     // The method is instantiated, executes IN a WORKER
@@ -541,16 +541,10 @@ Each DO's backing class will be given a `cloesce(env)` method which creates a `C
 
 This phase will add the syntax for backing a Model with a Durable Object, with the ability to use any KV storage templates declared on that DO as fields in the Model. Additionally, it will add semantic analysis for the shard field inheritance, DO-specific storage template usage, and rules with `self` and `inject` in API methods of DO-backed Models.
 
-Code generation of Data Sources and CRUD methods, along with runtime support will be added in a later phase.
+- `CRUD` Data Source method generation
+- Automatic injection of the DO instance for API methods of DO-backed Models, via the `self` keyword
+- Runtime support for hydrating DO-backed Model instances in the DO's execution context, with the correct injected DO instance and access to that DO's storage templates.
 
 ### Migrations
 
 This phase will cover the generation of migration files for DO-backed Models, and the necessary runtime support for applying those migrations to the DO's SQLite database. Additionally, it will cover the generation of Wrangler configuration migrations for changes to DO bindings.
-
-### Instantiated API Methods in Durable Objects
-
-Finally, this phase will cover the ability for instance methods of DO-backed Models to be executed in the context of a DO, by adding:
-
-- `CRUD` Data Source method generation
-- Automatic injection of the DO instance for API methods of DO-backed Models, via the `self` keyword
-- Runtime support for hydrating DO-backed Model instances in the DO's execution context, with the correct injected DO instance and access to that DO's storage templates.

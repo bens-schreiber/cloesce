@@ -1,5 +1,5 @@
 {
-  "hash": 17820378546947952927,
+  "hash": 1042024939585602875,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "PooAcceptYield": {
-      "hash": 8862362961581783171,
+      "hash": 1324370458544504440,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "PooAcceptYield",
       "primary_columns": [
         {
@@ -31,7 +36,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "acceptPoos",

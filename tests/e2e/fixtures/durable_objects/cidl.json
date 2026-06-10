@@ -1,8 +1,36 @@
 {
-  "hash": 4801091108252205024,
+  "hash": 0,
   "wrangler_env": {
     "d1_bindings": [],
-    "kv_bindings": [],
+    "kv_bindings": [
+      {
+        "name": "EntryMeta",
+        "templates": [
+          {
+            "field": {
+              "name": "label",
+              "cidl_type": {
+                "KvObject": "String"
+              },
+              "validators": []
+            },
+            "params": [
+              {
+                "name": "tenantId",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "rank",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "key_format": "entry/{tenantId}/{rank}"
+          }
+        ]
+      }
+    ],
     "r2_bindings": [],
     "durable_bindings": [
       {
@@ -56,7 +84,8 @@
   },
   "models": {
     "Global": {
-      "hash": 10767074612196930669,
+      "hash": 0,
+      "backing": null,
       "name": "Global",
       "primary_columns": [],
       "columns": [],
@@ -64,7 +93,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": null,
       "apis": [
         {
           "name": "setConfig",
@@ -111,7 +139,8 @@
       "cruds": []
     },
     "Leaderboard": {
-      "hash": 17039160295291214661,
+      "hash": 0,
+      "backing": null,
       "name": "Leaderboard",
       "primary_columns": [],
       "columns": [],
@@ -119,7 +148,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": null,
       "apis": [
         {
           "name": "setScore",
@@ -191,6 +219,264 @@
       ],
       "data_sources": {},
       "cruds": []
+    },
+    "LeaderboardEntry": {
+      "hash": 0,
+      "backing": {
+        "binding": "LeaderboardDo",
+        "fields": [
+          "tenantId"
+        ],
+        "kind": "DurableObject"
+      },
+      "name": "LeaderboardEntry",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "score",
+            "cidl_type": {
+              "KvObject": "Int"
+            },
+            "validators": []
+          },
+          "binding": "LeaderboardDo",
+          "key_format": "score"
+        },
+        {
+          "field": {
+            "name": "meta",
+            "cidl_type": {
+              "KvObject": "String"
+            },
+            "validators": []
+          },
+          "binding": "EntryMeta",
+          "key_format": "entry/{tenantId}/{rank}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "tenantId",
+          "cidl_type": "Int",
+          "validators": [
+            {
+              "GreaterThan": {
+                "Int": 0
+              }
+            }
+          ]
+        },
+        {
+          "name": "rank",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "LeaderboardEntry"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rank",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx",
+            "EntryMeta",
+            "LeaderboardDo"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "LeaderboardEntry"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rank",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "LeaderboardEntry"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx",
+            "EntryMeta",
+            "LeaderboardDo"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "tenantId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "rank",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "injected": [
+              "$ctx",
+              "EntryMeta",
+              "LeaderboardDo"
+            ],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "tenantId",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "GreaterThan": {
+                        "Int": 0
+                      }
+                    }
+                  ]
+                },
+                "instance_field": true
+              },
+              {
+                "parameter": {
+                  "name": "rank",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "$ctx",
+              "EntryMeta",
+              "LeaderboardDo"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "tenantId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "rank",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "LeaderboardEntry"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "$ctx",
+              "EntryMeta",
+              "LeaderboardDo"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "Save"
+      ]
     }
   },
   "poos": {},

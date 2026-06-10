@@ -1,5 +1,5 @@
 {
-  "hash": 1454352641393335132,
+  "hash": 1140808481517411490,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -42,7 +42,12 @@
   },
   "models": {
     "Validator": {
-      "hash": 1908438877902929966,
+      "hash": 58986984721463898,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Validator",
       "primary_columns": [
         {
@@ -106,7 +111,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "someMethod",

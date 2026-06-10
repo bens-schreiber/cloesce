@@ -401,8 +401,12 @@ pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
 
-    /// Optional binding the model is backed by, e.g. `for SomeBinding` in `model M for SomeBinding { ... }`.
+    /// `for SomeBinding` in `model M for SomeBinding { ... }`.
     pub database_binding: Option<Symbol<'src>>,
+
+    /// Arguments of a database binding, e.g.
+    /// `(shardKey1, shardKey2)` in `model M for SomeBinding(shardKey1, shardKey2) { ...
+    pub shard_args: Option<Vec<Symbol<'src>>>,
 
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }

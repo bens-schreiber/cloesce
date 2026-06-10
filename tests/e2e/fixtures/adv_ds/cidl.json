@@ -1,5 +1,5 @@
 {
-  "hash": 18434063000749143771,
+  "hash": 8316329841862264374,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "DefaultOverride": {
-      "hash": 3283447504166446726,
+      "hash": 7623099930840325705,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "DefaultOverride",
       "primary_columns": [
         {
@@ -31,7 +36,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -147,7 +151,12 @@
       ]
     },
     "Hamburger": {
-      "hash": 14624565934395245746,
+      "hash": 10900287864015129530,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Hamburger",
       "primary_columns": [
         {
@@ -201,7 +210,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "noLettuceToppings",
@@ -622,7 +630,12 @@
       ]
     },
     "Topping": {
-      "hash": 2310149034276584210,
+      "hash": 4637861392215237397,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Topping",
       "primary_columns": [
         {
@@ -676,7 +689,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -778,7 +790,12 @@
       ]
     },
     "HamburgerTopping": {
-      "hash": 4024964836951031313,
+      "hash": 2191875105602707450,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "HamburgerTopping",
       "primary_columns": [
         {
@@ -854,7 +871,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [],
       "data_sources": {
         "Default": {

@@ -26,10 +26,9 @@ impl<'a> SelectModel<'a> {
                 name: model_name.to_string(),
             }),
         };
-        if model.primary_columns.is_empty() {
-            fail!(OrmErrorKind::ModelMissingD1 {
-                name: model_name.to_string(),
-            })
+        if !model.uses_sqlite() {
+            // Fail silently.
+            return Ok(String::default());
         }
 
         const CUSTOM_FROM: &str = "__custom_from_placeholder__";
@@ -101,7 +100,7 @@ impl<'a> SelectModel<'a> {
 
             let child = self.idl.models.get(&nav.model_reference).unwrap();
 
-            if child.database_binding.is_none() {
+            if !child.uses_sqlite() {
                 // No actual SQL columns to select
                 continue;
             }

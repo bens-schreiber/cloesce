@@ -9,8 +9,19 @@ export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
 export interface Env {
+    EntryMeta: KVNamespace;
     GlobalDo: DurableObjectNamespace;
     LeaderboardDo: DurableObjectNamespace;
+}
+export class EntryMeta {
+    static readonly label = {
+        template: (tenantId: number, rank: number): string =>
+            `entry/${tenantId}/${rank}`,
+        get: (ns: KVNamespace, tenantId: number, rank: number): Promise<string | null> =>
+            ns.get(EntryMeta.label.template(tenantId, rank)) as any,
+        put: (ns: KVNamespace, tenantId: number, rank: number, value: string): Promise<void> =>
+            ns.put(EntryMeta.label.template(tenantId, rank), value as any),
+    };
 }
 // @ts-ignore
 export abstract class GlobalDo extends DurableObject<Env> {
@@ -114,6 +125,69 @@ export namespace Leaderboard {
 
     export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
         return _impl("Leaderboard", {}, implObj);
+    }
+}
+export namespace LeaderboardEntry {
+    export const Tag = "LeaderboardEntry" as const;
+    export const Meta = cidl.models.LeaderboardEntry as any;
+
+    export interface Self {
+        tenantId: number;
+        rank: number;
+        score: KValue<number>;
+        meta: KValue<string>;
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"meta":{},"score":{}},
+            async get(env: { $ctx: LeaderboardDo, EntryMeta: Env["EntryMeta"], LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, rank: number): Promise<HttpResult<Self | null>> {
+                const base = { tenantId, rank } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { $ctx: LeaderboardDo, EntryMeta: Env["EntryMeta"], LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, rank: number, model: DeepPartial<LeaderboardEntry.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("LeaderboardEntry", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+
+        export async function save(ctx: LeaderboardDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: LeaderboardDo, args: { tenantId: number, rank: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { tenantId: args.tenantId, rank: args.rank,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ $ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
     }
 }
 

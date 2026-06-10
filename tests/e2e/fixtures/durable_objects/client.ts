@@ -100,6 +100,68 @@ export class Leaderboard {
     return __$res;
   }
 }
+export class LeaderboardEntry {
+  tenantId: number;
+  rank: number;
+  score: KValue<number>;
+  meta: KValue<string>;
+  static async $get(
+    tenantId: number,
+    rank: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<LeaderboardEntry>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5843/api/LeaderboardEntry/$get`
+    );
+    __$baseUrl.searchParams.append("tenantId", String(tenantId));
+    __$baseUrl.searchParams.append("rank", String(rank));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      LeaderboardEntry,
+      false
+    );
+  }
+  static async $save(
+    tenantId: number,
+    rank: number,
+    model: DeepPartial<LeaderboardEntry>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<LeaderboardEntry>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5843/api/LeaderboardEntry/$save`
+    );
+    const __$payload: any = {};
+    __$payload["tenantId"] = tenantId;
+    __$payload["rank"] = rank;
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      LeaderboardEntry,
+      false
+    );
+  }
+
+  static fromJson(data: any): LeaderboardEntry {
+    const __$res = Object.assign(new LeaderboardEntry(), data);
+    if (__$res.score) __$res.score = Object.assign(new KValue(), __$res.score);
+    if (__$res.meta) __$res.meta = Object.assign(new KValue(), __$res.meta);
+    return __$res;
+  }
+}
 function dsKey(args: object): string {
   return Object.keys(args)[0];
 }

@@ -431,6 +431,7 @@ async function validateRequest(
       idl: idl,
       includeTree: null,
       env,
+      durable: null,
       promises: [],
     });
     params[p.name] = hydrated ?? validatedRaw;
@@ -478,6 +479,9 @@ async function forward(
   request: Request,
 ): Promise<Response> {
   const target = route.method.durable_target!;
+
+  // The shard values that locate the DO are always top-level method parameters
+  // (generated CRUD methods take them explicitly), never read from a partial body.
   const idSeed = [target.binding, ...target.shard_args.map((name) => String(params[name]))].join(
     "/",
   );

@@ -10,6 +10,10 @@ name = "GlobalDo"
 class_name = "LeaderboardDo"
 name = "LeaderboardDo"
 
+[[kv_namespaces]]
+binding = "EntryMeta"
+id = "replace_with_EntryMeta_id"
+
 [[migrations]]
 new_sqlite_classes = [
     "GlobalDo",

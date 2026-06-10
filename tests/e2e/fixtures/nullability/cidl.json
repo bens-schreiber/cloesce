@@ -1,5 +1,5 @@
 {
-  "hash": 9157797229480452983,
+  "hash": 7348474206251052039,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -11,7 +11,12 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 9423267146512996101,
+      "hash": 8590820119049858244,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "NullabilityChecks",
       "primary_columns": [
         {
@@ -56,7 +61,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "primitiveTypes",

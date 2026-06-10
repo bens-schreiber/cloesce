@@ -14,17 +14,28 @@ export interface Env {
     otherNamespace: KVNamespace;
 }
 export class namespace {
-    static data(id: number): string {
-        return `path/to/data/${id}`;
-    }
-    static paginatedData(): string {
-        return `path/to/data/`;
-    }
+    static readonly data = {
+        template: (id: number): string =>
+            `path/to/data/${id}`,
+        get: (ns: KVNamespace, id: number): Promise<unknown | null> =>
+            ns.get(namespace.data.template(id)) as any,
+        put: (ns: KVNamespace, id: number, value: unknown): Promise<void> =>
+            ns.put(namespace.data.template(id), value as any),
+    };
+    static readonly paginatedData = {
+        template: (): string =>
+            `path/to/data/`,
+    };
 }
 export class otherNamespace {
-    static otherData(id: number): string {
-        return `path/to/other/${id}`;
-    }
+    static readonly otherData = {
+        template: (id: number): string =>
+            `path/to/other/${id}`,
+        get: (ns: KVNamespace, id: number): Promise<string | null> =>
+            ns.get(otherNamespace.otherData.template(id)) as any,
+        put: (ns: KVNamespace, id: number, value: string): Promise<void> =>
+            ns.put(otherNamespace.otherData.template(id), value as any),
+    };
 }
 export namespace KVOnly {
     export const Tag = "KVOnly" as const;
