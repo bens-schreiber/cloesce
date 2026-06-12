@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, Keyword, ModelBlock, ModelBlockKind, NavAdj,
-    Spd, SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, InjectEntry, Keyword, ModelBlock,
+    ModelBlockKind, NavAdj, Spd, SqlBlockKind, Symbol, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -526,10 +526,10 @@ fn api_context_tag() {
         model Leaderboard {}
 
         api Leaderboard {
-            [context LeaderboardDo(tenantId)]
+            [inject LeaderboardDo(tenantId)]
             get topScores(tenantId: int) -> array<string>
 
-            [context GlobalDo]
+            [inject GlobalDo()]
             get config() -> json
         }
         "#,
@@ -556,17 +556,20 @@ fn api_context_tag() {
             .tags
             .iter()
             .find_map(|t| match &t.inner {
-                Tag::Context { initializer } => Some((
-                    initializer.symbol.name.to_string(),
-                    initializer
-                        .args
-                        .iter()
-                        .map(|a| a.name.to_string())
-                        .collect(),
-                )),
+                Tag::Inject { entries } => entries.iter().find_map(|entry| match entry {
+                    InjectEntry::Context(initializer) => Some((
+                        initializer.symbol.name.to_string(),
+                        initializer
+                            .args
+                            .iter()
+                            .map(|a| a.name.to_string())
+                            .collect(),
+                    )),
+                    InjectEntry::Binding(_) => None,
+                }),
                 _ => None,
             })
-            .expect("context tag")
+            .expect("context entry")
     };
 
     let (sharded_do, sharded_args) = context_of("topScores");

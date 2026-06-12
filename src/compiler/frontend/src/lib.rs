@@ -106,7 +106,6 @@ contextual_keywords! {
     Crud => "crud",
     Internal => "internal",
     Instance => "instance",
-    Context => "context",
 
     // Validator tag (numerical)
     LessThan => "lt",
@@ -198,6 +197,13 @@ pub struct DurableInitializer<'src> {
     pub args: Vec<Symbol<'src>>,
 }
 
+/// A single entry in an `[inject ...]` tag.
+#[derive(Debug, Clone)]
+pub enum InjectEntry<'src> {
+    Binding(Symbol<'src>),
+    Context(DurableInitializer<'src>),
+}
+
 #[derive(Debug, Clone)]
 pub enum Tag<'src> {
     Source {
@@ -209,10 +215,7 @@ pub enum Tag<'src> {
         kinds: Vec<Spd<CrudKind>>,
     },
     Inject {
-        bindings: Vec<Symbol<'src>>,
-    },
-    Context {
-        initializer: DurableInitializer<'src>,
+        entries: Vec<InjectEntry<'src>>,
     },
     Validator {
         name: Keyword,

@@ -5,10 +5,10 @@ import leaderboardDoInitial from "./migrations/LeaderboardDo/Initial.js";
 
 const Leaderboard = clo.Leaderboard.impl({
   async setScore(env, tenantId, score) {
-    env.$ctx.score.put(score);
+    env.ctx.score.put(score);
   },
   getScore(env) {
-    return env.$ctx.score.get() ?? 0;
+    return env.ctx.score.get() ?? 0;
   },
 });
 
@@ -18,10 +18,10 @@ const PlayerScore = clo.PlayerScore.impl({});
 
 const Global = clo.Global.impl({
   setConfig(env, value) {
-    env.$ctx.config.put(value);
+    env.ctx.config.put(value);
   },
   getConfig(env) {
-    return env.$ctx.config.get();
+    return env.ctx.config.get();
   },
 });
 

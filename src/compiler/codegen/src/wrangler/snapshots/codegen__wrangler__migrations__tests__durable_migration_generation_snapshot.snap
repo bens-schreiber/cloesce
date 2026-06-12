@@ -6,20 +6,20 @@ expression: migration_code
 import type { SqlStorage } from "@cloudflare/workers-types";
 
 function up(sql: SqlStorage): void {
-    sql.exec(`
-        
+  sql.exec(`
+    
             CREATE TABLE User (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE
             );
         
-    `);
+  `);
 }
 
 export default {
-    name: "create_users_table",
-    timestamp: 1700000000,
-    id: "create_users_table_1700000000",
-    up,
+  name: "create_users_table",
+  timestamp: 1700000000,
+  id: "create_users_table_1700000000",
+  up,
 };

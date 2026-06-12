@@ -21,7 +21,7 @@
 
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock,
-    DataSourceBlock, DurableBindingBlock, InjectBlock, KvBindingBlock, ModelBlock,
+    DataSourceBlock, DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, ModelBlock,
     PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, VarsBlock,
 };
 use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
@@ -696,9 +696,11 @@ fn resolve_validator_tags<'src, 'p>(
 /// Resolves the `[inject ...]` tags on a method's symbol into a deduplicated list of binding names.
 ///
 /// Each binding name must resolve to one of:
-/// - an env binding (D1 / KV / R2),
+/// - an env binding (D1 / KV / R2 / Durable Object),
 /// - an env var,
 /// - an `inject { ... }` block symbol.
+///
+/// Context entries (`Do(args)`) are skipped here; they are resolved separately.
 fn resolve_injects<'src, 'p>(
     method: &'p Symbol<'src>,
     table: &SymbolTable<'src, 'p>,
@@ -707,11 +709,7 @@ fn resolve_injects<'src, 'p>(
     let mut injected: Vec<&'src str> = Vec::new();
 
     for tag in &method.tags {
-        if matches!(tag.inner, Tag::Context { .. }) {
-            continue;
-        }
-
-        let Tag::Inject { bindings } = &tag.inner else {
+        let Tag::Inject { entries } = &tag.inner else {
             sink.push(SemanticError::TagInvalidInContext {
                 tag,
                 symbol: method,
@@ -719,7 +717,10 @@ fn resolve_injects<'src, 'p>(
             continue;
         };
 
-        for binding in bindings {
+        for entry in entries {
+            let InjectEntry::Binding(binding) = entry else {
+                continue;
+            };
             let name = binding.name;
 
             let is_d1 = table
@@ -729,6 +730,7 @@ fn resolve_injects<'src, 'p>(
                 .any(|s| s.name == name);
             let is_kv = table.kv_bindings.contains_key(name);
             let is_r2 = table.r2_bindings.contains_key(name);
+            let is_durable = table.durable_bindings.contains_key(name);
             let is_env_var = table
                 .vars_blocks
                 .iter()
@@ -741,7 +743,7 @@ fn resolve_injects<'src, 'p>(
                 .flat_map(|i| i.symbols.iter())
                 .any(|s| s.name == name);
 
-            if !is_d1 && !is_kv && !is_r2 && !is_env_var && !is_inject_block_symbol {
+            if !is_d1 && !is_kv && !is_r2 && !is_durable && !is_env_var && !is_inject_block_symbol {
                 sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
                 continue;
             }

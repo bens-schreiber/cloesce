@@ -371,7 +371,7 @@ pub enum MediaType {
 }
 
 /// A key that signifies an [ApiMethod::durable_target] should be injected.
-pub const CONTEXT_INJECT_KEY: &str = "$ctx";
+pub const CONTEXT_INJECT_KEY: &str = "ctx";
 pub const DEFAULT_DATA_SOURCE_NAME: &str = "Default";
 
 #[derive(Deserialize, Serialize, Clone)]

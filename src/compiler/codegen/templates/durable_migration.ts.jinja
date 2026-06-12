@@ -2,14 +2,14 @@
 import type { SqlStorage } from "@cloudflare/workers-types";
 
 function up(sql: SqlStorage): void {
-    sql.exec(`
-        {{ sql }}
-    `);
+  sql.exec(`
+    {{ sql }}
+  `);
 }
 
 export default {
-    name: "{{ name }}",
-    timestamp: {{ timestamp }},
-    id: "{{ name }}_{{ timestamp }}",
-    up,
+  name: "{{ name }}",
+  timestamp: {{ timestamp }},
+  id: "{{ name }}_{{ timestamp }}",
+  up,
 };

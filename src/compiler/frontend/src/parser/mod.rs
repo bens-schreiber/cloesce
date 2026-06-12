@@ -10,7 +10,7 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, DurableInitializer, InjectBlock, Keyword,
+    ArgumentLiteral, Ast, AstBlockKind, DurableInitializer, InjectBlock, InjectEntry, Keyword,
     PlainOldObjectBlock, Span, Spd, Symbol, Tag,
 };
 
@@ -198,22 +198,11 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|kinds| Tag::Crud { kinds });
 
-    // [inject binding1, binding2, ...]
-    let inject_tag = just(Token::LBracket)
-        .then(kw!(Inject))
-        .ignore_then(
-            symbol()
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBracket))
-        .map(|bindings| Tag::Inject { bindings });
-
-    // [context DurableDo(arg1, arg2)] | [context GlobalDo]
-    let context_tag = just(Token::LBracket)
-        .then(kw!(Context))
-        .ignore_then(symbol())
+    // [inject binding1, DurableDo(arg1, arg2), GlobalDo(), ...]
+    //
+    // An entry with parenthesis instantiates a Durable Object context;
+    // one without injects the binding namespace itself.
+    let inject_entry = symbol()
         .then(
             symbol()
                 .separated_by(just(Token::Comma))
@@ -222,13 +211,21 @@ fn tags<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LParen), just(Token::RParen))
                 .or_not(),
         )
-        .then_ignore(just(Token::RBracket))
-        .map(|(symbol, args)| Tag::Context {
-            initializer: DurableInitializer {
-                symbol,
-                args: args.unwrap_or_default(),
-            },
+        .map(|(symbol, args)| match args {
+            Some(args) => InjectEntry::Context(DurableInitializer { symbol, args }),
+            None => InjectEntry::Binding(symbol),
         });
+
+    let inject_tag = just(Token::LBracket)
+        .then(kw!(Inject))
+        .ignore_then(
+            inject_entry
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|entries| Tag::Inject { entries });
 
     // [internal]
     let internal_tag = just(Token::LBracket)
@@ -253,7 +250,6 @@ fn tags<'tokens, 'src: 'tokens>()
         validator,
         crud_tag,
         inject_tag,
-        context_tag,
         internal_tag,
         instance_tag,
         source_tag,

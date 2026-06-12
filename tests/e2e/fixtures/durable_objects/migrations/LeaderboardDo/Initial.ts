@@ -3,7 +3,7 @@ import type { SqlStorage } from "@cloudflare/workers-types";
 
 function up(sql: SqlStorage): void {
   sql.exec(`
-        --- New Models
+    --- New Models
 CREATE TABLE IF NOT EXISTS "PlayerScore" (
   "id" integer PRIMARY KEY,
   "playerName" text NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS "$cloesce_tmp" (
   "path" text PRIMARY KEY,
   "primary_key" text NOT NULL
 );
-    `);
+  `);
 }
 
 export default {

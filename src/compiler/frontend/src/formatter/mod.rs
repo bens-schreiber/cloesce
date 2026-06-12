@@ -22,10 +22,10 @@ use idl::{CidlType, CrudKind, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
     D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock,
-    ForeignBlock, InjectBlock, Keyword, KvBindingBlock, KvBindingTemplate, KvFieldBlock,
-    ModelBlock, ModelBlockKind, NavigationBlock, ParsedIncludeTree, PlainOldObjectBlock,
-    R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock,
-    fmt_cidl_type, lexer::CommentMap,
+    ForeignBlock, InjectBlock, InjectEntry, Keyword, KvBindingBlock, KvBindingTemplate,
+    KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock, ParsedIncludeTree,
+    PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind,
+    Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -472,22 +472,19 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
                 .then(Doc::text(" "))
                 .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
-            Tag::Inject { bindings: symbols } => Doc::kw(Keyword::Inject)
-                .then(Doc::text(" "))
-                .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
-            Tag::Context { initializer } => {
-                let head = Doc::kw(Keyword::Context)
+            Tag::Inject { entries } => {
+                Doc::kw(Keyword::Inject)
                     .then(Doc::text(" "))
-                    .then(ctx.sym_doc(&initializer.symbol, 0, true));
-                if initializer.args.is_empty() {
-                    head
-                } else {
-                    head.then(Doc::text("("))
-                        .then(comma_separated(&initializer.args, |arg| {
-                            ctx.sym_doc(arg, 0, true)
-                        }))
-                        .then(Doc::text(")"))
-                }
+                    .then(comma_separated(entries, |entry| match entry {
+                        InjectEntry::Binding(sym) => ctx.sym_doc(sym, 0, true),
+                        InjectEntry::Context(initializer) => ctx
+                            .sym_doc(&initializer.symbol, 0, true)
+                            .then(Doc::text("("))
+                            .then(comma_separated(&initializer.args, |arg| {
+                                ctx.sym_doc(arg, 0, true)
+                            }))
+                            .then(Doc::text(")")),
+                    }))
             }
         };
 

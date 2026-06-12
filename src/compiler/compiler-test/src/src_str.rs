@@ -304,10 +304,10 @@ api BasicService {
     get staticMethod(input: string) -> string
     post uploadData(data: stream) -> bool
 
-    [context LeaderboardDo(tenantId)]
+    [inject LeaderboardDo(tenantId)]
     get topScores(tenantId: int) -> json
 
-    [context GlobalDo]
+    [inject GlobalDo()]
     get globalConfig() -> json
 }
 

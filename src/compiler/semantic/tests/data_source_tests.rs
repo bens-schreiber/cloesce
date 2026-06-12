@@ -687,7 +687,7 @@ fn default_data_source_durable_sqlite() {
 
     // All methods run inside the DO.
     for injected in [&ds.get.injected, &ds.list.injected, &ds.save.injected] {
-        assert!(injected.contains(&"$ctx"));
+        assert!(injected.contains(&idl::CONTEXT_INJECT_KEY));
     }
 
     // CRUD routes carry the durable target for Worker-to-DO forwarding.

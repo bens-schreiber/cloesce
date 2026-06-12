@@ -1513,10 +1513,10 @@ fn context_tag_valid() {
         model Leaderboard {}
 
         api Leaderboard {
-            [context LeaderboardDo(tenantId)]
+            [inject LeaderboardDo(tenantId)]
             get topScores(tenantId: int) -> json
 
-            [context GlobalDo]
+            [inject GlobalDo()]
             get config() -> json
         }
     "#;
@@ -1555,6 +1555,36 @@ fn context_tag_valid() {
 }
 
 #[test]
+fn inject_binding_namespace_and_context() {
+    // Arrange
+    let src = r#"
+        durable GlobalDo {}
+
+        model Global {}
+
+        api Global {
+            [inject GlobalDo, GlobalDo()]
+            get config() -> json
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let api = &result.models.get("Global").unwrap().apis[0];
+
+    // `GlobalDo` injects the binding namespace; `GlobalDo()` the DO context.
+    assert!(api.injected.contains(&"GlobalDo"));
+    assert!(api.injected.contains(&idl::CONTEXT_INJECT_KEY));
+    let target = api.durable_target.as_ref().expect("durable target");
+    assert_eq!(target.binding, "GlobalDo");
+}
+
+#[test]
 fn context_tag_errors() {
     // Arrange
     let src = r#"
@@ -1569,20 +1599,20 @@ fn context_tag_errors() {
         model Leaderboard {}
 
         api Leaderboard {
-            [context NotADo(tenantId)]          // unknown binding
+            [inject NotADo(tenantId)]           // unknown binding
             get unknownBinding(tenantId: int) -> json
 
-            [context LeaderboardDo]             // missing shard arg
+            [inject LeaderboardDo()]            // missing shard arg
             get argCount(tenantId: int) -> json
 
-            [context LeaderboardDo(nope)]       // arg is not a param
+            [inject LeaderboardDo(nope)]        // arg is not a param
             get unknownParam(tenantId: int) -> json
 
-            [context LeaderboardDo(tenantId)]   // param type mismatch (string vs int)
+            [inject LeaderboardDo(tenantId)]    // param type mismatch (string vs int)
             get typeMismatch(tenantId: string) -> json
 
-            [context LeaderboardDo(tenantId)]   // multiple context tags
-            [context GlobalDo]
+            [inject LeaderboardDo(tenantId)]    // multiple context entries
+            [inject GlobalDo()]
             get multiple(tenantId: int) -> json
         }
     "#;

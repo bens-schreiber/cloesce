@@ -5,7 +5,7 @@ use crate::{
     err::{BatchResult, ErrorSink, SemanticError},
     resolve_cidl_type, resolve_injects, resolve_validator_tags,
 };
-use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Symbol, Tag};
+use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, InjectEntry, SpdSlice, Symbol, Tag};
 use idl::{ApiMethod, CidlType, DurableTarget, HttpVerb, MediaType, ValidatedField};
 
 #[derive(Default)]
@@ -82,7 +82,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         })
     }
 
-    /// Resolves a method's `[context Do(args)]` tag into a [DurableTarget].
+    /// Resolves a method's `[inject Do(args)]` context entries into a [DurableTarget].
     fn context(
         &mut self,
         method: &'p ApiBlockMethod<'src>,
@@ -92,79 +92,84 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         let mut target: Option<DurableTarget<'src>> = None;
 
         for tag in &method.symbol.tags {
-            let Tag::Context { initializer } = &tag.inner else {
+            let Tag::Inject { entries } = &tag.inner else {
                 continue;
             };
 
-            if target.is_some() {
-                // at most one DO instantiation per method.
-                self.sink.push(SemanticError::TagInvalidInContext {
-                    tag,
-                    symbol: &method.symbol,
-                });
-                continue;
-            }
-
-            let binding = &initializer.symbol;
-            let Some(durable) = table.durable_bindings.get(binding.name) else {
-                self.sink
-                    .push(SemanticError::UnresolvedSymbol { symbol: binding });
-                continue;
-            };
-
-            let shard_fields: Vec<&Symbol> = durable
-                .shard_blocks
-                .inners()
-                .flat_map(|s| &s.fields)
-                .collect();
-
-            if shard_fields.len() != initializer.args.len() {
-                self.sink.push(SemanticError::ArgCountMismatch {
-                    field: binding,
-                    expected: shard_fields.len(),
-                    got: initializer.args.len(),
-                });
-                continue;
-            }
-
-            let mut shard_args = Vec::with_capacity(initializer.args.len());
-            for (arg, shard_field) in initializer.args.iter().zip(&shard_fields) {
-                let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
-                    // a shard argument must name a parameter of the method.
-                    self.sink
-                        .push(SemanticError::UnresolvedSymbol { symbol: arg });
-                    continue;
-                };
-
-                let shard_type = match resolve_cidl_type(shard_field, &shard_field.cidl_type, table)
-                {
-                    Ok(t) => t,
-                    Err(e) => {
-                        self.sink.push(e);
-                        continue;
-                    }
-                };
-                if param.cidl_type != shard_type {
-                    self.sink.push(SemanticError::ArgTypeMismatch {
-                        field: binding,
-                        arg,
+            for initializer in entries.iter().filter_map(|entry| match entry {
+                InjectEntry::Context(initializer) => Some(initializer),
+                InjectEntry::Binding(_) => None,
+            }) {
+                if target.is_some() {
+                    // at most one DO instantiation per method.
+                    self.sink.push(SemanticError::TagInvalidInContext {
+                        tag,
+                        symbol: &method.symbol,
                     });
                     continue;
                 }
 
-                // Inherit the shard field's validators
-                match resolve_validator_tags(shard_field) {
-                    Ok(validators) => param.validators.extend(validators),
-                    Err(errs) => self.sink.extend(errs),
+                let binding = &initializer.symbol;
+                let Some(durable) = table.durable_bindings.get(binding.name) else {
+                    self.sink
+                        .push(SemanticError::UnresolvedSymbol { symbol: binding });
+                    continue;
+                };
+
+                let shard_fields: Vec<&Symbol> = durable
+                    .shard_blocks
+                    .inners()
+                    .flat_map(|s| &s.fields)
+                    .collect();
+
+                if shard_fields.len() != initializer.args.len() {
+                    self.sink.push(SemanticError::ArgCountMismatch {
+                        field: binding,
+                        expected: shard_fields.len(),
+                        got: initializer.args.len(),
+                    });
+                    continue;
                 }
 
-                shard_args.push(arg.name);
-            }
+                let mut shard_args = Vec::with_capacity(initializer.args.len());
+                for (arg, shard_field) in initializer.args.iter().zip(&shard_fields) {
+                    let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
+                        // a shard argument must name a parameter of the method.
+                        self.sink
+                            .push(SemanticError::UnresolvedSymbol { symbol: arg });
+                        continue;
+                    };
 
-            target = Some(DurableTarget {
-                binding: binding.name,
-                shard_args,
-            });
+                    let shard_type =
+                        match resolve_cidl_type(shard_field, &shard_field.cidl_type, table) {
+                            Ok(t) => t,
+                            Err(e) => {
+                                self.sink.push(e);
+                                continue;
+                            }
+                        };
+                    if param.cidl_type != shard_type {
+                        self.sink.push(SemanticError::ArgTypeMismatch {
+                            field: binding,
+                            arg,
+                        });
+                        continue;
+                    }
+
+                    // Inherit the shard field's validators
+                    match resolve_validator_tags(shard_field) {
+                        Ok(validators) => param.validators.extend(validators),
+                        Err(errs) => self.sink.extend(errs),
+                    }
+
+                    shard_args.push(arg.name);
+                }
+
+                target = Some(DurableTarget {
+                    binding: binding.name,
+                    shard_args,
+                });
+            }
         }
 
         target

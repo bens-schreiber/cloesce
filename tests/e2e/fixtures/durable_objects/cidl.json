@@ -110,7 +110,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "GlobalDo",
@@ -127,7 +127,7 @@
           "parameters_media": "Json",
           "parameters": [],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "GlobalDo",
@@ -176,7 +176,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "LeaderboardDo",
@@ -207,7 +207,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "LeaderboardDo",
@@ -308,7 +308,7 @@
             }
           ],
           "injected": [
-            "$ctx",
+            "ctx",
             "EntryMeta",
             "LeaderboardDo"
           ],
@@ -354,7 +354,7 @@
             }
           ],
           "injected": [
-            "$ctx",
+            "ctx",
             "EntryMeta",
             "LeaderboardDo"
           ],
@@ -400,7 +400,7 @@
               }
             ],
             "injected": [
-              "$ctx",
+              "ctx",
               "EntryMeta",
               "LeaderboardDo"
             ],
@@ -430,7 +430,7 @@
               }
             ],
             "injected": [
-              "$ctx",
+              "ctx",
               "EntryMeta",
               "LeaderboardDo"
             ],
@@ -542,7 +542,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "LeaderboardDo",
@@ -595,7 +595,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "LeaderboardDo",
@@ -639,7 +639,7 @@
             }
           ],
           "injected": [
-            "$ctx"
+            "ctx"
           ],
           "durable_target": {
             "binding": "LeaderboardDo",
@@ -683,7 +683,7 @@
               }
             ],
             "injected": [
-              "$ctx"
+              "ctx"
             ],
             "is_stub": false
           },
@@ -713,7 +713,7 @@
               }
             ],
             "injected": [
-              "$ctx"
+              "ctx"
             ],
             "is_stub": false
           },
@@ -741,7 +741,7 @@
               }
             ],
             "injected": [
-              "$ctx"
+              "ctx"
             ],
             "is_stub": false
           },

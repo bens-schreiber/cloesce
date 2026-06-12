@@ -24,20 +24,20 @@ kv EntryMeta {
 model Leaderboard {}
 
 api Leaderboard {
-    [context LeaderboardDo(tenantId)]
+    [inject LeaderboardDo(tenantId)]
     post setScore(tenantId: int, score: int)
 
-    [context LeaderboardDo(tenantId)]
+    [inject LeaderboardDo(tenantId)]
     get getScore(tenantId: int) -> int
 }
 
 model Global {}
 
 api Global {
-    [context GlobalDo]
+    [inject GlobalDo()]
     post setConfig(value: json)
 
-    [context GlobalDo]
+    [inject GlobalDo()]
     get getConfig() -> json
 }
 
