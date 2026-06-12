@@ -17,19 +17,71 @@
 //! [MigrationsDilemma] to a provided [MigrationsIntent], which is a potentially blocking call to allow the user to respond
 //! with their intent.
 
-mod fmt;
-
 use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
 };
 
-use idl::{CidlType, Column, MigrationsIdl, MigrationsModel};
+use idl::{CidlType, Column, ModelBacking, NavigationField};
 
 use indexmap::IndexMap;
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, Query, SchemaStatementBuilder, SqliteQueryBuilder, Table,
 };
+use serde::{Deserialize, Serialize};
+
+mod fmt;
+
+/// A subset of [Model] suited for migrations.
+///
+/// Assumed that the tree is semantically valid.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsModel<'src> {
+    pub hash: u64,
+    pub name: String,
+
+    #[serde(borrow)]
+    pub backing: Option<ModelBacking<'src>>,
+
+    #[serde(borrow)]
+    pub primary_columns: Vec<Column<'src>>,
+
+    #[serde(borrow)]
+    pub columns: Vec<Column<'src>>,
+
+    #[serde(borrow)]
+    pub navigation_fields: Vec<NavigationField<'src>>,
+}
+
+impl<'src> MigrationsModel<'src> {
+    /// Returns all columns, including primary key columns, as a single iterator.
+    /// The boolean indicates whether the column is a primary key column.
+    pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'src>, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_columns.iter().map(|c| (c, true)))
+    }
+}
+
+/// A subset of [idl::CloesceIdl] suited for D1 migrations.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsIdl<'src> {
+    pub hash: u64,
+
+    #[serde(borrow)]
+    pub models: IndexMap<String, MigrationsModel<'src>>,
+}
+
+impl<'src> MigrationsIdl<'src> {
+    pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
+        serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("serialize self to work")
+    }
+}
 
 pub struct MigrationsGenerator;
 impl MigrationsGenerator {

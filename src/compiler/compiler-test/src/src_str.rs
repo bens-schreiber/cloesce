@@ -324,6 +324,22 @@ model GlobalSettings for GlobalDo {
     }
 }
 
+[crud get, list, save]
+model LeaderboardEntry for LeaderboardDo(tenantId) {
+    primary {
+        id: int
+    }
+
+    column {
+        playerName: string
+        score: int
+    }
+
+    kv LeaderboardDo::topEntryCache {
+        topEntries
+    }
+}
+
 poo BasicPoo {
     field1: string
     field2: int

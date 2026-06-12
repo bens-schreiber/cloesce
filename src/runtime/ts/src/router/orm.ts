@@ -23,6 +23,11 @@ import {
 import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
+/**
+ * A SQL query plus its positional bindings, not bound to any database.
+ */
+export type SqlStatement = { query: string; values?: unknown[] };
+
 type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
@@ -34,9 +39,19 @@ type HydrateArgs = {
 type DurableContext = {
   state: {
     storage: {
-      kv: { get(key: string): any; put(key: string, value: any): void };
+      sql: DurableSql;
+      kv: {
+        get(key: string): any;
+        put(key: string, value: any): void;
+        list(options?: { prefix?: string }): Iterable<[string, any]>;
+      };
+      transactionSync?<T>(closure: () => T): T;
     };
   };
+};
+
+type DurableSql = {
+  exec(query: string, ...bindings: any[]): { toArray(): Record<string, unknown>[] };
 };
 
 interface KvRepository {
@@ -49,6 +64,11 @@ interface KvRepository {
 interface R2Repository {
   /** Reads `key` as the single object or full page the field's type calls for. */
   hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>>;
+}
+
+interface SqlRepository {
+  prepare(query: string): D1PreparedStatement;
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
 }
 
 type KvUpload = {
@@ -229,17 +249,14 @@ export class Orm {
       }),
     );
 
-    // The SQL upsert runs against the model's backing database. A DO-backed model's
-    // SQLite store is reached through the DO context (no Worker D1 binding); that path
-    // is a no-op until DO SQLite upserts land in a later phase.
-    const db: D1Database | undefined = isD1Backed(meta)
-      ? (this.env as any)[meta.backing!.binding]
-      : undefined;
-    const queries = db ? upsertRes.sql.map((s) => db.prepare(s.query).bind(...s.values)) : [];
+    const sqlRepo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
+    const queries = sqlRepo
+      ? upsertRes.sql.map((s) => sqlRepo.prepare(s.query).bind(...s.values))
+      : [];
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
-      queries.length > 0 ? db!.batch(queries) : Promise.resolve([]),
+      queries.length > 0 ? sqlRepo!.batch(queries) : Promise.resolve([]),
       ...kvUploadPromises,
     ]);
 
@@ -260,6 +277,16 @@ export class Orm {
         }
       }
       base = Orm.map(meta, batchRes[selectIndex], includeTree)[0];
+
+      // Route fields are not SQL columns, so the mapped row lacks them. Restore them
+      // from the supplied model.
+      if (base) {
+        for (const field of meta.route_fields) {
+          if (base[field.name] === undefined && (newModel as any)[field.name] !== undefined) {
+            base[field.name] = (newModel as any)[field.name];
+          }
+        }
+      }
     }
 
     // Base needs to include all of the key fields from newModel and its includes.
@@ -331,22 +358,44 @@ export class Orm {
   }
 
   /**
-   * Given some `D1PreparedStatement` that is expected to return a single row representing a Model,
-   * maps the result to the Model based on the provided metadata and include tree, and returns it.
-   *
-   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
+   * Resolves a query argument to a runnable prepared statement. A raw `SqlStatement`
+   * descriptor is bound against the model's backing SQL store (D1, or the Durable
+   * Object's SQLite storage when running inside the DO).
    */
-  async get<T extends object>(
+  private resolveStatement(
     meta: Model,
-    query: D1PreparedStatement | null | undefined,
-    includeTree: IncludeTree<T>,
-  ): Promise<CloesceResult<T | null>> {
+    query: D1PreparedStatement | SqlStatement | null | undefined,
+  ): D1PreparedStatement | null {
     if (!query) {
-      // No query provided, hydrate any non-SQL fields
-      return await this.hydrate(meta, {}, includeTree);
+      return null;
+    }
+    if (typeof (query as D1PreparedStatement).run === "function") {
+      return query as D1PreparedStatement;
     }
 
-    const res = await query.run();
+    const { query: sql, values = [] } = query as SqlStatement;
+    const repo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
+    if (!repo) {
+      throw new InternalError(
+        `Model "${meta.name}" has no reachable SQL store to execute a query against.`,
+      );
+    }
+    return repo.prepare(sql).bind(...values);
+  }
+
+  async get<T extends object>(
+    meta: Model,
+    query: D1PreparedStatement | SqlStatement | null | undefined,
+    includeTree: IncludeTree<T>,
+    seed?: DeepPartial<T>,
+  ): Promise<CloesceResult<T | null>> {
+    const stmt = this.resolveStatement(meta, query);
+    if (!stmt) {
+      // No query provided, hydrate any non-SQL fields
+      return await this.hydrate(meta, { ...seed }, includeTree);
+    }
+
+    const res = await stmt.run();
     if (!res.success) {
       return CloesceError.d1(res);
     }
@@ -355,32 +404,32 @@ export class Orm {
     if (!mapped) {
       return { value: null, errors: [] };
     }
-    return await this.hydrate(meta, mapped, includeTree);
+    // Seed values (e.g. a DO-backed model's route fields, which are not SQL columns)
+    // must be present before hydration so KV key formats can resolve.
+    return await this.hydrate(meta, Object.assign(mapped, seed), includeTree);
   }
 
-  /**
-   * Given some `D1PreparedStatement` that is expected to return multiple rows representing Models,
-   * maps the results to the Models based on the provided metadata and include tree, and returns them as an array.
-   *
-   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
-   */
   async list<T extends object>(
     meta: Model,
-    query: D1PreparedStatement | null | undefined,
+    query: D1PreparedStatement | SqlStatement | null | undefined,
     includeTree: IncludeTree<T>,
+    seed?: DeepPartial<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query) {
+    const stmt = this.resolveStatement(meta, query);
+    if (!stmt) {
       return { value: [], errors: [] };
     }
 
-    const rows = await query.run();
+    const rows = await stmt.run();
     if (!rows.success) {
       return CloesceError.d1(rows);
     }
 
     const results = Orm.map(meta, rows, includeTree);
     const hydratedResults = await Promise.all(
-      results.map((modelJson) => this.hydrate<T>(meta, modelJson, includeTree)),
+      results.map((modelJson) =>
+        this.hydrate<T>(meta, Object.assign(modelJson, seed), includeTree),
+      ),
     );
 
     const errors = hydratedResults.flatMap((r) => r.errors);
@@ -540,6 +589,109 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
   }
 }
 
+class D1SqlRepository implements SqlRepository {
+  constructor(private db: D1Database) {}
+
+  prepare(query: string): D1PreparedStatement {
+    return this.db.prepare(query);
+  }
+
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
+    return this.db.batch(statements);
+  }
+}
+
+class DurableSqlPreparedStatement {
+  constructor(
+    private sql: DurableSql,
+    private query: string,
+    private values: any[] = [],
+  ) {}
+
+  bind(...values: any[]): DurableSqlPreparedStatement {
+    return new DurableSqlPreparedStatement(this.sql, this.query, values);
+  }
+
+  runSync(): D1Result {
+    try {
+      const results = this.sql.exec(this.query, ...this.values).toArray();
+      return { success: true, results, meta: {} } as unknown as D1Result;
+    } catch (e) {
+      return {
+        success: false,
+        results: [],
+        error: e instanceof Error ? e.message : String(e),
+        meta: {},
+      } as unknown as D1Result;
+    }
+  }
+
+  async run(): Promise<D1Result> {
+    return this.runSync();
+  }
+}
+
+/** @internal Carries partial batch results out of a rolled-back transaction. */
+class DurableBatchFailure extends Error {
+  constructor(public results: D1Result[]) {
+    super("Durable Object SQL batch failed");
+  }
+}
+
+/**
+ * `batch` runs inside a synchronous storage transaction when available, rolling back
+ * on the first failed statement to mirror D1's transactional batch.
+ */
+class DurableSqlRepository implements SqlRepository {
+  constructor(private ctx: DurableContext) {}
+
+  prepare(query: string): D1PreparedStatement {
+    return new DurableSqlPreparedStatement(
+      this.ctx.state.storage.sql,
+      query,
+    ) as unknown as D1PreparedStatement;
+  }
+
+  async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
+    const storage = this.ctx.state.storage;
+    const runAll = () => {
+      const results = (statements as unknown as DurableSqlPreparedStatement[]).map((stmt) =>
+        stmt.runSync(),
+      );
+      if (results.some((r) => !r.success)) {
+        throw new DurableBatchFailure(results);
+      }
+      return results;
+    };
+
+    try {
+      return storage.transactionSync ? storage.transactionSync(runAll) : runAll();
+    } catch (e) {
+      if (e instanceof DurableBatchFailure) {
+        return e.results;
+      }
+      throw e;
+    }
+  }
+}
+
+/**
+ * @returns the `SqlRepository` backing this model, or undefined when the model has no
+ * reachable SQL store (no backing, or a DO-backed model outside its DO's context).
+ */
+function sqlRepositoryFor(
+  meta: Model,
+  ctx: { env: any; durable: DurableContext | null },
+): SqlRepository | undefined {
+  if (isD1Backed(meta)) {
+    return new D1SqlRepository(ctx.env[meta.backing!.binding]);
+  }
+  if (isDurableBacked(meta) && ctx.durable) {
+    return new DurableSqlRepository(ctx.durable);
+  }
+  return undefined;
+}
+
 class WorkerKvRepository implements KvRepository {
   constructor(private namespace: KVNamespace) {}
 
@@ -594,16 +746,12 @@ class DurableKvRepository implements KvRepository {
     return new KValue(key, raw ?? null, null);
   }
 
-  // DO storage exposes only single-key gets; a prefix list resolves to the single
-  // value at `prefix`.
-  // TODO: SQL-backed DO storage will support true prefix scans.
-  private async list(kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
-    const value = await this.get(kv, prefix);
-    return {
-      results: value.raw === null ? [] : [value],
-      cursor: null,
-      complete: true,
-    };
+  // The SQLite-backed KV storage scans synchronously; the page is always complete.
+  private async list(_kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
+    const results = [...this.ctx.state.storage.kv.list({ prefix })].map(
+      ([key, value]) => new KValue(key, value ?? null, null),
+    );
+    return { results, cursor: null, complete: true };
   }
 
   put(key: string, value: any): void {

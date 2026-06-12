@@ -355,6 +355,22 @@ impl<'src> DataSourceExpansion {
         model: &Model<'src>,
         ds: &DataSource<'src>,
     ) -> GeneratedDataSource<'src> {
+        let mut injected = model_bindings(idl, model, Some(&ds.tree));
+        let shard_fields = if model.is_durable_backed() {
+            // Default Durable Object methods run inside the DO context
+            injected.insert(0, idl::CONTEXT_INJECT_KEY);
+
+            let backing_fields = &model.backing.as_ref().unwrap().fields;
+            model
+                .route_fields
+                .iter()
+                .filter(|f| backing_fields.iter().any(|bf| *bf == f.name))
+                .map(|f| (*f).clone())
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
         let save_model_param = || ValidatedField {
             name: "model".into(),
             cidl_type: CidlType::Partial {
@@ -363,46 +379,9 @@ impl<'src> DataSourceExpansion {
             validators: vec![],
         };
 
-        // TODO: DO backed models can have SQL too, implement in next phase
-        if model.is_durable_backed() {
-            // Default Durable Object methods run inside the DO and inject the DO context.
-            // and any bindings from the Model
-            let injected = std::iter::once(idl::CONTEXT_INJECT_KEY)
-                .chain(model_bindings(idl, model, Some(&ds.tree)))
-                .collect::<Vec<_>>();
-
-            return GeneratedDataSource {
-                get: Some(DataSourceGetMethod {
-                    parameters: Self::instance_params(&model.route_fields),
-                    injected: injected.clone(),
-                    is_stub: false,
-                }),
-                list: Some(DataSourceMethod {
-                    parameters: model.route_fields.clone(),
-                    injected: injected.clone(),
-                    is_stub: false,
-                }),
-                save: Some(DataSourceMethod {
-                    parameters: model
-                        .route_fields
-                        .iter()
-                        .cloned()
-                        .chain(std::iter::once(save_model_param()))
-                        .collect(),
-                    injected,
-                    is_stub: false,
-                }),
-                ..GeneratedDataSource::default()
-            };
-        }
-
-        if model.is_d1_backed() {
-            let include_query =
-                SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
-            let bindings = model_bindings(idl, model, Some(&ds.tree));
-
-            // Seek-pagination params: `lastSeen_<pk>...`, `limit`.
-            let list_params = model
+        // Seek-pagination params: `lastSeen_<pk>...`, `limit`.
+        let list_params = || {
+            model
                 .primary_columns
                 .iter()
                 .map(|pk| ValidatedField {
@@ -414,66 +393,79 @@ impl<'src> DataSourceExpansion {
                     cidl_type: CidlType::Int,
                     validators: vec![Validator::GreaterThan(Number::Int(0))],
                 }))
-                .collect();
+        };
+
+        if model.uses_sqlite() {
+            let include_query =
+                SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
+
+            let get_params = shard_fields
+                .iter()
+                .cloned()
+                .chain(model.primary_columns.iter().map(|pk| pk.field.clone()))
+                .map(|parameter| DataSourceGetMethodParam {
+                    parameter,
+                    instance_field: true,
+                })
+                .collect::<Vec<_>>();
 
             return GeneratedDataSource {
                 get_query: Self::build_get_query(model, &include_query),
                 list_query: Self::build_list_query(model, &include_query),
                 include_query,
                 get: Some(DataSourceGetMethod {
-                    parameters: Self::instance_params(
-                        &model
-                            .primary_columns
-                            .iter()
-                            .map(|pk| pk.field.clone())
-                            .collect::<Vec<_>>(),
-                    ),
-                    injected: bindings.clone(),
+                    parameters: get_params,
+                    injected: injected.clone(),
                     is_stub: false,
                 }),
                 list: Some(DataSourceMethod {
-                    parameters: list_params,
-                    injected: bindings.clone(),
+                    parameters: shard_fields.iter().cloned().chain(list_params()).collect(),
+                    injected: injected.clone(),
                     is_stub: false,
                 }),
                 save: Some(DataSourceMethod {
-                    parameters: vec![save_model_param()],
-                    injected: bindings,
+                    parameters: shard_fields
+                        .iter()
+                        .cloned()
+                        .chain(std::iter::once(save_model_param()))
+                        .collect(),
+                    injected,
                     is_stub: false,
                 }),
             };
         }
 
-        // No SQL store
-        if model.backing.is_none() && !model.route_fields.is_empty() {
-            let bindings = model_bindings(idl, model, None);
-            return GeneratedDataSource {
-                get: Some(DataSourceGetMethod {
-                    parameters: Self::instance_params(&model.route_fields),
-                    injected: bindings.clone(),
-                    is_stub: false,
-                }),
-                save: Some(DataSourceMethod {
-                    parameters: vec![save_model_param()],
-                    injected: bindings,
-                    is_stub: false,
-                }),
-                ..GeneratedDataSource::default()
-            };
+        GeneratedDataSource {
+            get: Some(DataSourceGetMethod {
+                // All route fields (which includes shard fields)
+                parameters: model
+                    .route_fields
+                    .iter()
+                    .map(|f| DataSourceGetMethodParam {
+                        parameter: f.clone(),
+                        instance_field: true,
+                    })
+                    .collect(),
+                injected: injected.clone(),
+                is_stub: false,
+            }),
+            // Save does not need all route fields, just the shard fields to populate the
+            // DO context.
+            //
+            // TODO: Could we populate the DO from the `model` param object instead
+            // (like we do with the route fields)? Should `save` just be an instance method
+            // on the model?
+            save: Some(DataSourceMethod {
+                parameters: shard_fields
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(save_model_param()))
+                    .collect(),
+                injected: injected.clone(),
+                is_stub: false,
+            }),
+            ..GeneratedDataSource::default()
         }
-
-        GeneratedDataSource::default()
-    }
-
-    /// Maps fields to instance-field get parameters (the client auto-populates them).
-    fn instance_params(fields: &[ValidatedField<'src>]) -> Vec<DataSourceGetMethodParam<'src>> {
-        fields
-            .iter()
-            .map(|f| DataSourceGetMethodParam {
-                parameter: f.clone(),
-                instance_field: true,
-            })
-            .collect()
     }
 
     fn include_dfs<'m>(

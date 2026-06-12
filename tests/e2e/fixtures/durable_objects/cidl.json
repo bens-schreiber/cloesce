@@ -1,5 +1,5 @@
 {
-  "hash": 0,
+  "hash": 9620163066776067285,
   "wrangler_env": {
     "d1_bindings": [],
     "kv_bindings": [
@@ -344,11 +344,6 @@
               ]
             },
             {
-              "name": "rank",
-              "cidl_type": "Int",
-              "validators": []
-            },
-            {
               "name": "model",
               "cidl_type": {
                 "Partial": {
@@ -375,29 +370,8 @@
         "Default": {
           "name": "Default",
           "list": {
-            "parameters": [
-              {
-                "name": "tenantId",
-                "cidl_type": "Int",
-                "validators": [
-                  {
-                    "GreaterThan": {
-                      "Int": 0
-                    }
-                  }
-                ]
-              },
-              {
-                "name": "rank",
-                "cidl_type": "Int",
-                "validators": []
-              }
-            ],
-            "injected": [
-              "$ctx",
-              "EntryMeta",
-              "LeaderboardDo"
-            ],
+            "parameters": [],
+            "injected": [],
             "is_stub": false
           },
           "get": {
@@ -446,11 +420,6 @@
                 ]
               },
               {
-                "name": "rank",
-                "cidl_type": "Int",
-                "validators": []
-              },
-              {
                 "name": "model",
                 "cidl_type": {
                   "Partial": {
@@ -475,6 +444,316 @@
       },
       "cruds": [
         "Get",
+        "Save"
+      ]
+    },
+    "PlayerScore": {
+      "hash": 6286396927356444517,
+      "backing": {
+        "binding": "LeaderboardDo",
+        "fields": [
+          "tenantId"
+        ],
+        "kind": "DurableObject"
+      },
+      "name": "PlayerScore",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 14906130060783210742,
+          "field": {
+            "name": "playerName",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 13468748571261205685,
+          "field": {
+            "name": "points",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "tenantId",
+          "cidl_type": "Int",
+          "validators": [
+            {
+              "GreaterThan": {
+                "Int": 0
+              }
+            }
+          ]
+        }
+      ],
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "PlayerScore"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        },
+        {
+          "name": "$list",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "PlayerScore"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "PlayerScore"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "tenantId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "PlayerScore"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "$ctx"
+          ],
+          "durable_target": {
+            "binding": "LeaderboardDo",
+            "shard_args": [
+              "tenantId"
+            ]
+          }
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "tenantId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "injected": [
+              "$ctx"
+            ],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "tenantId",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "GreaterThan": {
+                        "Int": 0
+                      }
+                    }
+                  ]
+                },
+                "instance_field": true
+              },
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "$ctx"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "tenantId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "PlayerScore"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "$ctx"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\"",
+          "get_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\" WHERE \"PlayerScore\".\"id\" = ?1",
+          "list_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\" WHERE \"PlayerScore\".\"id\" > ?1 ORDER BY \"PlayerScore\".\"id\" ASC LIMIT ?2",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "List",
         "Save"
       ]
     }

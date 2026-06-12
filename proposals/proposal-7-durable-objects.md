@@ -367,18 +367,32 @@ An example migration:
 
 ```ts
 // <binding>/<timestamp>_<migration name>.ts
-async function up(db) {
-  await db.prepare(`ALTER TABLE users ADD COLUMN age INTEGER ...`);
+import type { SqlStorage } from "@cloudflare/workers-types";
+
+function up(sql: SqlStorage): void {
+  sql.exec(`ALTER TABLE users ADD COLUMN age INTEGER ...`);
 }
+
 export default {
   name: "migrationName",
   timestamp: 1234567890,
-  id: "migrationName_timestamp",
+  id: "migrationName_1234567890",
   up,
 };
 ```
 
-Cloesce will not provide a runner for migrations (at least, not in this initial proposal), leaving it to the developer to decide how and when to run migrations on their DO instances.
+The runtime provides `applyDurableMigrations(storage, migrations)`, which applies pending migrations in timestamp order, tracking applied ids in a `$cloesce_migrations` table so each migration runs exactly once per DO instance. The generated DO base class wires this in via `cloesce(env, migrations)`, applying them under `blockConcurrencyWhile` on construction — but the developer decides which migrations to pass and when, by importing the generated files:
+
+```ts
+import initial from "./migrations/LeaderboardDo/1234567890_initial.js";
+
+export class LeaderboardDo extends clo.LeaderboardDo {
+  constructor(ctx: DurableObjectState, env: clo.Env) {
+    super(ctx, env);
+    this.app = this.cloesce(env, [initial]);
+  }
+}
+```
 
 #### Wrangler
 
@@ -388,6 +402,8 @@ A Durable Object class can evolve in four ways:
 2. Renaming
 3. Modifying SQL support
 4. Deleting
+
+Cloesce automatically appends a `[[migrations]]` entry registering `new_sqlite_classes` for schema DO bindings not yet covered, folding the existing entries (including hand-authored renames and deletions) into the live class set first. Renames and deletions are destructive and cannot be inferred from the schema alone, so they are left to the developer to author in the Wrangler config; Cloesce warns when a registered class no longer has a schema binding.
 
 For example:
 
@@ -451,23 +467,33 @@ On the backend, a class will be generated for each DO:
 
 ```ts
 export abstract class LeaderboardDo implements DurableObject {
+  constructor(
+    public state: DurableObjectState,
+    env: Env,
+  ) {
+    super(state, env);
+  }
+
   static readonly Shard = {
     template: (tenantId: int) => `LeaderboardDo/${tenantId}`,
-    id: (tenantId: int, env: Env) =>
-      env.LeaderboardDo.idFromName(LeaderboardDo.Shard.template(tenantId)),
-    instance: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) =>
-      namespace.get(LeaderboardDo.Shard.id(tenantId, env)),
+    id: (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) =>
+      namespace.idFromName(LeaderboardDo.Shard.template(tenantId)),
+    get: async (tenantId: int, namespace: DurableObjectNamespace<LeaderboardDo>) =>
+      namespace.get(LeaderboardDo.Shard.id(tenantId, namespace)),
   };
 
   static readonly topEntryCache = {
     template: () => "top",
-    value: (storage: DurableObjectStorage) => storage.get("top"),
+    get: () => this.storage.get("top"),
+    put: (value: array<LeaderboardEntry>) => this.storage.put("top", value),
   };
 
   // or if some arguments were needed:
   static readonly topEntryCacheWithDate = {
     template: (date: string) => `top/${date}`,
-    value: (storage: DurableObjectStorage, date: string) => storage.get(`top/${date}`),
+    get: (storage: DurableObjectStorage, date: string) => storage.get(`top/${date}`),
+    put: (storage: DurableObjectStorage, date: string, value: array<LeaderboardEntry>) =>
+      storage.put(`top/${date}`, value),
   };
 }
 ```
@@ -512,7 +538,7 @@ An implementation for the `LeaderboardDo` class would look like this:
 // main.ts
 const Leaderboard = clo.Leaderboard.impl({
   // types can be omitted but are included here for clarity
-  async topScores(tenantId: int, env: { LeaderboardDo: clo.LeaderboardDo }) {
+  async topScores(tenantId: int, env: { $ctx: clo.LeaderboardDo }) {
     // Since there is an instance of `LeaderboardDo`, we must be inside of the DO's execution context,
     // and can access the DO's storage templates and shard fields directly.
   },
@@ -522,10 +548,7 @@ export class LeaderboardDo extends clo.LeaderboardDo {
   constructor(state: DurableObjectState, env: clo.Env) {
     super(state, env);
 
-    state.blockConcurrencyWhile(async () => {
-      this.app = await super.cloesce(env);
-      app.register(Leaderboard);
-    });
+    this.app = super.cloesce(env);
   }
 
   async fetch(request: Request) {

@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use idl::{CloesceIdl, MigrationsIdl, MigrationsModel, ModelBacking};
+use idl::{CloesceIdl, ModelBacking};
 
 use compiler_test::{expected_str, src_to_idl};
-use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
+use migrations::{
+    MigrationsDilemma, MigrationsGenerator, MigrationsIdl, MigrationsIntent, MigrationsModel,
+};
 
 use indexmap::IndexMap;
 use sqlx::SqlitePool;
@@ -31,8 +33,8 @@ async fn query(db: &SqlitePool, sql: &str) -> Result<(), sqlx::Error> {
 fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
     let CloesceIdl { hash, models, .. } = idl;
 
-    // Convert each full Model → MigrationsModel
-    let migrations_models: IndexMap<String, MigrationsModel> = models
+    // Convert each full Model -> MigrationsModel
+    let migrations_models = models
         .into_iter()
         .map(|(name, model)| {
             let m = MigrationsModel {
@@ -49,7 +51,7 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
             };
             (name.to_string(), m)
         })
-        .collect();
+        .collect::<IndexMap<_, _>>();
 
     MigrationsIdl {
         hash,

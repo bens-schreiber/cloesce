@@ -1,6 +1,7 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { CloesceApp } from "cloesce";
 import * as clo from "./backend.js";
+import leaderboardDoInitial from "./migrations/LeaderboardDo/Initial.js";
 
 const Leaderboard = clo.Leaderboard.impl({
   async setScore(env, tenantId, score) {
@@ -12,6 +13,8 @@ const Leaderboard = clo.Leaderboard.impl({
 });
 
 const LeaderboardEntry = clo.LeaderboardEntry.impl({});
+
+const PlayerScore = clo.PlayerScore.impl({});
 
 const Global = clo.Global.impl({
   setConfig(env, value) {
@@ -27,9 +30,10 @@ export class LeaderboardDo extends clo.LeaderboardDo {
 
   constructor(ctx: DurableObjectState, env: clo.Env) {
     super(ctx, env);
-    this.app = this.cloesce(env);
+    this.app = this.cloesce(env, [leaderboardDoInitial]);
     this.app.register(Leaderboard);
     this.app.register(LeaderboardEntry);
+    this.app.register(PlayerScore);
   }
 
   async fetch(request: Request): Promise<Response> {

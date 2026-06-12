@@ -1,6 +1,11 @@
 import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Leaderboard, Global, LeaderboardEntry } from "../fixtures/durable_objects/client";
+import {
+  Leaderboard,
+  Global,
+  LeaderboardEntry,
+  PlayerScore,
+} from "../fixtures/durable_objects/client";
 import config from "../fixtures/durable_objects/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -61,7 +66,7 @@ describe("Global Durable Object", () => {
 
 describe("Durable Object-backed model", () => {
   it("a single $save fans out KV writes to the DO storage and a Worker KV namespace", async () => {
-    const saved = await LeaderboardEntry.$save(1, 5, {
+    const saved = await LeaderboardEntry.$save(1, {
       tenantId: 1,
       rank: 5,
       score: { raw: 250 },
@@ -80,7 +85,7 @@ describe("Durable Object-backed model", () => {
   });
 
   it("different tenants resolve to isolated DO instances", async () => {
-    await LeaderboardEntry.$save(3, 1, {
+    await LeaderboardEntry.$save(3, {
       tenantId: 3,
       rank: 1,
       score: { raw: 70 },
@@ -93,5 +98,73 @@ describe("Durable Object-backed model", () => {
     // tenant 1 is unaffected by tenant 3's write.
     const tenant1 = await LeaderboardEntry.$get(1, 5);
     expect(tenant1.data!.score.value).toBe(250);
+  });
+});
+
+describe("SQL-backed Durable Object model", () => {
+  it("$save inserts a row into the DO's SQLite database (migration applied on construction)", async () => {
+    const saved = await PlayerScore.$save(1, { playerName: "alice", points: 100 });
+    expectHttpResult(saved, "$save should be OK");
+    expect(saved.data!.id).toBeTypeOf("number");
+    expect(saved.data!.playerName).toBe("alice");
+    expect(saved.data!.points).toBe(100);
+    expect(saved.data!.tenantId).toBe(1);
+  });
+
+  it("$get fetches a row by primary key inside the DO", async () => {
+    const saved = await PlayerScore.$save(1, { playerName: "bob", points: 55 });
+    expectHttpResult(saved, "$save should be OK");
+
+    const got = await PlayerScore.$get(1, saved.data!.id);
+    expectHttpResult(got, "$get should be OK");
+    expect(got.data!.id).toBe(saved.data!.id);
+    expect(got.data!.playerName).toBe("bob");
+    expect(got.data!.points).toBe(55);
+    expect(got.data!.tenantId).toBe(1);
+  });
+
+  it("$save with a primary key updates the existing row", async () => {
+    const saved = await PlayerScore.$save(1, { playerName: "carol", points: 10 });
+    expectHttpResult(saved, "$save should be OK");
+
+    const updated = await PlayerScore.$save(1, {
+      id: saved.data!.id,
+      playerName: "carol",
+      points: 999,
+    });
+    expectHttpResult(updated, "$save update should be OK");
+    expect(updated.data!.id).toBe(saved.data!.id);
+    expect(updated.data!.points).toBe(999);
+  });
+
+  it("$list seek-paginates rows within the DO", async () => {
+    const all = await PlayerScore.$list(1, 0, 100);
+    expectHttpResult(all, "$list should be OK");
+    expect(all.data!.length).toBeGreaterThanOrEqual(3);
+
+    // Seek past the first row.
+    const firstId = all.data![0].id;
+    const rest = await PlayerScore.$list(1, firstId, 100);
+    expectHttpResult(rest, "$list after firstId should be OK");
+    expect(rest.data!.length).toBe(all.data!.length - 1);
+    expect(rest.data!.every((row) => row.id > firstId)).toBe(true);
+  });
+
+  it("rows are isolated per tenant shard", async () => {
+    await PlayerScore.$save(9, { playerName: "tenant9", points: 1 });
+
+    const tenant9 = await PlayerScore.$list(9, 0, 100);
+    expectHttpResult(tenant9, "$list(9) should be OK");
+    expect(tenant9.data!.length).toBe(1);
+    expect(tenant9.data![0].playerName).toBe("tenant9");
+
+    // tenant 9's database does not contain tenant 1's rows.
+    expect(tenant9.data!.some((row) => row.playerName === "alice")).toBe(false);
+  });
+
+  it("$get for a missing row returns 404", async () => {
+    const res = await PlayerScore.$get(1, 999999);
+    expect(res.ok, `expected 404\n\n${JSON.stringify(res)}`).toBe(false);
+    expect(res.status).toBe(404);
   });
 });

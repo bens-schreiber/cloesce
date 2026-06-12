@@ -1,4 +1,5 @@
-use idl::{CloesceIdl, MigrationsIdl, MigrationsModel};
+use idl::CloesceIdl;
+use migrations::{MigrationsIdl, MigrationsModel};
 
 pub async fn test_sql(
     ast: CloesceIdl<'_>,

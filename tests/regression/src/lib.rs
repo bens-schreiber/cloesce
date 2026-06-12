@@ -215,7 +215,15 @@ impl Fixture {
         for binding in bindings {
             let fixture_path = fixture_root.join(format!("migrations/{binding}"));
             let cidl_out = OutputFile::new(&fixture_path, "Initial.json");
-            let sql_out = OutputFile::new(&fixture_path, "Initial.sql");
+
+            // D1 migrations are plain SQL; Durable Object migrations are TypeScript
+            // modules applied inside the DO.
+            let migration_name = if fixture_path.join("out.Initial.ts").exists() {
+                "Initial.ts"
+            } else {
+                "Initial.sql"
+            };
+            let sql_out = OutputFile::new(&fixture_path, migration_name);
 
             sql_changed |= self.read_out_and_diff(sql_out).0;
             cidl_changed |= self.read_out_and_diff(cidl_out).0;

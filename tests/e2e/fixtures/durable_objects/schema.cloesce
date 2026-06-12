@@ -61,3 +61,19 @@ model LeaderboardEntry for LeaderboardDo(tenantId) {
         meta
     }
 }
+
+// A model with a SQLite table INSIDE the Durable Object: rows live in the DO shard's
+// private database, and the generated CRUD routes execute in the DO. The table is
+// created by the generated migration in migrations/LeaderboardDo/, applied by the DO
+// itself on construction.
+[crud get, list, save]
+model PlayerScore for LeaderboardDo(tenantId) {
+    primary {
+        id: int
+    }
+
+    column {
+        playerName: string
+        points: int
+    }
+}

@@ -6,6 +6,7 @@
     "lib": ["ES2024"],
     "skipLibCheck": true,
     "target": "ES2024",
+    "rootDir": "src",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
@@ -15,5 +16,6 @@
     "emitDeclarationOnly": false,
     "stripInternal": true
   },
+  "include": ["src"],
   "exclude": ["tests", "dist"]
 }

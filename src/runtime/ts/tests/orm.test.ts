@@ -18,14 +18,26 @@ function createHydrateArgs() {
 
 function mockDurableContext() {
   const store = new Map<string, any>();
+  const executed: { query: string; bindings: any[] }[] = [];
   return {
     store,
+    executed,
     ctx: {
       state: {
         storage: {
+          sql: {
+            exec: (query: string, ...bindings: any[]) => {
+              executed.push({ query, bindings });
+              return { toArray: () => [] };
+            },
+          },
           kv: {
             get: (key: string) => store.get(key),
             put: (key: string, value: any) => store.set(key, value),
+            list: (options?: { prefix?: string }) =>
+              [...store.entries()]
+                .filter(([key]) => key.startsWith(options?.prefix ?? ""))
+                .sort(([a], [b]) => a.localeCompare(b)),
           },
         },
       },
@@ -566,5 +578,43 @@ describe("ORM Hydrate Tests", () => {
     // Assert
     expect(result.score.key).toBe("score/7");
     expect(result.score.raw).toBe(42);
+  });
+
+  test("paginated Durable Object KV field prefix-scans the DO's SQL-backed storage", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Leaderboard")
+      .durable("LeaderboardDo", ["tenantId"])
+      .kvField("scores/{tenantId}", "LeaderboardDo", "scores", { Paginated: "Int" })
+      .build();
+
+    const idl = createIdl({ models: [modelMeta] });
+    const { ctx, store } = mockDurableContext();
+    store.set("scores/7/1", 10);
+    store.set("scores/7/2", 20);
+    store.set("scores/8/1", 99);
+
+    // Act
+    const promises: Promise<CloesceResult<void>>[] = [];
+    const result = hydrateType(
+      { tenantId: 7 },
+      { Object: { name: "Leaderboard" } },
+      {
+        ...createHydrateArgs(),
+        idl,
+        includeTree: { scores: {} },
+        durable: ctx,
+        promises,
+      },
+    );
+
+    await Promise.all(promises);
+
+    // Assert: only tenant 7's keys, as a complete page
+    expect(result.scores.complete).toBe(true);
+    expect(result.scores.cursor).toBeNull();
+    expect(result.scores.results).toEqual([
+      { key: "scores/7/1", raw: 10, metadata: null },
+      { key: "scores/7/2", raw: 20, metadata: null },
+    ]);
   });
 });

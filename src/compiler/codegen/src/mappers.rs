@@ -24,6 +24,8 @@ pub trait LanguageTypeMapper {
 
     /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
+
+    fn escape_string(&self, s: &str) -> String;
 }
 
 pub enum TypeScriptMapperKind {
@@ -129,5 +131,11 @@ impl LanguageTypeMapper for TypeScriptMapper {
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
         serde_json::to_string(&tree).unwrap()
+    }
+
+    fn escape_string(&self, s: &str) -> String {
+        s.replace('\\', "\\\\")
+            .replace('`', "\\`")
+            .replace("${", "\\${")
     }
 }

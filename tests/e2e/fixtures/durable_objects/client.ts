@@ -129,7 +129,6 @@ export class LeaderboardEntry {
   }
   static async $save(
     tenantId: number,
-    rank: number,
     model: DeepPartial<LeaderboardEntry>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<LeaderboardEntry>> {
@@ -138,7 +137,6 @@ export class LeaderboardEntry {
     );
     const __$payload: any = {};
     __$payload["tenantId"] = tenantId;
-    __$payload["rank"] = rank;
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
@@ -159,6 +157,88 @@ export class LeaderboardEntry {
     const __$res = Object.assign(new LeaderboardEntry(), data);
     if (__$res.score) __$res.score = Object.assign(new KValue(), __$res.score);
     if (__$res.meta) __$res.meta = Object.assign(new KValue(), __$res.meta);
+    return __$res;
+  }
+}
+export class PlayerScore {
+  id: number;
+  playerName: string;
+  points: number;
+  tenantId: number;
+  static async $get(
+    tenantId: number,
+    id: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PlayerScore>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5843/api/PlayerScore/$get`
+    );
+    __$baseUrl.searchParams.append("tenantId", String(tenantId));
+    __$baseUrl.searchParams.append("id", String(id));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      PlayerScore,
+      false
+    );
+  }
+  static async $list(
+    tenantId: number,
+    lastSeen_id: number,
+    limit: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PlayerScore[]>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5843/api/PlayerScore/$list`
+    );
+    __$baseUrl.searchParams.append("tenantId", String(tenantId));
+    __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    __$baseUrl.searchParams.append("limit", String(limit));
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      PlayerScore,
+      true
+    );
+  }
+  static async $save(
+    tenantId: number,
+    model: DeepPartial<PlayerScore>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PlayerScore>> {
+    const __$baseUrl = new URL(
+      `http://localhost:5843/api/PlayerScore/$save`
+    );
+    const __$payload: any = {};
+    __$payload["tenantId"] = tenantId;
+    __$payload["model"] = model;
+
+    const __$res = await fetchImpl(__$baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, __$payload),
+    });
+
+    return await HttpResult.fromResponse(
+      __$res,
+      MediaType.Json,
+      PlayerScore,
+      false
+    );
+  }
+
+  static fromJson(data: any): PlayerScore {
+    const __$res = Object.assign(new PlayerScore(), data);
     return __$res;
   }
 }

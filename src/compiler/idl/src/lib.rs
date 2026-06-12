@@ -12,7 +12,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -21,7 +20,6 @@ use indexmap::IndexMap;
 use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
@@ -281,7 +279,7 @@ pub struct DataSourceMethod<'src> {
     pub is_stub: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct DataSourceGetMethodParam<'src> {
     #[serde(borrow)]
     pub parameter: ValidatedField<'src>,
@@ -691,123 +689,6 @@ impl CloesceIdl<'_> {
         }
 
         self.hash = root_h.finish();
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct D1Database {
-    pub binding: Option<String>,
-    pub database_name: Option<String>,
-    pub database_id: Option<String>,
-    pub migrations_dir: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct KVNamespace {
-    pub binding: Option<String>,
-    pub id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct R2Bucket {
-    pub binding: Option<String>,
-    pub bucket_name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct DurableObjectBinding {
-    pub name: Option<String>,
-    pub class_name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct DurableObjects {
-    #[serde(default)]
-    pub bindings: Vec<DurableObjectBinding>,
-}
-
-/// Placeholder until full DO migration support (Proposal 7 Phase 4).
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct DurableObjectMigration {
-    pub tag: String,
-
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub new_sqlite_classes: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct WranglerSpec {
-    pub name: Option<String>,
-    pub compatibility_date: Option<String>,
-    pub main: Option<String>,
-
-    #[serde(default)]
-    pub d1_databases: Vec<D1Database>,
-
-    #[serde(default)]
-    pub kv_namespaces: Vec<KVNamespace>,
-
-    #[serde(default)]
-    pub r2_buckets: Vec<R2Bucket>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub durable_objects: Option<DurableObjects>,
-
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub migrations: Vec<DurableObjectMigration>,
-
-    #[serde(default)]
-    pub vars: HashMap<String, Value>,
-}
-
-/// A subset of [Model] suited for migrations.
-///
-/// Assumed that the tree is semantically valid.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsModel<'src> {
-    pub hash: u64,
-    pub name: String,
-
-    #[serde(borrow)]
-    pub backing: Option<ModelBacking<'src>>,
-
-    #[serde(borrow)]
-    pub primary_columns: Vec<Column<'src>>,
-
-    #[serde(borrow)]
-    pub columns: Vec<Column<'src>>,
-
-    #[serde(borrow)]
-    pub navigation_fields: Vec<NavigationField<'src>>,
-}
-
-impl<'src> MigrationsModel<'src> {
-    /// Returns all columns, including primary key columns, as a single iterator.
-    /// The boolean indicates whether the column is a primary key column.
-    pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'src>, bool)> {
-        self.columns
-            .iter()
-            .map(|c| (c, false))
-            .chain(self.primary_columns.iter().map(|c| (c, true)))
-    }
-}
-
-/// A subset of [CloesceIdl] suited for D1 migrations.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsIdl<'src> {
-    pub hash: u64,
-
-    #[serde(borrow)]
-    pub models: IndexMap<String, MigrationsModel<'src>>,
-}
-
-impl<'src> MigrationsIdl<'src> {
-    pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
-        serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
-    }
-
-    pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 }
 
