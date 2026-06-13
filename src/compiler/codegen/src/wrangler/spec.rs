@@ -1,22 +1,65 @@
-// TODO: This module sucks. Can't think of a pattern here that would
-// both avoid the variant-specific code in generate() and not introduce
-// even more boilerplate, so I'm just doing no pattern at all.
-
 use std::path::Path;
 
 use idl::{CidlType, CloesceIdl};
-use serde::Deserialize;
-use serde_json::Value as JsonValue;
-use toml::Value as TomlValue;
+use serde_json::{Map, Value as JsonValue};
 
 use crate::wrangler::{
     D1Database, DurableObjectBinding, DurableObjectMigration, DurableObjects, KVNamespace,
     R2Bucket, WranglerSpec,
 };
 
-pub enum WranglerGenerator {
-    Json(JsonValue),
-    Toml(TomlValue),
+#[derive(Clone, Copy)]
+pub enum Format {
+    Json,
+    Toml,
+}
+
+/// A wrangler config held as a canonical JSON document, regardless of whether
+/// it was authored as JSON or TOML.
+pub struct WranglerGenerator {
+    root: JsonValue,
+    format: Format,
+}
+
+fn entry_object<'a>(
+    obj: &'a mut Map<String, JsonValue>,
+    key: &str,
+    ctx: &str,
+) -> &'a mut Map<String, JsonValue> {
+    obj.entry(key.to_string())
+        .or_insert_with(|| JsonValue::Object(Map::new()))
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("{ctx}"))
+}
+
+/// Merge `items` into the `key` array under `target`, matching existing entries
+/// by their `match_field` string member. For a match, `patch` applies per-field
+/// updates onto the existing entry; otherwise the whole item is appended.
+fn merge_into_array<T: serde::Serialize>(
+    target: &mut Map<String, JsonValue>,
+    key: &str,
+    match_field: &str,
+    items: &[T],
+    matched: impl Fn(&T) -> Option<&str>,
+    patch: impl Fn(&T, &mut Map<String, JsonValue>),
+) {
+    let arr = target
+        .entry(key.to_string())
+        .or_insert_with(|| JsonValue::Array(vec![]))
+        .as_array_mut()
+        .expect("entry must be an array");
+
+    for item in items {
+        let id = matched(item);
+        if let Some(JsonValue::Object(existing)) = arr
+            .iter_mut()
+            .find(|e| e.get(match_field).and_then(|b| b.as_str()) == id)
+        {
+            patch(item, existing);
+        } else {
+            arr.push(serde_json::to_value(item).expect("JSON to serialize"));
+        }
+    }
 }
 
 impl WranglerGenerator {
@@ -31,361 +74,154 @@ impl WranglerGenerator {
         match extension {
             "json" | "jsonc" => {
                 let contents_no_comments = json_comments::StripComments::new(contents.as_bytes());
-                let val: JsonValue = serde_json::from_reader(contents_no_comments)
-                    .unwrap_or(JsonValue::Object(serde_json::Map::new()));
-                Ok(WranglerGenerator::Json(val))
+                let root: JsonValue = serde_json::from_reader(contents_no_comments)
+                    .unwrap_or(JsonValue::Object(Map::new()));
+                Ok(WranglerGenerator {
+                    root,
+                    format: Format::Json,
+                })
             }
             "toml" => {
-                let val: TomlValue =
-                    toml::from_str(&contents).unwrap_or(TomlValue::Table(toml::Table::new()));
-                Ok(WranglerGenerator::Toml(val))
+                // Reinterpret TOML as the canonical JSON document.
+                let toml_val: toml::Value =
+                    toml::from_str(&contents).unwrap_or(toml::Value::Table(toml::Table::new()));
+                let root = serde_json::to_value(toml_val).expect("TOML reparses as JSON");
+                Ok(WranglerGenerator {
+                    root,
+                    format: Format::Toml,
+                })
             }
             other => Err(format!("Unsupported wrangler file extension: {other}")),
         }
     }
 
+    fn root_object(&mut self) -> &mut Map<String, JsonValue> {
+        self.root
+            .as_object_mut()
+            .expect("Expected wrangler root to be an object")
+    }
+
     pub fn generate(&mut self, spec: WranglerSpec, env: Option<&str>) -> String {
         // Top-level fields (name, compatibility_date, main) always go at root
         if let Some(name) = &spec.name {
-            self.insert("name".into(), name.clone());
+            self.insert("name", name.clone());
         }
 
         if let Some(date) = &spec.compatibility_date {
-            self.insert("compatibility_date".into(), date.clone());
+            self.insert("compatibility_date", date.clone());
         }
 
         if let Some(main) = &spec.main {
-            self.insert("main".into(), main.clone());
+            self.insert("main", main.clone());
         }
 
-        match self {
-            WranglerGenerator::Json(val) => {
-                let root = if let JsonValue::Object(map) = val {
-                    map
-                } else {
-                    panic!("Expected JSON root to be an object");
-                };
+        Self::write_bindings(self.root_object(), &spec, env);
 
-                // When an env is specified, write bindings into env.<name> instead of root
-                let target: &mut serde_json::Map<String, JsonValue> = if let Some(env_name) = env {
-                    let env_map = root
-                        .entry("env".to_string())
-                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
-                        .as_object_mut()
-                        .expect("env must be an object");
-                    env_map
-                        .entry(env_name.to_string())
-                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
-                        .as_object_mut()
-                        .expect("env entry must be an object")
-                } else {
-                    root
-                };
-
-                if !spec.d1_databases.is_empty() {
-                    let arr = target
-                        .entry("d1_databases".to_string())
-                        .or_insert_with(|| JsonValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("d1_databases must be an array");
-
-                    for db in &spec.d1_databases {
-                        let binding = db.binding.as_deref();
-
-                        if let Some(JsonValue::Object(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(id) = &db.database_id {
-                                existing.insert(
-                                    "database_id".into(),
-                                    serde_json::to_value(id).expect("JSON to serialize"),
-                                );
-                            }
-                            if let Some(name) = &db.database_name {
-                                existing.insert(
-                                    "database_name".into(),
-                                    serde_json::to_value(name).expect("JSON to serialize"),
-                                );
-                            }
-                            if let Some(migrations_dir) = &db.migrations_dir {
-                                existing.insert(
-                                    "migrations_dir".into(),
-                                    serde_json::to_value(migrations_dir)
-                                        .expect("JSON to serialize"),
-                                );
-                            }
-                        } else {
-                            arr.push(serde_json::to_value(db).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.kv_namespaces.is_empty() {
-                    let arr = target
-                        .entry("kv_namespaces".to_string())
-                        .or_insert_with(|| JsonValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("kv_namespaces must be an array");
-
-                    for ns in &spec.kv_namespaces {
-                        let binding = ns.binding.as_deref();
-
-                        if let Some(JsonValue::Object(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(id) = &ns.id {
-                                existing.insert(
-                                    "id".into(),
-                                    serde_json::to_value(id).expect("JSON to serialize"),
-                                );
-                            }
-                        } else {
-                            arr.push(serde_json::to_value(ns).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.r2_buckets.is_empty() {
-                    let arr = target
-                        .entry("r2_buckets".to_string())
-                        .or_insert_with(|| JsonValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("r2_buckets must be an array");
-
-                    for bucket in &spec.r2_buckets {
-                        let binding = bucket.binding.as_deref();
-
-                        if let Some(JsonValue::Object(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(name) = &bucket.bucket_name {
-                                existing.insert(
-                                    "bucket_name".into(),
-                                    serde_json::to_value(name).expect("JSON to serialize"),
-                                );
-                            }
-                        } else {
-                            arr.push(serde_json::to_value(bucket).unwrap());
-                        }
-                    }
-                }
-
-                if let Some(durable_objects) = &spec.durable_objects
-                    && !durable_objects.bindings.is_empty()
-                {
-                    let dos = target
-                        .entry("durable_objects".to_string())
-                        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()))
-                        .as_object_mut()
-                        .expect("durable_objects must be an object");
-
-                    let arr = dos
-                        .entry("bindings".to_string())
-                        .or_insert_with(|| JsonValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("durable_objects.bindings must be an array");
-
-                    for binding in &durable_objects.bindings {
-                        let name = binding.name.as_deref();
-
-                        if let Some(JsonValue::Object(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("name").and_then(|b| b.as_str()) == name)
-                        {
-                            if let Some(class_name) = &binding.class_name {
-                                existing.insert(
-                                    "class_name".into(),
-                                    serde_json::to_value(class_name).expect("JSON to serialize"),
-                                );
-                            }
-                        } else {
-                            arr.push(serde_json::to_value(binding).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.migrations.is_empty() {
-                    target.insert(
-                        "migrations".into(),
-                        serde_json::to_value(&spec.migrations).expect("JSON to serialize"),
-                    );
-                }
-
-                if !spec.vars.is_empty() {
-                    target.insert(
-                        "vars".into(),
-                        serde_json::to_value(&spec.vars).expect("JSON to serialize"),
-                    );
-                }
-            }
-            WranglerGenerator::Toml(val) => {
-                let root = if let TomlValue::Table(map) = val {
-                    map
-                } else {
-                    panic!("Expected TOML root to be a table");
-                };
-
-                // When an env is specified, write bindings into env.<name> instead of root
-                let target: &mut toml::map::Map<String, TomlValue> = if let Some(env_name) = env {
-                    let env_map = root
-                        .entry("env")
-                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
-                        .as_table_mut()
-                        .expect("env must be a table");
-                    env_map
-                        .entry(env_name)
-                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
-                        .as_table_mut()
-                        .expect("env entry must be a table")
-                } else {
-                    root
-                };
-
-                if !spec.d1_databases.is_empty() {
-                    let arr = target
-                        .entry("d1_databases")
-                        .or_insert_with(|| TomlValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("d1_databases must be an array");
-
-                    for db in &spec.d1_databases {
-                        let binding = db.binding.as_deref();
-
-                        if let Some(TomlValue::Table(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(id) = &db.database_id {
-                                existing.insert(
-                                    "database_id".to_string(),
-                                    TomlValue::String(id.clone()),
-                                );
-                            }
-                            if let Some(name) = &db.database_name {
-                                existing.insert(
-                                    "database_name".to_string(),
-                                    TomlValue::String(name.clone()),
-                                );
-                            }
-                            if let Some(migrations_dir) = &db.migrations_dir {
-                                existing.insert(
-                                    "migrations_dir".to_string(),
-                                    TomlValue::String(migrations_dir.clone()),
-                                );
-                            }
-                        } else {
-                            arr.push(TomlValue::try_from(db).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.kv_namespaces.is_empty() {
-                    let arr = target
-                        .entry("kv_namespaces")
-                        .or_insert_with(|| TomlValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("kv_namespaces must be an array");
-
-                    for ns in &spec.kv_namespaces {
-                        let binding = ns.binding.as_deref();
-
-                        if let Some(TomlValue::Table(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(id) = &ns.id {
-                                existing.insert("id".to_string(), TomlValue::String(id.clone()));
-                            }
-                        } else {
-                            arr.push(TomlValue::try_from(ns).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.r2_buckets.is_empty() {
-                    let arr = target
-                        .entry("r2_buckets")
-                        .or_insert_with(|| TomlValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("r2_buckets must be an array");
-
-                    for bucket in &spec.r2_buckets {
-                        let binding = bucket.binding.as_deref();
-
-                        if let Some(TomlValue::Table(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                        {
-                            if let Some(name) = &bucket.bucket_name {
-                                existing.insert(
-                                    "bucket_name".to_string(),
-                                    TomlValue::String(name.clone()),
-                                );
-                            }
-                        } else {
-                            arr.push(TomlValue::try_from(bucket).unwrap());
-                        }
-                    }
-                }
-
-                if let Some(durable_objects) = &spec.durable_objects
-                    && !durable_objects.bindings.is_empty()
-                {
-                    let dos = target
-                        .entry("durable_objects")
-                        .or_insert_with(|| TomlValue::Table(toml::Table::new()))
-                        .as_table_mut()
-                        .expect("durable_objects must be a table");
-
-                    let arr = dos
-                        .entry("bindings")
-                        .or_insert_with(|| TomlValue::Array(vec![]))
-                        .as_array_mut()
-                        .expect("durable_objects.bindings must be an array");
-
-                    for binding in &durable_objects.bindings {
-                        let name = binding.name.as_deref();
-
-                        if let Some(TomlValue::Table(existing)) = arr
-                            .iter_mut()
-                            .find(|e| e.get("name").and_then(|b| b.as_str()) == name)
-                        {
-                            if let Some(class_name) = &binding.class_name {
-                                existing.insert(
-                                    "class_name".to_string(),
-                                    TomlValue::String(class_name.clone()),
-                                );
-                            }
-                        } else {
-                            arr.push(TomlValue::try_from(binding).unwrap());
-                        }
-                    }
-                }
-
-                if !spec.migrations.is_empty() {
-                    target.insert(
-                        "migrations".into(),
-                        TomlValue::try_from(&spec.migrations).expect("TOML to serialize"),
-                    );
-                }
-
-                if !spec.vars.is_empty() {
-                    target.insert(
-                        "vars".into(),
-                        TomlValue::try_from(&spec.vars).expect("TOML to serialize"),
-                    );
-                }
+        match self.format {
+            Format::Json => serde_json::to_string_pretty(&self.root).expect("JSON to serialize"),
+            Format::Toml => {
+                let toml_val = toml::Value::try_from(&self.root).expect("JSON reparses as TOML");
+                toml::to_string_pretty(&toml_val).expect("TOML to serialize")
             }
         }
+    }
 
-        match self {
-            WranglerGenerator::Json(val) => {
-                serde_json::to_string_pretty(val).expect("JSON to serialize")
+    /// Writes every binding section of `spec` into `root`.
+    fn write_bindings(root: &mut Map<String, JsonValue>, spec: &WranglerSpec, env: Option<&str>) {
+        // When an env is specified, write bindings into env.<name> instead of root
+        let target = match env {
+            Some(env_name) => {
+                let envs = entry_object(root, "env", "env must be an object");
+                entry_object(envs, env_name, "env entry must be an object")
             }
-            WranglerGenerator::Toml(val) => toml::to_string_pretty(val).expect("TOML to serialize"),
+            None => root,
+        };
+
+        if !spec.d1_databases.is_empty() {
+            merge_into_array(
+                target,
+                "d1_databases",
+                "binding",
+                &spec.d1_databases,
+                |db| db.binding.as_deref(),
+                |db, existing| {
+                    if let Some(id) = &db.database_id {
+                        existing.insert("database_id".into(), id.clone().into());
+                    }
+                    if let Some(name) = &db.database_name {
+                        existing.insert("database_name".into(), name.clone().into());
+                    }
+                    if let Some(migrations_dir) = &db.migrations_dir {
+                        existing.insert("migrations_dir".into(), migrations_dir.clone().into());
+                    }
+                },
+            );
+        }
+
+        if !spec.kv_namespaces.is_empty() {
+            merge_into_array(
+                target,
+                "kv_namespaces",
+                "binding",
+                &spec.kv_namespaces,
+                |ns| ns.binding.as_deref(),
+                |ns, existing| {
+                    if let Some(id) = &ns.id {
+                        existing.insert("id".into(), id.clone().into());
+                    }
+                },
+            );
+        }
+
+        if !spec.r2_buckets.is_empty() {
+            merge_into_array(
+                target,
+                "r2_buckets",
+                "binding",
+                &spec.r2_buckets,
+                |bucket| bucket.binding.as_deref(),
+                |bucket, existing| {
+                    if let Some(name) = &bucket.bucket_name {
+                        existing.insert("bucket_name".into(), name.clone().into());
+                    }
+                },
+            );
+        }
+
+        if let Some(durable_objects) = &spec.durable_objects
+            && !durable_objects.bindings.is_empty()
+        {
+            let dos = entry_object(
+                target,
+                "durable_objects",
+                "durable_objects must be an object",
+            );
+            merge_into_array(
+                dos,
+                "bindings",
+                "name",
+                &durable_objects.bindings,
+                |binding| binding.name.as_deref(),
+                |binding, existing| {
+                    if let Some(class_name) = &binding.class_name {
+                        existing.insert("class_name".into(), class_name.clone().into());
+                    }
+                },
+            );
+        }
+
+        if !spec.migrations.is_empty() {
+            target.insert(
+                "migrations".into(),
+                serde_json::to_value(&spec.migrations).expect("JSON to serialize"),
+            );
+        }
+
+        if !spec.vars.is_empty() {
+            target.insert(
+                "vars".into(),
+                serde_json::to_value(&spec.vars).expect("JSON to serialize"),
+            );
         }
     }
 
@@ -393,83 +229,47 @@ impl WranglerGenerator {
     /// When `env` is specified, reads bindings from `env.<name>`, merging
     /// top-level fields (name, compatibility_date, main) that are absent there.
     pub fn as_spec(&self, env: Option<&str>) -> Result<WranglerSpec, Box<dyn std::error::Error>> {
-        match self {
-            WranglerGenerator::Json(val) => {
-                let Some(env_name) = env else {
-                    return Ok(serde_json::from_value(val.clone())?);
-                };
+        let Some(env_name) = env else {
+            return Ok(serde_json::from_value(self.root.clone())?);
+        };
 
-                // Start from the env-specific subobject, falling back to top-level
-                let env_val = val
-                    .get("env")
-                    .and_then(|e| e.get(env_name))
-                    .cloned()
-                    .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+        // Start from the env-specific subobject, falling back to top-level
+        let env_val = self
+            .root
+            .get("env")
+            .and_then(|e| e.get(env_name))
+            .cloned()
+            .unwrap_or(JsonValue::Object(Map::new()));
 
-                let mut merged = if let JsonValue::Object(map) = env_val {
-                    map
-                } else {
-                    serde_json::Map::new()
-                };
+        let mut merged = match env_val {
+            JsonValue::Object(map) => map,
+            _ => Map::new(),
+        };
 
-                // Inherit top-level scalar fields when absent in the env block
-                for key in &["name", "compatibility_date", "main"] {
-                    if !merged.contains_key(*key)
-                        && let Some(v) = val.get(*key)
-                    {
-                        merged.insert(key.to_string(), v.clone());
-                    }
-                }
-
-                let res = serde_json::from_value(JsonValue::Object(merged))?;
-                Ok(res)
-            }
-            WranglerGenerator::Toml(val) => {
-                let Some(env_name) = env else {
-                    return Ok(WranglerSpec::deserialize(val.clone())?);
-                };
-
-                let env_val = val
-                    .get("env")
-                    .and_then(|e| e.get(env_name))
-                    .cloned()
-                    .unwrap_or(TomlValue::Table(toml::Table::new()));
-
-                let mut merged = if let TomlValue::Table(map) = env_val {
-                    map
-                } else {
-                    toml::Table::new()
-                };
-
-                for key in &["name", "compatibility_date", "main"] {
-                    if !merged.contains_key(*key)
-                        && let Some(v) = val.get(*key)
-                    {
-                        merged.insert(key.to_string(), v.clone());
-                    }
-                }
-
-                let res = WranglerSpec::deserialize(TomlValue::Table(merged))?;
-                Ok(res)
+        // Inherit top-level scalar fields when absent in the env block
+        for key in &["name", "compatibility_date", "main"] {
+            if !merged.contains_key(*key)
+                && let Some(v) = self.root.get(*key)
+            {
+                merged.insert(key.to_string(), v.clone());
             }
         }
+
+        Ok(serde_json::from_value(JsonValue::Object(merged))?)
     }
 
-    pub fn insert(&mut self, key: String, value: impl Into<JsonValue> + Into<TomlValue>) {
-        match self {
-            WranglerGenerator::Json(val) => {
-                let JsonValue::Object(map) = val else {
-                    panic!("Expected JSON root to be an object");
-                };
-                map.insert(key, value.into());
-            }
-            WranglerGenerator::Toml(val) => {
-                let TomlValue::Table(table) = val else {
-                    panic!("Expected TOML root to be a table");
-                };
-                table.insert(key, value.into());
-            }
-        }
+    pub fn insert(&mut self, key: &str, value: impl Into<JsonValue>) {
+        self.root_object().insert(key.to_string(), value.into());
+    }
+
+    #[cfg(test)]
+    fn from_toml_str(src: &str) -> Self {
+        Self::from_contents(src.to_string(), Path::new("wrangler.toml")).unwrap()
+    }
+
+    #[cfg(test)]
+    fn from_json_str(src: &str) -> Self {
+        Self::from_contents(src.to_string(), Path::new("wrangler.json")).unwrap()
     }
 }
 
@@ -716,14 +516,14 @@ mod tests {
     fn test_serialize_wrangler_spec() {
         // Empty TOML
         {
-            WranglerGenerator::Toml(toml::from_str("").unwrap())
+            WranglerGenerator::from_toml_str("")
                 .as_spec(None)
                 .expect("Empty TOML should produce a valid spec");
         }
 
         // Empty JSON
         {
-            WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+            WranglerGenerator::from_json_str("{}")
                 .as_spec(None)
                 .expect("Empty JSON should produce a valid spec");
         }
@@ -746,14 +546,12 @@ mod tests {
         // Act
         let specs = vec![
             {
-                let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
-                    .as_spec(None)
-                    .unwrap();
+                let mut spec = WranglerGenerator::from_toml_str("").as_spec(None).unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
                 spec
             },
             {
-                let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                let mut spec = WranglerGenerator::from_json_str("{}")
                     .as_spec(None)
                     .unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
@@ -790,14 +588,12 @@ mod tests {
         // Act
         let specs = vec![
             {
-                let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
-                    .as_spec(None)
-                    .unwrap();
+                let mut spec = WranglerGenerator::from_toml_str("").as_spec(None).unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "my-migrations");
                 spec
             },
             {
-                let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                let mut spec = WranglerGenerator::from_json_str("{}")
                     .as_spec(None)
                     .unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "my-migrations");
@@ -839,14 +635,12 @@ mod tests {
         // Act
         let specs = vec![
             {
-                let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
-                    .as_spec(None)
-                    .unwrap();
+                let mut spec = WranglerGenerator::from_toml_str("").as_spec(None).unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
                 spec
             },
             {
-                let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                let mut spec = WranglerGenerator::from_json_str("{}")
                     .as_spec(None)
                     .unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
@@ -890,14 +684,12 @@ mod tests {
         // Act
         let specs = vec![
             {
-                let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
-                    .as_spec(None)
-                    .unwrap();
+                let mut spec = WranglerGenerator::from_toml_str("").as_spec(None).unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
                 spec
             },
             {
-                let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap())
+                let mut spec = WranglerGenerator::from_json_str("{}")
                     .as_spec(None)
                     .unwrap();
                 WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
@@ -943,13 +735,13 @@ mod tests {
         );
 
         // Act: TOML
-        let mut toml_gen = WranglerGenerator::Toml(toml::from_str("").unwrap());
+        let mut toml_gen = WranglerGenerator::from_toml_str("");
         let mut toml_spec = toml_gen.as_spec(None).unwrap();
         WranglerDefault::set_defaults(&mut toml_spec, &idl, "migrations");
         let toml_out = toml_gen.generate(toml_spec, None);
 
         // Act: JSON
-        let mut json_gen = WranglerGenerator::Json(serde_json::from_str("{}").unwrap());
+        let mut json_gen = WranglerGenerator::from_json_str("{}");
         let mut json_spec = json_gen.as_spec(None).unwrap();
         WranglerDefault::set_defaults(&mut json_spec, &idl, "migrations");
         let json_out = json_gen.generate(json_spec, None);
@@ -994,7 +786,7 @@ mod tests {
         );
 
         // Act
-        let mut spec = WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap())
+        let mut spec = WranglerGenerator::from_toml_str(toml_with_incomplete_d1)
             .as_spec(None)
             .unwrap();
         WranglerDefault::set_defaults(&mut spec, &idl, "default-migrations");
@@ -1015,8 +807,7 @@ mod tests {
             "default-migrations/db"
         );
 
-        let mut generator =
-            WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap());
+        let mut generator = WranglerGenerator::from_toml_str(toml_with_incomplete_d1);
         let result = generator.generate(spec, None);
         assert!(result.contains("replace_with_db_id"));
     }
@@ -1042,7 +833,7 @@ mod tests {
         migrations_dir = "migrations/DB"
     "#;
 
-        let toml_spec = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap())
+        let toml_spec = WranglerGenerator::from_toml_str(toml_src)
             .as_spec(Some("staging"))
             .unwrap();
         assert_eq!(
@@ -1056,7 +847,7 @@ mod tests {
             Some("staging-id")
         );
 
-        let toml_root_spec = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap())
+        let toml_root_spec = WranglerGenerator::from_toml_str(toml_src)
             .as_spec(None)
             .unwrap();
         assert_eq!(
@@ -1080,7 +871,7 @@ mod tests {
         }
     }"#;
 
-        let json_spec = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap())
+        let json_spec = WranglerGenerator::from_json_str(json_src)
             .as_spec(Some("staging"))
             .unwrap();
         assert_eq!(
@@ -1095,7 +886,7 @@ mod tests {
         );
 
         // Verify top-level spec is unaffected
-        let json_root_spec = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap())
+        let json_root_spec = WranglerGenerator::from_json_str(json_src)
             .as_spec(None)
             .unwrap();
         assert_eq!(
@@ -1138,7 +929,7 @@ mod tests {
             id = "prod-cache-id"
         "#;
 
-            let mut generator = WranglerGenerator::Toml(toml::from_str(toml_src).unwrap());
+            let mut generator = WranglerGenerator::from_toml_str(toml_src);
             let mut spec = generator.as_spec(Some("staging")).unwrap();
             WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
             let output = generator.generate(spec, Some("staging"));
@@ -1148,7 +939,7 @@ mod tests {
                 "expected env.staging section in TOML output:\n{output}"
             );
 
-            let root_spec = WranglerGenerator::Toml(toml::from_str(&output).unwrap())
+            let root_spec = WranglerGenerator::from_toml_str(&output)
                 .as_spec(None)
                 .unwrap();
             assert_eq!(
@@ -1161,7 +952,7 @@ mod tests {
             );
 
             // Staging env reads back the generated values
-            let staging_spec = WranglerGenerator::Toml(toml::from_str(&output).unwrap())
+            let staging_spec = WranglerGenerator::from_toml_str(&output)
                 .as_spec(Some("staging"))
                 .unwrap();
             assert!(staging_spec.d1_databases[0].database_id.is_some());
@@ -1180,7 +971,7 @@ mod tests {
             ]
         }"#;
 
-            let mut generator = WranglerGenerator::Json(serde_json::from_str(json_src).unwrap());
+            let mut generator = WranglerGenerator::from_json_str(json_src);
             let mut spec = generator.as_spec(Some("staging")).unwrap();
             WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
             let output = generator.generate(spec, Some("staging"));
@@ -1195,7 +986,7 @@ mod tests {
             assert_eq!(output_val["d1_databases"][0]["database_id"], "prod-id");
             assert_eq!(output_val["kv_namespaces"][0]["id"], "prod-cache-id");
 
-            let staging_spec = WranglerGenerator::Json(serde_json::from_str(&output).unwrap())
+            let staging_spec = WranglerGenerator::from_json_str(&output)
                 .as_spec(Some("staging"))
                 .unwrap();
             assert!(staging_spec.d1_databases[0].database_id.is_some());
@@ -1205,8 +996,7 @@ mod tests {
 
     #[test]
     fn durable_object_migrations_diff_against_existing_entries() {
-        // Arrange: the config already registered LeaderboardDo (v1) and renamed-away/deleted
-        // classes; only the new GlobalDo binding should be appended under a new tag.
+        // Arrange
         let existing = r#"
         [[migrations]]
         tag = "v1"
@@ -1235,7 +1025,7 @@ mod tests {
         );
 
         // Act
-        let mut generator = WranglerGenerator::Toml(toml::from_str(existing).unwrap());
+        let mut generator = WranglerGenerator::from_toml_str(existing);
         let mut spec = generator.as_spec(None).unwrap();
         WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
         let out = generator.generate(spec.clone(), None);
@@ -1276,9 +1066,7 @@ mod tests {
         );
 
         // Act: two consecutive compiles over the same config
-        let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap())
-            .as_spec(None)
-            .unwrap();
+        let mut spec = WranglerGenerator::from_toml_str("").as_spec(None).unwrap();
         WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
         WranglerDefault::set_defaults(&mut spec, &idl, "migrations");
 
