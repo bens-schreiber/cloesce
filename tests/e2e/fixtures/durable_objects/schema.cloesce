@@ -1,79 +1,102 @@
-durable LeaderboardDo {
-    shard {
-        [gt 0]
-        tenantId: int
-    }
-
-    score() -> int {
-        "score"
-    }
-}
-
+// #region: Global
 durable GlobalDo {
-    config() -> json {
-        "config"
+    metadata() -> json {
+        "metadata"
     }
 }
 
-kv EntryMeta {
-    label(tenantId: int, rank: int) -> string {
-        "entry/{tenantId}/{rank}"
+model Global for GlobalDo {
+    kv GlobalDo::metadata() {
+        metadata
     }
 }
-
-model Leaderboard {}
-
-api Leaderboard {
-    [inject LeaderboardDo(tenantId)]
-    post setScore(tenantId: int, score: int)
-
-    [inject LeaderboardDo(tenantId)]
-    get getScore(tenantId: int) -> int
-}
-
-model Global {}
 
 api Global {
-    [inject GlobalDo()]
-    post setConfig(value: json)
+    post newGlobal() -> Global
 
     [inject GlobalDo()]
-    get getConfig() -> json
+    get getMetadata(self) -> json
+}
+// #endregion
+
+// #region: CRUD and Custom Data Sources
+kv GlobalSubRedditMetadata {
+    metadata(subId: int) -> json {
+        "metadata/{subId}"
+    }
 }
 
-// A model BACKED BY a Durable Object: it hydrates its `score` field from the DO's
-// own KV storage, and its generated CRUD routes run inside the DO. It inherits
-// `tenantId` from the DO's shard and declares an extra `rank` route field.
-//
-// `meta` is bound to a regular Worker KV namespace, so a single upsert fans out to
-// two destinations: `score` to the DO storage, `meta` to Worker KV.
+durable SubRedditDo {
+    shard {
+        [gt 0]
+        id: int
+    }
+
+    metadata() -> json {
+        "metadata"
+    }
+}
+
 [crud get, save]
-model LeaderboardEntry for LeaderboardDo(tenantId) {
-    route {
-        rank: int
+model SubReddit for SubRedditDo(subId) {
+    kv SubRedditDo::metadata() {
+        metadata
     }
 
-    kv LeaderboardDo::score {
-        score
-    }
-
-    kv EntryMeta::label(tenantId, rank) {
-        meta
+    kv GlobalSubRedditMetadata::metadata(subId) {
+        globalMetadata
     }
 }
 
-// A model with a SQLite table INSIDE the Durable Object: rows live in the DO shard's
-// private database, and the generated CRUD routes execute in the DO. The table is
-// created by the generated migration in migrations/LeaderboardDo/, applied by the DO
-// itself on construction.
+api SubReddit {
+    post newSubReddit() -> SubReddit
+
+    [inject SubRedditDo(subId)]
+    get feed(self, subId: int) -> array<Post>
+}
+
 [crud get, list, save]
-model PlayerScore for LeaderboardDo(tenantId) {
+model Post for SubRedditDo(subId) {
     primary {
         id: int
     }
 
     column {
-        playerName: string
-        points: int
+        title: string
+        content: string
+    }
+
+    nav Comment::postId {
+        comments
     }
 }
+
+source Custom for Post {
+    include {}
+
+    [inject SubRedditDo]
+    get(id: int, subId: int)
+
+    [inject SubRedditDo]
+    list(subId: int)
+
+    [inject SubRedditDo]
+    save(post: partial<Post>, subId: int)
+}
+
+[crud get, list, save]
+model Comment for SubRedditDo(subId) {
+    primary {
+        id: int
+    }
+
+    column {
+        content: string
+        upvotes: int
+    }
+
+    foreign (Post::id) {
+        postId
+    }
+}
+// #endregion

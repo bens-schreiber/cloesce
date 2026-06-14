@@ -7,16 +7,16 @@ class_name = "GlobalDo"
 name = "GlobalDo"
 
 [[durable_objects.bindings]]
-class_name = "LeaderboardDo"
-name = "LeaderboardDo"
+class_name = "SubRedditDo"
+name = "SubRedditDo"
 
 [[kv_namespaces]]
-binding = "EntryMeta"
-id = "replace_with_EntryMeta_id"
+binding = "GlobalSubRedditMetadata"
+id = "replace_with_GlobalSubRedditMetadata_id"
 
 [[migrations]]
 new_sqlite_classes = [
     "GlobalDo",
-    "LeaderboardDo",
+    "SubRedditDo",
 ]
 tag = "v1"

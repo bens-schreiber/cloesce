@@ -102,8 +102,9 @@ export abstract class {{ binding.name }} extends DurableObject<Env> {
             {{ shard_template(binding) }},
         id: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName({{ binding.name }}.Shard.template({% for field in &binding.shard_fields %}{{ field.name }}{% if !loop.last %}, {% endif %}{% endfor %})),
-        instance: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}namespace: DurableObjectNamespace): DurableObjectStub =>
-            namespace.get({{ binding.name }}.Shard.id({% for field in &binding.shard_fields %}{{ field.name }}, {% endfor %}namespace)),
+        instance<T extends {{ binding.name }} = {{ binding.name }}>({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}namespace: DurableObjectNamespace): DurableObjectStub & T {
+            return namespace.get({{ binding.name }}.Shard.id({% for field in &binding.shard_fields %}{{ field.name }}, {% endfor %}namespace)) as DurableObjectStub & T;
+        },
     };
 {%- for template in &binding.templates %}
 
@@ -332,13 +333,13 @@ export namespace {{ model.name }} {
     export namespace {{ ds.name }} {
         export interface Crud {
 {%- if ds.get.is_stub %}
-            get({% if !ds.get.injected.is_empty() %}env: {{ inject_env(ds.get.injected) }}{% endif %}{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): ApiResult<Self>;
+            get({% if !ds.get.injected.is_empty() %}env: {{ inject_env(ds.get.injected) }}{% endif %}{% for param in ds.get.parameters %}{% if !loop.first || !ds.get.injected.is_empty() %}, {% endif %}{{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): ApiResult<Self>;
 {%- endif %}
 {%- if ds.list.is_stub %}
-            list({% if !ds.list.injected.is_empty() %}env: {{ inject_env(ds.list.injected) }}{% endif %}{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self[]>;
+            list({% if !ds.list.injected.is_empty() %}env: {{ inject_env(ds.list.injected) }}{% endif %}{% for param in ds.list.parameters %}{% if !loop.first || !ds.list.injected.is_empty() %}, {% endif %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self[]>;
 {%- endif %}
 {%- if ds.save.is_stub %}
-            save({% if !ds.save.injected.is_empty() %}env: {{ inject_env(ds.save.injected) }}{% endif %}{% for param in ds.save.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self>;
+            save({% if !ds.save.injected.is_empty() %}env: {{ inject_env(ds.save.injected) }}{% endif %}{% for param in ds.save.parameters %}{% if !loop.first || !ds.save.injected.is_empty() %}, {% endif %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self>;
 {%- endif %}
         }
         export type Impl = typeof GeneratedSource.{{ ds.name }} & Crud;

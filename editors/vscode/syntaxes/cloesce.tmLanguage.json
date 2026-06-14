@@ -116,12 +116,12 @@
     "structural-keyword": {
       "comment": "Block/sub-block keywords used by the parser",
       "name": "keyword.other.cloesce",
-      "match": "\\b(primary|optional|unique|foreign|nav|column|route|include|for|crud|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
+      "match": "\\b(primary|optional|unique|foreign|nav|column|route|shard|include|for|crud|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
     },
     "binding-keyword": {
       "comment": "Storage binding kinds (also introduce top-level binding blocks)",
       "name": "storage.type.binding.cloesce",
-      "match": "\\b(d1|kv|r2|vars)\\b"
+      "match": "\\b(d1|kv|r2|vars|durable)\\b"
     },
     "builtin-type": {
       "name": "support.type.primitive.cloesce",

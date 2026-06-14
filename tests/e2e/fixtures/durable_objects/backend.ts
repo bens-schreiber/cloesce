@@ -9,18 +9,18 @@ export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
 export interface Env {
-    EntryMeta: KVNamespace;
+    GlobalSubRedditMetadata: KVNamespace;
     GlobalDo: DurableObjectNamespace;
-    LeaderboardDo: DurableObjectNamespace;
+    SubRedditDo: DurableObjectNamespace;
 }
-export class EntryMeta {
-    static readonly label = {
-        template: (tenantId: number, rank: number): string =>
-            `entry/${tenantId}/${rank}`,
-        get: (ns: KVNamespace, tenantId: number, rank: number): Promise<string | null> =>
-            ns.get(EntryMeta.label.template(tenantId, rank)) as any,
-        put: (ns: KVNamespace, tenantId: number, rank: number, value: string): Promise<void> =>
-            ns.put(EntryMeta.label.template(tenantId, rank), value as any),
+export class GlobalSubRedditMetadata {
+    static readonly metadata = {
+        template: (subId: number): string =>
+            `metadata/${subId}`,
+        get: (ns: KVNamespace, subId: number): Promise<unknown | null> =>
+            ns.get(GlobalSubRedditMetadata.metadata.template(subId)) as any,
+        put: (ns: KVNamespace, subId: number, value: unknown): Promise<void> =>
+            ns.put(GlobalSubRedditMetadata.metadata.template(subId), value as any),
     };
 }
 // @ts-ignore
@@ -34,17 +34,18 @@ export abstract class GlobalDo extends DurableObject<Env> {
             `GlobalDo`,
         id: (namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName(GlobalDo.Shard.template()),
-        instance: (namespace: DurableObjectNamespace): DurableObjectStub =>
-            namespace.get(GlobalDo.Shard.id(namespace)),
+        instance<T extends GlobalDo = GlobalDo>(namespace: DurableObjectNamespace): DurableObjectStub & T {
+            return namespace.get(GlobalDo.Shard.id(namespace)) as DurableObjectStub & T;
+        },
     };
 
-    readonly config = {
+    readonly metadata = {
         template: (): string =>
-            `config`,
+            `metadata`,
         get: (): unknown | null | undefined =>
-            this.state.storage.kv.get(this.config.template()),
+            this.state.storage.kv.get(this.metadata.template()),
         put: ( value: unknown) =>
-            this.state.storage.kv.put(this.config.template(), value),
+            this.state.storage.kv.put(this.metadata.template(), value),
     };
 
     protected cloesce(env: Env, migrations: DurableMigration[] = []): CloesceApp {
@@ -56,27 +57,28 @@ export abstract class GlobalDo extends DurableObject<Env> {
     }
 }
 // @ts-ignore
-export abstract class LeaderboardDo extends DurableObject<Env> {
+export abstract class SubRedditDo extends DurableObject<Env> {
     constructor(public state: DurableObjectState, env: Env) {
         super(state, env);
     }
 
     static readonly Shard = {
-        template: (tenantId: number): string =>
-            `LeaderboardDo/${tenantId}`,
-        id: (tenantId: number, namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName(LeaderboardDo.Shard.template(tenantId)),
-        instance: (tenantId: number, namespace: DurableObjectNamespace): DurableObjectStub =>
-            namespace.get(LeaderboardDo.Shard.id(tenantId, namespace)),
+        template: (id: number): string =>
+            `SubRedditDo/${id}`,
+        id: (id: number, namespace: DurableObjectNamespace): DurableObjectId =>
+            namespace.idFromName(SubRedditDo.Shard.template(id)),
+        instance<T extends SubRedditDo = SubRedditDo>(id: number, namespace: DurableObjectNamespace): DurableObjectStub & T {
+            return namespace.get(SubRedditDo.Shard.id(id, namespace)) as DurableObjectStub & T;
+        },
     };
 
-    readonly score = {
+    readonly metadata = {
         template: (): string =>
-            `score`,
-        get: (): number | null | undefined =>
-            this.state.storage.kv.get(this.score.template()),
-        put: ( value: number) =>
-            this.state.storage.kv.put(this.score.template(), value),
+            `metadata`,
+        get: (): unknown | null | undefined =>
+            this.state.storage.kv.get(this.metadata.template()),
+        put: ( value: unknown) =>
+            this.state.storage.kv.put(this.metadata.template(), value),
     };
 
     protected cloesce(env: Env, migrations: DurableMigration[] = []): CloesceApp {
@@ -89,62 +91,21 @@ export abstract class LeaderboardDo extends DurableObject<Env> {
 }
 export namespace Global {
     export const Tag = "Global" as const;
+    export const Meta = cidl.models.Global as any;
+
+    export interface Self {
+        metadata: KValue<unknown>;
+    }
 
     export interface Api {
-        setConfig(
-            env: {
-                ctx: GlobalDo,
-            },
-            value: unknown,
-        ): ApiResult<void>;
-        getConfig(
+        newGlobal(
+        ): ApiResult<Global.Self>;
+        getMetadata(
+            self: Global.Self,
             env: {
                 ctx: GlobalDo,
             },
         ): ApiResult<unknown>;
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
-        return _impl("Global", {}, implObj);
-    }
-}
-export namespace Leaderboard {
-    export const Tag = "Leaderboard" as const;
-
-    export interface Api {
-        setScore(
-            env: {
-                ctx: LeaderboardDo,
-            },
-            tenantId: number,
-            score: number,
-        ): ApiResult<void>;
-        getScore(
-            env: {
-                ctx: LeaderboardDo,
-            },
-            tenantId: number,
-        ): ApiResult<number>;
-    }
-    export const _api = undefined as unknown as Api;
-
-    export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
-        return _impl("Leaderboard", {}, implObj);
-    }
-}
-export namespace LeaderboardEntry {
-    export const Tag = "LeaderboardEntry" as const;
-    export const Meta = cidl.models.LeaderboardEntry as any;
-
-    export interface Self {
-        tenantId: number;
-        rank: number;
-        score: KValue<number>;
-        meta: KValue<string>;
-    }
-
-    export interface Api {
     }
     export const _api = undefined as unknown as Api;
 
@@ -153,17 +114,17 @@ export namespace LeaderboardEntry {
 
     export namespace GeneratedSource {
         export const Default = {
-            tree: {"meta":{},"score":{}},
-            async get(env: { ctx: LeaderboardDo, EntryMeta: Env["EntryMeta"], LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, rank: number): Promise<HttpResult<Self | null>> {
-                const base = { tenantId, rank } as DeepPartial<Self>;
+            tree: {"metadata":{}},
+            async get(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }): Promise<HttpResult<Self | null>> {
+                const base = {  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async save(env: { ctx: LeaderboardDo, EntryMeta: Env["EntryMeta"], LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, model: DeepPartial<LeaderboardEntry.Self>): Promise<HttpResult<Self | null>> {
-                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, tenantId } as DeepPartial<Self>, this.tree);
+            async save(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }, model: DeepPartial<Global.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
@@ -176,35 +137,215 @@ export namespace LeaderboardEntry {
     }
 
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
-        return _impl("LeaderboardEntry", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+        return _impl("Global", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
     export namespace Orm {
 
-        export async function save(ctx: LeaderboardDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(ctx: GlobalDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(ctx: LeaderboardDo, args: { tenantId: number, rank: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(ctx: GlobalDo, args: { include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
-            const base = { tenantId: args.tenantId, rank: args.rank,  } as DeepPartial<Self>;
+            const base = {  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(ctx: GlobalDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }
-export namespace PlayerScore {
-    export const Tag = "PlayerScore" as const;
-    export const Meta = cidl.models.PlayerScore as any;
+export namespace Post {
+    export const Tag = "Post" as const;
+    export const Meta = cidl.models.Post as any;
 
     export interface Self {
         id: number;
-        playerName: string;
-        points: number;
-        tenantId: number;
+        title: string;
+        content: string;
+        subId: number;
+        comments: Comment.Self[];
+    }
+
+    export interface Api {
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+        Custom: Custom.Impl;
+    }
+
+    export namespace GeneratedSource {
+        export const Custom = {
+            tree: {},
+            selectQuery: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post"`,
+
+            getQuery(subId: number): SqlStatement {
+                return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post" WHERE "Post"."id" = ?1`, values: [subId] };
+            },
+            listQuery(): SqlStatement {
+                return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post" WHERE "Post"."id" > ?1 ORDER BY "Post"."id" ASC LIMIT ?2`, values: [] };
+            },
+        };
+        export const Default = {
+            tree: {"comments":{}},
+            selectQuery: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId"`,
+
+            getQuery(id: number): SqlStatement {
+                return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId" WHERE "Post"."id" = ?1`, values: [id] };
+            },
+            listQuery(lastSeen_id: number, limit: number): SqlStatement {
+                return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId" WHERE "Post"."id" > ?1 ORDER BY "Post"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
+            },
+            async get(env: { ctx: SubRedditDo }, subId: number, id: number): Promise<HttpResult<Self | null>> {
+                const stmt = this.getQuery(id);
+                const seed = { subId,  } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree, seed);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async list(env: { ctx: SubRedditDo }, subId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
+                const stmt = this.listQuery(lastSeen_id, limit);
+                const seed = { subId,  } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree, seed);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+            async save(env: { ctx: SubRedditDo }, subId: number, model: DeepPartial<Post.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+    export namespace Custom {
+        export interface Crud {
+            get(env: { SubRedditDo: Env["SubRedditDo"] }, id: number, subId: number): ApiResult<Self>;
+            list(env: { SubRedditDo: Env["SubRedditDo"] }, subId: number): ApiResult<Self[]>;
+            save(env: { SubRedditDo: Env["SubRedditDo"] }, post: DeepPartial<Post.Self>, subId: number): ApiResult<Self>;
+        }
+        export type Impl = typeof GeneratedSource.Custom & Crud;
+        export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.Custom & I>): typeof GeneratedSource.Custom & I {
+            return _implDs(GeneratedSource.Custom, implObj);
+        }
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("Post", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+
+        export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { subId: args.subId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace SubReddit {
+    export const Tag = "SubReddit" as const;
+    export const Meta = cidl.models.SubReddit as any;
+
+    export interface Self {
+        subId: number;
+        metadata: KValue<unknown>;
+        globalMetadata: KValue<unknown>;
+    }
+
+    export interface Api {
+        newSubReddit(
+        ): ApiResult<SubReddit.Self>;
+        feed(
+            self: SubReddit.Self,
+            env: {
+                ctx: SubRedditDo,
+            },
+            subId: number,
+        ): ApiResult<Post.Self[]>;
+    }
+    export const _api = undefined as unknown as Api;
+
+    export interface Sources {
+    }
+
+    export namespace GeneratedSource {
+        export const Default = {
+            tree: {"globalMetadata":{},"metadata":{}},
+            async get(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"], SubRedditDo: Env["SubRedditDo"] }, subId: number): Promise<HttpResult<Self | null>> {
+                const base = { subId } as DeepPartial<Self>;
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value);
+            },
+            async save(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"], SubRedditDo: Env["SubRedditDo"] }, subId: number, model: DeepPartial<SubReddit.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+        };
+    }
+
+    export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
+        return _impl("SubReddit", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+    }
+
+    export namespace Orm {
+
+        export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
+        }
+
+        export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+            const include = args.include ?? GeneratedSource.Default.tree;
+            const base = { subId: args.subId,  } as DeepPartial<Self>;
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+
+        export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
+        }
+    }
+}
+export namespace Comment {
+    export const Tag = "Comment" as const;
+    export const Meta = cidl.models.Comment as any;
+
+    export interface Self {
+        id: number;
+        content: string;
+        upvotes: number;
+        postId: number;
+        subId: number;
     }
 
     export interface Api {
@@ -217,17 +358,17 @@ export namespace PlayerScore {
     export namespace GeneratedSource {
         export const Default = {
             tree: {},
-            selectQuery: `SELECT "PlayerScore"."id" AS "id", "PlayerScore"."playerName" AS "playerName", "PlayerScore"."points" AS "points" FROM "PlayerScore"`,
+            selectQuery: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment"`,
 
             getQuery(id: number): SqlStatement {
-                return { query: `SELECT "PlayerScore"."id" AS "id", "PlayerScore"."playerName" AS "playerName", "PlayerScore"."points" AS "points" FROM "PlayerScore" WHERE "PlayerScore"."id" = ?1`, values: [id] };
+                return { query: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment" WHERE "Comment"."id" = ?1`, values: [id] };
             },
             listQuery(lastSeen_id: number, limit: number): SqlStatement {
-                return { query: `SELECT "PlayerScore"."id" AS "id", "PlayerScore"."playerName" AS "playerName", "PlayerScore"."points" AS "points" FROM "PlayerScore" WHERE "PlayerScore"."id" > ?1 ORDER BY "PlayerScore"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
+                return { query: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment" WHERE "Comment"."id" > ?1 ORDER BY "Comment"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
             },
-            async get(env: { ctx: LeaderboardDo }, tenantId: number, id: number): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: SubRedditDo }, subId: number, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(id);
-                const seed = { tenantId,  } as DeepPartial<Self>;
+                const seed = { subId,  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree, seed);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
@@ -237,17 +378,17 @@ export namespace PlayerScore {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async list(env: { ctx: LeaderboardDo }, tenantId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
+            async list(env: { ctx: SubRedditDo }, subId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(lastSeen_id, limit);
-                const seed = { tenantId,  } as DeepPartial<Self>;
+                const seed = { subId,  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree, seed);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
             },
-            async save(env: { ctx: LeaderboardDo }, tenantId: number, model: DeepPartial<PlayerScore.Self>): Promise<HttpResult<Self | null>> {
-                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, tenantId } as DeepPartial<Self>, this.tree);
+            async save(env: { ctx: SubRedditDo }, subId: number, model: DeepPartial<Comment.Self>): Promise<HttpResult<Self | null>> {
+                const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
@@ -260,22 +401,22 @@ export namespace PlayerScore {
     }
 
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
-        return _impl("PlayerScore", { Orm, Default: GeneratedSource.Default }, implObj) as any;
+        return _impl("Comment", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
     export namespace Orm {
 
-        export async function save(ctx: LeaderboardDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(ctx: LeaderboardDo, args: { tenantId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
-            const base = { tenantId: args.tenantId,  } as DeepPartial<Self>;
+            const base = { subId: args.subId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }

@@ -578,7 +578,7 @@ mod migrate {
             return Ok(());
         }
 
-        let bindings: Vec<String> = if args.all {
+        let bindings = if args.all {
             spec.d1_databases
                 .iter()
                 .filter_map(|db| db.binding.as_deref())
@@ -706,13 +706,12 @@ mod migrate {
                 })
                 .transpose()?;
 
-            let lm_ast: Option<MigrationsIdl> = lm_contents
+            let lm_ast = lm_contents
                 .as_deref()
                 .map(MigrationsIdl::from_json)
                 .transpose()?;
 
-            // Migrate only the models backed by the specified binding. Durable Object
-            // bindings additionally require a SQLite table (KV-only models have none).
+            // Migrate only the models backed by the specified binding.
             let idl = {
                 let mut idl = MigrationsIdl::from_json(&ast_contents)?;
                 idl.models.retain(|_, m| {
@@ -740,18 +739,7 @@ mod migrate {
                         .map_err(|e| format!("Failed to write migrated SQL file: {e}"))?;
                 }
                 BackingKind::DurableObject => {
-                    // A DO binding with no SQLite-backed models (now or previously) has no
-                    // database to migrate; an unchanged schema needs no new migration.
-                    let no_sqlite_models = idl.models.is_empty()
-                        && lm_ast.as_ref().is_none_or(|lm| lm.models.is_empty());
-                    if no_sqlite_models || generated_sql.is_empty() {
-                        tracing::info!(
-                            "No SQLite changes for Durable Object binding '{}'. Nothing to migrate.",
-                            current_binding
-                        );
-                        continue;
-                    }
-
+                    // TODO: Locked to TS for now
                     let migration_ts =
                         DurableMigrationGenerator::generate(&args.name, timestamp, &generated_sql);
 

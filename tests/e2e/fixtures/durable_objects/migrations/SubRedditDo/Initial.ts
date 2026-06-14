@@ -4,10 +4,18 @@ import type { SqlStorage } from "@cloudflare/workers-types";
 function up(sql: SqlStorage): void {
   sql.exec(`
     --- New Models
-CREATE TABLE IF NOT EXISTS "PlayerScore" (
+CREATE TABLE IF NOT EXISTS "Post" (
   "id" integer PRIMARY KEY,
-  "playerName" text NOT NULL,
-  "points" integer NOT NULL
+  "title" text NOT NULL,
+  "content" text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "Comment" (
+  "id" integer PRIMARY KEY,
+  "content" text NOT NULL,
+  "upvotes" integer NOT NULL,
+  "postId" integer NOT NULL,
+  FOREIGN KEY ("postId") REFERENCES "Post" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 --- Cloesce Temporary Table

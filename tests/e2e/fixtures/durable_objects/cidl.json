@@ -1,32 +1,27 @@
 {
-  "hash": 9620163066776067285,
+  "hash": 6095058718984118637,
   "wrangler_env": {
     "d1_bindings": [],
     "kv_bindings": [
       {
-        "name": "EntryMeta",
+        "name": "GlobalSubRedditMetadata",
         "templates": [
           {
             "field": {
-              "name": "label",
+              "name": "metadata",
               "cidl_type": {
-                "KvObject": "String"
+                "KvObject": "Json"
               },
               "validators": []
             },
             "params": [
               {
-                "name": "tenantId",
-                "cidl_type": "Int",
-                "validators": []
-              },
-              {
-                "name": "rank",
+                "name": "subId",
                 "cidl_type": "Int",
                 "validators": []
               }
             ],
-            "key_format": "entry/{tenantId}/{rank}"
+            "key_format": "metadata/{subId}"
           }
         ]
       }
@@ -39,22 +34,22 @@
         "templates": [
           {
             "field": {
-              "name": "config",
+              "name": "metadata",
               "cidl_type": {
                 "KvObject": "Json"
               },
               "validators": []
             },
             "params": [],
-            "key_format": "config"
+            "key_format": "metadata"
           }
         ]
       },
       {
-        "name": "LeaderboardDo",
+        "name": "SubRedditDo",
         "shard_fields": [
           {
-            "name": "tenantId",
+            "name": "id",
             "cidl_type": "Int",
             "validators": [
               {
@@ -68,14 +63,14 @@
         "templates": [
           {
             "field": {
-              "name": "score",
+              "name": "metadata",
               "cidl_type": {
-                "KvObject": "Int"
+                "KvObject": "Json"
               },
               "validators": []
             },
             "params": [],
-            "key_format": "score"
+            "key_format": "metadata"
           }
         ]
       }
@@ -85,42 +80,51 @@
   "models": {
     "Global": {
       "hash": 0,
-      "backing": null,
+      "backing": {
+        "binding": "GlobalDo",
+        "fields": [],
+        "kind": "DurableObject"
+      },
       "name": "Global",
       "primary_columns": [],
       "columns": [],
-      "kv_fields": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "metadata",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "GlobalDo",
+          "key_format": "metadata"
+        }
+      ],
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
       "apis": [
         {
-          "name": "setConfig",
+          "name": "newGlobal",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "value",
-              "cidl_type": "Json",
-              "validators": []
+          "return_type": {
+            "Object": {
+              "name": "Global"
             }
-          ],
-          "injected": [
-            "ctx"
-          ],
-          "durable_target": {
-            "binding": "GlobalDo",
-            "shard_args": []
-          }
+          },
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": [],
+          "durable_target": null
         },
         {
-          "name": "getConfig",
-          "is_static": true,
-          "data_source": null,
+          "name": "getMetadata",
+          "is_static": false,
+          "data_source": "Default",
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": "Json",
@@ -135,237 +139,6 @@
           }
         }
       ],
-      "data_sources": {},
-      "cruds": []
-    },
-    "Leaderboard": {
-      "hash": 0,
-      "backing": null,
-      "name": "Leaderboard",
-      "primary_columns": [],
-      "columns": [],
-      "kv_fields": [],
-      "r2_fields": [],
-      "navigation_fields": [],
-      "route_fields": [],
-      "apis": [
-        {
-          "name": "setScore",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "tenantId",
-              "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
-            },
-            {
-              "name": "score",
-              "cidl_type": "Int",
-              "validators": []
-            }
-          ],
-          "injected": [
-            "ctx"
-          ],
-          "durable_target": {
-            "binding": "LeaderboardDo",
-            "shard_args": [
-              "tenantId"
-            ]
-          }
-        },
-        {
-          "name": "getScore",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": "Int",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "tenantId",
-              "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
-            }
-          ],
-          "injected": [
-            "ctx"
-          ],
-          "durable_target": {
-            "binding": "LeaderboardDo",
-            "shard_args": [
-              "tenantId"
-            ]
-          }
-        }
-      ],
-      "data_sources": {},
-      "cruds": []
-    },
-    "LeaderboardEntry": {
-      "hash": 0,
-      "backing": {
-        "binding": "LeaderboardDo",
-        "fields": [
-          "tenantId"
-        ],
-        "kind": "DurableObject"
-      },
-      "name": "LeaderboardEntry",
-      "primary_columns": [],
-      "columns": [],
-      "kv_fields": [
-        {
-          "field": {
-            "name": "score",
-            "cidl_type": {
-              "KvObject": "Int"
-            },
-            "validators": []
-          },
-          "binding": "LeaderboardDo",
-          "key_format": "score"
-        },
-        {
-          "field": {
-            "name": "meta",
-            "cidl_type": {
-              "KvObject": "String"
-            },
-            "validators": []
-          },
-          "binding": "EntryMeta",
-          "key_format": "entry/{tenantId}/{rank}"
-        }
-      ],
-      "r2_fields": [],
-      "navigation_fields": [],
-      "route_fields": [
-        {
-          "name": "tenantId",
-          "cidl_type": "Int",
-          "validators": [
-            {
-              "GreaterThan": {
-                "Int": 0
-              }
-            }
-          ]
-        },
-        {
-          "name": "rank",
-          "cidl_type": "Int",
-          "validators": []
-        }
-      ],
-      "apis": [
-        {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": {
-              "name": "LeaderboardEntry"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "tenantId",
-              "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
-            },
-            {
-              "name": "rank",
-              "cidl_type": "Int",
-              "validators": []
-            }
-          ],
-          "injected": [
-            "ctx",
-            "EntryMeta",
-            "LeaderboardDo"
-          ],
-          "durable_target": {
-            "binding": "LeaderboardDo",
-            "shard_args": [
-              "tenantId"
-            ]
-          }
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Object": {
-              "name": "LeaderboardEntry"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "tenantId",
-              "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
-            },
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "LeaderboardEntry"
-                }
-              },
-              "validators": []
-            }
-          ],
-          "injected": [
-            "ctx",
-            "EntryMeta",
-            "LeaderboardDo"
-          ],
-          "durable_target": {
-            "binding": "LeaderboardDo",
-            "shard_args": [
-              "tenantId"
-            ]
-          }
-        }
-      ],
       "data_sources": {
         "Default": {
           "name": "Default",
@@ -375,55 +148,20 @@
             "is_stub": false
           },
           "get": {
-            "parameters": [
-              {
-                "parameter": {
-                  "name": "tenantId",
-                  "cidl_type": "Int",
-                  "validators": [
-                    {
-                      "GreaterThan": {
-                        "Int": 0
-                      }
-                    }
-                  ]
-                },
-                "instance_field": true
-              },
-              {
-                "parameter": {
-                  "name": "rank",
-                  "cidl_type": "Int",
-                  "validators": []
-                },
-                "instance_field": true
-              }
-            ],
+            "parameters": [],
             "injected": [
               "ctx",
-              "EntryMeta",
-              "LeaderboardDo"
+              "GlobalDo"
             ],
             "is_stub": false
           },
           "save": {
             "parameters": [
               {
-                "name": "tenantId",
-                "cidl_type": "Int",
-                "validators": [
-                  {
-                    "GreaterThan": {
-                      "Int": 0
-                    }
-                  }
-                ]
-              },
-              {
                 "name": "model",
                 "cidl_type": {
                   "Partial": {
-                    "object_name": "LeaderboardEntry"
+                    "object_name": "Global"
                   }
                 },
                 "validators": []
@@ -431,8 +169,7 @@
             ],
             "injected": [
               "ctx",
-              "EntryMeta",
-              "LeaderboardDo"
+              "GlobalDo"
             ],
             "is_stub": false
           },
@@ -442,21 +179,18 @@
           "is_internal": false
         }
       },
-      "cruds": [
-        "Get",
-        "Save"
-      ]
+      "cruds": []
     },
-    "PlayerScore": {
-      "hash": 6286396927356444517,
+    "Post": {
+      "hash": 11845234384393994783,
       "backing": {
-        "binding": "LeaderboardDo",
+        "binding": "SubRedditDo",
         "fields": [
-          "tenantId"
+          "subId"
         ],
         "kind": "DurableObject"
       },
-      "name": "PlayerScore",
+      "name": "Post",
       "primary_columns": [
         {
           "hash": 6397878138472974760,
@@ -472,9 +206,9 @@
       ],
       "columns": [
         {
-          "hash": 14906130060783210742,
+          "hash": 16671312646982238929,
           "field": {
-            "name": "playerName",
+            "name": "title",
             "cidl_type": "String",
             "validators": []
           },
@@ -483,10 +217,10 @@
           "composite_id": null
         },
         {
-          "hash": 13468748571261205685,
+          "hash": 10580003897996311112,
           "field": {
-            "name": "points",
-            "cidl_type": "Int",
+            "name": "content",
+            "cidl_type": "String",
             "validators": []
           },
           "foreign_key_reference": null,
@@ -496,10 +230,32 @@
       ],
       "kv_fields": [],
       "r2_fields": [],
-      "navigation_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 3208139060237204101,
+          "field": {
+            "name": "comments",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Comment"
+                }
+              }
+            }
+          },
+          "model_reference": "Comment",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "postId"
+              ]
+            }
+          }
+        }
+      ],
       "route_fields": [
         {
-          "name": "tenantId",
+          "name": "subId",
           "cidl_type": "Int",
           "validators": [
             {
@@ -512,6 +268,40 @@
       ],
       "apis": [
         {
+          "name": "$get_Custom",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Post"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "SubRedditDo"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        },
+        {
           "name": "$get",
           "is_static": true,
           "data_source": null,
@@ -519,13 +309,13 @@
           "return_media": "Json",
           "return_type": {
             "Object": {
-              "name": "PlayerScore"
+              "name": "Post"
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "tenantId",
+              "name": "subId",
               "cidl_type": "Int",
               "validators": [
                 {
@@ -545,9 +335,40 @@
             "ctx"
           ],
           "durable_target": {
-            "binding": "LeaderboardDo",
+            "binding": "SubRedditDo",
             "shard_args": [
-              "tenantId"
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$list_Custom",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "Post"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "SubRedditDo"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
             ]
           }
         },
@@ -560,14 +381,14 @@
           "return_type": {
             "Array": {
               "Object": {
-                "name": "PlayerScore"
+                "name": "Post"
               }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "tenantId",
+              "name": "subId",
               "cidl_type": "Int",
               "validators": [
                 {
@@ -598,9 +419,47 @@
             "ctx"
           ],
           "durable_target": {
-            "binding": "LeaderboardDo",
+            "binding": "SubRedditDo",
             "shard_args": [
-              "tenantId"
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$save_Custom",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Post"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "post",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Post"
+                }
+              },
+              "validators": []
+            },
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "SubRedditDo"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
             ]
           }
         },
@@ -612,13 +471,13 @@
           "return_media": "Json",
           "return_type": {
             "Object": {
-              "name": "PlayerScore"
+              "name": "Post"
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "tenantId",
+              "name": "subId",
               "cidl_type": "Int",
               "validators": [
                 {
@@ -632,7 +491,7 @@
               "name": "model",
               "cidl_type": {
                 "Partial": {
-                  "object_name": "PlayerScore"
+                  "object_name": "Post"
                 }
               },
               "validators": []
@@ -642,20 +501,86 @@
             "ctx"
           ],
           "durable_target": {
-            "binding": "LeaderboardDo",
+            "binding": "SubRedditDo",
             "shard_args": [
-              "tenantId"
+              "subId"
             ]
           }
         }
       ],
       "data_sources": {
+        "Custom": {
+          "name": "Custom",
+          "list": {
+            "parameters": [
+              {
+                "name": "subId",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "injected": [
+              "SubRedditDo"
+            ],
+            "is_stub": true
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": false
+              },
+              {
+                "parameter": {
+                  "name": "subId",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": false
+              }
+            ],
+            "injected": [
+              "SubRedditDo"
+            ],
+            "is_stub": true
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "post",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Post"
+                  }
+                },
+                "validators": []
+              },
+              {
+                "name": "subId",
+                "cidl_type": "Int",
+                "validators": []
+              }
+            ],
+            "injected": [
+              "SubRedditDo"
+            ],
+            "is_stub": true
+          },
+          "include_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\" FROM \"Post\"",
+          "get_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\" FROM \"Post\" WHERE \"Post\".\"id\" = ?1",
+          "list_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\" FROM \"Post\" WHERE \"Post\".\"id\" > ?1 ORDER BY \"Post\".\"id\" ASC LIMIT ?2",
+          "is_internal": false
+        },
         "Default": {
           "name": "Default",
           "list": {
             "parameters": [
               {
-                "name": "tenantId",
+                "name": "subId",
                 "cidl_type": "Int",
                 "validators": [
                   {
@@ -691,7 +616,7 @@
             "parameters": [
               {
                 "parameter": {
-                  "name": "tenantId",
+                  "name": "subId",
                   "cidl_type": "Int",
                   "validators": [
                     {
@@ -720,7 +645,7 @@
           "save": {
             "parameters": [
               {
-                "name": "tenantId",
+                "name": "subId",
                 "cidl_type": "Int",
                 "validators": [
                   {
@@ -734,7 +659,7 @@
                 "name": "model",
                 "cidl_type": {
                   "Partial": {
-                    "object_name": "PlayerScore"
+                    "object_name": "Post"
                   }
                 },
                 "validators": []
@@ -745,9 +670,595 @@
             ],
             "is_stub": false
           },
-          "include_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\"",
-          "get_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\" WHERE \"PlayerScore\".\"id\" = ?1",
-          "list_query": "SELECT \"PlayerScore\".\"id\" AS \"id\", \"PlayerScore\".\"playerName\" AS \"playerName\", \"PlayerScore\".\"points\" AS \"points\" FROM \"PlayerScore\" WHERE \"PlayerScore\".\"id\" > ?1 ORDER BY \"PlayerScore\".\"id\" ASC LIMIT ?2",
+          "include_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\", \"Comment_1\".\"id\" AS \"comments.id\", \"Comment_1\".\"content\" AS \"comments.content\", \"Comment_1\".\"upvotes\" AS \"comments.upvotes\", \"Comment_1\".\"postId\" AS \"comments.postId\" FROM \"Post\" LEFT JOIN \"Comment\" AS \"Comment_1\" ON \"Post\".\"id\" = \"Comment_1\".\"postId\"",
+          "get_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\", \"Comment_1\".\"id\" AS \"comments.id\", \"Comment_1\".\"content\" AS \"comments.content\", \"Comment_1\".\"upvotes\" AS \"comments.upvotes\", \"Comment_1\".\"postId\" AS \"comments.postId\" FROM \"Post\" LEFT JOIN \"Comment\" AS \"Comment_1\" ON \"Post\".\"id\" = \"Comment_1\".\"postId\" WHERE \"Post\".\"id\" = ?1",
+          "list_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\", \"Comment_1\".\"id\" AS \"comments.id\", \"Comment_1\".\"content\" AS \"comments.content\", \"Comment_1\".\"upvotes\" AS \"comments.upvotes\", \"Comment_1\".\"postId\" AS \"comments.postId\" FROM \"Post\" LEFT JOIN \"Comment\" AS \"Comment_1\" ON \"Post\".\"id\" = \"Comment_1\".\"postId\" WHERE \"Post\".\"id\" > ?1 ORDER BY \"Post\".\"id\" ASC LIMIT ?2",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "List",
+        "Save"
+      ]
+    },
+    "SubReddit": {
+      "hash": 0,
+      "backing": {
+        "binding": "SubRedditDo",
+        "fields": [
+          "subId"
+        ],
+        "kind": "DurableObject"
+      },
+      "name": "SubReddit",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "metadata",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "SubRedditDo",
+          "key_format": "metadata"
+        },
+        {
+          "field": {
+            "name": "globalMetadata",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "GlobalSubRedditMetadata",
+          "key_format": "metadata/{subId}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "subId",
+          "cidl_type": "Int",
+          "validators": [
+            {
+              "GreaterThan": {
+                "Int": 0
+              }
+            }
+          ]
+        }
+      ],
+      "apis": [
+        {
+          "name": "newSubReddit",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "SubReddit"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [],
+          "injected": [],
+          "durable_target": null
+        },
+        {
+          "name": "feed",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "Post"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "ctx"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "SubReddit"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "ctx",
+            "GlobalSubRedditMetadata",
+            "SubRedditDo"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "SubReddit"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "SubReddit"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "ctx",
+            "GlobalSubRedditMetadata",
+            "SubRedditDo"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "subId",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "GreaterThan": {
+                        "Int": 0
+                      }
+                    }
+                  ]
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "ctx",
+              "GlobalSubRedditMetadata",
+              "SubRedditDo"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "subId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "SubReddit"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "ctx",
+              "GlobalSubRedditMetadata",
+              "SubRedditDo"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "Save"
+      ]
+    },
+    "Comment": {
+      "hash": 17696079539672160570,
+      "backing": {
+        "binding": "SubRedditDo",
+        "fields": [
+          "subId"
+        ],
+        "kind": "DurableObject"
+      },
+      "name": "Comment",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 10580003897996311112,
+          "field": {
+            "name": "content",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5390241804535561539,
+          "field": {
+            "name": "upvotes",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 9111420070857022687,
+          "field": {
+            "name": "postId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Post",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [
+        {
+          "name": "subId",
+          "cidl_type": "Int",
+          "validators": [
+            {
+              "GreaterThan": {
+                "Int": 0
+              }
+            }
+          ]
+        }
+      ],
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Comment"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "ctx"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$list",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": {
+                "name": "Comment"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "lastSeen_id",
+              "cidl_type": "Int",
+              "validators": []
+            },
+            {
+              "name": "limit",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            }
+          ],
+          "injected": [
+            "ctx"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "Comment"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "subId",
+              "cidl_type": "Int",
+              "validators": [
+                {
+                  "GreaterThan": {
+                    "Int": 0
+                  }
+                }
+              ]
+            },
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Comment"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "ctx"
+          ],
+          "durable_target": {
+            "binding": "SubRedditDo",
+            "shard_args": [
+              "subId"
+            ]
+          }
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "subId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Int",
+                "validators": []
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "injected": [
+              "ctx"
+            ],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "subId",
+                  "cidl_type": "Int",
+                  "validators": [
+                    {
+                      "GreaterThan": {
+                        "Int": 0
+                      }
+                    }
+                  ]
+                },
+                "instance_field": true
+              },
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "ctx"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "subId",
+                "cidl_type": "Int",
+                "validators": [
+                  {
+                    "GreaterThan": {
+                      "Int": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "Comment"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "ctx"
+            ],
+            "is_stub": false
+          },
+          "include_query": "SELECT \"Comment\".\"id\" AS \"id\", \"Comment\".\"content\" AS \"content\", \"Comment\".\"upvotes\" AS \"upvotes\", \"Comment\".\"postId\" AS \"postId\" FROM \"Comment\"",
+          "get_query": "SELECT \"Comment\".\"id\" AS \"id\", \"Comment\".\"content\" AS \"content\", \"Comment\".\"upvotes\" AS \"upvotes\", \"Comment\".\"postId\" AS \"postId\" FROM \"Comment\" WHERE \"Comment\".\"id\" = ?1",
+          "list_query": "SELECT \"Comment\".\"id\" AS \"id\", \"Comment\".\"content\" AS \"content\", \"Comment\".\"upvotes\" AS \"upvotes\", \"Comment\".\"postId\" AS \"postId\" FROM \"Comment\" WHERE \"Comment\".\"id\" > ?1 ORDER BY \"Comment\".\"id\" ASC LIMIT ?2",
           "is_internal": false
         }
       },
