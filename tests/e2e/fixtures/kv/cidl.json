@@ -1,5 +1,5 @@
 {
-  "hash": 16455310751165633242,
+  "hash": 4942585655006904544,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -64,11 +64,13 @@
       }
     ],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "KVOnly": {
       "hash": 0,
+      "backing": null,
       "name": "KVOnly",
       "primary_columns": [],
       "columns": [],
@@ -114,7 +116,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [
         {
           "name": "$get",
@@ -138,7 +139,8 @@
           "injected": [
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -166,7 +168,8 @@
           "injected": [
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -225,6 +228,7 @@
     },
     "KVSibling": {
       "hash": 0,
+      "backing": null,
       "name": "KVSibling",
       "primary_columns": [],
       "columns": [],
@@ -250,7 +254,6 @@
           "validators": []
         }
       ],
-      "database_binding": null,
       "apis": [],
       "data_sources": {
         "Default": {
@@ -302,7 +305,12 @@
       "cruds": []
     },
     "ModelWithKv": {
-      "hash": 2176846329808501385,
+      "hash": 1348455096908926699,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "ModelWithKv",
       "primary_columns": [
         {
@@ -381,7 +389,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "acceptPaginated",
@@ -406,7 +413,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -431,7 +439,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -460,7 +469,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -498,7 +508,8 @@
             "db",
             "namespace",
             "otherNamespace"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

@@ -1,5 +1,5 @@
 {
-  "hash": 5303730850516668862,
+  "hash": 2059275121413458389,
   "wrangler_env": {
     "d1_bindings": [
       "db1",
@@ -7,11 +7,17 @@
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "DB1Model": {
-      "hash": 7341731061861978357,
+      "hash": 18313784107899668473,
+      "backing": {
+        "binding": "db1",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "DB1Model",
       "primary_columns": [
         {
@@ -43,7 +49,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db1",
       "apis": [
         {
           "name": "$get",
@@ -66,7 +71,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -93,7 +99,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -129,7 +136,8 @@
           ],
           "injected": [
             "db1"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -205,7 +213,12 @@
       ]
     },
     "DB2Model": {
-      "hash": 122024037709630579,
+      "hash": 9997892997765285449,
+      "backing": {
+        "binding": "db2",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "DB2Model",
       "primary_columns": [
         {
@@ -237,7 +250,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db2",
       "apis": [
         {
           "name": "$get",
@@ -260,7 +272,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -287,7 +300,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -323,7 +337,8 @@
           ],
           "injected": [
             "db2"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

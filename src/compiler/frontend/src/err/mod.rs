@@ -26,6 +26,8 @@ impl std::fmt::Display for Token<'_> {
             Token::RegexLit(s) => write!(f, "/{s}/"),
             Token::Ident(s) => write!(f, "{s}"),
             Token::SelfToken => write!(f, "self"),
+            Token::Ctx => write!(f, "ctx"),
+            Token::Env => write!(f, "env"),
             Token::Comment(s) => write!(f, "{s}"),
             Token::Error => write!(f, "<error>"),
         }

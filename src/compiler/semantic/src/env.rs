@@ -1,5 +1,5 @@
 use frontend::{SpdSlice, Symbol};
-use idl::{Binding, BindingTemplate, CidlType, Field, ValidatedField, WranglerEnv};
+use idl::{Binding, BindingTemplate, CidlType, DurableBinding, Field, ValidatedField, WranglerEnv};
 
 use crate::{
     SymbolTable,
@@ -112,10 +112,60 @@ impl WranglerAnalysis {
             });
         }
 
+        let mut durable_bindings = Vec::new();
+        for block in table.durable_bindings.values() {
+            let shard_fields = block
+                .shard_blocks
+                .inners()
+                .flat_map(|s| &s.fields)
+                .filter_map(|sf| validate_symbol(sf, sink, table))
+                .collect::<Vec<_>>();
+
+            let mut templates = Vec::new();
+            for bf in block.templates.inners() {
+                let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+                    continue;
+                };
+
+                // DO storage templates follow KV semantics
+                field.cidl_type = match &field.cidl_type {
+                    CidlType::Paginated(inner) => {
+                        CidlType::paginated(CidlType::KvObject(inner.clone()))
+                    }
+                    other => CidlType::KvObject(Box::new(other.clone())),
+                };
+
+                let params = bf
+                    .params
+                    .iter()
+                    .filter_map(|p| validate_symbol(p, sink, table))
+                    .collect::<Vec<_>>();
+
+                if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
+                    || params.len() != bf.params.len()
+                {
+                    continue;
+                }
+
+                templates.push(BindingTemplate {
+                    field,
+                    key_format: bf.key_format,
+                    params,
+                });
+            }
+
+            durable_bindings.push(DurableBinding {
+                name: block.symbol.name,
+                shard_fields,
+                templates,
+            });
+        }
+
         WranglerEnv {
             d1_bindings,
             r2_bindings,
             kv_bindings,
+            durable_bindings,
             vars,
         }
     }

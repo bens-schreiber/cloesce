@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { Validator } from "../fixtures/validators/client";
 import config from "../fixtures/validators/cloesce.jsonc" with { type: "jsonc" };
 
@@ -19,7 +19,7 @@ describe("Validator Tests", () => {
       id: 150,
       email: "test@example.com",
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -28,7 +28,7 @@ describe("Validator Tests", () => {
       id: 50,
       email: "a@b.c",
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -38,7 +38,7 @@ describe("Validator Tests", () => {
       id: 50,
       email: longEmail,
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -47,7 +47,7 @@ describe("Validator Tests", () => {
       id: 50,
       email: "not-an-email",
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -56,7 +56,7 @@ describe("Validator Tests", () => {
       id: 50,
       email: "test@example.com",
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -69,7 +69,7 @@ describe("Validator Tests", () => {
         raw: longValue,
       },
     });
-    expect(res.ok, withRes("Expected validation to fail", res)).toBe(false);
+    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
@@ -82,7 +82,7 @@ describe("Validator Tests", () => {
         raw: "valid data",
       },
     });
-    expect(res.ok, withRes("Expected validation to succeed", res)).toBe(true);
+    expectHttpResult(res, "Expected validation to succeed");
     expect(res.status).toBe(200);
 
     validator = res.data!;
@@ -90,19 +90,19 @@ describe("Validator Tests", () => {
 
   it("api method fails when id is too high", async () => {
     const res = await validator.someMethod(150, "testuser");
-    expect(res.ok, withRes("Expected API call to fail", res)).toBe(false);
+    expect(res.ok, `Expected API call to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
   it("api method fails when name is not length 10", async () => {
     const res = await validator.someMethod(50, "short");
-    expect(res.ok, withRes("Expected API call to fail", res)).toBe(false);
+    expect(res.ok, `Expected API call to fail\n\n${JSON.stringify(res)}`).toBe(false);
     expect(res.status).toBe(400);
   });
 
   it("api method succeeds when all fields are valid", async () => {
     const res = await validator.someMethod(50, "testuser12");
-    expect(res.ok, withRes("Expected API call to succeed", res)).toBe(true);
+    expectHttpResult(res, "Expected API call to succeed");
     expect(res.status).toBe(200);
   });
 });

@@ -1,0 +1,42 @@
+{
+  "compatibility_date": "2025-10-02",
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "UserDo",
+        "name": "UserDo"
+      },
+      {
+        "class_name": "SubRedditDo",
+        "name": "SubRedditDo"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "Sessions",
+      "id": "replace_with_Sessions_id"
+    },
+    {
+      "binding": "SubReddits",
+      "id": "replace_with_SubReddits_id"
+    }
+  ],
+  "main": "./src/api/main.ts",
+  "migrations": [
+    {
+      "new_sqlite_classes": [
+        "UserDo",
+        "SubRedditDo"
+      ],
+      "tag": "v1"
+    }
+  ],
+  "name": "reddit",
+  "r2_buckets": [
+    {
+      "binding": "Avatars",
+      "bucket_name": "reddit-avatars"
+    }
+  ]
+}

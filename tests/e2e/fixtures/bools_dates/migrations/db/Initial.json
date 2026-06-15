@@ -1,10 +1,14 @@
 {
-  "hash": 14113549040013838164,
+  "hash": 7884496493624852865,
   "models": {
     "Weather": {
-      "hash": 10306382131681195126,
+      "hash": 13409753493227586003,
       "name": "Weather",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,

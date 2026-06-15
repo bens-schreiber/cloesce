@@ -20,18 +20,23 @@ pub enum SemanticError<'src, 'p> {
     },
 
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
-    D1ModelMissingD1Binding {
+    ModelMissingDatabaseBinding {
         model: &'p Symbol<'src>,
     },
 
-    /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
-    D1ModelInvalidD1Binding {
+    /// A model specifies a binding that does not resolve to a D1 or DO binding.
+    ModelInvalidBinding {
         model: &'p Symbol<'src>,
         binding: &'p Symbol<'src>,
     },
 
-    /// A model that specifies a D1 binding but does not specify a primary key.
-    D1ModelMissingPrimaryKey {
+    /// A model that specifies a database binding but does not specify a primary key.
+    ModelMissingPrimaryKey {
+        model: &'p Symbol<'src>,
+    },
+
+    /// Route fields and SQL blocks are mutually exclusive
+    ModelMixesRoutesAndSql {
         model: &'p Symbol<'src>,
     },
 
@@ -80,13 +85,6 @@ pub enum SemanticError<'src, 'p> {
     /// database, or one side is a route model and the other is not.
     NavigationReferencesDifferentBacking {
         field: &'p Symbol<'src>,
-    },
-
-    /// A route model declares a block it cannot have: a `for` binding, or a SQL block
-    /// (column/foreign/primary/unique).
-    RouteModelInvalidBlock {
-        model: &'p Symbol<'src>,
-        block: &'static str,
     },
 
     /// A route model declares a navigation that is not a 1:1 to another route model.
@@ -311,7 +309,7 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::D1ModelMissingD1Binding { model } => {
+        SemanticError::ModelMissingDatabaseBinding { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
@@ -324,7 +322,7 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::D1ModelInvalidD1Binding { model, binding } => {
+        SemanticError::ModelInvalidBinding { model, binding } => {
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
             report!(binding_path.clone(), binding_range.clone())
@@ -340,7 +338,7 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-        SemanticError::D1ModelMissingPrimaryKey { model } => {
+        SemanticError::ModelMissingPrimaryKey { model } => {
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
@@ -350,6 +348,21 @@ fn display(
                 .with_label(
                     Label::new((path, range))
                         .with_message("add a `primary { (\"<field>\") }` block to this model")
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ModelMixesRoutesAndSql { model } => {
+            let (path, range) = span_parts(&model.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "model '{}' mixes route fields with a SQLite table",
+                    model.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(
+                            "a `route` block cannot coexist with SQL blocks or a D1 backing",
+                        )
                         .with_color(Color::Red),
                 )
         }
@@ -496,19 +509,6 @@ fn display(
                             "navigation properties must reference models with the same backing \
                              (the same D1 database, or both route models)",
                         )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::RouteModelInvalidBlock { model, block } => {
-            let (path, range) = span_parts(&model.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "route model '{}' cannot have a {block}",
-                    model.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("route models have no SQL backing")
                         .with_color(Color::Red),
                 )
         }

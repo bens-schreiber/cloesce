@@ -6,8 +6,8 @@
 //! a [LexResult] containing the token stream for each file, along with any lexing errors and a [FileTable] for
 //! resolving file IDs to source strings and paths for error reporting.
 //!
-//! Each [Token] is either some kind of punctuation, a literal, or an identifier. The only reserved keyword in Cloesce
-//! is `self`. The `$` character is intentionally excluded from identifiers since it is used for generated content in the codegen phase.
+//! Each [Token] is either some kind of punctuation, a literal, or an identifier. The only reserved keywords in Cloesce
+//! are `self`, `ctx`, and `env`. The `$` character is intentionally excluded from identifiers since it is used for generated content in the codegen phase.
 //!
 //! All comments are extracted and stored in a [CommentMap] such that the parser does not need to handle them.
 //!
@@ -25,6 +25,10 @@ pub enum Token<'src> {
     // Reserved
     #[token("self")]
     SelfToken,
+    #[token("ctx")]
+    Ctx,
+    #[token("env")]
+    Env,
 
     // Punctuation
     #[token("{")]

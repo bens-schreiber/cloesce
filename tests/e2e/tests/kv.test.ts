@@ -1,4 +1,4 @@
-import { startWrangler, withRes } from "../src/setup.js";
+import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { ModelWithKv, KVOnly, KValue, Paginated } from "../fixtures/kv/client";
 import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
@@ -27,12 +27,12 @@ describe("ModelWithKv", () => {
       someOtherData: { raw: someOtherData },
     };
     const res = await ModelWithKv.$save(model);
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
   });
 
   it("GET", async () => {
     const res = await ModelWithKv.$get(id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);
     expect(res.data?.someData.value).toEqual(someData);
@@ -41,7 +41,7 @@ describe("ModelWithKv", () => {
 
   it("LIST", async () => {
     const res = await ModelWithKv.$list(0, 10);
-    expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
+    expectHttpResult(res, "LIST should be OK");
     expect(res.data!.length).toBeGreaterThan(0);
     const item = res.data![0];
     expect(item.id).toBeDefined();
@@ -49,7 +49,7 @@ describe("ModelWithKv", () => {
 
   it("GET with paginated KV list returns paginated structure", async () => {
     const res = await ModelWithKv.$get(id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toBeDefined();
 
     expect(res.data?.paginatedItems).toBeDefined();
@@ -70,7 +70,7 @@ describe("ModelWithKv", () => {
 
     const res = await ModelWithKv.acceptPaginated(paginatedData);
 
-    expect(res.ok, withRes("acceptPaginated should be OK", res)).toBe(true);
+    expectHttpResult(res, "acceptPaginated should be OK");
     expect(res.data).toBeDefined();
     expect(res.data).toEqual(paginatedData);
   });
@@ -91,12 +91,12 @@ describe("KVOnly (route model)", () => {
       },
     };
     const res = await KVOnly.$save(model);
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
   });
 
   it("GET hydrates KV and the assembled route nav with its KV", async () => {
     const res = await KVOnly.$get(id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data?.id).toBe(id);
     expect(res.data?.someData.value).toEqual(someData);
 

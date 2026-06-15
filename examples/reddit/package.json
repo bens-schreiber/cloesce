@@ -1,0 +1,26 @@
+{
+  "name": "examples-reddit",
+  "version": "1.0.0",
+  "description": "A tiny Reddit clone built on Durable Objects.",
+  "main": "index.js",
+  "scripts": {
+    "start:dev": "wrangler dev --port 5000",
+    "start:web": "vite",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cloesce": "workspace:*",
+    "wrangler": "^4.61.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.15",
+    "@cloudflare/workers-types": "^4.20260130.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.10",
+    "vitest": "^4.0.18"
+  }
+}

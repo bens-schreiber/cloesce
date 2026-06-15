@@ -16,7 +16,6 @@ pub enum OrmErrorKind {
 
     UnknownModel { name: String },
     UnknownDataSource { model: String, name: String },
-    ModelMissingD1 { name: String },
     ModelKeyCannotAutoIncrement { model: String, field: String },
     MissingField { expected: String, missing: String },
     TypeMismatch { expected: String, got: Value },
@@ -40,9 +39,6 @@ impl std::fmt::Display for OrmErrorKind {
             OrmErrorKind::UnknownModel { name } => write!(f, "Unknown model: {name}"),
             OrmErrorKind::UnknownDataSource { model, name } => {
                 write!(f, "Unknown data source '{name}' for model '{model}'")
-            }
-            OrmErrorKind::ModelMissingD1 { name } => {
-                write!(f, "Model '{name}' is missing D1 metadata")
             }
             OrmErrorKind::ModelKeyCannotAutoIncrement { model, field } => write!(
                 f,

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { CrudHaver, Parent } from "../fixtures/d1_crud/client";
 import config from "../fixtures/d1_crud/cloesce.jsonc" with { type: "jsonc" };
 
@@ -17,7 +17,7 @@ describe("Basic", () => {
   let model: CrudHaver;
   it("POST", async () => {
     const res = await CrudHaver.$save({ name: "tim" });
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toEqual({
       id: 1,
       name: "tim",
@@ -28,7 +28,7 @@ describe("Basic", () => {
   it("POST Update", async () => {
     model.name = "julio";
     const res = await CrudHaver.$save(model);
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toEqual({
       id: 1,
       name: "julio",
@@ -38,7 +38,7 @@ describe("Basic", () => {
 
   it("$get a model", async () => {
     const res = await CrudHaver.$get(model.id);
-    expect(res.ok, withRes("$get should be OK", res)).toBe(true);
+    expectHttpResult(res, "$get should be OK");
     expect(res.data).toEqual(model);
   });
 
@@ -47,7 +47,7 @@ describe("Basic", () => {
     await Promise.all(
       models.map(async (m) => {
         const res = await CrudHaver.$save({ name: m });
-        expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+        expectHttpResult(res, "POST should be OK");
         expect(res.data!.name).toEqual(m);
       }),
     );
@@ -55,8 +55,8 @@ describe("Basic", () => {
 
   it("$list 4 models", async () => {
     const res = await CrudHaver.$list(0, 4);
-    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
-    expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
+    expectHttpResult(res, "$list should be OK");
+    expect(res.data!.length, `Should be 4 results\n\n${JSON.stringify(res)}`).toBe(4); // including the one from the prev test
     models.forEach((m) => expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m));
   });
 });
@@ -69,8 +69,8 @@ describe("Parent with children", () => {
       children: [{}, {}, {}], // should be able to leave blank, creating 3 children
     });
 
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-    expect(res.data, withRes("Data should be equal", res)).toEqual({
+    expectHttpResult(res, "POST should be OK");
+    expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual({
       id: 1,
       favoriteChildId: null,
       children: [
@@ -87,8 +87,8 @@ describe("Parent with children", () => {
     model.favoriteChildId = model.children[0].id;
     const res = await Parent.$save_WithChildren(model);
 
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-    expect(res.data, withRes("Data should be equal", res)).toEqual({
+    expectHttpResult(res, "POST should be OK");
+    expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual({
       id: 1,
       favoriteChildId: 1,
       favoriteChild: {
@@ -107,14 +107,14 @@ describe("Parent with children", () => {
 
   it("$get", async () => {
     const res = await Parent.$get_WithChildren(model.id);
-    expect(res.ok, withRes("$get should be OK", res)).toBe(true);
-    expect(res.data, withRes("Data should be equal", res)).toEqual(model);
+    expectHttpResult(res, "$get should be OK");
+    expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual(model);
   });
 
   it("$list", async () => {
     const res = await Parent.$list_WithChildren(0, 100);
-    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
+    expectHttpResult(res, "$list should be OK");
     expect(res.data!.length).toEqual(1);
-    expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);
+    expect(res.data![0], `Data should be equal\n\n${JSON.stringify(res)}`).toEqual(model);
   });
 });

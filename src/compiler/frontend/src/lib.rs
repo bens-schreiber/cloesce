@@ -70,6 +70,8 @@ contextual_keywords! {
     D1 => "d1",
     R2 => "r2",
     Kv => "kv",
+    Durable => "durable",
+    Shard => "shard",
 
     // CRUD / SQL method
     Get => "get",
@@ -190,6 +192,19 @@ pub enum ArgumentLiteral<'src> {
 }
 
 #[derive(Debug, Clone)]
+pub struct DurableInitializer<'src> {
+    pub symbol: Symbol<'src>,
+    pub args: Vec<Symbol<'src>>,
+}
+
+/// A single entry in an `[inject ...]` tag.
+#[derive(Debug, Clone)]
+pub enum InjectEntry<'src> {
+    Binding(Symbol<'src>),
+    Context(DurableInitializer<'src>),
+}
+
+#[derive(Debug, Clone)]
 pub enum Tag<'src> {
     Source {
         name: Spd<&'src str>,
@@ -200,7 +215,7 @@ pub enum Tag<'src> {
         kinds: Vec<Spd<CrudKind>>,
     },
     Inject {
-        bindings: Vec<Symbol<'src>>,
+        entries: Vec<InjectEntry<'src>>,
     },
     Validator {
         name: Keyword,
@@ -389,8 +404,12 @@ pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
 
-    /// Optional binding the model is backed by, e.g. `for SomeBinding` in `model M for SomeBinding { ... }`.
+    /// `for SomeBinding` in `model M for SomeBinding { ... }`.
     pub database_binding: Option<Symbol<'src>>,
+
+    /// Arguments of a database binding, e.g.
+    /// `(shardKey1, shardKey2)` in `model M for SomeBinding(shardKey1, shardKey2) { ...
+    pub shard_args: Option<Vec<Symbol<'src>>>,
 
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }
@@ -492,6 +511,21 @@ pub struct R2BindingBlock<'src> {
     pub templates: Vec<Spd<R2BindingTemplate<'src>>>,
 }
 
+pub struct DurableShardBlock<'src> {
+    pub fields: Vec<Symbol<'src>>,
+}
+
+pub struct DurableBindingBlock<'src> {
+    /// The binding name, e.g. `LeaderboardDo`.
+    pub symbol: Symbol<'src>,
+
+    pub shard_blocks: Vec<Spd<DurableShardBlock<'src>>>,
+
+    /// Identical in shape to [KvBindingTemplate] since DO storage
+    /// mirrors KV semantics.
+    pub templates: Vec<Spd<KvBindingTemplate<'src>>>,
+}
+
 pub struct InjectBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
 }
@@ -505,6 +539,7 @@ pub enum AstBlockKind<'src> {
     D1Binding(D1BindingBlock<'src>),
     KvBinding(KvBindingBlock<'src>),
     R2Binding(R2BindingBlock<'src>),
+    DurableBinding(DurableBindingBlock<'src>),
     Vars(VarsBlock<'src>),
     Inject(InjectBlock<'src>),
 }

@@ -1,0 +1,102 @@
+// #region: Global
+durable GlobalDo {
+    metadata() -> json {
+        "metadata"
+    }
+}
+
+model Global for GlobalDo {
+    kv GlobalDo::metadata() {
+        metadata
+    }
+}
+
+api Global {
+    post newGlobal() -> Global
+
+    [inject GlobalDo()]
+    get getMetadata(self) -> json
+}
+// #endregion
+
+// #region: CRUD and Custom Data Sources
+kv GlobalSubRedditMetadata {
+    metadata(subId: int) -> json {
+        "metadata/{subId}"
+    }
+}
+
+durable SubRedditDo {
+    shard {
+        [gt 0]
+        id: int
+    }
+
+    metadata() -> json {
+        "metadata"
+    }
+}
+
+[crud get, save]
+model SubReddit for SubRedditDo(subId) {
+    kv SubRedditDo::metadata() {
+        metadata
+    }
+
+    kv GlobalSubRedditMetadata::metadata(subId) {
+        globalMetadata
+    }
+}
+
+api SubReddit {
+    post newSubReddit() -> SubReddit
+
+    [inject SubRedditDo(subId)]
+    get feed(self, subId: int) -> array<Post>
+}
+
+[crud get, list, save]
+model Post for SubRedditDo(subId) {
+    primary {
+        id: int
+    }
+
+    column {
+        title: string
+        content: string
+    }
+
+    nav Comment::postId {
+        comments
+    }
+}
+
+source Custom for Post {
+    include {}
+
+    [inject SubRedditDo]
+    get(id: int, subId: int)
+
+    [inject SubRedditDo]
+    list(subId: int)
+
+    [inject SubRedditDo]
+    save(post: partial<Post>, subId: int)
+}
+
+[crud get, list, save]
+model Comment for SubRedditDo(subId) {
+    primary {
+        id: int
+    }
+
+    column {
+        content: string
+        upvotes: int
+    }
+
+    foreign (Post::id) {
+        postId
+    }
+}
+// #endregion

@@ -9,16 +9,67 @@ import type {
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import { Model, CidlType, Cidl, getNavigationCidlType, KvField } from "../cidl.js";
+import {
+  Model,
+  CidlType,
+  Cidl,
+  getNavigationCidlType,
+  KvField,
+  R2Field,
+  isD1Backed,
+  isDurableBacked,
+  CONTEXT_INJECT_KEY,
+} from "../cidl.js";
 import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
+
+/**
+ * A SQL query plus its positional bindings, not bound to any database.
+ */
+export type SqlStatement = { query: string; values?: unknown[] };
 
 type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
   env: any;
+  durable: DurableContext | null;
   promises: Promise<CloesceResult<void>>[];
 };
+
+type DurableContext = {
+  state: {
+    storage: {
+      sql: DurableSql;
+      kv: {
+        get(key: string): any;
+        put(key: string, value: any): void;
+        list(options?: { prefix?: string }): Iterable<[string, any]>;
+      };
+      transactionSync?<T>(closure: () => T): T;
+    };
+  };
+};
+
+type DurableSql = {
+  exec(query: string, ...bindings: any[]): { toArray(): Record<string, unknown>[] };
+};
+
+interface KvRepository {
+  /** Reads `key` as the single value or full page the field's type calls for. */
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>>;
+
+  put(key: string, value: any, metadata?: unknown): Promise<void> | void;
+}
+
+interface R2Repository {
+  /** Reads `key` as the single object or full page the field's type calls for. */
+  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>>;
+}
+
+interface SqlRepository {
+  prepare(query: string): D1PreparedStatement;
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
+}
 
 type KvUpload = {
   namespace_binding: string;
@@ -34,10 +85,14 @@ type UpsertResult = {
 };
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(
+    private env: any,
+    private durable: DurableContext | null,
+  ) {}
 
-  static fromEnv(env: unknown): Orm {
-    return new Orm(env);
+  static fromEnv(env: any): Orm {
+    const durable = env[CONTEXT_INJECT_KEY] as DurableContext | undefined;
+    return new Orm(env, durable ?? null);
   }
 
   /**
@@ -83,10 +138,6 @@ export class Orm {
     from: string | null,
     includeTree: IncludeTree<T>,
   ): string {
-    if (!meta.database_binding) {
-      return "";
-    }
-
     const { wasm } = RuntimeContainer.get();
     const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
     const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
@@ -126,6 +177,7 @@ export class Orm {
       idl,
       includeTree,
       env,
+      durable: this.durable,
       promises,
     });
 
@@ -135,6 +187,10 @@ export class Orm {
     }
 
     return { value: hydrated, errors: [] };
+  }
+
+  private kvRepositoryFor(meta: Model, binding: string): KvRepository {
+    return kvRepositoryFor(meta, binding, { env: this.env, durable: this.durable });
   }
 
   /**
@@ -183,36 +239,28 @@ export class Orm {
     }
     const upsertRes = JSON.parse(upsertQueryRes.unwrap()) as UpsertResult;
 
-    // Collect all KV uploads that can be performed concurrently with the SQL upsert
-    const kvUploadPromises = upsertRes.kv_uploads.map(async (upload) => {
-      const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
-      if (!namespace) {
-        throw new InternalError(
-          `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
-        );
-      }
+    // Collect all KV uploads that can be performed concurrently with the SQL upsert.
+    // Each upload is routed to its destination (a Worker KV namespace, or this model's
+    // own Durable Object storage) by its binding.
+    const kvUploadPromises = upsertRes.kv_uploads.map((upload) =>
+      CloesceError.catchGeneric(async () => {
+        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
+        await repo.put(upload.key, upload.value, upload.metadata);
+      }),
+    );
 
-      return CloesceError.catchGeneric(
-        async () =>
-          await namespace.put(upload.key, JSON.stringify(upload.value), {
-            metadata: upload.metadata,
-          }),
-      );
-    });
-
-    // If there are any SQL queries to execute, collect them as [D1PreparedStatement]s
-    const db: D1Database | undefined = meta.database_binding
-      ? (this.env as any)[meta.database_binding]
-      : undefined;
-    const queries = upsertRes.sql.map((s) => db!.prepare(s.query).bind(...s.values));
+    const sqlRepo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
+    const queries = sqlRepo
+      ? upsertRes.sql.map((s) => sqlRepo.prepare(s.query).bind(...s.values))
+      : [];
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
-      queries.length > 0 ? db!.batch(queries) : Promise.resolve([]),
+      queries.length > 0 ? sqlRepo!.batch(queries) : Promise.resolve([]),
       ...kvUploadPromises,
     ]);
 
-    let base = {};
+    let base: any = newModel;
 
     // Ensure all queries succeeded, then map the result of the final SELECT statement to the Model
     if (queries.length > 0) {
@@ -229,6 +277,16 @@ export class Orm {
         }
       }
       base = Orm.map(meta, batchRes[selectIndex], includeTree)[0];
+
+      // Route fields are not SQL columns, so the mapped row lacks them. Restore them
+      // from the supplied model.
+      if (base) {
+        for (const field of meta.route_fields) {
+          if (base[field.name] === undefined && (newModel as any)[field.name] !== undefined) {
+            base[field.name] = (newModel as any)[field.name];
+          }
+        }
+      }
     }
 
     // Base needs to include all of the key fields from newModel and its includes.
@@ -266,7 +324,7 @@ export class Orm {
 
     // Execute all delayed KV uploads that depended on SQL results
     const delayedUploadResults = await Promise.all(
-      upsertRes.kv_delayed_uploads.map(async (upload): Promise<CloesceResult<void>> => {
+      upsertRes.kv_delayed_uploads.map((upload): Promise<CloesceResult<void>> => {
         let current: any = base;
         for (const pathPart of upload.path) {
           current = current[pathPart];
@@ -277,13 +335,6 @@ export class Orm {
           }
         }
 
-        const namespace: KVNamespace | undefined = (this.env as any)[upload.namespace_binding];
-        if (!namespace) {
-          throw new InternalError(
-            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
-          );
-        }
-
         const key = resolveKey(upload.key, current);
         if (!key) {
           throw new InternalError(
@@ -291,11 +342,10 @@ export class Orm {
           );
         }
 
-        return CloesceError.catchGeneric(() =>
-          namespace.put(key, JSON.stringify(upload.value), {
-            metadata: upload.metadata,
-          }),
-        );
+        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
+        return CloesceError.catchGeneric(async () => {
+          await repo.put(key, upload.value, upload.metadata);
+        });
       }),
     );
 
@@ -304,27 +354,48 @@ export class Orm {
       return delayedUploadErrors;
     }
 
-    // Hydrate and return the upserted model
     return await this.hydrate(meta, base, includeTree);
   }
 
   /**
-   * Given some `D1PreparedStatement` that is expected to return a single row representing a Model,
-   * maps the result to the Model based on the provided metadata and include tree, and returns it.
-   *
-   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
+   * Resolves a query argument to a runnable prepared statement. A raw `SqlStatement`
+   * descriptor is bound against the model's backing SQL store (D1, or the Durable
+   * Object's SQLite storage when running inside the DO).
    */
-  async get<T extends object>(
+  private resolveStatement(
     meta: Model,
-    query: D1PreparedStatement | null | undefined,
-    includeTree: IncludeTree<T>,
-  ): Promise<CloesceResult<T | null>> {
-    if (!query || !meta.database_binding) {
-      // No query provided, hydrate any non-SQL fields
-      return await this.hydrate(meta, {}, includeTree);
+    query: D1PreparedStatement | SqlStatement | null | undefined,
+  ): D1PreparedStatement | null {
+    if (!query) {
+      return null;
+    }
+    if (typeof (query as D1PreparedStatement).run === "function") {
+      return query as D1PreparedStatement;
     }
 
-    const res = await query.run();
+    const { query: sql, values = [] } = query as SqlStatement;
+    const repo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
+    if (!repo) {
+      throw new InternalError(
+        `Model "${meta.name}" has no reachable SQL store to execute a query against.`,
+      );
+    }
+    return repo.prepare(sql).bind(...values);
+  }
+
+  async get<T extends object>(
+    meta: Model,
+    query: D1PreparedStatement | SqlStatement | null | undefined,
+    includeTree: IncludeTree<T>,
+    seed?: DeepPartial<T>,
+  ): Promise<CloesceResult<T | null>> {
+    const stmt = this.resolveStatement(meta, query);
+    if (!stmt) {
+      // No query provided, hydrate any non-SQL fields
+      return await this.hydrate(meta, { ...seed }, includeTree);
+    }
+
+    const res = await stmt.run();
     if (!res.success) {
       return CloesceError.d1(res);
     }
@@ -333,32 +404,32 @@ export class Orm {
     if (!mapped) {
       return { value: null, errors: [] };
     }
-    return await this.hydrate(meta, mapped, includeTree);
+    // Seed values (e.g. a DO-backed model's route fields, which are not SQL columns)
+    // must be present before hydration so KV key formats can resolve.
+    return await this.hydrate(meta, Object.assign(mapped, seed), includeTree);
   }
 
-  /**
-   * Given some `D1PreparedStatement` that is expected to return multiple rows representing Models,
-   * maps the results to the Models based on the provided metadata and include tree, and returns them as an array.
-   *
-   * See `Orm.map` for details on how the mapping is performed, and `Orm.hydrate` for details on how hydration is performed.
-   */
   async list<T extends object>(
     meta: Model,
-    query: D1PreparedStatement | null | undefined,
+    query: D1PreparedStatement | SqlStatement | null | undefined,
     includeTree: IncludeTree<T>,
+    seed?: DeepPartial<T>,
   ): Promise<CloesceResult<T[]>> {
-    if (!query || !meta.database_binding) {
+    const stmt = this.resolveStatement(meta, query);
+    if (!stmt) {
       return { value: [], errors: [] };
     }
 
-    const rows = await query.run();
+    const rows = await stmt.run();
     if (!rows.success) {
       return CloesceError.d1(rows);
     }
 
     const results = Orm.map(meta, rows, includeTree);
     const hydratedResults = await Promise.all(
-      results.map((modelJson) => this.hydrate<T>(meta, modelJson, includeTree)),
+      results.map((modelJson) =>
+        this.hydrate<T>(meta, Object.assign(modelJson, seed), includeTree),
+      ),
     );
 
     const errors = hydratedResults.flatMap((r) => r.errors);
@@ -367,21 +438,6 @@ export class Orm {
     }
 
     return { value: hydratedResults.map((r) => r.value as T), errors: [] };
-  }
-}
-
-/**
- * @returns null if any parameter could not be resolved
- */
-function resolveKey(format: string, current: any): string | null {
-  try {
-    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-      const paramValue = current[paramName];
-      if (paramValue === undefined) throw null;
-      return String(paramValue);
-    });
-  } catch {
-    return null;
   }
 }
 
@@ -469,7 +525,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       const target = args.idl.models[nav.model_reference];
       if (
         value[nav.field.name] === undefined &&
-        !target.database_binding &&
+        !target.backing &&
         target.route_fields.length > 0 &&
         typeof nav.kind === "object" &&
         "OneToOne" in nav.kind
@@ -491,56 +547,32 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
 
     for (const kv of modelMeta.kv_fields) {
       const key = resolveKey(kv.key_format, value);
-      const isPaginated =
-        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type;
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        if (isPaginated) {
-          value[kv.field.name] = {
-            results: [],
-            cursor: null,
-            complete: true,
-          } as Paginated<KValue<unknown>>;
-        }
+        const empty = emptyHydration(kv.field.cidl_type);
+        if (empty) value[kv.field.name] = empty;
         continue;
       }
-      const namespace: KVNamespace = args.env[kv.binding]!;
+
+      const repo = kvRepositoryFor(modelMeta, kv.binding, args);
       args.promises.push(
-        isPaginated
-          ? hydrateKVList(namespace, key, kv, value)
-          : hydrateKVSingle(namespace, key, kv, value),
+        CloesceError.catchGeneric(async () => {
+          value[kv.field.name] = await repo.hydrate(kv, key);
+        }),
       );
     }
 
     for (const r2 of modelMeta.r2_fields) {
       const key = resolveKey(r2.key_format, value);
-      const isPaginated =
-        typeof r2.field.cidl_type === "object" && "Paginated" in r2.field.cidl_type;
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        if (isPaginated) {
-          value[r2.field.name] = {
-            results: [],
-            cursor: null,
-            complete: true,
-          } as Paginated<R2ObjectBody>;
-        }
+        const empty = emptyHydration(r2.field.cidl_type);
+        if (empty) value[r2.field.name] = empty;
         continue;
       }
-      const bucket: R2Bucket = args.env[r2.binding]!;
+      const repo = r2RepositoryFor(r2.binding, args.env);
       args.promises.push(
-        isPaginated
-          ? CloesceError.catchGeneric(async () => {
-              const list = await bucket.list({ prefix: key });
-              const results = await Promise.all(list.objects.map((obj) => bucket.get(obj.key)));
-              const cursor = list.truncated ? (list.cursor ?? null) : null;
-              value[r2.field.name] = {
-                results,
-                cursor,
-                complete: !cursor,
-              } as Paginated<R2ObjectBody>;
-            })
-          : CloesceError.catchGeneric(async () => {
-              value[r2.field.name] = await bucket.get(key);
-            }),
+        CloesceError.catchGeneric(async () => {
+          value[r2.field.name] = await repo.hydrate(r2, key);
+        }),
       );
     }
 
@@ -557,61 +589,246 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
   }
 }
 
-function hydrateKVList(
-  namespace: KVNamespace,
-  key: string,
-  kv: KvField,
-  current: any,
-): Promise<CloesceResult<void>> {
-  return CloesceError.catchGeneric(async () => {
-    const res = await namespace.list({ prefix: key });
+class D1SqlRepository implements SqlRepository {
+  constructor(private db: D1Database) {}
+
+  prepare(query: string): D1PreparedStatement {
+    return this.db.prepare(query);
+  }
+
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
+    return this.db.batch(statements);
+  }
+}
+
+class DurableSqlPreparedStatement {
+  constructor(
+    private sql: DurableSql,
+    private query: string,
+    private values: any[] = [],
+  ) {}
+
+  bind(...values: any[]): DurableSqlPreparedStatement {
+    return new DurableSqlPreparedStatement(this.sql, this.query, values);
+  }
+
+  runSync(): D1Result {
+    try {
+      const results = this.sql.exec(this.query, ...this.values).toArray();
+      return { success: true, results, meta: {} } as unknown as D1Result;
+    } catch (e) {
+      return {
+        success: false,
+        results: [],
+        error: e instanceof Error ? e.message : String(e),
+        meta: {},
+      } as unknown as D1Result;
+    }
+  }
+
+  async run(): Promise<D1Result> {
+    return this.runSync();
+  }
+}
+
+/** @internal Carries partial batch results out of a rolled-back transaction. */
+class DurableBatchFailure extends Error {
+  constructor(public results: D1Result[]) {
+    super("Durable Object SQL batch failed");
+  }
+}
+
+/**
+ * `batch` runs inside a synchronous storage transaction when available, rolling back
+ * on the first failed statement to mirror D1's transactional batch.
+ */
+class DurableSqlRepository implements SqlRepository {
+  constructor(private ctx: DurableContext) {}
+
+  prepare(query: string): D1PreparedStatement {
+    return new DurableSqlPreparedStatement(
+      this.ctx.state.storage.sql,
+      query,
+    ) as unknown as D1PreparedStatement;
+  }
+
+  async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
+    const storage = this.ctx.state.storage;
+    const runAll = () => {
+      const results = (statements as unknown as DurableSqlPreparedStatement[]).map((stmt) =>
+        stmt.runSync(),
+      );
+      if (results.some((r) => !r.success)) {
+        throw new DurableBatchFailure(results);
+      }
+      return results;
+    };
+
+    try {
+      return storage.transactionSync ? storage.transactionSync(runAll) : runAll();
+    } catch (e) {
+      if (e instanceof DurableBatchFailure) {
+        return e.results;
+      }
+      throw e;
+    }
+  }
+}
+
+/**
+ * @returns the `SqlRepository` backing this model, or undefined when the model has no
+ * reachable SQL store (no backing, or a DO-backed model outside its DO's context).
+ */
+function sqlRepositoryFor(
+  meta: Model,
+  ctx: { env: any; durable: DurableContext | null },
+): SqlRepository | undefined {
+  if (isD1Backed(meta)) {
+    return new D1SqlRepository(ctx.env[meta.backing!.binding]);
+  }
+  if (isDurableBacked(meta) && ctx.durable) {
+    return new DurableSqlRepository(ctx.durable);
+  }
+  return undefined;
+}
+
+class WorkerKvRepository implements KvRepository {
+  constructor(private namespace: KVNamespace) {}
+
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
+    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
+  }
+
+  private async get(kv: KvField, key: string): Promise<KValue<unknown>> {
+    // KV Fields are capable of holding a `Stream` of data, which must be retrieved
+    // with the `type: "stream"` option and cannot be JSON-parsed.
+    //
+    // A field is a `Stream` if the root type is of `Stream`.
+    const isStreamField = (kv: KvField) => {
+      const inner =
+        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
+          ? kv.field.cidl_type.Paginated
+          : kv.field.cidl_type;
+      return inner === "Stream";
+    };
+
+    if (isStreamField(kv)) {
+      return new KValue(key, await this.namespace.get(key, { type: "stream" }), null);
+    }
+
+    const { value: raw, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
+    return new KValue(key, raw, metadata);
+  }
+
+  private async list(kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
+    const res = await this.namespace.list({ prefix });
     const cursor = !res.list_complete ? (res.cursor ?? null) : null;
     const complete = res.list_complete || !cursor;
 
-    const inner =
-      typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
-        ? kv.field.cidl_type.Paginated
-        : kv.field.cidl_type;
+    const results = await Promise.all(res.keys.map((k: any) => this.get(kv, k.name)));
+    return { results, cursor, complete };
+  }
 
-    if (inner === "Stream") {
-      const results = await Promise.all(
-        res.keys.map(
-          async (k: any) =>
-            new KValue(k.name, await namespace.get(k.name, { type: "stream" }), null),
-        ),
-      );
-      current[kv.field.name] = {
-        results,
-        cursor,
-        complete,
-      } as unknown as Paginated<KValue<ReadableStream>>;
-      return;
-    }
-
-    const results = await Promise.all(
-      res.keys.map(async (k: any) => {
-        const { value: raw, metadata } = await namespace.getWithMetadata(k.name, { type: "json" });
-        return new KValue(k.name, raw, metadata);
-      }),
-    );
-    current[kv.field.name] = { results, cursor, complete } as Paginated<KValue<unknown>>;
-  });
+  put(key: string, value: any, metadata: unknown): Promise<void> {
+    return this.namespace.put(key, JSON.stringify(value), { metadata });
+  }
 }
 
-function hydrateKVSingle(
-  namespace: KVNamespace,
-  key: string,
-  kv: KvField,
-  current: any,
-): Promise<CloesceResult<void>> {
-  return CloesceError.catchGeneric(async () => {
-    if (kv.field.cidl_type === "Stream") {
-      current[kv.field.name] = new KValue(key, await namespace.get(key, { type: "stream" }), null);
-      return;
-    }
-    const { value: raw, metadata } = await namespace.getWithMetadata(key, {
-      type: "json",
+class DurableKvRepository implements KvRepository {
+  constructor(private ctx: DurableContext) {}
+
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
+    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
+  }
+
+  private async get(_kv: KvField, key: string): Promise<KValue<unknown>> {
+    const raw = this.ctx.state.storage.kv.get(key);
+    return new KValue(key, raw ?? null, null);
+  }
+
+  // The SQLite-backed KV storage scans synchronously; the page is always complete.
+  private async list(_kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
+    const results = [...this.ctx.state.storage.kv.list({ prefix })].map(
+      ([key, value]) => new KValue(key, value ?? null, null),
+    );
+    return { results, cursor: null, complete: true };
+  }
+
+  put(key: string, value: any): void {
+    this.ctx.state.storage.kv.put(key, value);
+  }
+}
+
+class WorkerR2Repository implements R2Repository {
+  constructor(private bucket: R2Bucket) {}
+
+  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>> {
+    return isPaginated(r2.field.cidl_type) ? this.list(key) : this.get(key);
+  }
+
+  private get(key: string): Promise<R2ObjectBody | null> {
+    return this.bucket.get(key);
+  }
+
+  private async list(prefix: string): Promise<Paginated<R2ObjectBody>> {
+    const res = await this.bucket.list({ prefix });
+    const results = await Promise.all(res.objects.map((obj) => this.bucket.get(obj.key)));
+    const cursor = res.truncated ? (res.cursor ?? null) : null;
+    return { results, cursor, complete: !cursor } as Paginated<R2ObjectBody>;
+  }
+}
+
+/**
+ * @returns null if any parameter could not be resolved
+ */
+function resolveKey(format: string, current: any): string | null {
+  try {
+    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
+      const paramValue = current[paramName];
+      if (paramValue === undefined) throw null;
+      return String(paramValue);
     });
-    current[kv.field.name] = new KValue(key, raw, metadata);
-  });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @returns a `KvRepository` instance based on the provided model metadata and binding,
+ * routing to either a Worker KV namespace or Durable Object storage as appropriate.
+ */
+function kvRepositoryFor(
+  meta: Model,
+  binding: string,
+  ctx: { env: any; durable: DurableContext | null },
+): KvRepository {
+  if (ctx.durable && isDurableBacked(meta) && binding === meta.backing!.binding) {
+    return new DurableKvRepository(ctx.durable);
+  }
+
+  const namespace: KVNamespace | undefined = ctx.env?.[binding];
+  if (!namespace) {
+    throw new InternalError(`KV Namespace binding "${binding}" not found.`);
+  }
+
+  return new WorkerKvRepository(namespace);
+}
+
+/**
+ * @returns an `R2Repository` instance based on the provided binding, routing to a Worker R2 bucket.
+ */
+function r2RepositoryFor(binding: string, env: any): R2Repository {
+  const bucket: R2Bucket | undefined = env?.[binding];
+  if (!bucket) {
+    throw new InternalError(`R2 Bucket binding "${binding}" not found.`);
+  }
+  return new WorkerR2Repository(bucket);
+}
+
+function isPaginated(cidlType: CidlType): boolean {
+  return typeof cidlType === "object" && "Paginated" in cidlType;
+}
+
+function emptyHydration(cidlType: CidlType): Paginated<never> | undefined {
+  return isPaginated(cidlType) ? { results: [], cursor: null, complete: true } : undefined;
 }

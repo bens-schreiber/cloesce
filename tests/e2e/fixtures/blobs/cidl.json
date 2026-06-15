@@ -1,16 +1,22 @@
 {
-  "hash": 586114424312205097,
+  "hash": 8633793898084098255,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "BlobHaver": {
-      "hash": 560041510452854967,
+      "hash": 8487640514228991993,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "BlobHaver",
       "primary_columns": [
         {
@@ -53,7 +59,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "getBlob1",
@@ -64,7 +69,8 @@
           "return_type": "Blob",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "inputStream",
@@ -81,7 +87,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "yieldStream",
@@ -92,7 +99,8 @@
           "return_type": "Stream",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -119,7 +127,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -142,7 +151,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -178,7 +188,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -254,7 +265,8 @@
       ]
     },
     "BlobService": {
-      "hash": 1852071612599625679,
+      "hash": 0,
+      "backing": null,
       "name": "BlobService",
       "primary_columns": [],
       "columns": [],
@@ -262,7 +274,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": null,
       "apis": [
         {
           "name": "incrementBlob",
@@ -279,7 +290,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         }
       ],
       "data_sources": {},

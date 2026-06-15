@@ -1,15 +1,16 @@
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, kahns, resolve_validator_tags,
+    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
     ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, NavAdj, R2FieldBlock, SpdSlice,
     SqlBlockKind, Symbol, Tag,
 };
 use idl::{
-    Binding, BindingTemplate, CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField,
-    Model, NavigationField, NavigationFieldKind, R2Field, ValidatedField, WranglerEnv,
+    BackingKind, BindingTemplate, CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField,
+    Model, ModelBacking, NavigationField, NavigationFieldKind, R2Field, ValidatedField,
+    WranglerEnv,
 };
 use indexmap::IndexMap;
 use std::collections::HashSet;
@@ -63,11 +64,10 @@ impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
                 continue;
             };
 
-            // Validate CRUD operations. `list` needs a SQL store for seek pagination;
-            // `get` and `save` (which may persist KV/R2 fields) do not.
+            // `list` needs a SQL store
             for crud in &cruds {
                 ensure!(
-                    !matches!(crud.inner, CrudKind::List) || model.database_binding.is_some(),
+                    !matches!(crud.inner, CrudKind::List) || model.uses_sqlite(),
                     self.sink,
                     SemanticError::UnsupportedCrudOperation {
                         model: &model_block.symbol,
@@ -104,7 +104,6 @@ struct ModelBuilder<'src, 'p> {
     symbol: &'p Symbol<'src>,
     model: &'p ModelBlock<'src>,
 
-    has_defined_pk: bool,
     unique_seed: usize,
     composite_seed: usize,
     primary_columns: Vec<Column<'src>>,
@@ -113,6 +112,7 @@ struct ModelBuilder<'src, 'p> {
     kv_fields: Vec<KvField<'src>>,
     r2_fields: Vec<R2Field<'src>>,
     route_fields: Vec<ValidatedField<'src>>,
+    backing: Option<ModelBacking<'src>>,
 }
 
 impl<'src, 'p> ModelBuilder<'src, 'p> {
@@ -122,7 +122,6 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             symbol: &model_block.symbol,
             model: model_block,
 
-            has_defined_pk: false,
             unique_seed: 0,
             composite_seed: 0,
             primary_columns: Vec::new(),
@@ -131,6 +130,7 @@ impl<'src, 'p> ModelBuilder<'src, 'p> {
             kv_fields: Vec::new(),
             r2_fields: Vec::new(),
             route_fields: Vec::new(),
+            backing: None,
         }
     }
 }
@@ -144,38 +144,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         ma.graph.entry(self.name).or_default();
         ma.in_degree.entry(self.name).or_insert(0);
 
-        let is_route = self
-            .model
-            .blocks
-            .inners()
-            .any(|b| matches!(b, ModelBlockKind::Route(_)));
-
-        // A route model has no SQL backing, so it cannot carry SQL blocks or a `for` binding.
-        if is_route {
-            if self.model.database_binding.is_some() {
-                ma.sink.push(SemanticError::RouteModelInvalidBlock {
-                    model: self.symbol,
-                    block: "`for` binding",
-                });
-                return None;
-            }
-            let sql_block = self.model.blocks.inners().find_map(|b| match b {
-                ModelBlockKind::Column(_) => Some("column block"),
-                ModelBlockKind::Foreign(_) => Some("foreign block"),
-                ModelBlockKind::Primary(_) => Some("primary block"),
-                ModelBlockKind::Unique(_) => Some("unique block"),
-                _ => None,
-            });
-            if let Some(block) = sql_block {
-                ma.sink.push(SemanticError::RouteModelInvalidBlock {
-                    model: self.symbol,
-                    block,
-                });
-                return None;
-            }
-        }
-
-        // Models with SQL columns require a D1 binding
         let has_sql_blocks = self.model.blocks.inners().any(|b| {
             matches!(
                 b,
@@ -183,36 +151,61 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                     | ModelBlockKind::Foreign(_)
                     | ModelBlockKind::Primary(_)
                     | ModelBlockKind::Unique(_)
-                    | ModelBlockKind::Navigation(_)
             )
         });
 
-        let binding = if !is_route && (has_sql_blocks || self.model.database_binding.is_some()) {
-            let Some(binding_sym) = self.model.database_binding.as_ref() else {
-                ma.sink
-                    .push(SemanticError::D1ModelMissingD1Binding { model: self.symbol });
-                return None;
-            };
+        let has_route_blocks = self
+            .model
+            .blocks
+            .inners()
+            .any(|b| matches!(b, ModelBlockKind::Route(_)));
 
-            let is_valid_d1 = table
+        let binding = self.model.database_binding.as_ref();
+        if binding.is_none() && has_sql_blocks {
+            // A model with SQL blocks must specify a database binding
+            ma.sink
+                .push(SemanticError::ModelMissingDatabaseBinding { model: self.symbol });
+            return None;
+        }
+
+        // Resolve backing
+        if let Some(binding_sym) = binding {
+            let is_durable = table.durable_bindings.contains_key(binding_sym.name);
+            let is_d1 = table
                 .d1_bindings
                 .iter()
                 .flat_map(|b| b.bindings.iter())
                 .any(|s| s.name == binding_sym.name);
-            if !is_valid_d1 {
-                ma.sink.push(SemanticError::D1ModelInvalidD1Binding {
+
+            if !is_durable && !is_d1 {
+                // A model can't be backed by non DO/ D1 bindings
+                ma.sink.push(SemanticError::ModelInvalidBinding {
                     model: self.symbol,
                     binding: binding_sym,
                 });
                 return None;
+            }
+
+            let kind = if is_durable {
+                BackingKind::DurableObject
+            } else {
+                BackingKind::D1
             };
 
-            Some(binding_sym)
-        } else {
-            None
-        };
+            self.backing(ma, table, binding_sym, kind);
+        }
 
-        let binding_name = binding.map(|b| b.name);
+        let is_d1_backed = matches!(
+            self.backing.as_ref().map(|b| &b.kind),
+            Some(BackingKind::D1)
+        );
+        let needs_pk = has_sql_blocks || is_d1_backed;
+
+        if has_route_blocks && needs_pk {
+            ma.sink
+                .push(SemanticError::ModelMixesRoutesAndSql { model: self.symbol });
+            return None;
+        }
 
         for block in self.model.blocks.inners() {
             match block {
@@ -222,26 +215,23 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                     }
                 }
                 ModelBlockKind::Foreign(fk) => {
-                    let binding_name = binding.unwrap().name;
-                    self.foreign(ma, table, binding_name, fk, false);
+                    self.foreign(ma, table, binding.unwrap().name, fk, false);
                 }
                 ModelBlockKind::Primary(blocks) => {
-                    let binding_name = binding.unwrap().name;
-
                     for block in blocks {
                         match &block.inner {
                             SqlBlockKind::Column(symbol) => {
                                 self.column(ma, symbol, true);
                             }
                             SqlBlockKind::Foreign(foreign_block) => {
-                                self.foreign(ma, table, binding_name, foreign_block, true)
+                                self.foreign(ma, table, binding.unwrap().name, foreign_block, true)
                             }
                         }
                     }
                 }
                 ModelBlockKind::Navigation(navigation_block) => self.nav(
                     ma,
-                    binding_name,
+                    binding,
                     &navigation_block.adj,
                     &navigation_block.nav.inner,
                     table,
@@ -260,21 +250,21 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         for block in self.model.blocks.inners() {
             match block {
                 ModelBlockKind::Unique(fields) => self.unique_constraint(ma, fields),
-                ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv),
+                ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv, binding),
                 ModelBlockKind::R2(r2) => self.r2_field(ma, table, r2),
                 _ => {}
             }
         }
 
-        if binding.is_some() && !self.has_defined_pk {
+        if needs_pk && self.primary_columns.is_empty() {
             ma.sink
-                .push(SemanticError::D1ModelMissingPrimaryKey { model: self.symbol });
+                .push(SemanticError::ModelMissingPrimaryKey { model: self.symbol });
             return None;
         }
 
         Some(Model {
             name: self.name,
-            database_binding: binding_name,
+            backing: self.backing,
             primary_columns: self.primary_columns,
             columns: self.columns,
             kv_fields: self.kv_fields,
@@ -285,13 +275,89 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         })
     }
 
+    /// Resolves the [Model::backing] as well as expanding a Durable Object's shard
+    /// fields into [Model::route_fields] if [BackingKind::DurableObject].
+    fn backing(
+        &mut self,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
+        table: &SymbolTable<'src, 'p>,
+        binding_sym: &'p Symbol<'src>,
+        kind: BackingKind,
+    ) {
+        if matches!(kind, BackingKind::D1) {
+            // Shard args are only meaningful for a Durable Object backing.
+            if self.model.shard_args.is_some() {
+                ma.sink.push(SemanticError::ModelInvalidBinding {
+                    model: self.symbol,
+                    binding: binding_sym,
+                });
+                return;
+            }
+            self.backing = Some(ModelBacking {
+                binding: binding_sym.name,
+                fields: Vec::new(),
+                kind: BackingKind::D1,
+            });
+            return;
+        }
+
+        let shard_fields = {
+            let block = table.durable_bindings.get(binding_sym.name).unwrap();
+            block
+                .shard_blocks
+                .inners()
+                .flat_map(|s| &s.fields)
+                .collect::<Vec<_>>()
+        };
+
+        let shard_args = self.model.shard_args.as_deref().unwrap_or(&[]);
+        if shard_args.len() != shard_fields.len() {
+            ma.sink.push(SemanticError::ArgCountMismatch {
+                field: binding_sym,
+                expected: shard_fields.len(),
+                got: shard_args.len(),
+            });
+            return;
+        }
+
+        let mut shard_field_names = Vec::with_capacity(shard_fields.len());
+        for (arg, shard_field) in shard_args.iter().zip(&shard_fields) {
+            let cidl_type = match resolve_cidl_type(shard_field, &shard_field.cidl_type, table) {
+                Ok(t) => t,
+                Err(e) => {
+                    ma.sink.push(e);
+                    continue;
+                }
+            };
+            let validators = match resolve_validator_tags(shard_field) {
+                Ok(v) => v,
+                Err(errs) => {
+                    ma.sink.extend(errs);
+                    Vec::new()
+                }
+            };
+
+            self.route_fields.push(ValidatedField {
+                name: arg.name.into(),
+                cidl_type,
+                validators,
+            });
+            shard_field_names.push(arg.name);
+        }
+
+        self.backing = Some(ModelBacking {
+            binding: binding_sym.name,
+            fields: shard_field_names,
+            kind: BackingKind::DurableObject,
+        });
+    }
+
     fn column(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         symbol: &'p Symbol<'src>,
         is_primary: bool,
     ) {
-        self.has_defined_pk |= is_primary;
         let cidl_type = symbol.cidl_type.clone();
 
         if !is_valid_sql_type(&cidl_type) {
@@ -378,8 +444,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         fk: &'p ForeignBlock<'src>,
         is_primary: bool,
     ) {
-        self.has_defined_pk |= is_primary;
-
         // Check that the adjacent model exists
         let adj_model_sym = &fk.adj.first().unwrap().0;
         let Some(adj_model_block) = table.models.get(adj_model_sym.name) else {
@@ -506,7 +570,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
     fn nav(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
-        binding: Option<&'src str>,
+        binding: Option<&'p Symbol<'src>>,
         adj: &'p [NavAdj<'src>],
         field: &'p Symbol<'src>,
         table: &SymbolTable<'src, 'p>,
@@ -626,7 +690,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         // Otherwise, the adjacent model is D1 backed, and navigations to it must
         // reference the same D1 binding
         let adj_binding = adj_model_block.database_binding.as_ref().map(|s| s.name);
-        if adj_binding != binding {
+        if adj_binding != binding.map(|s| s.name) {
             ma.sink
                 .push(SemanticError::NavigationReferencesDifferentBacking { field });
             return;
@@ -774,18 +838,53 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
         kv: &'p KvFieldBlock<'src>,
+        binding: Option<&'p Symbol<'src>>,
     ) {
-        if !table.kv_bindings.contains_key(&kv.binding.name) {
+        if !table.kv_bindings.contains_key(kv.binding.name)
+            && !table.durable_bindings.contains_key(kv.binding.name)
+        {
+            // KV must be either a Wrangler KV binding or a Durable Object binding
             ma.sink.push(SemanticError::UnresolvedSymbol {
                 symbol: &kv.binding,
             });
             return;
         }
 
+        let durable_kv_templates = ma
+            .env
+            .durable_bindings
+            .iter()
+            .find(|b| b.name == kv.binding.name)
+            .map(|b| b.templates.as_slice());
+
+        let kv_templates = ma
+            .env
+            .kv_bindings
+            .iter()
+            .find(|b| b.name == kv.binding.name)
+            .map(|b| b.templates.as_slice());
+
+        let templates = match (kv_templates, durable_kv_templates) {
+            (Some(kv), _) => kv,
+            (_, Some(durable)) => {
+                if binding.map(|b| b.name) != Some(kv.binding.name) {
+                    ma.sink.push(SemanticError::UnresolvedSymbol {
+                        symbol: &kv.binding,
+                    });
+                    return;
+                }
+                durable
+            }
+            (None, None) => {
+                // The binding is invalid but the error has already been sunk during env validation
+                return;
+            }
+        };
+
         let Some((template, key_format)) = self.resolve_binding_ref(
             ma,
             table,
-            ma.env.kv_bindings.as_slice(),
+            templates,
             &kv.binding,
             &kv.binding_template,
             &kv.args,
@@ -819,10 +918,21 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
+        let Some(templates) = ma
+            .env
+            .r2_bindings
+            .iter()
+            .find(|b| b.name == r2.binding.name)
+            .map(|b| b.templates.as_slice())
+        else {
+            // The binding is invalid but the error has already been sunk during env validation
+            return;
+        };
+
         let Some((template, key_format)) = self.resolve_binding_ref(
             ma,
             table,
-            &ma.env.r2_bindings,
+            templates,
             &r2.binding,
             &r2.binding_template,
             &r2.args,
@@ -841,8 +951,8 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         });
     }
 
-    /// Resolves a KV/R2 binding reference against the wrangler env and validates
-    /// its args against the binding template's params.
+    /// Resolves a KV/R2/Durable storage binding reference against the supplied
+    /// templates and validates its args against the matched template's params.
     ///
     /// On success, returns the resolved binding template and the key format with
     /// the binding template's param placeholders replaced by the model's field
@@ -856,7 +966,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
-        bindings: &'sem [Binding<'src>],
+        templates: &'sem [BindingTemplate<'src>],
         binding_sym: &'p Symbol<'src>,
         template_sym: &'p Symbol<'src>,
         args: &'p [Symbol<'src>],
@@ -872,15 +982,8 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return None;
         }
 
-        let Some(wrangler_binding) = bindings.iter().find(|b| b.name == binding_sym.name) else {
-            // The binding is invalid but the error has already been sunk during env validation
-            return None;
-        };
-
-        let Some(wrangler_binding_template) = wrangler_binding
-            .templates
-            .iter()
-            .find(|f| f.field.name == template_sym.name)
+        let Some(wrangler_binding_template) =
+            templates.iter().find(|f| f.field.name == template_sym.name)
         else {
             // The binding is invalid but the error has already been sunk during env validation
             return None;

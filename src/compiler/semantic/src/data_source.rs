@@ -23,6 +23,16 @@ enum DsMethodKind {
     Body,
 }
 
+#[derive(Default)]
+struct GeneratedDataSource<'src> {
+    include_query: String,
+    get_query: String,
+    list_query: String,
+    get: Option<DataSourceGetMethod<'src>>,
+    list: Option<DataSourceMethod<'src>>,
+    save: Option<DataSourceMethod<'src>>,
+}
+
 pub struct DataSourceAnalysis;
 impl<'src, 'p> DataSourceAnalysis {
     pub fn analyze(
@@ -274,9 +284,7 @@ impl<'src, 'p> DataSourceAnalysis {
 
 pub struct DataSourceExpansion;
 impl<'src> DataSourceExpansion {
-    /// Adds a `Default` [DataSource] to every D1-backed model that doesn't have one,
-    /// then for every DS: precomputes the include/get/list SQL and synthesizes default
-    /// get/list/save methods for any verb the user didn't declare as a stub.
+    /// Adds a `Default` [DataSource] to every model that doesn't have one.
     ///
     /// The default include tree contains all KV, R2, 1:1, 1:N and M:N relationships,
     /// but stops recursing after a 1:N or M:N to avoid join explosion.
@@ -284,10 +292,7 @@ impl<'src> DataSourceExpansion {
         let needs_default = idl
             .models
             .values()
-            .filter(|m| {
-                (m.database_binding.is_some() || !m.route_fields.is_empty())
-                    && m.default_data_source().is_none()
-            })
+            .filter(|m| m.default_data_source().is_none() && m.has_data())
             .map(|m| m.name)
             .collect::<Vec<&str>>();
 
@@ -309,81 +314,17 @@ impl<'src> DataSourceExpansion {
             );
         }
 
-        let pending = idl
+        let generated = idl
             .models
             .values()
-            .filter(|m| m.database_binding.is_some())
             .flat_map(|model| {
                 model.data_sources.iter().map(|(ds_name, ds)| {
-                    let include_query = SelectModel::query(model.name, None, Some(&ds.tree), idl)
-                        .unwrap_or_default();
-                    let bindings = model_bindings(idl, model, Some(&ds.tree));
-
-                    let get_query = Self::build_get_query(model, &include_query);
-                    let list_query = Self::build_list_query(model, &include_query);
-
-                    // One PK-instance parameter per primary key column.
-                    let get = ds.get.is_stub.not().then(|| DataSourceGetMethod {
-                        parameters: model
-                            .primary_columns
-                            .iter()
-                            .map(|pk| DataSourceGetMethodParam {
-                                parameter: pk.field.clone(),
-                                instance_field: true,
-                            })
-                            .collect(),
-                        injected: bindings.clone(),
-                        is_stub: false,
-                    });
-
-                    // Seek-pagination params: `lastSeen_<pk>...`, `limit`.
-                    let list = ds.list.is_stub.not().then(|| DataSourceMethod {
-                        parameters: model
-                            .primary_columns
-                            .iter()
-                            .map(|pk| ValidatedField {
-                                name: format!("lastSeen_{}", pk.field.name).into(),
-                                ..pk.field.clone()
-                            })
-                            .chain(std::iter::once(ValidatedField {
-                                name: "limit".into(),
-                                cidl_type: CidlType::Int,
-                                validators: vec![Validator::GreaterThan(Number::Int(0))],
-                            }))
-                            .collect(),
-                        injected: bindings.clone(),
-                        is_stub: false,
-                    });
-
-                    // Single `model: partial<Model>` parameter.
-                    let save = ds.save.is_stub.not().then(|| DataSourceMethod {
-                        parameters: vec![ValidatedField {
-                            name: "model".into(),
-                            cidl_type: CidlType::Partial {
-                                object_name: model.name,
-                            },
-                            validators: vec![],
-                        }],
-                        injected: bindings,
-                        is_stub: false,
-                    });
-
-                    (
-                        model.name,
-                        *ds_name,
-                        include_query,
-                        get_query,
-                        list_query,
-                        get,
-                        list,
-                        save,
-                    )
+                    (model.name, *ds_name, Self::generate_source(idl, model, ds))
                 })
             })
             .collect::<Vec<_>>();
 
-        for (model_name, ds_name, include_query, get_query, list_query, get, list, save) in pending
-        {
+        for (model_name, ds_name, generated) in generated {
             let Some(ds) = idl
                 .models
                 .get_mut(model_name)
@@ -391,72 +332,139 @@ impl<'src> DataSourceExpansion {
             else {
                 continue;
             };
-            ds.include_query = include_query;
-            ds.get_query = get_query;
-            ds.list_query = list_query;
-            if let Some(g) = get {
-                ds.get = g;
-            }
-            if let Some(l) = list {
-                ds.list = l;
-            }
-            if let Some(s) = save {
-                ds.save = s;
-            }
-        }
 
-        // Route models have no SQL, but still synthesize a `get` keyed on their route
-        // fields (so the runtime can fetch them and resolve their navigations) and a
-        // `save` that persists their KV/R2 fields.
-        let route_pending = idl
-            .models
-            .values()
-            .filter(|m| m.database_binding.is_none() && !m.route_fields.is_empty())
-            .flat_map(|model| {
-                model.data_sources.keys().map(|ds_name| {
-                    let bindings = model_bindings(idl, model, None);
-                    let get = DataSourceGetMethod {
-                        parameters: model
-                            .route_fields
-                            .iter()
-                            .map(|f| DataSourceGetMethodParam {
-                                parameter: f.clone(),
-                                instance_field: true,
-                            })
-                            .collect(),
-                        injected: bindings.clone(),
-                        is_stub: false,
-                    };
-                    let save = DataSourceMethod {
-                        parameters: vec![ValidatedField {
-                            name: "model".into(),
-                            cidl_type: CidlType::Partial {
-                                object_name: model.name,
-                            },
-                            validators: vec![],
-                        }],
-                        injected: bindings,
-                        is_stub: false,
-                    };
-                    (model.name, *ds_name, get, save)
-                })
-            })
-            .collect::<Vec<_>>();
+            ds.include_query = generated.include_query;
+            ds.get_query = generated.get_query;
+            ds.list_query = generated.list_query;
 
-        for (model_name, ds_name, get, save) in route_pending {
-            let Some(ds) = idl
-                .models
-                .get_mut(model_name)
-                .and_then(|m| m.data_sources.get_mut(ds_name))
-            else {
-                continue;
-            };
-            if !ds.get.is_stub {
+            // Only replace a verb the user did not declare as a stub.
+            if let Some(get) = generated.get.filter(|_| !ds.get.is_stub) {
                 ds.get = get;
             }
-            if !ds.save.is_stub {
+            if let Some(list) = generated.list.filter(|_| !ds.list.is_stub) {
+                ds.list = list;
+            }
+            if let Some(save) = generated.save.filter(|_| !ds.save.is_stub) {
                 ds.save = save;
             }
+        }
+    }
+
+    fn generate_source(
+        idl: &CloesceIdl<'src>,
+        model: &Model<'src>,
+        ds: &DataSource<'src>,
+    ) -> GeneratedDataSource<'src> {
+        let mut injected = model_bindings(idl, model, Some(&ds.tree));
+        let shard_fields = if model.is_durable_backed() {
+            // Default Durable Object methods run inside the DO context
+            injected.insert(0, idl::CONTEXT_INJECT_KEY);
+
+            let backing_fields = &model.backing.as_ref().unwrap().fields;
+            model
+                .route_fields
+                .iter()
+                .filter(|f| backing_fields.iter().any(|bf| *bf == f.name))
+                .map(|f| (*f).clone())
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
+        let save_model_param = || ValidatedField {
+            name: "model".into(),
+            cidl_type: CidlType::Partial {
+                object_name: model.name,
+            },
+            validators: vec![],
+        };
+
+        // Seek-pagination params: `lastSeen_<pk>...`, `limit`.
+        let list_params = || {
+            model
+                .primary_columns
+                .iter()
+                .map(|pk| ValidatedField {
+                    name: format!("lastSeen_{}", pk.field.name).into(),
+                    ..pk.field.clone()
+                })
+                .chain(std::iter::once(ValidatedField {
+                    name: "limit".into(),
+                    cidl_type: CidlType::Int,
+                    validators: vec![Validator::GreaterThan(Number::Int(0))],
+                }))
+        };
+
+        if model.uses_sqlite() {
+            let include_query =
+                SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
+
+            let get_params = shard_fields
+                .iter()
+                .cloned()
+                .chain(model.primary_columns.iter().map(|pk| pk.field.clone()))
+                .map(|parameter| DataSourceGetMethodParam {
+                    parameter,
+                    instance_field: true,
+                })
+                .collect::<Vec<_>>();
+
+            return GeneratedDataSource {
+                get_query: Self::build_get_query(model, &include_query),
+                list_query: Self::build_list_query(model, &include_query),
+                include_query,
+                get: Some(DataSourceGetMethod {
+                    parameters: get_params,
+                    injected: injected.clone(),
+                    is_stub: false,
+                }),
+                list: Some(DataSourceMethod {
+                    parameters: shard_fields.iter().cloned().chain(list_params()).collect(),
+                    injected: injected.clone(),
+                    is_stub: false,
+                }),
+                save: Some(DataSourceMethod {
+                    parameters: shard_fields
+                        .iter()
+                        .cloned()
+                        .chain(std::iter::once(save_model_param()))
+                        .collect(),
+                    injected,
+                    is_stub: false,
+                }),
+            };
+        }
+
+        GeneratedDataSource {
+            get: Some(DataSourceGetMethod {
+                // All route fields (which includes shard fields)
+                parameters: model
+                    .route_fields
+                    .iter()
+                    .map(|f| DataSourceGetMethodParam {
+                        parameter: f.clone(),
+                        instance_field: true,
+                    })
+                    .collect(),
+                injected: injected.clone(),
+                is_stub: false,
+            }),
+            // Save does not need all route fields, just the shard fields to populate the
+            // DO context.
+            //
+            // TODO: Could we populate the DO from the `model` param object instead
+            // (like we do with the route fields)? Should `save` just be an instance method
+            // on the model?
+            save: Some(DataSourceMethod {
+                parameters: shard_fields
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(save_model_param()))
+                    .collect(),
+                injected: injected.clone(),
+                is_stub: false,
+            }),
+            ..GeneratedDataSource::default()
         }
     }
 

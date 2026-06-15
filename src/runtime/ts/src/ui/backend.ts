@@ -4,9 +4,10 @@ import { u8ToB64 } from "../common.js";
 /**
  * cloesce/backend
  */
-export { CloesceApp, DependencyContainer } from "../router/router.js";
+export { CloesceApp } from "../router/router.js";
 export type { CrudKind } from "../cidl.js";
 export { Orm } from "../router/orm.js";
+export type { SqlStatement } from "../router/orm.js";
 export type { R2ObjectBody } from "@cloudflare/workers-types";
 
 /**

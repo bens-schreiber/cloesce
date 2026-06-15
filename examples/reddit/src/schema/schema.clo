@@ -1,0 +1,164 @@
+// #region: Users
+inject {
+    AuthUser
+}
+
+kv Sessions {
+    session(token: string) -> string {
+        "sessions/{token}"
+    }
+}
+
+r2 Avatars {
+    avatar(username: string) {
+        "avatars/{username}.png"
+    }
+}
+
+poo Profile {
+    posts: array<int>
+    comments: array<int>
+    subReddits: array<string>
+}
+
+durable UserDo {
+    shard {
+        username: string
+    }
+    
+    profile() -> Profile {
+        "profile"
+    }
+}
+
+[crud get]
+model User for UserDo(username) {
+    kv UserDo::profile() {
+        profile
+    }
+    
+    r2 Avatars::avatar(username) {
+        avatar
+    }
+}
+
+poo AuthResult {
+    token: string
+    user: User
+}
+
+api User {
+    [inject UserDo(username), Sessions]
+    post login(username: string) -> AuthResult
+    
+    [inject Avatars]
+    put uploadAvatar(self, image: stream)
+    
+    get downloadAvatar(self) -> stream
+}
+// #endregion
+
+// #region: Subreddits
+poo SubRedditMeta {
+    name: string
+    description: string
+}
+
+poo SubRedditEntry {
+    subId: string
+    name: string
+}
+
+kv SubReddits {
+    entry(subId: string) -> SubRedditEntry {
+        "subreddits/{subId}"
+    }
+    
+    directory() -> paginated<SubRedditEntry> {
+        "subreddits/"
+    }
+}
+
+durable SubRedditDo {
+    shard {
+        subId: string
+    }
+    
+    metadata() -> SubRedditMeta {
+        "metadata"
+    }
+}
+
+[crud get]
+model SubReddit for SubRedditDo(subId) {
+    kv SubRedditDo::metadata() {
+        metadata
+    }
+}
+
+api SubReddit {
+    [inject SubRedditDo, AuthUser, UserDo, SubReddits]
+    post create(meta: SubRedditMeta) -> SubReddit
+    
+    [inject SubReddits]
+    get list() -> paginated<SubRedditEntry>
+    
+    [inject SubRedditDo(subId)]
+    get feed(self, subId: string) -> array<Post>
+}
+// #endregion
+
+// #region: Posts
+[crud get, list]
+model Post for SubRedditDo(subId) {
+    primary {
+        id: int
+    }
+    
+    column {
+        author: string
+        title: string
+        content: string
+        upvotes: int
+    }
+    
+    nav Comment::postId {
+        comments
+    }
+}
+
+api Post {
+    [inject SubRedditDo(subId), AuthUser, UserDo]
+    post create(subId: string, title: string, content: string) -> Post
+    
+    [inject SubRedditDo(subId), AuthUser]
+    post vote(self, subId: string, delta: int) -> Post
+}
+// #endregion
+
+// #region: Comments
+[crud get, list]
+model Comment for SubRedditDo(subId) {
+    primary {
+        id: int
+    }
+    
+    column {
+        author: string
+        content: string
+        upvotes: int
+    }
+    
+    foreign (Post::id) {
+        postId
+    }
+}
+
+api Comment {
+    [inject SubRedditDo(subId), AuthUser, UserDo]
+    post create(subId: string, postId: int, content: string) -> Comment
+    
+    [inject SubRedditDo(subId), AuthUser]
+    post vote(self, subId: string, delta: int) -> Comment
+}
+// #endregion

@@ -41,6 +41,27 @@ r2 MyR2 {
     }
 }
 
+durable LeaderboardDo {
+    shard {
+        [gt 0]
+        tenantId: int
+    }
+
+    topEntryCache() -> json {
+        "top"
+    }
+
+    topEntryCacheWithDate(date: string) -> json {
+        "top/{date}"
+    }
+}
+
+durable GlobalDo {
+    config() -> json {
+        "config"
+    }
+}
+
 vars {
     // Comment again
     MY_VAR: string // More comments
@@ -282,6 +303,41 @@ api BasicService {
     post instanceMethod(input: int) -> int
     get staticMethod(input: string) -> string
     post uploadData(data: stream) -> bool
+
+    [inject LeaderboardDo(tenantId)]
+    get topScores(tenantId: int) -> json
+
+    [inject GlobalDo()]
+    get globalConfig() -> json
+}
+
+[crud get, save]
+model Leaderboard for LeaderboardDo(tenantId) {
+    kv LeaderboardDo::topEntryCache {
+        topEntries
+    }
+}
+
+model GlobalSettings for GlobalDo {
+    kv GlobalDo::config {
+        config
+    }
+}
+
+[crud get, list, save]
+model LeaderboardEntry for LeaderboardDo(tenantId) {
+    primary {
+        id: int
+    }
+
+    column {
+        playerName: string
+        score: int
+    }
+
+    kv LeaderboardDo::topEntryCache {
+        topEntries
+    }
 }
 
 poo BasicPoo {

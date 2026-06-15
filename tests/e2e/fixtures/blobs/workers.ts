@@ -1,7 +1,7 @@
 import { HttpResult } from "cloesce";
-import * as Cloesce from "./backend.js";
+import * as clo from "./backend.js";
 
-const BlobService = Cloesce.BlobService.impl({
+const BlobService = clo.BlobService.impl({
   incrementBlob(blob: Uint8Array) {
     if (!(blob instanceof Uint8Array)) {
       throw new Error(`Received blob was not an instance of uint8array: ${JSON.stringify(blob)}`);
@@ -15,9 +15,9 @@ const BlobService = Cloesce.BlobService.impl({
   },
 });
 
-const BlobHaver = Cloesce.BlobHaver.impl({
+const BlobHaver = clo.BlobHaver.impl({
   // Returns a stream of its own blob1 column
-  yieldStream(self: Cloesce.BlobHaver.Self): HttpResult<Cloesce.CfReadableStream> {
+  yieldStream(self: clo.BlobHaver.Self): HttpResult<clo.CfReadableStream> {
     const blob1 = self.blob1;
     return HttpResult.ok(
       200,
@@ -30,12 +30,12 @@ const BlobHaver = Cloesce.BlobHaver.impl({
     );
   },
 
-  getBlob1(self: Cloesce.BlobHaver.Self) {
+  getBlob1(self: clo.BlobHaver.Self) {
     return HttpResult.ok(200, self.blob1);
   },
 
   // Accepts some stream and validates that it sent [1, 2, 3, 4, 5]
-  async inputStream(stream: Cloesce.CfReadableStream) {
+  async inputStream(stream: clo.CfReadableStream) {
     if (!(stream instanceof ReadableStream)) {
       throw new Error("Did not receive a stream");
     }
@@ -56,10 +56,10 @@ const BlobHaver = Cloesce.BlobHaver.impl({
 });
 
 export default {
-  async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
-    const app = await Cloesce.cloesce();
+  async fetch(request: Request, env: clo.Env): Promise<Response> {
+    const app = clo.cloesce(env);
     app.register(BlobService).register(BlobHaver);
 
-    return app.run(request, env);
+    return app.run(request);
   },
 };

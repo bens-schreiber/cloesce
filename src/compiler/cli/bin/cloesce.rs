@@ -516,9 +516,10 @@ mod compile {
 }
 
 mod migrate {
+    use codegen::wrangler::DurableMigrationGenerator;
     use codegen::wrangler::WranglerGenerator;
-    use idl::MigrationsIdl;
-    use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
+    use idl::BackingKind;
+    use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIdl, MigrationsIntent};
 
     use super::*;
 
@@ -558,16 +559,31 @@ mod migrate {
                 })?
         };
 
-        if spec.d1_databases.is_empty() {
-            tracing::warn!("No D1 bindings found in the wrangler config. Nothing to migrate.");
+        let durable_bindings = spec
+            .durable_objects
+            .as_ref()
+            .map(|dos| {
+                dos.bindings
+                    .iter()
+                    .filter_map(|b| b.name.as_deref())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        if spec.d1_databases.is_empty() && durable_bindings.is_empty() {
+            tracing::warn!(
+                "No D1 or Durable Object bindings found in the wrangler config. Nothing to migrate."
+            );
             return Ok(());
         }
 
-        let bindings: Vec<String> = if args.all {
+        let bindings = if args.all {
             spec.d1_databases
                 .iter()
                 .filter_map(|db| db.binding.as_deref())
                 .map(|s| s.to_string())
+                .chain(durable_bindings.iter().cloned())
                 .collect()
         } else {
             vec![
@@ -577,28 +593,37 @@ mod migrate {
             ]
         };
 
-        for current_binding in bindings {
-            let db = {
-                // Binding should exist in the wrangler config and be of type D1
-                let d1_database = spec
-                    .d1_databases
-                    .iter()
-                    .find(|db| db.binding.as_deref() == Some(current_binding.as_str()));
+        let ast_contents = std::fs::read_to_string(&cidl_path)
+            .map_err(|e| format!("Failed to read CIDL file {}: {}", cidl_path.display(), e))?;
 
-                match d1_database {
-                    Some(db) => db,
-                    None => {
-                        return Err(format!(
-                            "No D1 database binding named '{}' found in the wrangler config.",
-                            current_binding
-                        ));
-                    }
+        for current_binding in bindings {
+            let d1_database = spec
+                .d1_databases
+                .iter()
+                .find(|db| db.binding.as_deref() == Some(current_binding.as_str()));
+
+            let kind = match d1_database {
+                Some(_) => BackingKind::D1,
+                None if durable_bindings.contains(&current_binding) => BackingKind::DurableObject,
+                None => {
+                    return Err(format!(
+                        "No D1 database or Durable Object binding named '{}' found in the wrangler config.",
+                        current_binding
+                    ));
                 }
             };
 
-            let migrations_dir = config
-                .root
-                .join(db.migrations_dir.as_deref().unwrap_or("migrations"));
+            // A D1 database declares its own migrations directory; a Durable Object's
+            // migrations live under the configured migrations path, by binding name.
+            let migrations_dir = match d1_database {
+                Some(db) => config
+                    .root
+                    .join(db.migrations_dir.as_deref().unwrap_or("migrations")),
+                None => config
+                    .root
+                    .join(&config.parsed.migrations_path)
+                    .join(&current_binding),
+            };
             std::fs::create_dir_all(&migrations_dir).map_err(|e| {
                 format!(
                     "Failed to create migrations directory {}: {}",
@@ -607,9 +632,9 @@ mod migrate {
                 )
             })?;
 
-            // The last migrated CIDL and SQL files are the most recent timestamped files
+            // The last migrated CIDL file is the most recent timestamped file
             // within the migrations directory.
-            let (last_migrated_cidl_path, mut migrated_cidl_file, mut migrated_sql_file) = {
+            let last_migrated_cidl_path: Option<PathBuf> = {
                 let mut dir_entries = std::fs::read_dir(&migrations_dir)
                     .map_err(|e| {
                         format!(
@@ -622,48 +647,51 @@ mod migrate {
                     .collect::<Vec<_>>();
                 dir_entries.sort();
 
-                let last_migrated_cidl_path = {
-                    #[cfg(feature = "regression-tests")]
-                    {
-                        None
-                    }
+                #[cfg(feature = "regression-tests")]
+                {
+                    let _ = dir_entries;
+                    None
+                }
 
-                    #[cfg(not(feature = "regression-tests"))]
-                    {
-                        dir_entries
-                            .iter()
-                            .rfind(|p| {
-                                p.extension()
-                                    .and_then(|e| e.to_str())
-                                    .map(|ext| ext.eq_ignore_ascii_case("json"))
-                                    .unwrap_or(false)
-                            })
-                            .cloned()
-                    }
-                };
+                #[cfg(not(feature = "regression-tests"))]
+                {
+                    dir_entries
+                        .iter()
+                        .rfind(|p| {
+                            p.extension()
+                                .and_then(|e| e.to_str())
+                                .map(|ext| ext.eq_ignore_ascii_case("json"))
+                                .unwrap_or(false)
+                        })
+                        .cloned()
+                }
+            };
 
-                let file_stem = {
-                    #[cfg(feature = "regression-tests")]
-                    {
-                        args.name.to_string()
-                    }
+            let timestamp: u64 = {
+                #[cfg(feature = "regression-tests")]
+                {
+                    0
+                }
 
-                    #[cfg(not(feature = "regression-tests"))]
-                    {
-                        let timestamp = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .expect("Time went backwards")
-                            .as_secs();
+                #[cfg(not(feature = "regression-tests"))]
+                {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .expect("Time went backwards")
+                        .as_secs()
+                }
+            };
 
-                        format!("{timestamp}_{}", args.name)
-                    }
-                };
+            let file_stem = {
+                #[cfg(feature = "regression-tests")]
+                {
+                    args.name.to_string()
+                }
 
-                (
-                    last_migrated_cidl_path,
-                    open_file_or_create(&migrations_dir.join(format!("{}.json", file_stem)))?,
-                    open_file_or_create(&migrations_dir.join(format!("{}.sql", file_stem)))?,
-                )
+                #[cfg(not(feature = "regression-tests"))]
+                {
+                    format!("{timestamp}_{}", args.name)
+                }
             };
 
             let lm_contents = last_migrated_cidl_path
@@ -678,31 +706,56 @@ mod migrate {
                 })
                 .transpose()?;
 
-            let lm_ast: Option<MigrationsIdl> = lm_contents
+            let lm_ast = lm_contents
                 .as_deref()
                 .map(MigrationsIdl::from_json)
                 .transpose()?;
 
-            let ast_contents = std::fs::read_to_string(&cidl_path)
-                .map_err(|e| format!("Failed to read CIDL file {}: {}", cidl_path.display(), e))?;
-
-            // Migrate only the models with the specified D1 binding
+            // Migrate only the models backed by the specified binding.
             let idl = {
                 let mut idl = MigrationsIdl::from_json(&ast_contents)?;
-                idl.models
-                    .retain(|_, m| m.database_binding == Some(current_binding.to_string()));
+                idl.models.retain(|_, m| {
+                    m.backing.as_ref().map(|b| b.binding) == Some(&current_binding)
+                        && (kind == BackingKind::D1 || !m.primary_columns.is_empty())
+                });
 
                 idl
             };
 
             let generated_sql = MigrationsGenerator::migrate(&idl, lm_ast.as_ref(), &MigrationsCli);
 
-            migrated_cidl_file
-                .write_all(idl.to_json().as_bytes())
-                .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
-            migrated_sql_file
-                .write_all(generated_sql.as_bytes())
-                .map_err(|e| format!("Failed to write migrated SQL file: {e}"))?;
+            match kind {
+                BackingKind::D1 => {
+                    let mut migrated_cidl_file =
+                        open_file_or_create(&migrations_dir.join(format!("{file_stem}.json")))?;
+                    let mut migrated_sql_file =
+                        open_file_or_create(&migrations_dir.join(format!("{file_stem}.sql")))?;
+
+                    migrated_cidl_file
+                        .write_all(idl.to_json().as_bytes())
+                        .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
+                    migrated_sql_file
+                        .write_all(generated_sql.as_bytes())
+                        .map_err(|e| format!("Failed to write migrated SQL file: {e}"))?;
+                }
+                BackingKind::DurableObject => {
+                    // TODO: Locked to TS for now
+                    let migration_ts =
+                        DurableMigrationGenerator::generate(&args.name, timestamp, &generated_sql);
+
+                    let mut migrated_cidl_file =
+                        open_file_or_create(&migrations_dir.join(format!("{file_stem}.json")))?;
+                    let mut migration_file =
+                        open_file_or_create(&migrations_dir.join(format!("{file_stem}.ts")))?;
+
+                    migrated_cidl_file
+                        .write_all(idl.to_json().as_bytes())
+                        .map_err(|e| format!("Failed to write migrated CIDL file: {e}"))?;
+                    migration_file
+                        .write_all(migration_ts.as_bytes())
+                        .map_err(|e| format!("Failed to write migration file: {e}"))?;
+                }
+            }
 
             tracing::info!("Finished migration for binding '{}'.", current_binding);
         }

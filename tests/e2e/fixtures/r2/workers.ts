@@ -10,36 +10,32 @@ import {
 
 export const D1BackedModelImpl = D1BackedModel.impl({
   async uploadData(self, env, data: CfReadableStream) {
-    const key = bucket1.data(self.id);
-    await env.bucket1.put(key, data as any);
+    await bucket1.data.put(env.bucket1, self.id, data as any);
   },
 
   async uploadOtherData(self, env, data: CfReadableStream) {
-    const key = bucket1.otherData(self.id);
-    await env.bucket1.put(key, data as any);
+    await bucket1.otherData.put(env.bucket1, self.id, data as any);
   },
 });
 
 export const R2OnlyImpl = R2Only.impl({
   async uploadData(self, env, data: CfReadableStream) {
-    const key = bucket1.data(self.id);
-    await env.bucket1.put(key, data as any);
+    await bucket1.data.put(env.bucket1, self.id, data as any);
   },
 });
 
 export const R2SiblingImpl = R2Sibling.impl({
   async uploadData(self, env, data: CfReadableStream) {
-    const key = bucket1.otherData(self.siblingId);
-    await env.bucket1.put(key, data as any);
+    await bucket1.otherData.put(env.bucket1, self.siblingId, data as any);
   },
 });
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
+    const app = cloesce(env);
     app.register(D1BackedModelImpl);
     app.register(R2OnlyImpl);
     app.register(R2SiblingImpl);
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

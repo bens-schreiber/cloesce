@@ -1,0 +1,139 @@
+{
+  "hash": 6095058718984118637,
+  "models": {
+    "Post": {
+      "hash": 11845234384393994783,
+      "name": "Post",
+      "backing": {
+        "binding": "SubRedditDo",
+        "fields": [
+          "subId"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 16671312646982238929,
+          "field": {
+            "name": "title",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 10580003897996311112,
+          "field": {
+            "name": "content",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": [
+        {
+          "hash": 3208139060237204101,
+          "field": {
+            "name": "comments",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Comment"
+                }
+              }
+            }
+          },
+          "model_reference": "Comment",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "postId"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Comment": {
+      "hash": 17696079539672160570,
+      "name": "Comment",
+      "backing": {
+        "binding": "SubRedditDo",
+        "fields": [
+          "subId"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 10580003897996311112,
+          "field": {
+            "name": "content",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5390241804535561539,
+          "field": {
+            "name": "upvotes",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 9111420070857022687,
+          "field": {
+            "name": "postId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Post",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": []
+    }
+  }
+}

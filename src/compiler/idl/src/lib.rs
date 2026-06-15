@@ -12,7 +12,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -21,7 +20,6 @@ use indexmap::IndexMap;
 use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::Value;
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
@@ -90,8 +88,23 @@ impl<'src> CidlType<'src> {
         }
     }
 
+    pub fn unwrap_kv(&self) -> &CidlType<'src> {
+        match self {
+            CidlType::KvObject(inner) => inner,
+            _ => unreachable!("unwrap_kv_object called on non-KvObject type"),
+        }
+    }
+
     pub fn is_nullable(&self) -> bool {
         matches!(self, CidlType::Nullable(_))
+    }
+
+    pub fn is_paginated(&self) -> bool {
+        matches!(self, CidlType::Paginated(_))
+    }
+
+    pub fn is_kv_object(&self) -> bool {
+        matches!(self, CidlType::KvObject(_))
     }
 
     pub fn array(cidl_type: CidlType<'src>) -> CidlType<'src> {
@@ -266,7 +279,7 @@ pub struct DataSourceMethod<'src> {
     pub is_stub: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct DataSourceGetMethodParam<'src> {
     #[serde(borrow)]
     pub parameter: ValidatedField<'src>,
@@ -357,6 +370,21 @@ pub enum MediaType {
     Octet,
 }
 
+/// A key that signifies an [ApiMethod::durable_target] should be injected.
+pub const CONTEXT_INJECT_KEY: &str = "ctx";
+pub const DEFAULT_DATA_SOURCE_NAME: &str = "Default";
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct DurableTarget<'src> {
+    #[serde(borrow)]
+    pub binding: &'src str,
+
+    /// The API method parameter names supplying the DO's shard values,
+    /// in shard-field order.
+    #[serde(borrow)]
+    pub shard_args: Vec<&'src str>,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct ApiMethod<'src> {
     #[serde(borrow)]
@@ -366,6 +394,7 @@ pub struct ApiMethod<'src> {
     /// Static methods require no hydration or data source.
     pub is_static: bool,
 
+    #[serde(borrow)]
     pub data_source: Option<&'src str>,
 
     pub http_verb: HttpVerb,
@@ -384,12 +413,39 @@ pub struct ApiMethod<'src> {
 
     #[serde(borrow)]
     pub injected: Vec<&'src str>,
+
+    /// If present, the method executes inside this Durable Object's context.
+    #[serde(borrow)]
+    pub durable_target: Option<DurableTarget<'src>>,
+}
+
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub enum BackingKind {
+    DurableObject,
+    D1,
+}
+
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct ModelBacking<'src> {
+    /// A Durable Object or D1 binding
+    #[serde(borrow)]
+    pub binding: &'src str,
+
+    /// References to [Model::route_fields] that supply shard values
+    /// for this model's backing DO, should [ModelBacking::binding] be a sharded DO.
+    #[serde(borrow)]
+    pub fields: Vec<&'src str>,
+
+    pub kind: BackingKind,
 }
 
 #[derive(Deserialize, Serialize, Default)]
 pub struct Model<'src> {
     #[serde(default)]
     pub hash: u64,
+
+    #[serde(borrow)]
+    pub backing: Option<ModelBacking<'src>>,
 
     #[serde(borrow)]
     pub name: &'src str,
@@ -412,10 +468,6 @@ pub struct Model<'src> {
     #[serde(borrow, default)]
     pub route_fields: Vec<ValidatedField<'src>>,
 
-    /// References a Wrangler binding if this model is backed by a SQLite database
-    #[serde(borrow)]
-    pub database_binding: Option<&'src str>,
-
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
 
@@ -434,13 +486,41 @@ impl Model<'_> {
         !self.r2_fields.is_empty()
     }
 
-    /// Returns the data source with name "Default"
+    pub fn is_durable_backed(&self) -> bool {
+        matches!(
+            self.backing.as_ref().map(|b| &b.kind),
+            Some(BackingKind::DurableObject)
+        )
+    }
+
+    pub fn is_d1_backed(&self) -> bool {
+        matches!(
+            self.backing.as_ref().map(|b| &b.kind),
+            Some(BackingKind::D1)
+        )
+    }
+
+    pub fn uses_sqlite(&self) -> bool {
+        !self.primary_columns.is_empty()
+    }
+
+    /// Returns the data source with name [DEFAULT_DATA_SOURCE_NAME].
     pub fn default_data_source(&self) -> Option<&DataSource<'_>> {
-        self.data_sources.get("Default")
+        self.data_sources.get(DEFAULT_DATA_SOURCE_NAME)
     }
 
     pub fn has_composite_pk(&self) -> bool {
         self.primary_columns.len() > 1
+    }
+
+    /// True if the model carries any hydratable / serializable state
+    pub fn has_data(&self) -> bool {
+        self.backing.is_some()
+            || !self.route_fields.is_empty()
+            || !self.navigation_fields.is_empty()
+            || self.uses_sqlite()
+            || self.has_kv()
+            || self.has_r2()
     }
 
     /// Returns all columns, including primary key columns, as a single list.
@@ -482,6 +562,17 @@ pub struct Binding<'src> {
     pub templates: Vec<BindingTemplate<'src>>,
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct DurableBinding<'src> {
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub shard_fields: Vec<ValidatedField<'src>>,
+
+    #[serde(borrow)]
+    pub templates: Vec<BindingTemplate<'src>>,
+}
+
 #[derive(Deserialize, Serialize, Default)]
 pub struct WranglerEnv<'src> {
     /// Contains each d1 binding name
@@ -493,6 +584,9 @@ pub struct WranglerEnv<'src> {
 
     #[serde(borrow)]
     pub r2_bindings: Vec<Binding<'src>>,
+
+    #[serde(borrow, default)]
+    pub durable_bindings: Vec<DurableBinding<'src>>,
 
     #[serde(borrow)]
     pub vars: Vec<Field<'src>>,
@@ -534,16 +628,18 @@ impl CloesceIdl<'_> {
 
         let mut root_h = FxHasher::default();
         for model in self.models.values_mut() {
-            // Route models have no SQL representation, so they are excluded from
-            // the merkle hash, which tracks migration-relevant schema changes.
-            if model.database_binding.is_none() && !model.route_fields.is_empty() {
+            let binding = match &model.backing {
+                Some(b) => b.binding,
+                _ => continue,
+            };
+            if !model.uses_sqlite() {
                 continue;
             }
 
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
-            model.database_binding.hash(&mut model_h);
+            binding.hash(&mut model_h);
 
             for pk in model.primary_columns.iter_mut() {
                 let pk_col_h = {
@@ -596,96 +692,6 @@ impl CloesceIdl<'_> {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct D1Database {
-    pub binding: Option<String>,
-    pub database_name: Option<String>,
-    pub database_id: Option<String>,
-    pub migrations_dir: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct KVNamespace {
-    pub binding: Option<String>,
-    pub id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct R2Bucket {
-    pub binding: Option<String>,
-    pub bucket_name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct WranglerSpec {
-    pub name: Option<String>,
-    pub compatibility_date: Option<String>,
-    pub main: Option<String>,
-
-    #[serde(default)]
-    pub d1_databases: Vec<D1Database>,
-
-    #[serde(default)]
-    pub kv_namespaces: Vec<KVNamespace>,
-
-    #[serde(default)]
-    pub r2_buckets: Vec<R2Bucket>,
-
-    #[serde(default)]
-    pub vars: HashMap<String, Value>,
-}
-
-/// A subset of [Model] suited for migrations.
-///
-/// Assumed that the tree is semantically valid.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsModel<'src> {
-    pub hash: u64,
-    pub name: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub database_binding: Option<String>,
-
-    #[serde(borrow)]
-    pub primary_columns: Vec<Column<'src>>,
-
-    #[serde(borrow)]
-    pub columns: Vec<Column<'src>>,
-
-    #[serde(borrow)]
-    pub navigation_fields: Vec<NavigationField<'src>>,
-}
-
-impl<'src> MigrationsModel<'src> {
-    /// Returns all columns, including primary key columns, as a single iterator.
-    /// The boolean indicates whether the column is a primary key column.
-    pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'src>, bool)> {
-        self.columns
-            .iter()
-            .map(|c| (c, false))
-            .chain(self.primary_columns.iter().map(|c| (c, true)))
-    }
-}
-
-/// A subset of [CloesceIdl] suited for D1 migrations.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsIdl<'src> {
-    pub hash: u64,
-
-    #[serde(borrow)]
-    pub models: IndexMap<String, MigrationsModel<'src>>,
-}
-
-impl<'src> MigrationsIdl<'src> {
-    pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
-        serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
-    }
-
-    pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).expect("serialize self to work")
-    }
-}
-
 /// All Wrangler bindings (D1 / KV / R2) a model's view through `include` may touch.
 ///
 /// Walks the include tree: each nav field's target model is recursed into;
@@ -700,45 +706,64 @@ pub fn model_bindings<'src>(
 ) -> Vec<&'src str> {
     let mut visited = HashSet::new();
     let mut bindings = BTreeSet::new();
-    collect_model_bindings(idl, model, include, &mut visited, &mut bindings);
-    bindings.into_iter().collect()
-}
+    let do_bindings = idl
+        .wrangler_env
+        .durable_bindings
+        .iter()
+        .map(|b| b.name)
+        .collect::<HashSet<_>>();
+    collect_model_bindings(
+        idl,
+        model,
+        include,
+        &mut visited,
+        &mut bindings,
+        &do_bindings,
+    );
+    return bindings.into_iter().collect();
 
-fn collect_model_bindings<'src>(
-    idl: &CloesceIdl<'src>,
-    model: &Model<'src>,
-    include: Option<&IncludeTree<'src>>,
-    visited: &mut HashSet<&'src str>,
-    bindings: &mut BTreeSet<&'src str>,
-) {
-    if !visited.insert(model.name) {
-        return;
-    }
-    let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
+    // DFS
+    fn collect_model_bindings<'src>(
+        idl: &CloesceIdl<'src>,
+        model: &Model<'src>,
+        include: Option<&IncludeTree<'src>>,
+        visited: &mut HashSet<&'src str>,
+        bindings: &mut BTreeSet<&'src str>,
+        do_bindings: &HashSet<&'src str>,
+    ) {
+        if !visited.insert(model.name) {
+            return;
+        }
+        let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
 
-    if let Some(b) = model.database_binding {
-        bindings.insert(b);
-    }
-    for kv in &model.kv_fields {
-        if included(kv.field.name.as_ref()) {
-            bindings.insert(kv.binding);
+        if let Some(b) = model.backing.as_ref() {
+            // Ignore Durable Object bindings as the context for them is injected separately
+            if !do_bindings.contains(b.binding) {
+                bindings.insert(b.binding);
+            }
         }
-    }
-    for r2 in &model.r2_fields {
-        if included(r2.field.name.as_ref()) {
-            bindings.insert(r2.binding);
+
+        for kv in &model.kv_fields {
+            if included(kv.field.name.as_ref()) {
+                bindings.insert(kv.binding);
+            }
         }
-    }
-    for nav in &model.navigation_fields {
-        let subtree = match include {
-            Some(t) => match t.0.get(nav.field.name.as_ref()) {
-                Some(sub) => Some(sub),
-                None => continue,
-            },
-            None => None,
-        };
-        if let Some(referenced) = idl.models.get(nav.model_reference) {
-            collect_model_bindings(idl, referenced, subtree, visited, bindings);
+        for r2 in &model.r2_fields {
+            if included(r2.field.name.as_ref()) {
+                bindings.insert(r2.binding);
+            }
+        }
+        for nav in &model.navigation_fields {
+            let subtree = match include {
+                Some(t) => match t.0.get(nav.field.name.as_ref()) {
+                    Some(sub) => Some(sub),
+                    None => continue,
+                },
+                None => None,
+            };
+            if let Some(referenced) = idl.models.get(nav.model_reference) {
+                collect_model_bindings(idl, referenced, subtree, visited, bindings, do_bindings);
+            }
         }
     }
 }

@@ -1,10 +1,14 @@
 {
-  "hash": 586114424312205097,
+  "hash": 8633793898084098255,
   "models": {
     "BlobHaver": {
-      "hash": 560041510452854967,
+      "hash": 8487640514228991993,
       "name": "BlobHaver",
-      "database_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,

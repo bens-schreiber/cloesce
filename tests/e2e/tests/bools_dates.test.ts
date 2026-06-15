@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { startWrangler, expectHttpResult } from "../src/setup";
 import { Weather } from "../fixtures/bools_dates/client";
 import config from "../fixtures/bools_dates/cloesce.jsonc" with { type: "jsonc" };
 
@@ -20,7 +20,7 @@ describe("Bools, Dates", () => {
       isRaining: true,
       date,
     });
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expectHttpResult(res, "POST should be OK");
     expect(res.data).toEqual({
       id: 1,
       isRaining: true,
@@ -30,20 +30,20 @@ describe("Bools, Dates", () => {
 
   it("Returns 2026 date", async () => {
     const res = await Weather.getCurrentDate();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toEqual(new Date("2026-01-01T00:00:00.000Z"));
   });
 
   it("Returns true for isItRainingSomewhere", async () => {
     const res = await Weather.isItRainingSomewhere();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toBe(true);
   });
 
   it("Echoes bools and dates properly", async () => {
     const date = new Date("2020-01-01");
     const res = await Weather.echo(date, true);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data).toEqual({
       id: 1,
       isRaining: true,

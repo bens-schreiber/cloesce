@@ -6,13 +6,14 @@ edition = "2024"
 idl = { path = "../idl" }
 indexmap = { workspace = true }
 sea-query = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 sqlformat = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
 indexmap = { workspace = true }
-serde_json = { workspace = true }
 sqlx = { workspace = true }
 
 

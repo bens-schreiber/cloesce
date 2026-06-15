@@ -629,3 +629,70 @@ fn api_method_defaults_to_default_data_source() {
     let create = item.apis.iter().find(|m| m.name == "create").unwrap();
     assert_eq!(create.data_source, None);
 }
+
+#[test]
+fn default_data_source_durable_sqlite() {
+    let idl = src_to_idl(
+        r#"
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+            }
+
+            topCache() -> json {
+                "top"
+            }
+        }
+
+        [crud get, list, save]
+        model LeaderboardEntry for LeaderboardDo(tenantId) {
+            primary {
+                id: int
+            }
+
+            column {
+                playerName: string
+                score: int
+            }
+
+            kv LeaderboardDo::topCache {
+                top
+            }
+        }
+    "#,
+    );
+
+    let entry = idl.models.get("LeaderboardEntry").unwrap();
+    let ds = entry.default_data_source().expect("default data source");
+
+    // SQL queries are generated like a D1 model's, keyed on the primary key.
+    assert!(!ds.include_query.is_empty());
+    assert!(ds.get_query.contains(r#""LeaderboardEntry"."id" = ?1"#));
+    assert!(ds.list_query.contains("ORDER BY"));
+
+    // Every method takes the shard fields first to locate the DO instance.
+    let get_params: Vec<&str> = ds
+        .get
+        .parameters
+        .iter()
+        .map(|p| p.parameter.name.as_ref())
+        .collect();
+    assert_eq!(get_params, vec!["tenantId", "id"]);
+
+    let list_params: Vec<&str> = ds.list.parameters.iter().map(|p| p.name.as_ref()).collect();
+    assert_eq!(list_params, vec!["tenantId", "lastSeen_id", "limit"]);
+
+    let save_params: Vec<&str> = ds.save.parameters.iter().map(|p| p.name.as_ref()).collect();
+    assert_eq!(save_params, vec!["tenantId", "model"]);
+
+    // All methods run inside the DO.
+    for injected in [&ds.get.injected, &ds.list.injected, &ds.save.injected] {
+        assert!(injected.contains(&idl::CONTEXT_INJECT_KEY));
+    }
+
+    // CRUD routes carry the durable target for Worker-to-DO forwarding.
+    let get_api = entry.apis.iter().find(|a| a.name == "$get").unwrap();
+    let target = get_api.durable_target.as_ref().expect("durable target");
+    assert_eq!(target.binding, "LeaderboardDo");
+    assert_eq!(target.shard_args, vec!["tenantId"]);
+}

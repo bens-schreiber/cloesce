@@ -10,8 +10,8 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, Keyword, PlainOldObjectBlock, Span, Spd,
-    Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, DurableInitializer, InjectBlock, InjectEntry, Keyword,
+    PlainOldObjectBlock, Span, Spd, Symbol, Tag,
 };
 
 /// Converts a [Keyword] to a `just` [Token] parser
@@ -100,6 +100,7 @@ fn parser<'tokens, 'src: 'tokens>()
         env::d1_binding_block().map_spanned(|b| b),
         env::kv_binding_block().map_spanned(|b| b),
         env::r2_binding_block().map_spanned(|b| b),
+        env::durable_binding_block().map_spanned(|b| b),
         env::vars_block().map_spanned(|b| b),
         api::api_block().map_spanned(|b| b),
         poo_block().map_spanned(|b| b),
@@ -197,17 +198,34 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|kinds| Tag::Crud { kinds });
 
-    // [inject binding1, binding2, ...]
+    // [inject binding1, DurableDo(arg1, arg2), GlobalDo(), ...]
+    //
+    // An entry with parenthesis instantiates a Durable Object context;
+    // one without injects the binding namespace itself.
+    let inject_entry = symbol()
+        .then(
+            symbol()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LParen), just(Token::RParen))
+                .or_not(),
+        )
+        .map(|(symbol, args)| match args {
+            Some(args) => InjectEntry::Context(DurableInitializer { symbol, args }),
+            None => InjectEntry::Binding(symbol),
+        });
+
     let inject_tag = just(Token::LBracket)
         .then(kw!(Inject))
         .ignore_then(
-            symbol()
+            inject_entry
                 .separated_by(just(Token::Comma))
                 .allow_trailing()
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map(|bindings| Tag::Inject { bindings });
+        .map(|entries| Tag::Inject { entries });
 
     // [internal]
     let internal_tag = just(Token::LBracket)

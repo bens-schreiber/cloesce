@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, Keyword, ModelBlock, ModelBlockKind, NavAdj,
-    Spd, SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, InjectEntry, Keyword, ModelBlock,
+    ModelBlockKind, NavAdj, Spd, SqlBlockKind, Symbol, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -141,6 +141,161 @@ fn top_level_bindings() {
             ("enabled", &CidlType::Boolean)
         ]
     )
+}
+
+#[test]
+fn durable_binding_block() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        durable LeaderboardDo {
+            shard {
+                [gt 0]
+                tenantId: int
+                region: string
+            }
+
+            topEntryCache() -> json {
+                "top"
+            }
+
+            topEntryCacheWithDate(date: string) -> json {
+                "top/{date}"
+            }
+        }
+
+        durable GlobalDo {
+            config() -> json {
+                "config"
+            }
+        }
+        "#,
+    );
+
+    let durables = ast
+        .blocks
+        .iter()
+        .filter_map(|spd| match &spd.inner {
+            AstBlockKind::DurableBinding(b) => Some(b),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(durables.len(), 2);
+
+    // Sharded DO
+    let leaderboard = durables
+        .iter()
+        .find(|b| b.symbol.name == "LeaderboardDo")
+        .expect("LeaderboardDo to be present");
+
+    assert_eq!(leaderboard.shard_blocks.len(), 1);
+    let shard_fields = &leaderboard.shard_blocks[0].inner.fields;
+    assert_eq!(shard_fields.len(), 2);
+    let tenant = &shard_fields[0];
+    assert_eq!(tenant.name, "tenantId");
+    assert_eq!(tenant.cidl_type, CidlType::Int);
+    assert!(
+        tenant.tags.iter().any(|t| matches!(
+            &t.inner,
+            Tag::Validator {
+                name: Keyword::GreaterThan,
+                argument: ArgumentLiteral::Int("0"),
+            }
+        )),
+        "tenantId should carry a [gt 0] validator tag"
+    );
+    let region = &shard_fields[1];
+    assert_eq!(region.name, "region");
+    assert_eq!(region.cidl_type, CidlType::String);
+
+    assert_eq!(leaderboard.templates.len(), 2);
+    let cache = &leaderboard.templates[0].inner;
+    assert_eq!(cache.symbol.name, "topEntryCache");
+    assert_eq!(cache.symbol.cidl_type, CidlType::Json);
+    assert_eq!(cache.key_format, "top");
+    assert!(cache.params.is_empty());
+
+    let cache_with_date = &leaderboard.templates[1].inner;
+    assert_eq!(cache_with_date.symbol.name, "topEntryCacheWithDate");
+    assert_eq!(cache_with_date.key_format, "top/{date}");
+    assert_eq!(cache_with_date.params.len(), 1);
+    assert_eq!(cache_with_date.params[0].name, "date");
+    assert_eq!(cache_with_date.params[0].cidl_type, CidlType::String);
+
+    // Global DO (no shard block)
+    let global = durables
+        .iter()
+        .find(|b| b.symbol.name == "GlobalDo")
+        .expect("GlobalDo to be present");
+    assert!(global.shard_blocks.is_empty());
+    assert_eq!(global.templates.len(), 1);
+    assert_eq!(global.templates[0].inner.symbol.name, "config");
+}
+
+#[test]
+fn model_durable_backing() {
+    let ast = lex_and_ast(
+        r#"
+        model Leaderboard for LeaderboardDo(tenantId, region) {
+            kv LeaderboardDo::topEntryCache {
+                top
+            }
+
+            kv LeaderboardDo::topEntryCacheWithDate(date) {
+                topWithDate
+            }
+        }
+
+        model Global for GlobalDo {}
+        "#,
+    );
+
+    let leaderboard = find_model(&ast, "Leaderboard");
+    assert_eq!(
+        leaderboard.database_binding.as_ref().map(|s| s.name),
+        Some("LeaderboardDo")
+    );
+    let shard_args = leaderboard
+        .shard_args
+        .as_ref()
+        .expect("Leaderboard to carry shard args");
+    assert_eq!(
+        shard_args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["tenantId", "region"]
+    );
+
+    let top_entry_cache = leaderboard
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) => Some(kv),
+            _ => None,
+        })
+        .expect("Leaderboard to have a kv field");
+    assert_eq!(top_entry_cache.binding.name, "LeaderboardDo");
+    assert_eq!(top_entry_cache.binding_template.name, "topEntryCache");
+    assert!(top_entry_cache.args.is_empty());
+    assert_eq!(top_entry_cache.field.name, "top");
+
+    let top_entry_cache_with_date = leaderboard
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) if kv.binding_template.name == "topEntryCacheWithDate" => {
+                Some(kv)
+            }
+            _ => None,
+        })
+        .expect("Leaderboard to have a topEntryCacheWithDate kv field");
+    assert_eq!(top_entry_cache_with_date.binding.name, "LeaderboardDo");
+    assert_eq!(top_entry_cache_with_date.args.len(), 1,);
+
+    let global = find_model(&ast, "Global");
+    assert_eq!(
+        global.database_binding.as_ref().map(|s| s.name),
+        Some("GlobalDo")
+    );
+    assert!(global.shard_args.is_none());
 }
 
 #[test]
@@ -361,6 +516,69 @@ fn api_block() {
         .find(|m| m.inner.symbol.name == "listItems")
         .unwrap();
     assert!(matches!(list.inner.http_verb, HttpVerb::Get));
+}
+
+#[test]
+fn api_context_tag() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        model Leaderboard {}
+
+        api Leaderboard {
+            [inject LeaderboardDo(tenantId)]
+            get topScores(tenantId: int) -> array<string>
+
+            [inject GlobalDo()]
+            get config() -> json
+        }
+        "#,
+    );
+
+    // Assert
+    let api = ast
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::Api(a) if a.symbol.name == "Leaderboard" => Some(a),
+            _ => None,
+        })
+        .expect("Leaderboard api block");
+
+    let context_of = |method: &str| -> (String, Vec<String>) {
+        let m = api
+            .methods
+            .iter()
+            .find(|m| m.inner.symbol.name == method)
+            .unwrap();
+        m.inner
+            .symbol
+            .tags
+            .iter()
+            .find_map(|t| match &t.inner {
+                Tag::Inject { entries } => entries.iter().find_map(|entry| match entry {
+                    InjectEntry::Context(initializer) => Some((
+                        initializer.symbol.name.to_string(),
+                        initializer
+                            .args
+                            .iter()
+                            .map(|a| a.name.to_string())
+                            .collect(),
+                    )),
+                    InjectEntry::Binding(_) => None,
+                }),
+                _ => None,
+            })
+            .expect("context entry")
+    };
+
+    let (sharded_do, sharded_args) = context_of("topScores");
+    assert_eq!(sharded_do, "LeaderboardDo");
+    assert_eq!(sharded_args, vec!["tenantId"]);
+
+    let (global_do, global_args) = context_of("config");
+    assert_eq!(global_do, "GlobalDo");
+    assert!(global_args.is_empty());
 }
 
 #[test]

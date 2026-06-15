@@ -1153,6 +1153,7 @@ dependencies = [
  "idl",
  "indexmap",
  "sea-query",
+ "serde",
  "serde_json",
  "sqlformat",
  "sqlx",

@@ -73,6 +73,17 @@ export interface R2Field {
 
 export type MediaType = "Json" | "Octet";
 
+/**
+ * Durable Object context is implicitly injected to API methods under
+ * this key.
+ */
+export const CONTEXT_INJECT_KEY = "ctx";
+
+export interface DurableTarget {
+  binding: string;
+  shard_args: string[];
+}
+
 export interface ApiMethod {
   name: string;
   is_static: boolean;
@@ -83,11 +94,20 @@ export interface ApiMethod {
   parameters: ValidatedField[];
   data_source: string | null;
   injected: string[];
+  durable_target?: DurableTarget | null;
+}
+
+export type BackingKind = "D1" | "DurableObject";
+
+export interface ModelBacking {
+  binding: string;
+  fields: string[];
+  kind: BackingKind;
 }
 
 export interface Model {
   name: string;
-  database_binding: string | null;
+  backing?: ModelBacking | null;
   primary_columns: Column[];
   columns: Column[];
   navigation_fields: NavigationField[];
@@ -97,6 +117,14 @@ export interface Model {
   apis: ApiMethod[];
   cruds: CrudKind[];
   data_sources: Record<string, DataSource>;
+}
+
+export function isDurableBacked(model: Model): boolean {
+  return model.backing?.kind === "DurableObject";
+}
+
+export function isD1Backed(model: Model): boolean {
+  return model.backing?.kind === "D1";
 }
 
 export interface PlainOldObject {
@@ -141,6 +169,7 @@ export interface WranglerEnv {
   d1_bindings: string[];
   kv_bindings: unknown[];
   r2_bindings: unknown[];
+  durable_bindings: unknown[];
   vars: Field[];
 }
 

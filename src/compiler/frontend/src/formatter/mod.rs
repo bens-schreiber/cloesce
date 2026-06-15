@@ -21,10 +21,11 @@ use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
-    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, ForeignBlock, InjectBlock, Keyword,
-    KvBindingBlock, KvBindingTemplate, KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock,
-    ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd,
-    SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
+    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock,
+    ForeignBlock, InjectBlock, InjectEntry, Keyword, KvBindingBlock, KvBindingTemplate,
+    KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock, ParsedIncludeTree,
+    PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind,
+    Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
 use doc::{Doc, render};
 
@@ -264,6 +265,8 @@ impl<'src> FmtCtx<'src> {
         indent: usize,
         inline: bool,
     ) -> Doc<'src> {
+        let is_top_decl = keyword.is_some();
+
         // Tags
         let mut tags_doc = Doc::nil();
         for (idx, tag) in sym.tags.iter().enumerate() {
@@ -273,7 +276,9 @@ impl<'src> FmtCtx<'src> {
             self.node_ends.borrow_mut().pop();
             let tag_trailing = self.trailing_comment(tag.span.end);
             self.advance(tag.span.end);
-            let tag_sep = if tag_has_leading {
+            // The first tag of a nested field needs a hardline to break it onto its own
+            // line below the opening brace, unless a leading comment already supplies one.
+            let tag_sep = if tag_has_leading || (idx == 0 && !is_top_decl && !inline) {
                 Doc::hardline(indent)
             } else {
                 Doc::nil()
@@ -298,7 +303,6 @@ impl<'src> FmtCtx<'src> {
                 .then(post_sep);
         }
 
-        let is_top_decl = keyword.is_some();
         let (leading, has_leading_comments) = self.leading_comments(sym.span.start, indent);
         let content = if matches!(sym.cidl_type, CidlType::Void) {
             keyword.map_or_else(
@@ -404,6 +408,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
             AstBlockKind::D1Binding(b) => b.to_doc(ctx),
             AstBlockKind::KvBinding(b) => b.to_doc(ctx),
             AstBlockKind::R2Binding(b) => b.to_doc(ctx),
+            AstBlockKind::DurableBinding(b) => b.to_doc(ctx),
             AstBlockKind::Vars(b) => b.to_doc(ctx),
             AstBlockKind::Inject(b) => b.to_doc(ctx),
         }
@@ -420,6 +425,13 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
                 .then(Doc::kw(Keyword::For))
                 .then(Doc::text(" "))
                 .then(ctx.sym_doc(binding, 0, true));
+
+            if let Some(shard_args) = &self.shard_args {
+                doc = doc
+                    .then(Doc::text("("))
+                    .then(comma_separated(shard_args, |sym| ctx.sym_doc(sym, 0, true)))
+                    .then(Doc::text(")"));
+            }
         }
 
         if self.blocks.is_empty() {
@@ -460,9 +472,20 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
                 .then(Doc::text(" "))
                 .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
-            Tag::Inject { bindings: symbols } => Doc::kw(Keyword::Inject)
-                .then(Doc::text(" "))
-                .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
+            Tag::Inject { entries } => {
+                Doc::kw(Keyword::Inject)
+                    .then(Doc::text(" "))
+                    .then(comma_separated(entries, |entry| match entry {
+                        InjectEntry::Binding(sym) => ctx.sym_doc(sym, 0, true),
+                        InjectEntry::Context(initializer) => ctx
+                            .sym_doc(&initializer.symbol, 0, true)
+                            .then(Doc::text("("))
+                            .then(comma_separated(&initializer.args, |arg| {
+                                ctx.sym_doc(arg, 0, true)
+                            }))
+                            .then(Doc::text(")")),
+                    }))
+            }
         };
 
         Doc::text("[").then(inner).then(Doc::text("]"))
@@ -849,6 +872,40 @@ impl<'src> ToDoc<'src> for R2BindingBlock<'src> {
             inner = inner.then(ctx.spd_doc(spd, 1, false));
         }
         doc.then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for DurableBindingBlock<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let doc = ctx.top_decl_doc(&self.symbol, Keyword::Durable);
+        if self.shard_blocks.is_empty() && self.templates.is_empty() {
+            return doc.then(Doc::text(" {}"));
+        }
+
+        let mut inner = Doc::nil();
+
+        for spd in &self.shard_blocks {
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
+        }
+
+        for spd in &self.templates {
+            inner = inner.then(ctx.spd_doc(spd, 1, false));
+        }
+
+        doc.then(ctx.block(inner, 1))
+    }
+}
+
+impl<'src> ToDoc<'src> for DurableShardBlock<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        if self.fields.is_empty() {
+            return Doc::kw(Keyword::Shard).then(Doc::text(" {}"));
+        }
+        let mut shard_inner = Doc::nil();
+        for field in &self.fields {
+            shard_inner = shard_inner.then(ctx.sym_doc(field, 2, false));
+        }
+        Doc::kw(Keyword::Shard).then(ctx.block(shard_inner, 2))
     }
 }
 

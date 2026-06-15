@@ -1,4 +1,4 @@
-use idl::{CidlType, CloesceIdl, IncludeTree, MediaType};
+use idl::{ApiMethod, CidlType, CloesceIdl, IncludeTree, MediaType};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
@@ -6,6 +6,13 @@ pub trait LanguageTypeMapper {
 
     /// Maps a [MediaType] to a type in the target language
     fn media_type(&self, ty: &MediaType) -> String;
+
+    /// The type an injected `name` resolves to in a method's `env`.
+    fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String;
+
+    /// Like [Self::inject_type], but resolves [idl::CONTEXT_INJECT_KEY] to the
+    /// method's Durable Object instance type.
+    fn api_injected_type(&self, idl: &CloesceIdl, api: &ApiMethod, name: &str) -> String;
 
     /// Converts a format string to the target languages string interpolation syntax,
     /// using the provided parameter names to identify placeholders.
@@ -17,6 +24,8 @@ pub trait LanguageTypeMapper {
 
     /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
+
+    fn escape_string(&self, s: &str) -> String;
 }
 
 pub enum TypeScriptMapperKind {
@@ -88,6 +97,27 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
+    fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String {
+        // An `inject {}` symbol injects that class; everything else is a Wrangler
+        // `Env` binding.
+        if idl.injects.contains(&name) {
+            name.to_string()
+        } else {
+            format!("Env[\"{name}\"]")
+        }
+    }
+
+    fn api_injected_type(&self, idl: &CloesceIdl, api: &ApiMethod, name: &str) -> String {
+        if name == idl::CONTEXT_INJECT_KEY {
+            return api
+                .durable_target
+                .as_ref()
+                .map(|t| t.binding.to_string())
+                .unwrap();
+        }
+        self.inject_type(idl, name)
+    }
+
     fn interpolate_format<'src>(
         &self,
         format: &str,
@@ -101,5 +131,11 @@ impl LanguageTypeMapper for TypeScriptMapper {
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
         serde_json::to_string(&tree).unwrap()
+    }
+
+    fn escape_string(&self, s: &str) -> String {
+        s.replace('\\', "\\\\")
+            .replace('`', "\\`")
+            .replace("${", "\\${")
     }
 }

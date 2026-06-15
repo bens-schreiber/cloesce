@@ -1,16 +1,22 @@
 {
-  "hash": 6288574505062725002,
+  "hash": 4837763849636801285,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "Course": {
-      "hash": 3886618121582101491,
+      "hash": 15350045299932412082,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Course",
       "primary_columns": [
         {
@@ -64,7 +70,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get",
@@ -87,7 +92,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -123,7 +129,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -150,7 +157,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -226,7 +234,12 @@
       ]
     },
     "Student": {
-      "hash": 9911641945952268111,
+      "hash": 509565385708070536,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Student",
       "primary_columns": [
         {
@@ -292,7 +305,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get_CoursesOrderedDescending",
@@ -320,7 +332,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -348,7 +361,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list_CoursesOrderedDescending",
@@ -383,7 +397,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -424,7 +439,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_CoursesOrderedDescending",
@@ -451,7 +467,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -478,7 +495,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -638,7 +656,12 @@
       ]
     },
     "StudentCourse": {
-      "hash": 5636406891270849129,
+      "hash": 14843247351436001423,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "StudentCourse",
       "primary_columns": [
         {
@@ -729,7 +752,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$get",
@@ -762,7 +784,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithStudentCourse",
@@ -795,7 +818,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -841,7 +865,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list_WithStudentCourse",
@@ -887,7 +912,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -914,7 +940,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithStudentCourse",
@@ -941,7 +968,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

@@ -1,16 +1,22 @@
 {
-  "hash": 14039577506740097549,
+  "hash": 3659956248672565578,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "A": {
-      "hash": 13694065073971378326,
+      "hash": 1303172740734510662,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "A",
       "primary_columns": [
         {
@@ -67,7 +73,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -94,7 +99,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "withoutB",
@@ -109,7 +115,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -136,7 +143,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithB",
@@ -163,7 +171,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithoutB",
@@ -190,7 +199,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -213,7 +223,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithB",
@@ -236,7 +247,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithoutB",
@@ -259,7 +271,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -462,7 +475,12 @@
       ]
     },
     "B": {
-      "hash": 5976713688952143785,
+      "hash": 10635246349852312340,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "B",
       "primary_columns": [
         {
@@ -504,7 +522,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -515,7 +532,8 @@
           "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -542,7 +560,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -565,7 +584,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -640,7 +660,12 @@
       ]
     },
     "Course": {
-      "hash": 7562159567723127520,
+      "hash": 12932233359836810835,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Course",
       "primary_columns": [
         {
@@ -682,7 +707,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "$save",
@@ -709,7 +733,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -783,7 +808,12 @@
       ]
     },
     "Person": {
-      "hash": 823242336505793948,
+      "hash": 10142848541173516075,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Person",
       "primary_columns": [
         {
@@ -825,7 +855,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -852,7 +881,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "withoutDogs",
@@ -867,7 +897,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -894,7 +925,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithDogs",
@@ -921,7 +953,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithoutDogs",
@@ -948,7 +981,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -971,7 +1005,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithDogs",
@@ -994,7 +1029,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithoutDogs",
@@ -1017,7 +1053,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -1220,7 +1257,12 @@
       ]
     },
     "Student": {
-      "hash": 5262831485580231479,
+      "hash": 5337292872625529486,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Student",
       "primary_columns": [
         {
@@ -1262,7 +1304,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -1289,7 +1330,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "none",
@@ -1304,7 +1346,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -1331,7 +1374,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_None",
@@ -1358,7 +1402,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_WithCoursesStudentsCourses",
@@ -1385,7 +1430,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -1408,7 +1454,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_None",
@@ -1431,7 +1478,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_WithCoursesStudentsCourses",
@@ -1454,7 +1502,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -1657,7 +1706,12 @@
       ]
     },
     "Dog": {
-      "hash": 8677285544175970002,
+      "hash": 6550663264689982777,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Dog",
       "primary_columns": [
         {
@@ -1712,7 +1766,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "testMethod",
@@ -1723,7 +1776,8 @@
           "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -1750,7 +1804,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -1824,7 +1879,12 @@
       ]
     },
     "CourseStudent": {
-      "hash": 514777369792557541,
+      "hash": 6047280902844329700,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "CourseStudent",
       "primary_columns": [
         {
@@ -1900,7 +1960,6 @@
         }
       ],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [],
       "data_sources": {
         "Default": {

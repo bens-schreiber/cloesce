@@ -21,8 +21,8 @@
 
 use frontend::{
     ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock,
-    DataSourceBlock, InjectBlock, KvBindingBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock,
-    Spd, SpdSlice, Symbol, Tag, VarsBlock,
+    DataSourceBlock, DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, ModelBlock,
+    PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, VarsBlock,
 };
 use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
@@ -176,6 +176,10 @@ enum LocalSymbolKind<'src> {
         template: &'src str,
         name: &'src str,
     },
+    ShardField {
+        binding: &'src str,
+        name: &'src str,
+    },
     ModelField {
         model: &'src str,
         name: &'src str,
@@ -212,6 +216,7 @@ struct SymbolTable<'src, 'p> {
     d1_bindings: Vec<&'p D1BindingBlock<'src>>,
     kv_bindings: BTreeMap<&'src str, &'p KvBindingBlock<'src>>,
     r2_bindings: BTreeMap<&'src str, &'p R2BindingBlock<'src>>,
+    durable_bindings: BTreeMap<&'src str, &'p DurableBindingBlock<'src>>,
     vars_blocks: Vec<&'p VarsBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
@@ -266,6 +271,17 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             LocalSymbolKind::ModelField {
                                 model: model_block.symbol.name,
                                 name: symbol.name,
+                            },
+                        );
+                    }
+
+                    for arg in model_block.shard_args.iter().flatten() {
+                        insert_local(
+                            sink,
+                            arg,
+                            LocalSymbolKind::ModelField {
+                                model: model_block.symbol.name,
+                                name: arg.name,
                             },
                         );
                     }
@@ -384,6 +400,45 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 AstBlockKind::R2Binding(block) => {
                     if insert_global(sink, &block.symbol) {
                         st.r2_bindings.insert(block.symbol.name, block);
+
+                        for field in block.templates.inners() {
+                            insert_local(
+                                sink,
+                                &field.symbol,
+                                LocalSymbolKind::BindingTemplate {
+                                    binding: block.symbol.name,
+                                    name: field.symbol.name,
+                                },
+                            );
+
+                            for param in &field.params {
+                                insert_local(
+                                    sink,
+                                    param,
+                                    LocalSymbolKind::BindingTemplateParam {
+                                        binding: block.symbol.name,
+                                        template: field.symbol.name,
+                                        name: param.name,
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
+                AstBlockKind::DurableBinding(block) => {
+                    if insert_global(sink, &block.symbol) {
+                        st.durable_bindings.insert(block.symbol.name, block);
+
+                        for field in block.shard_blocks.inners().flat_map(|s| &s.fields) {
+                            insert_local(
+                                sink,
+                                field,
+                                LocalSymbolKind::ShardField {
+                                    binding: block.symbol.name,
+                                    name: field.name,
+                                },
+                            );
+                        }
 
                         for field in block.templates.inners() {
                             insert_local(
@@ -641,9 +696,11 @@ fn resolve_validator_tags<'src, 'p>(
 /// Resolves the `[inject ...]` tags on a method's symbol into a deduplicated list of binding names.
 ///
 /// Each binding name must resolve to one of:
-/// - an env binding (D1 / KV / R2),
+/// - an env binding (D1 / KV / R2 / Durable Object),
 /// - an env var,
 /// - an `inject { ... }` block symbol.
+///
+/// Context entries (`Do(args)`) are skipped here; they are resolved separately.
 fn resolve_injects<'src, 'p>(
     method: &'p Symbol<'src>,
     table: &SymbolTable<'src, 'p>,
@@ -652,7 +709,7 @@ fn resolve_injects<'src, 'p>(
     let mut injected: Vec<&'src str> = Vec::new();
 
     for tag in &method.tags {
-        let Tag::Inject { bindings } = &tag.inner else {
+        let Tag::Inject { entries } = &tag.inner else {
             sink.push(SemanticError::TagInvalidInContext {
                 tag,
                 symbol: method,
@@ -660,7 +717,10 @@ fn resolve_injects<'src, 'p>(
             continue;
         };
 
-        for binding in bindings {
+        for entry in entries {
+            let InjectEntry::Binding(binding) = entry else {
+                continue;
+            };
             let name = binding.name;
 
             let is_d1 = table
@@ -670,6 +730,7 @@ fn resolve_injects<'src, 'p>(
                 .any(|s| s.name == name);
             let is_kv = table.kv_bindings.contains_key(name);
             let is_r2 = table.r2_bindings.contains_key(name);
+            let is_durable = table.durable_bindings.contains_key(name);
             let is_env_var = table
                 .vars_blocks
                 .iter()
@@ -682,7 +743,7 @@ fn resolve_injects<'src, 'p>(
                 .flat_map(|i| i.symbols.iter())
                 .any(|s| s.name == name);
 
-            if !is_d1 && !is_kv && !is_r2 && !is_env_var && !is_inject_block_symbol {
+            if !is_d1 && !is_kv && !is_r2 && !is_durable && !is_env_var && !is_inject_block_symbol {
                 sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
                 continue;
             }

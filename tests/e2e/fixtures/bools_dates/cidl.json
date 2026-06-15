@@ -1,16 +1,22 @@
 {
-  "hash": 14113549040013838164,
+  "hash": 7884496493624852865,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "Weather": {
-      "hash": 10306382131681195126,
+      "hash": 13409753493227586003,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Weather",
       "primary_columns": [
         {
@@ -53,7 +59,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "isItRainingSomewhere",
@@ -64,7 +69,8 @@
           "return_type": "Boolean",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "getCurrentDate",
@@ -75,7 +81,8 @@
           "return_type": "DateIso",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "echo",
@@ -101,7 +108,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -128,7 +136,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -151,7 +160,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cloesce Reddit</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1b; }
+        a { color: #0079d3; cursor: pointer; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #ccc; padding-bottom: .5rem; }
+        .card { border: 1px solid #ccc; border-radius: 6px; padding: .75rem; margin: .5rem 0; }
+        .muted { color: #787c7e; font-size: .85rem; }
+        input, textarea { display: block; width: 100%; box-sizing: border-box; margin: 4px 0; padding: 6px; }
+        button { padding: 4px 10px; cursor: pointer; }
+        .vote { cursor: pointer; user-select: none; padding: 0 .3rem; }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h2 style="margin:0"><a onclick="go('')">🗨️ Cloesce Reddit</a></h2>
+        <span id="user"></span>
+    </header>
+    <main id="app"></main>
+    <script type="module" src="index.ts"></script>
+</body>
+
+</html>

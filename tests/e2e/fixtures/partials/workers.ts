@@ -13,8 +13,8 @@ export const DogImpl = Dog.impl({
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
+    const app = cloesce(env);
     app.register(DogImpl);
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

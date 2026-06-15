@@ -1,4 +1,4 @@
-import { startWrangler, withRes } from "../src/setup.js";
+import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { A, Person, Dog, Student, Course, CourseStudent, B } from "../fixtures/foreign_keys/client";
 import config from "../fixtures/foreign_keys/cloesce.jsonc" with { type: "jsonc" };
@@ -25,8 +25,8 @@ describe("POST and refresh A", () => {
   let b: B;
   it("POST A", async () => {
     const res = await A.create(a);
-    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-    expect(res.data!.id, withRes("POST id should match input", res)).toBe(a.id);
+    expectHttpResult(res, "POST should be OK");
+    expect(res.data!.id, `POST id should match input\n\n${JSON.stringify(res)}`).toBe(a.id);
     b = res.data!.b!;
   });
 
@@ -67,7 +67,7 @@ describe("POST and refresh Student", () => {
 
   it("POST Student", async () => {
     const res = await Student.create(student);
-    expect(res.ok, withRes("Expected POST to work", res)).toBe(true);
+    expectHttpResult(res, "Expected POST to work");
     expect(res.data!.courses.length).toBe(1);
 
     // student -> courses (junction) -> course -> students (junction) -> student -> courses (junction)

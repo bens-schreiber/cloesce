@@ -1,16 +1,22 @@
 {
-  "hash": 16093517306524961070,
+  "hash": 1485928650438980974,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "FailModel": {
-      "hash": 8168459232680355642,
+      "hash": 12056437209279385934,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "FailModel",
       "primary_columns": [
         {
@@ -42,7 +48,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "throwingMethod",
@@ -53,7 +58,8 @@
           "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "numericValidators",
@@ -118,7 +124,8 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "stringValidators",
@@ -166,7 +173,8 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -193,7 +201,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -216,7 +225,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -252,7 +262,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {
@@ -328,7 +339,8 @@
       ]
     },
     "UnregisteredService": {
-      "hash": 9964477462680799238,
+      "hash": 0,
+      "backing": null,
       "name": "UnregisteredService",
       "primary_columns": [],
       "columns": [],
@@ -336,7 +348,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": null,
       "apis": [
         {
           "name": "unregistered",
@@ -347,7 +358,8 @@
           "return_type": "String",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         }
       ],
       "data_sources": {},

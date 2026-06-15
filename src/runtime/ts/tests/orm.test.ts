@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
-import { ModelBuilder, createIdl } from "./builder";
+import { ModelBuilder, createIdl } from "./builder.js";
 import { _cloesceInternal } from "../src/router/router.js";
 import { hydrateType } from "../src/router/orm";
 import { Cidl } from "../src/cidl.js";
@@ -11,7 +11,37 @@ function createHydrateArgs() {
     idl: { models: {}, poos: {} } as Cidl,
     includeTree: null,
     env: {},
+    durable: null,
     promises: [],
+  };
+}
+
+function mockDurableContext() {
+  const store = new Map<string, any>();
+  const executed: { query: string; bindings: any[] }[] = [];
+  return {
+    store,
+    executed,
+    ctx: {
+      state: {
+        storage: {
+          sql: {
+            exec: (query: string, ...bindings: any[]) => {
+              executed.push({ query, bindings });
+              return { toArray: () => [] };
+            },
+          },
+          kv: {
+            get: (key: string) => store.get(key),
+            put: (key: string, value: any) => store.set(key, value),
+            list: (options?: { prefix?: string }) =>
+              [...store.entries()]
+                .filter(([key]) => key.startsWith(options?.prefix ?? ""))
+                .sort(([a], [b]) => a.localeCompare(b)),
+          },
+        },
+      },
+    },
   };
 }
 
@@ -361,6 +391,7 @@ describe("ORM Hydrate Tests", () => {
           idl,
           includeTree: {},
           env,
+          durable: null,
           promises,
         },
       );
@@ -400,6 +431,7 @@ describe("ORM Hydrate Tests", () => {
             emptyImage: {},
           },
           env,
+          durable: null,
           promises,
         },
       );
@@ -486,6 +518,7 @@ describe("ORM Hydrate Tests", () => {
         idl,
         includeTree: { configList: {} },
         env: { namespace1 },
+        durable: null,
         promises,
       },
     );
@@ -514,4 +547,74 @@ describe("ORM Hydrate Tests", () => {
       expect(firstPageKeys.has(key.name)).toBe(false);
     }
   }, 30000);
+
+  test("reads a Durable Object-backed model's KV field from the DO's own storage", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Leaderboard")
+      .durable("LeaderboardDo", ["tenantId"])
+      .kvField("score/{tenantId}", "LeaderboardDo", "score", "Int")
+      .build();
+
+    const idl = createIdl({ models: [modelMeta] });
+    const { ctx, store } = mockDurableContext();
+    store.set("score/7", 42);
+
+    // Act
+    const promises: Promise<CloesceResult<void>>[] = [];
+    const result = hydrateType(
+      { tenantId: 7 },
+      { Object: { name: "Leaderboard" } },
+      {
+        ...createHydrateArgs(),
+        idl,
+        includeTree: { score: {} },
+        durable: ctx,
+        promises,
+      },
+    );
+
+    await Promise.all(promises);
+
+    // Assert
+    expect(result.score.key).toBe("score/7");
+    expect(result.score.raw).toBe(42);
+  });
+
+  test("paginated Durable Object KV field prefix-scans the DO's SQL-backed storage", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Leaderboard")
+      .durable("LeaderboardDo", ["tenantId"])
+      .kvField("scores/{tenantId}", "LeaderboardDo", "scores", { Paginated: "Int" })
+      .build();
+
+    const idl = createIdl({ models: [modelMeta] });
+    const { ctx, store } = mockDurableContext();
+    store.set("scores/7/1", 10);
+    store.set("scores/7/2", 20);
+    store.set("scores/8/1", 99);
+
+    // Act
+    const promises: Promise<CloesceResult<void>>[] = [];
+    const result = hydrateType(
+      { tenantId: 7 },
+      { Object: { name: "Leaderboard" } },
+      {
+        ...createHydrateArgs(),
+        idl,
+        includeTree: { scores: {} },
+        durable: ctx,
+        promises,
+      },
+    );
+
+    await Promise.all(promises);
+
+    // Assert: only tenant 7's keys, as a complete page
+    expect(result.scores.complete).toBe(true);
+    expect(result.scores.cursor).toBeNull();
+    expect(result.scores.results).toEqual([
+      { key: "scores/7/1", raw: 10, metadata: null },
+      { key: "scores/7/2", raw: 20, metadata: null },
+    ]);
+  });
 });

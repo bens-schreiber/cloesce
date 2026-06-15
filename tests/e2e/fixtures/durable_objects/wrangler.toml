@@ -1,0 +1,22 @@
+compatibility_date = "2025-10-02"
+main = "workers.ts"
+name = "cloesce"
+
+[[durable_objects.bindings]]
+class_name = "GlobalDo"
+name = "GlobalDo"
+
+[[durable_objects.bindings]]
+class_name = "SubRedditDo"
+name = "SubRedditDo"
+
+[[kv_namespaces]]
+binding = "GlobalSubRedditMetadata"
+id = "replace_with_GlobalSubRedditMetadata_id"
+
+[[migrations]]
+new_sqlite_classes = [
+    "GlobalDo",
+    "SubRedditDo",
+]
+tag = "v1"

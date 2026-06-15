@@ -1,16 +1,22 @@
 {
-  "hash": 9157797229480452983,
+  "hash": 7348474206251052039,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 9423267146512996101,
+      "hash": 8590820119049858244,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "NullabilityChecks",
       "primary_columns": [
         {
@@ -55,7 +61,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "primitiveTypes",
@@ -83,7 +88,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "modelTypes",
@@ -112,7 +118,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "injectableTypes",
@@ -123,7 +130,8 @@
           "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "arrayTypes",
@@ -161,7 +169,8 @@
               "validators": []
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "httpResultTypes",
@@ -180,7 +189,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         }
       ],
       "data_sources": {

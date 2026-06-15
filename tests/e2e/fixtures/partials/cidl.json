@@ -1,16 +1,22 @@
 {
-  "hash": 5565231451096687504,
+  "hash": 11650565627070256166,
   "wrangler_env": {
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "Dog": {
-      "hash": 16625692680497709233,
+      "hash": 14499070401011722008,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Dog",
       "primary_columns": [
         {
@@ -53,7 +59,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "create",
@@ -80,7 +85,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "getPartialSelf",
@@ -95,7 +101,8 @@
           },
           "parameters_media": "Json",
           "parameters": [],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -122,7 +129,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

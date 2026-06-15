@@ -37,6 +37,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
 }
 
 /// `kv Binding::field(arg1, arg2, ...) { localField }`
+/// or `kv Binding::field { localField }`
 fn kv_field_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvFieldBlock<'src>, Extra<'tokens, 'src>> {
     kw!(Kv)
@@ -48,18 +49,20 @@ fn kv_field_block<'tokens, 'src: 'tokens>()
                 .separated_by(just(Token::Comma))
                 .allow_trailing()
                 .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)),
+                .delimited_by(just(Token::LParen), just(Token::RParen))
+                .or_not(),
         )
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|(((binding, binding_field), args), field)| KvFieldBlock {
             binding,
             binding_template: binding_field,
-            args,
+            args: args.unwrap_or_default(),
             field,
         })
 }
 
 /// `r2 Binding::field(arg1, arg2, ...) { localField }`
+/// or `r2 Binding::field { localField }`
 fn r2_field_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2FieldBlock<'src>, Extra<'tokens, 'src>> {
     kw!(R2)
@@ -176,10 +179,21 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     ))
     .boxed();
 
+    // `for Binding`
+    // or `for Binding(shard1, shard2, ...)`
+    let backing = kw!(For).ignore_then(symbol()).then(
+        symbol()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LParen), just(Token::RParen))
+            .or_not(),
+    );
+
     let model_body = tags()
         .then_ignore(kw!(Model))
         .then(symbol())
-        .then(kw!(For).ignore_then(symbol()).or_not())
+        .then(backing.or_not())
         .then(
             sub_blocks
                 .map_spanned(|k| k)
@@ -187,10 +201,17 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(((tags, symbol), database_binding), blocks)| ModelBlock {
-            symbol: Symbol { tags, ..symbol },
-            database_binding,
-            blocks,
+        .map(|(((tags, symbol), backing), blocks)| {
+            let (database_binding, shard_args) = match backing {
+                Some((binding, shard_args)) => (Some(binding), shard_args),
+                None => (None, None),
+            };
+            ModelBlock {
+                symbol: Symbol { tags, ..symbol },
+                database_binding,
+                shard_args,
+                blocks,
+            }
         });
 
     model_body.map_spanned(AstBlockKind::Model).boxed()

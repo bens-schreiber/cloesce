@@ -1,5 +1,5 @@
 {
-  "hash": 1454352641393335132,
+  "hash": 1140808481517411490,
   "wrangler_env": {
     "d1_bindings": [
       "db"
@@ -37,11 +37,17 @@
       }
     ],
     "r2_bindings": [],
+    "durable_bindings": [],
     "vars": []
   },
   "models": {
     "Validator": {
-      "hash": 1908438877902929966,
+      "hash": 58986984721463898,
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "name": "Validator",
       "primary_columns": [
         {
@@ -105,7 +111,6 @@
       "r2_fields": [],
       "navigation_fields": [],
       "route_fields": [],
-      "database_binding": "db",
       "apis": [
         {
           "name": "someMethod",
@@ -137,7 +142,8 @@
               ]
             }
           ],
-          "injected": []
+          "injected": [],
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -165,7 +171,8 @@
           "injected": [
             "db",
             "store"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$save_None",
@@ -192,7 +199,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -222,7 +230,8 @@
           "injected": [
             "db",
             "store"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$get_None",
@@ -251,7 +260,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -294,7 +304,8 @@
           "injected": [
             "db",
             "store"
-          ]
+          ],
+          "durable_target": null
         },
         {
           "name": "$list_None",
@@ -336,7 +347,8 @@
           ],
           "injected": [
             "db"
-          ]
+          ],
+          "durable_target": null
         }
       ],
       "data_sources": {

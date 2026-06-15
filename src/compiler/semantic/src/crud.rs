@@ -1,4 +1,7 @@
-use idl::{ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model};
+use idl::{
+    ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, DurableTarget, HttpVerb, MediaType,
+    Model,
+};
 
 pub struct CrudExpansion;
 impl CrudExpansion {
@@ -34,6 +37,16 @@ impl CrudExpansion {
             }
         };
 
+        // A DO-backed model's CRUD routes execute inside the DO, so they carry the DO
+        // target that the router forwards to. Located by the model's shard fields.
+        let durable_target = model.is_durable_backed().then(|| {
+            let backing = model.backing.as_ref().unwrap();
+            DurableTarget {
+                binding: backing.binding,
+                shard_args: backing.fields.clone(),
+            }
+        });
+
         match crud {
             CrudKind::Get => sources
                 .map(|ds| ApiMethod {
@@ -51,6 +64,7 @@ impl CrudExpansion {
                         .map(|p| p.parameter.clone())
                         .collect(),
                     injected: ds.get.injected.clone(),
+                    durable_target: durable_target.clone(),
                 })
                 .collect(),
             CrudKind::List => sources
@@ -64,6 +78,7 @@ impl CrudExpansion {
                     parameters_media: MediaType::Json,
                     parameters: ds.list.parameters.clone(),
                     injected: ds.list.injected.clone(),
+                    durable_target: durable_target.clone(),
                 })
                 .collect(),
             CrudKind::Save => sources
@@ -77,6 +92,7 @@ impl CrudExpansion {
                     parameters_media: MediaType::Json,
                     parameters: ds.save.parameters.clone(),
                     injected: ds.save.injected.clone(),
+                    durable_target: durable_target.clone(),
                 })
                 .collect(),
         }

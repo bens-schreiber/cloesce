@@ -40,9 +40,9 @@ const Course = clo.Course.impl({});
 
 export default {
   async fetch(request: Request, env: clo.Env): Promise<Response> {
-    const app = await clo.cloesce();
+    const app = clo.cloesce(env);
     app.register(A).register(B).register(Person).register(Dog).register(Student).register(Course);
 
-    return await app.run(request, env);
+    return await app.run(request);
   },
 };

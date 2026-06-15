@@ -2,9 +2,11 @@
   "compilerOptions": {
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": ["@cloudflare/workers-types", "node"],
+    "lib": ["ES2024"],
+    "skipLibCheck": true,
+    "target": "ES2024",
     "rootDir": "src",
-    "target": "ES2022",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
@@ -14,6 +16,6 @@
     "emitDeclarationOnly": false,
     "stripInternal": true
   },
-  "include": ["src", "tests"],
-  "exclude": ["tests/**/*.ts"]
+  "include": ["src"],
+  "exclude": ["tests", "dist"]
 }

@@ -119,6 +119,10 @@ export class CloesceError {
   }
 }
 
+declare const Buffer:
+  | { from(data: Uint8Array): { toString(encoding: string): string } }
+  | undefined;
+
 /** @internal */
 export function u8ToB64(u8: Uint8Array): string {
   // Prefer Buffer in Node.js environments

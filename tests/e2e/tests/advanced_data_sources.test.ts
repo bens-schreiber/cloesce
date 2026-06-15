@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, withRes } from "../src/setup";
+import { expectHttpResult, startWrangler } from "../src/setup";
 import { DefaultOverride, Hamburger, Topping } from "../fixtures/adv_ds/client";
 import config from "../fixtures/adv_ds/cloesce.jsonc" with { type: "jsonc" };
 
@@ -64,14 +64,14 @@ describe("Advanced Data Sources", () => {
   it("$list all hamburgers with default", async () => {
     const res = await Hamburger.$list(0, 100);
 
-    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
+    expectHttpResult(res, "$list should be OK");
     expect(res.data!.length).toBe(4);
   });
 
   it("$list hamburgers with BurgersWithLettuceOrdered data source", async () => {
     const res = await Hamburger.$list_BurgersWithLettuceOrdered(0, 100);
 
-    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
+    expectHttpResult(res, "$list should be OK");
     expect(res.data!.length).toBe(2);
     expect(res.data![0].id).toBe(burgers[0].id);
     expect(res.data![1].id).toBe(burgers[1].id);
@@ -79,25 +79,25 @@ describe("Advanced Data Sources", () => {
 
   it("`noLettuceToppings` should return only the toppings that arent LETTUCE", async () => {
     const res = await burgers[0].noLettuceToppings();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data!.length).toBe(1);
     expect(res.data![0].name).toBe("BACON");
   });
 
   it("`onlyBaconToppings` should return only the toppings that are BACON", async () => {
     const res = await burgers[0].onlyBaconToppings();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data!.length).toBe(1);
     expect(res.data![0].name).toBe("BACON");
   });
 
   it("DefaultOverrides default data source returns fixed values", async () => {
     const res = await DefaultOverride.$get();
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expectHttpResult(res, "GET should be OK");
     expect(res.data!.id).toBe(Number.MAX_VALUE);
 
     const listRes = await DefaultOverride.$list();
-    expect(listRes.ok, withRes("LIST should be OK", listRes)).toBe(true);
+    expectHttpResult(listRes, "LIST should be OK");
     expect(listRes.data!.length).toBe(1);
     expect(listRes.data![0].id).toBe(Number.MAX_VALUE);
   });
