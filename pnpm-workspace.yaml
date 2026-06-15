@@ -2,6 +2,7 @@ packages:
   - src/runtime/ts
   - tests/e2e
   - examples/weather
+  - examples/reddit
 allowBuilds:
   esbuild: true
   sharp: false
