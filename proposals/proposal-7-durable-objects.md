@@ -33,6 +33,7 @@ Durable Objects are easily the most powerful product on the Cloudflare Workers p
 
 ### Non-Goals
 
+- KV Backed Durable Objects
 - WebSocket RPC generation
 
 ---
@@ -49,8 +50,8 @@ durable LeaderboardDo {
         tenantId: int
     }
 
-    kv topEntryCache() -> array<LeaderboardEntry> {
-        "top"
+    kv topEntries() -> array<LeaderboardEntry> {
+        "topEntries"
     }
 }
 ```
@@ -74,11 +75,23 @@ where the order of the shard values is determined by the order of the shard fiel
 
 #### Storage Templates
 
-Just like with KV and R2 binding templates, a Durable Object binding can declare some storage templates to be fetched from the Durable Object's storage.
+Just like with KV and R2 binding templates, a Durable Object binding can declare templates to be fetched from the Durable Object's SQLite storage.
 
 These are declared as methods on the Durable Object binding, and they can be used in any Model **backed by that Durable Object** (Models with different backings CANNOT use these storage templates).
 
-Storage templates follow the same syntax as KV templates, even using the same `kv` keyword. Templates will **not** be able to use `shard` fields, because there is no real use case (storage is already inside that specific DO).
+DO templates follow the same syntax as KV templates, even using the same `kv` keyword. Templates will **not** be able to use `shard` fields implicitly, and can only use passed in parameters. For example, this is valid:
+
+```cloesce
+durable LeaderboardDo {
+    shard {
+        tenantId: int
+    }
+
+    kv topEntries(date: string) -> array<LeaderboardEntry> {
+        `top/${date}` // cannot use {tenantId} unless it is passed in as a parameter
+    }
+}
+```
 
 #### Shard Field Validators
 
@@ -97,7 +110,7 @@ These tags will be inherited by any Model that is backed by the Durable Object.
 
 ### Backing Models
 
-If a Model is "backed by" a Durable Object, it is capable of hydrating itself from that Durable Object's KV and SQLite storage.
+If a Model is "backed by" a Durable Object, it is capable of hydrating itself from that Durable Object's SQLite storage.
 
 For example:
 
@@ -107,19 +120,19 @@ durable LeaderboardDo {
         tenantId: int
     }
 
-    kv topEntryCache() -> array<LeaderboardEntry> {
-        "top"
+    kv topEntries -> array<LeaderboardEntry> {
+        "topEntries"
     }
 }
 
 model Leaderboard for LeaderboardDo(shard) {
-    kv LeaderboardDo::topEntryCache {
+    kv LeaderboardDo::topEntries {
         top
     }
 }
 ```
 
-Here, `Leaderboard` is backed by `LeaderboardDo`, and it is able to use the `topEntryCache` storage template declared on `LeaderboardDo` as a field.
+Here, `Leaderboard` is backed by `LeaderboardDo`, and it is able to use the `topEntries` storage template declared on `LeaderboardDo` as a field.
 
 In order to declare that a Model is backed by a Durable Object, the shard fields of that Durable Object must be bound to that Model. In the above case, `LeaderboardDo::tenantId` is bound to `Leaderboard::shard`. This means that whenever a `Leaderboard` instance is hydrated, it will use the value of `tenantId` from its shard to know which DO instance to hydrate from, aliased as `shard` in the Model.
 
