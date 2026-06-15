@@ -6,6 +6,10 @@
 - Binding templates for `kv` and `r2` allowing the declaration to list all key locations
 - New Worker backed models to replace `keyfield`
 - Allow D1 backed models to have a navigation property to a Worker backed model, but not the other way around.
+- Durable Object backed Models
+- Durable Object execution context injection into API methods
+- Durable Object Wrangler configuration generation
+- Durable Object Migration generation
 
 ### Changed
 
