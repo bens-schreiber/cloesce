@@ -1,9 +1,9 @@
 # Proposal: Durable Objects
 
 - **Author(s):** Ben Schreiber
-- **Status:** Draft | **Review** | Accepted | Rejected | Implemented
+- **Status:** Draft | Review | Accepted | Rejected | **Implemented**
 - **Created:** 2026-04-30
-- **Last Updated:** 2026-06-03
+- **Last Updated:** 2026-06-14
 
 ---
 
