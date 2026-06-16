@@ -1,20 +1,14 @@
 //! SQLite Migrations generator
 //!
-//! # Overview
-//!
-//! This module takes in a [MigrationsIdl], representing the current state of the world, and an optional
-//! second [MigrationsIdl] representing the last migrated (abbreviated as "lm") state. From these, it produces
+//! Uses a [MigrationsIdl] representing the current state of the world, and an optional
+//! second [MigrationsIdl] for the last migrated (abbreviated as "lm") state. From these, it produces
 //! a sequence of SQL statements that will migrate a database from the last migrated state to the new state.
-//!
-//! The main entry point is [MigrationsGenerator::migrate], which produces a new SQL schema from the given IDL pair.
-//! If no last migrated IDL is given, it produces a SQL schema from scratch. Otherwise, it identifies the differences
-//! between the two IDLs and produces a sequence of SQL statements to alter the last migrated schema into the new schema.
 //!
 //! ## [MigrationsIntent]
 //!
 //! Some migration scenarios require user intervention, such as when a model or column is dropped in the new IDL but could
 //! potentially be a rename. Because it is impossible to determine the intent from the IDLs alone, the generator poses a
-//! [MigrationsDilemma] to a provided [MigrationsIntent], which is a potentially blocking call to allow the user to respond
+//! [MigrationsDilemma] to a provided [MigrationsIntent], which is a blocking call to allow the user to respond
 //! with their intent.
 
 use std::{
@@ -32,9 +26,7 @@ use serde::{Deserialize, Serialize};
 
 mod fmt;
 
-/// A subset of [Model] suited for migrations.
-///
-/// Assumed that the tree is semantically valid.
+/// A subset of [idl::Model] suited for migrations.
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsModel<'src> {
     pub hash: u64,
@@ -64,7 +56,7 @@ impl<'src> MigrationsModel<'src> {
     }
 }
 
-/// A subset of [idl::CloesceIdl] suited for D1 migrations.
+/// A subset of [idl::CloesceIdl] suited for migrations
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsIdl<'src> {
     pub hash: u64,

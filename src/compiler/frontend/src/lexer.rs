@@ -1,17 +1,13 @@
 //! Converts source strings into a stream of tokens, emitting file and span information for each token.
 //!
-//! # Overview
-//!
-//! The main entry point is [CloesceLexer::lex], which takes in a list of [LexTarget]s and produces
-//! a [LexResult] containing the token stream for each file, along with any lexing errors and a [FileTable] for
-//! resolving file IDs to source strings and paths for error reporting.
-//!
 //! Each [Token] is either some kind of punctuation, a literal, or an identifier. The only reserved keywords in Cloesce
-//! are `self`, `ctx`, and `env`. The `$` character is intentionally excluded from identifiers since it is used for generated content in the codegen phase.
+//! are [Token::SelfToken], [Token::Ctx], and [Token::Env]. The `$` character is intentionally excluded from identifiers
+//! since it is used for  generated content in the codegen phase.
 //!
-//! All comments are extracted and stored in a [CommentMap] such that the parser does not need to handle them.
+//! All comments are extracted from the token stream and stored in a [CommentMap] such that the parser can be
+//! oblivious to them.
 //!
-//! TODO: Currently, the lexer is synchronous across all files, but could be parallelized in the future.
+//! TODO: The lexer is synchronous across all files and can be parallelized.
 
 use chumsky::span::{SimpleSpan, Spanned};
 use logos::Logos;
@@ -71,6 +67,7 @@ pub enum Token<'src> {
     #[regex(r"[0-9]+", |lex| lex.slice())]
     IntLit(&'src str),
 
+    // ex: /regex/
     #[regex(r"/[^/\n][^/\n]*/", |lex| {
         let s = lex.slice();
         &s[1..s.len()-1]
@@ -95,7 +92,8 @@ pub struct LexTarget<'src> {
     /// The full program source string.
     pub src: &'src str,
 
-    /// The file path of the source, used for error reporting. Safe to be a dummy value for tests.
+    /// The file path of the source, used for error reporting.
+    /// Safe to be a dummy value for tests.
     pub path: PathBuf,
 }
 
@@ -103,7 +101,8 @@ pub type Span = SimpleSpan<usize, FileId>;
 pub type SpannedToken<'src> = Spanned<Token<'src>, Span>;
 
 pub struct CommentMap<'src> {
-    /// Each entry is `(start_byte_offset, comment_text)` including the `//` prefix.
+    /// Each entry is `(start_byte_offset, comment_text)` including
+    /// the `//` prefix.
     pub entries: Vec<(usize, &'src str)>,
 }
 
@@ -154,87 +153,75 @@ pub struct LexedFile<'src> {
     pub comment_map: CommentMap<'src>,
 }
 
-pub struct LexResult<'src> {
-    pub results: Vec<LexedFile<'src>>,
-    pub file_table: FileTable<'src>,
-    pub errors: Vec<LexError>,
-}
-impl LexResult<'_> {
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-}
-
 pub struct LexError {
     pub error_spans: Vec<Range<usize>>,
     pub file_id: FileId,
 }
 
-pub struct CloesceLexer;
-impl<'src> CloesceLexer {
-    fn lex_file(
-        src: &'src str,
-        file_id: FileId,
-    ) -> (Vec<SpannedToken<'src>>, CommentMap<'src>, Vec<LexError>) {
-        let mut tokens = Vec::new();
-        let mut comments = Vec::new();
-        let mut error_spans: Vec<Range<usize>> = Vec::new();
+fn lex_file<'src>(
+    src: &'src str,
+    file_id: FileId,
+) -> (Vec<SpannedToken<'src>>, CommentMap<'src>, Vec<LexError>) {
+    let mut tokens = Vec::new();
+    let mut comments = Vec::new();
+    let mut error_spans: Vec<Range<usize>> = Vec::new();
 
-        for (result, span) in Token::lexer(src).spanned() {
-            match result {
-                Ok(Token::Comment(text)) => {
-                    comments.push((span.start, text));
-                }
-                Ok(token) => tokens.push(Spanned {
-                    inner: token,
-                    span: SimpleSpan {
-                        start: span.start,
-                        end: span.end,
-                        context: file_id,
-                    },
-                }),
-                Err(_) => error_spans.push(span),
+    for (result, span) in Token::lexer(src).spanned() {
+        match result {
+            Ok(Token::Comment(text)) => {
+                comments.push((span.start, text));
             }
+            Ok(token) => tokens.push(Spanned {
+                inner: token,
+                span: SimpleSpan {
+                    start: span.start,
+                    end: span.end,
+                    context: file_id,
+                },
+            }),
+            Err(_) => error_spans.push(span),
         }
-
-        let errors = error_spans
-            .into_iter()
-            .map(|span| LexError {
-                error_spans: vec![span],
-                file_id,
-            })
-            .collect();
-
-        (tokens, CommentMap { entries: comments }, errors)
     }
 
-    pub fn lex(targets: impl IntoIterator<Item = LexTarget<'src>>) -> LexResult<'src> {
-        let mut file_table = FileTable {
-            table: HashMap::new(),
-        };
+    let errors = error_spans
+        .into_iter()
+        .map(|span| LexError {
+            error_spans: vec![span],
+            file_id,
+        })
+        .collect();
 
-        let mut results = Vec::new();
-        let mut errors = Vec::new();
+    (tokens, CommentMap { entries: comments }, errors)
+}
 
-        // todo: could be parallelized
-        for (id_seed, source) in targets.into_iter().enumerate() {
-            let file_id = FileId(id_seed.try_into().expect("too many files to lex"));
+pub fn lex<'src>(
+    targets: impl IntoIterator<Item = LexTarget<'src>>,
+) -> Result<(Vec<LexedFile<'src>>, FileTable<'src>), (Vec<LexError>, FileTable<'src>)> {
+    let mut file_table = FileTable {
+        table: HashMap::new(),
+    };
 
-            file_table.table.insert(file_id, (source.src, source.path));
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
 
-            let (tokens, comment_map, errs) = Self::lex_file(source.src, file_id);
-            results.push(LexedFile {
-                tokens,
-                file_id,
-                comment_map,
-            });
-            errors.extend(errs);
-        }
+    // todo: could be parallelized
+    for (id_seed, source) in targets.into_iter().enumerate() {
+        let file_id = FileId(id_seed.try_into().expect("too many files to lex"));
 
-        LexResult {
-            results,
-            errors,
-            file_table,
-        }
+        file_table.table.insert(file_id, (source.src, source.path));
+
+        let (tokens, comment_map, errs) = lex_file(source.src, file_id);
+        results.push(LexedFile {
+            tokens,
+            file_id,
+            comment_map,
+        });
+        errors.extend(errs);
+    }
+
+    if errors.is_empty() {
+        Ok((results, file_table))
+    } else {
+        Err((errors, file_table))
     }
 }

@@ -1,5 +1,4 @@
 {
-  // Browser frontend config
   "compilerOptions": {
     "module": "ESNext",
     "target": "ES2020",
@@ -10,9 +9,9 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "paths": {
-      "@cloesce/*": ["./.cloesce/*"],
+      "@cloesce/*": ["../../.cloesce/*"],
     },
     "noEmit": true,
   },
-  "include": ["src/web/**/*.ts"],
+  "include": ["*.ts"],
 }

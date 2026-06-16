@@ -7,8 +7,6 @@ use crate::{
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
 
-/// Parses a block of the form:
-///
 /// ```cloesce
 /// source SourceName for ModelName {
 ///     include { ... }

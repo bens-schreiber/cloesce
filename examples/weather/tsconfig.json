@@ -1,13 +1,11 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    "module": "Node16",
+    "module": "NodeNext",
     "target": "ES2020",
-    "moduleResolution": "node16",
-    "types": [],
+    "moduleResolution": "nodenext",
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
     "skipLibCheck": true,
 
-    // Cloesce required options
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "paths": {
@@ -16,5 +14,5 @@
     },
     "outDir": "dist",
   },
-  "include": [".cloesce/*.ts", "src/**/*.ts", "tests/**/*.ts"],
+  "include": [".cloesce/*.ts", "src/api/**/*.ts", "tests/**/*.ts", "migrations/**/*.ts"],
 }

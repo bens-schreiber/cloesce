@@ -1,7 +1,7 @@
 use crate::{
     LocalSymbolKind, SymbolTable, ensure,
     err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, kahns, resolve_cidl_type, resolve_validator_tags,
+    is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
     ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, NavAdj, R2FieldBlock, SpdSlice,
@@ -13,7 +13,7 @@ use idl::{
     WranglerEnv,
 };
 use indexmap::IndexMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::{collections::BTreeMap, ops::Not};
 
 pub struct ModelAnalysis<'src, 'p, 'sem> {
@@ -1058,4 +1058,51 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         Some((wrangler_binding_template, key_format))
     }
+}
+
+/// Kahns algorithm for topological sort + cycle detection.
+///
+/// If no cycles, returns a map of name to position used for sorting
+/// the original collection.
+fn kahns<'src, 'p>(
+    graph: BTreeMap<&'src str, Vec<&'src str>>,
+    mut in_degree: BTreeMap<&'src str, usize>,
+    len: usize,
+) -> Result<HashMap<&'src str, usize>, SemanticError<'src, 'p>> {
+    let mut queue = in_degree
+        .iter()
+        .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
+        .collect::<VecDeque<_>>();
+
+    let mut rank = HashMap::with_capacity(len);
+    let mut counter = 0usize;
+
+    while let Some(name) = queue.pop_front() {
+        rank.insert(name, counter);
+        counter += 1;
+
+        if let Some(adjs) = graph.get(name) {
+            for adj in adjs {
+                let deg = in_degree.get_mut(adj).expect("names to be validated");
+                *deg -= 1;
+
+                if *deg == 0 {
+                    queue.push_back(adj);
+                }
+            }
+        }
+    }
+
+    if rank.len() != len {
+        let cycle: Vec<&str> = in_degree
+            .iter()
+            .filter_map(|(&n, &d)| (d > 0).then_some(n))
+            .collect();
+
+        if !cycle.is_empty() {
+            return Err(SemanticError::CyclicalRelationship { cycle });
+        }
+    }
+
+    Ok(rank)
 }

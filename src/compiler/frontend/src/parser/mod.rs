@@ -10,86 +10,38 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, DurableInitializer, InjectBlock, InjectEntry, Keyword,
-    PlainOldObjectBlock, Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, Keyword, PlainOldObjectBlock,
+    Span, Spd, Symbol, Tag,
 };
 
-/// Converts a [Keyword] to a `just` [Token] parser
-macro_rules! kw {
-    ($kw:ident) => {
-        just(Token::from(crate::Keyword::$kw))
-    };
-}
-pub(crate) use kw;
+pub type ParserError<'tokens, 'src> = Vec<Rich<'tokens, Token<'src>, Span>>;
 
-type TokenInput<'tokens, 'src> =
-    MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
+/// Parses a list of [LexedFile]s into an [Ast], returning any errors encountered during parsing.
+pub fn parse<'tokens, 'src: 'tokens>(
+    lexed: &'tokens [LexedFile<'src>],
+    file_table: &'tokens FileTable<'src>,
+) -> Result<Ast<'src>, ParserError<'tokens, 'src>> {
+    let mut ast = Ast::default();
+    let mut errors = Vec::new();
 
-type Extra<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, Span>>;
+    for lf in lexed {
+        let (src, _) = file_table.resolve(lf.file_id);
 
-trait MapSpanned<'tokens, 'src: 'tokens, O>:
-    Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
-{
-    fn map_spanned<F, T>(
-        self,
-        f: F,
-    ) -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<T>, Extra<'tokens, 'src>>
-    where
-        F: Fn(O) -> T,
-    {
-        self.try_map(move |out, span: Span| {
-            Ok(Spd {
-                inner: f(out),
-                span,
-            })
-        })
-    }
-}
+        let input = lf.tokens.split_spanned(Span {
+            start: 0,
+            end: src.len(),
+            context: lf.file_id,
+        });
 
-impl<'tokens, 'src: 'tokens, P, O> MapSpanned<'tokens, 'src, O> for P where
-    P: Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
-{
-}
+        let res = parser().parse(input).into_result();
 
-pub struct ParserResult<'src, 'tokens> {
-    pub ast: Ast<'src>,
-    pub errors: Vec<Rich<'tokens, Token<'src>, Span>>,
-}
-
-impl ParserResult<'_, '_> {
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-}
-
-pub struct CloesceParser;
-impl CloesceParser {
-    pub fn parse<'tokens, 'src: 'tokens>(
-        lexed: &'tokens [LexedFile<'src>],
-        file_table: &'tokens FileTable<'src>,
-    ) -> ParserResult<'src, 'tokens> {
-        let mut ast = Ast::default();
-        let mut errors = Vec::new();
-
-        for lf in lexed {
-            let (src, _) = file_table.resolve(lf.file_id);
-
-            let input = lf.tokens.split_spanned(Span {
-                start: 0,
-                end: src.len(),
-                context: lf.file_id,
-            });
-
-            let res = parser().parse(input).into_result();
-
-            match res {
-                Ok(res) => ast.merge(res),
-                Err(errs) => errors.extend(errs),
-            }
+        match res {
+            Ok(res) => ast.merge(res),
+            Err(errs) => errors.extend(errs),
         }
-
-        ParserResult { ast, errors }
     }
+
+    errors.is_empty().then_some(ast).ok_or(errors)
 }
 
 fn parser<'tokens, 'src: 'tokens>()
@@ -111,8 +63,6 @@ fn parser<'tokens, 'src: 'tokens>()
     .map(|blocks| Ast { blocks })
 }
 
-/// Parses a block of the form:
-///
 /// ```cloesce
 /// poo MyObject {
 ///     ident1: cidl_type
@@ -135,8 +85,6 @@ fn poo_block<'tokens, 'src: 'tokens>()
         })
 }
 
-/// Parses a block of the form:
-///
 /// ```cloesce
 /// inject {
 ///     ident1
@@ -199,9 +147,6 @@ fn tags<'tokens, 'src: 'tokens>()
         .map(|kinds| Tag::Crud { kinds });
 
     // [inject binding1, DurableDo(arg1, arg2), GlobalDo(), ...]
-    //
-    // An entry with parenthesis instantiates a Durable Object context;
-    // one without injects the binding namespace itself.
     let inject_entry = symbol()
         .then(
             symbol()
@@ -212,7 +157,7 @@ fn tags<'tokens, 'src: 'tokens>()
                 .or_not(),
         )
         .map(|(symbol, args)| match args {
-            Some(args) => InjectEntry::Context(DurableInitializer { symbol, args }),
+            Some(args) => InjectEntry::Context { symbol, args },
             None => InjectEntry::Binding(symbol),
         });
 
@@ -260,7 +205,6 @@ fn tags<'tokens, 'src: 'tokens>()
     .boxed()
 }
 
-/// Parses a block of the form:
 ///```cloesce
 /// ident
 /// ```
@@ -275,7 +219,6 @@ fn symbol<'tokens, 'src: 'tokens>()
     })
 }
 
-/// Parses a block of the form:
 /// ```cloesce
 /// ident: cidl_type
 /// ```
@@ -291,7 +234,6 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
         })
 }
 
-/// Parses a block of the form:
 /// ```cloesce
 /// [tags]
 /// ident: cidl_type
@@ -350,4 +292,41 @@ fn cidl_type<'tokens, 'src: 'tokens>()
 
         choice((generic, primitive_keyword, unresolved_type)).boxed()
     })
+}
+
+/// Converts a [Keyword] to a `just` [Token] parser
+macro_rules! kw {
+    ($kw:ident) => {
+        just(Token::from(crate::Keyword::$kw))
+    };
+}
+pub(crate) use kw;
+
+type TokenInput<'tokens, 'src> =
+    MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
+
+type Extra<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, Span>>;
+
+trait MapSpanned<'tokens, 'src: 'tokens, O>:
+    Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
+{
+    fn map_spanned<F, T>(
+        self,
+        f: F,
+    ) -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<T>, Extra<'tokens, 'src>>
+    where
+        F: Fn(O) -> T,
+    {
+        self.try_map(move |out, span: Span| {
+            Ok(Spd {
+                inner: f(out),
+                span,
+            })
+        })
+    }
+}
+
+impl<'tokens, 'src: 'tokens, P, O> MapSpanned<'tokens, 'src, O> for P where
+    P: Parser<'tokens, TokenInput<'tokens, 'src>, O, Extra<'tokens, 'src>> + Sized
+{
 }

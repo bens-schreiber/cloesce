@@ -1,22 +1,18 @@
-//! Formatter for a Cloesce [Ast], preserving as much of the original formatting as possible, including comments and blank lines.
+//! Formatter for a Cloesce [Ast].
 //!
-//! # Overview
+//! Preserves as much of the original formatting as possible, including comments and blank lines.
 //!
-//! The formatter works by traversing the [Ast] and emitting a [Doc] for each node. The [Doc] is an IR that represents the formatted output,
-//! which is rendered to a string after being fully constructed. All comments are left in their original position, but the formatter
-//! will adjust whitespace in an opinionated way (at most two consectutive newlines are preserved).
+//! Traverses the [Ast] and emits a [Doc] on each node. [Doc] is an IR for the formatted output,
+//! which is rendered to a string [doc::render].
 //!
-//! ## Cursor
-//!
-//! The only portions of the formatter that require manual cursor management are comments, handeled entirely in the
-//! [FmtCtx] struct. The formatter consults the [CommentMap] to determine which comments to emit at each point in the traversal, and advances the cursor
-//! accordingly. Comments are categorized as leading, trailing, or inner based on their position relative to the syntax nodes,
-//! and the formatter ensures they are emitted in the correct order and with appropriate spacing.
+//! All comments are left in their original position, but the formatter will adjust whitespace in an
+//! opinonated way (at most two consectutive newlines are preserved).
 
 mod doc;
 
 use std::cell::{Cell, RefCell};
 
+use doc::Doc;
 use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
@@ -27,21 +23,23 @@ use crate::{
     PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind,
     Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
-use doc::{Doc, render};
 
-pub struct Formatter;
-
-impl Formatter {
-    pub fn format(ast: &Ast<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
-        let ctx = FmtCtx::new(comment_map, src);
-        let doc = ast.to_doc(&ctx);
-        render(&doc).trim_start_matches('\n').to_string()
-    }
+/// Formats an [Ast] into a string, preserving comments and blank lines.
+pub fn format(ast: &Ast<'_>, comment_map: &CommentMap<'_>, src: &str) -> String {
+    let ctx = FmtCtx::new(comment_map, src);
+    let doc = ast.to_doc(&ctx);
+    doc::render(&doc).trim_start_matches('\n').to_string()
 }
 
+/// Responsible for handling the attachment of comments to symbols and blocks,
+/// and for tracking the current cursor position in the source string.
+///
+/// Abstracts away state management and comment placement for the rest of the formatter.
 struct FmtCtx<'src> {
-    cm: &'src CommentMap<'src>,
     src: &'src str,
+
+    /// A map of all comments in the source, keyed by their start offset.
+    cm: &'src CommentMap<'src>,
 
     /// Byte offset just past the last thing emitted
     cursor: Cell<usize>,
@@ -58,6 +56,18 @@ impl<'src> FmtCtx<'src> {
             src,
             cursor: Cell::new(0),
             node_ends: RefCell::new(vec![]),
+        }
+    }
+
+    fn normalize_comment_text(text: &str) -> String {
+        if let Some(content) = text.strip_prefix("//") {
+            if content.is_empty() || content.starts_with(char::is_whitespace) {
+                text.to_string()
+            } else {
+                format!("// {}", content)
+            }
+        } else {
+            text.to_string()
         }
     }
 
@@ -93,7 +103,7 @@ impl<'src> FmtCtx<'src> {
             doc = doc
                 .then(extra_blank)
                 .then(line_prefix)
-                .then(Doc::owned(normalize_comment_text(text)));
+                .then(Doc::owned(Self::normalize_comment_text(text)));
             emitted = true;
             cursor = offset + text.len();
         }
@@ -124,7 +134,7 @@ impl<'src> FmtCtx<'src> {
             // intervening syntax token between the node and the comment.
             if !gap.contains('\n') && gap.chars().all(char::is_whitespace) {
                 self.cursor.set(offset + text.len());
-                return Doc::text(" ").then(Doc::owned(normalize_comment_text(text)));
+                return Doc::text(" ").then(Doc::owned(Self::normalize_comment_text(text)));
             }
         }
         Doc::nil()
@@ -161,7 +171,7 @@ impl<'src> FmtCtx<'src> {
             doc = doc
                 .then(extra_blank)
                 .then(Doc::hardline(indent))
-                .then(Doc::owned(normalize_comment_text(text)));
+                .then(Doc::owned(Self::normalize_comment_text(text)));
             cursor = offset + text.len();
         }
 
@@ -364,19 +374,8 @@ impl<'src> FmtCtx<'src> {
     }
 }
 
-fn normalize_comment_text(text: &str) -> String {
-    if let Some(content) = text.strip_prefix("//") {
-        if content.is_empty() || content.starts_with(char::is_whitespace) {
-            text.to_string()
-        } else {
-            format!("// {}", content)
-        }
-    } else {
-        text.to_string()
-    }
-}
-
 trait ToDoc<'src> {
+    /// Convert an [Ast] node into a [Doc]
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src>;
 }
 
@@ -388,7 +387,7 @@ impl<'src> Ast<'src> {
             doc = doc.then(ctx.spd_doc(spd, 0, false));
         }
 
-        // Consume any dangling comments
+        // Consume any final dangling comments
         let (trailing_comments, has_trailing_comments) = ctx.leading_comments(usize::MAX, 0);
         if has_trailing_comments {
             doc = doc.then(trailing_comments);
@@ -463,26 +462,27 @@ impl<'src> ToDoc<'src> for Tag<'src> {
 
                 Doc::text(name.as_str()).then(Doc::text(" ")).then(arg)
             }
+
             Tag::Source { name } => Doc::kw(Keyword::Source)
                 .then(Doc::text(" "))
                 .then(Doc::text(name.inner)),
+
             Tag::Internal => Doc::kw(Keyword::Internal),
             Tag::Instance => Doc::kw(Keyword::Instance),
 
             Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
                 .then(Doc::text(" "))
                 .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
+
             Tag::Inject { entries } => {
                 Doc::kw(Keyword::Inject)
                     .then(Doc::text(" "))
                     .then(comma_separated(entries, |entry| match entry {
                         InjectEntry::Binding(sym) => ctx.sym_doc(sym, 0, true),
-                        InjectEntry::Context(initializer) => ctx
-                            .sym_doc(&initializer.symbol, 0, true)
+                        InjectEntry::Context { symbol, args } => ctx
+                            .sym_doc(symbol, 0, true)
                             .then(Doc::text("("))
-                            .then(comma_separated(&initializer.args, |arg| {
-                                ctx.sym_doc(arg, 0, true)
-                            }))
+                            .then(comma_separated(args, |arg| ctx.sym_doc(arg, 0, true)))
                             .then(Doc::text(")")),
                     }))
             }
@@ -610,23 +610,6 @@ impl<'src> ToDoc<'src> for NavigationBlock<'src> {
             .then(refs)
             .then(ctx.block(ctx.sym_doc(&self.nav.inner, 2, false), 2))
     }
-}
-
-fn binding_ref_doc<'src>(
-    ctx: &FmtCtx<'src>,
-    binding: &'src Symbol<'src>,
-    binding_template: &'src Symbol<'src>,
-    args: &'src [Symbol<'src>],
-) -> Doc<'src> {
-    let mut doc = ctx
-        .sym_doc(binding, 0, true)
-        .then(Doc::text("::"))
-        .then(ctx.sym_doc(binding_template, 0, true));
-    if !args.is_empty() {
-        let args = comma_separated(args, |sym| ctx.sym_doc(sym, 0, true));
-        doc = doc.then(Doc::text("(")).then(args).then(Doc::text(")"));
-    }
-    doc
 }
 
 impl<'src> ToDoc<'src> for KvFieldBlock<'src> {
@@ -949,6 +932,23 @@ fn comma_separated<'src, T, F: FnMut(&'src T) -> Doc<'src>>(
         if idx + 1 < items.len() {
             doc = doc.then(Doc::text(", "));
         }
+    }
+    doc
+}
+
+fn binding_ref_doc<'src>(
+    ctx: &FmtCtx<'src>,
+    binding: &'src Symbol<'src>,
+    binding_template: &'src Symbol<'src>,
+    args: &'src [Symbol<'src>],
+) -> Doc<'src> {
+    let mut doc = ctx
+        .sym_doc(binding, 0, true)
+        .then(Doc::text("::"))
+        .then(ctx.sym_doc(binding_template, 0, true));
+    if !args.is_empty() {
+        let args = comma_separated(args, |sym| ctx.sym_doc(sym, 0, true));
+        doc = doc.then(Doc::text("(")).then(args).then(Doc::text(")"));
     }
     doc
 }

@@ -2,14 +2,9 @@
 
 use std::path::PathBuf;
 
-use frontend::{
-    Ast,
-    err::DisplayError,
-    lexer::{CloesceLexer, LexTarget},
-    parser::CloesceParser,
-};
+use frontend::{Ast, err::DisplayError, lexer, lexer::LexTarget, parser};
 use idl::CloesceIdl;
-use semantic::SemanticAnalysis;
+use semantic::{self};
 
 mod src_str;
 pub use src_str::*;
@@ -36,19 +31,21 @@ pub fn lex_and_ast(src: &str) -> Ast<'_> {
         path: PathBuf::from("<test>"),
     };
 
-    let lexed = CloesceLexer::lex(vec![source]);
-    if lexed.has_errors() {
-        lexed.display_error(&lexed.file_table);
-        panic!("lexing should succeed");
-    }
+    let (lexed, file_table) = match lexer::lex(vec![source]) {
+        Ok((results, file_table)) => (results, file_table),
+        Err((errors, file_table)) => {
+            errors.display_error(&file_table);
+            panic!("lexing should succeed");
+        }
+    };
 
-    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
-    if result.has_errors() {
-        result.display_error(&lexed.file_table);
-        panic!("parse should succeed");
+    match parser::parse(&lexed, &file_table) {
+        Ok(ast) => ast,
+        Err(errors) => {
+            errors.display_error(&file_table);
+            panic!("parse should succeed");
+        }
     }
-
-    result.ast
 }
 
 /// Given a source string, lex, parse, and semantically analyze it into a [CloesceIdl],
@@ -59,25 +56,29 @@ pub fn src_to_idl(src: &str) -> CloesceIdl<'_> {
         path: PathBuf::from("<test>"),
     };
 
-    let lexed = CloesceLexer::lex(vec![source]);
-    if lexed.has_errors() {
-        lexed.display_error(&lexed.file_table);
-        panic!("lexing should succeed");
-    }
-
-    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
-    if result.has_errors() {
-        result.display_error(&lexed.file_table);
-        panic!("parse should succeed");
-    }
-
-    let (result, errors) = SemanticAnalysis::analyze(&result.ast);
-    if !errors.is_empty() {
-        for error in &errors {
-            error.display_error(&lexed.file_table);
+    let (lexed, file_table) = match lexer::lex(vec![source]) {
+        Ok((results, file_table)) => (results, file_table),
+        Err((errors, file_table)) => {
+            errors.display_error(&file_table);
+            panic!("lexing should succeed");
         }
-        panic!("semantic analysis should succeed");
-    }
+    };
 
-    result
+    let parsed = match parser::parse(&lexed, &file_table) {
+        Ok(ast) => ast,
+        Err(errors) => {
+            errors.display_error(&file_table);
+            panic!("parse should succeed");
+        }
+    };
+
+    match semantic::analyze(&parsed) {
+        Ok(idl) => idl,
+        Err(errors) => {
+            for error in &errors {
+                error.display_error(&file_table);
+            }
+            panic!("semantic analysis should succeed");
+        }
+    }
 }
