@@ -98,8 +98,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
     }
 
     fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String {
-        // An `inject {}` symbol injects that class; everything else is a Wrangler
-        // `Env` binding.
         if idl.injects.contains(&name) {
             name.to_string()
         } else {

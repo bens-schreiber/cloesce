@@ -609,6 +609,79 @@ fn d1_model_route_navigation_errors() {
 }
 
 #[test]
+fn keyless_nav_to_routed_model_is_invalid() {
+    let src = r#"
+    durable AppDo {
+        data() -> json { "data" }
+    }
+
+    model HasRoute for AppDo {
+        route { id: int }
+        kv AppDo::data() { data }
+    }
+
+    model App for AppDo {
+        kv AppDo::data() { data }
+        nav HasRoute { config }
+    }
+    "#;
+
+    let parse = lex_and_ast(src);
+    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+
+    assert!(
+        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }) > 0,
+        "expected RouteNavigationInvalid error, got: {errors:#?}"
+    );
+}
+
+#[test]
+fn keyless_singleton_nav() {
+    let src = r#"
+    kv GlobalKv {
+        config() -> json {
+            "config"
+        }
+    }
+
+    durable AppDo {
+        settings() -> json {
+            "settings"
+        }
+    }
+
+    model AppConfig for AppDo {
+        kv GlobalKv::config() {
+            config
+        }
+    }
+
+    model App for AppDo {
+        kv AppDo::settings() {
+            settings
+        }
+
+        nav AppConfig { appConfig }
+    }
+    "#;
+
+    let parse = lex_and_ast(src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let app = result.models.get("App").unwrap();
+    let nav = app.navigation_fields.first().unwrap();
+    assert_eq!(nav.field.name, "appConfig");
+    assert_eq!(nav.model_reference, "AppConfig");
+    assert_eq!(nav.field.cidl_type, CidlType::Object { name: "AppConfig" });
+    assert!(
+        matches!(&nav.kind, NavigationFieldKind::OneToOne { fields } if fields.is_empty()),
+        "expected OneToOne with empty fields"
+    );
+}
+
+#[test]
 fn worker_model_errors() {
     // Arrange
     let src = &with_env(

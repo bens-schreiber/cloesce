@@ -8,31 +8,46 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db: D1Database;
     bucket1: R2Bucket;
 }
-export class bucket1 {
-    static readonly data = {
-        template: (id: number): string =>
-            `path/to/data/${id}`,
-        get: (bucket: R2Bucket, id: number): Promise<R2ObjectBody | null> =>
-            bucket.get(bucket1.data.template(id)),
-        put: (bucket: R2Bucket, id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-            bucket.put(bucket1.data.template(id), value),
+function bucket1Helpers(bucket: R2Bucket) {
+    return {
+        data: {
+            template: (id: number): string =>
+                `path/to/data/${id}`,
+            get: (id: number): Promise<R2ObjectBody | null> =>
+                bucket.get(`path/to/data/${id}`),
+            put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+                bucket.put(`path/to/data/${id}`, value),
+        },
+        otherData: {
+            template: (id: number): string =>
+                `path/to/other/${id}`,
+            get: (id: number): Promise<R2ObjectBody | null> =>
+                bucket.get(`path/to/other/${id}`),
+            put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
+                bucket.put(`path/to/other/${id}`, value),
+        },
+        allData: {
+            template: (): string =>
+                `path/`,
+        },
     };
-    static readonly otherData = {
-        template: (id: number): string =>
-            `path/to/other/${id}`,
-        get: (bucket: R2Bucket, id: number): Promise<R2ObjectBody | null> =>
-            bucket.get(bucket1.otherData.template(id)),
-        put: (bucket: R2Bucket, id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-            bucket.put(bucket1.otherData.template(id), value),
-    };
-    static readonly allData = {
-        template: (): string =>
-            `path/`,
-    };
+}
+
+export namespace Env {
+    export type bucket1 = CfEnv["bucket1"] & ReturnType<typeof bucket1Helpers>;
+}
+
+export type Env = CfEnv & {
+    bucket1: Env.bucket1;
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    Object.assign(env.bucket1, bucket1Helpers(env.bucket1));
+    return env as Env;
 }
 export namespace D1BackedModel {
     export const Tag = "D1BackedModel" as const;
@@ -72,10 +87,10 @@ export namespace D1BackedModel {
             tree: {"someData":{},"someOtherData":{}},
             selectQuery: `SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -115,16 +130,16 @@ export namespace D1BackedModel {
     }
 
     export namespace Orm {
-        export async function save(env: { bucket1: Env["bucket1"], db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { bucket1: Env["bucket1"], db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
+        export async function list(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -133,7 +148,7 @@ export namespace D1BackedModel {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { bucket1: Env["bucket1"], db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -191,16 +206,16 @@ export namespace R2Only {
     }
 
     export namespace Orm {
-        export async function save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { bucket1: CfEnv["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
-        export async function get(env: { bucket1: Env["bucket1"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(env: { bucket1: CfEnv["bucket1"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { id: args.id,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { bucket1: CfEnv["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -257,16 +272,16 @@ export namespace R2Sibling {
     }
 
     export namespace Orm {
-        export async function save(env: { bucket1: Env["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { bucket1: CfEnv["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
-        export async function get(env: { bucket1: Env["bucket1"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(env: { bucket1: CfEnv["bucket1"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { siblingId: args.siblingId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(env: { bucket1: Env["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { bucket1: CfEnv["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -292,15 +307,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5538/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5538/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

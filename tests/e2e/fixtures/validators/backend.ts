@@ -8,19 +8,34 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db: D1Database;
     store: KVNamespace;
 }
-export class store {
-    static readonly data = {
-        template: (email: string): string =>
-            `some_crap/${email}`,
-        get: (ns: KVNamespace, email: string): Promise<string | null> =>
-            ns.get(store.data.template(email)) as any,
-        put: (ns: KVNamespace, email: string, value: string): Promise<void> =>
-            ns.put(store.data.template(email), value as any),
+function storeHelpers(namespace: KVNamespace) {
+    return {
+        data: {
+            template: (email: string): string =>
+                `some_crap/${email}`,
+            get: (email: string): Promise<string | null> =>
+                namespace.get(`some_crap/${email}`) as any,
+            put: (email: string, value: string): Promise<void> =>
+                namespace.put(`some_crap/${email}`, value as any),
+        },
     };
+}
+
+export namespace Env {
+    export type store = CfEnv["store"] & ReturnType<typeof storeHelpers>;
+}
+
+export type Env = CfEnv & {
+    store: Env.store;
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    Object.assign(env.store, storeHelpers(env.store));
+    return env as Env;
 }
 export namespace Validator {
     export const Tag = "Validator" as const;
@@ -49,10 +64,10 @@ export namespace Validator {
             tree: {"someData":{}},
             selectQuery: `SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"], store: Env["store"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -89,10 +104,10 @@ export namespace Validator {
             tree: {},
             selectQuery: `SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Validator"."id" AS "id", "Validator"."email" AS "email" FROM "Validator" WHERE "Validator"."id" > ?1 ORDER BY "Validator"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -132,16 +147,16 @@ export namespace Validator {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"], store: Env["store"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"], store: CfEnv["store"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"], store: CfEnv["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"], store: Env["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Validator.Self[]>> {
+        export async function list(env: { db: CfEnv["db"], store: CfEnv["store"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Validator.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -150,7 +165,7 @@ export namespace Validator {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"], store: Env["store"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"], store: CfEnv["store"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -176,15 +191,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5038/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5038/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

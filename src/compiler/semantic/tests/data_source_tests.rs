@@ -121,6 +121,56 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
 }
 
 #[test]
+fn omitted_include_uses_default_tree() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Profile for db {
+            primary {
+                id: int
+            }
+        }
+
+        model User for db {
+            primary {
+                id: int
+            }
+
+            foreign Profile::id {
+                profileId
+            }
+
+            nav Profile::id(profileId) {
+                profile
+            }
+        }
+
+        source WithDefault for User {}
+
+        source Empty for User {
+            include {}
+        }
+        "#,
+    );
+
+    let user = idl.models.get("User").unwrap();
+
+    // An omitted include block falls back to the default include tree.
+    let with_default = user.data_sources.get("WithDefault").unwrap();
+    let default = user.default_data_source().unwrap();
+    assert_eq!(
+        with_default.tree.0.keys().collect::<Vec<_>>(),
+        default.tree.0.keys().collect::<Vec<_>>()
+    );
+    assert!(with_default.tree.0.contains_key("profile"));
+
+    // An explicit `include {}` stays empty.
+    let empty = user.data_sources.get("Empty").unwrap();
+    assert!(empty.tree.0.is_empty());
+}
+
+#[test]
 fn default_data_source_present_on_every_d1_model() {
     let idl = src_to_idl(
         r#"

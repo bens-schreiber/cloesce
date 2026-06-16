@@ -1,11 +1,20 @@
 import { defineConfig } from "vitest/config";
-import tsconfigPaths from "vite-tsconfig-paths";
-import wasm from "vite-plugin-wasm";
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { fileURLToPath } from "url";
 
-// Consumers of this library do NOT need to install vite-plugin-wasm.
-// Vite automatically prebundles npm dependencies (including their WASM imports),
-// but it does NOT prebundle local source files during development.
-// This plugin is only required so Vitest can load local raw `.wasm` imports.
+const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
+
 export default defineConfig({
-    plugins: [tsconfigPaths(), wasm()]
+  resolve: {
+    alias: {
+      "@cloesce": resolve("./.cloesce"),
+      "@api": resolve("./src/api"),
+    },
+  },
+  plugins: [
+    cloudflareTest({
+      main: "./src/api/main.ts",
+      wrangler: { configPath: "./wrangler.jsonc" },
+    }),
+  ],
 });

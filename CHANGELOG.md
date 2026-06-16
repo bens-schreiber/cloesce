@@ -2,14 +2,14 @@
 
 ### Added
 
-- Data Source stubs for `get`, `list`, `save`
-- Binding templates for `kv` and `r2` allowing the declaration to list all key locations
-- New Worker backed models to replace `keyfield`
-- Allow D1 backed models to have a navigation property to a Worker backed model, but not the other way around.
 - Durable Object backed Models
 - Durable Object execution context injection into API methods
 - Durable Object Wrangler configuration generation
 - Durable Object Migration generation
+- Data Source stubs for `get`, `list`, `save`
+- Binding templates for `kv`, `r2`, and `durable` allowing the declaration to list all key locations
+- New Worker backed models to replace `keyfield`
+- Allow D1 backed models to have a navigation property to a Worker backed model, but not the other way around.
 
 ### Changed
 
@@ -17,6 +17,11 @@
 - Data sources no longer accept inline SQL queries, instead generating stub functions
 - Removed many to many relationship support in favor of manual join tables using composite keys
 - Changed syntax of `nav` fields
+- Upgraded the Cloudflare Env to the Cloesce Env which adds more methods to access bindings
+- Allow a missing `include` block (defaults to default include tree)
+- Allow dropping of outer parenthesis in statements that are not composite
+- Allow a `nav` field with no keys (1:1 to a singleton model).
+- Pass variardic args to `CloesceApp.register` instead of chaining calls
 
 ### Fixed
 

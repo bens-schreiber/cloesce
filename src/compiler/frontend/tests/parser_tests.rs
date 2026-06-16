@@ -14,11 +14,11 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
 }
 
 /// Matches a nav block's adjacency entries against `(model, field, local_key)` triples.
-fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, &str, Option<&str>)]) -> bool {
+fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, Option<&str>, Option<&str>)]) -> bool {
     adj.len() == expected.len()
         && adj.iter().zip(expected).all(|(a, (em, ef, ek))| {
             a.model.name == *em
-                && a.field.name == *ef
+                && a.field.as_ref().map(|s| s.name) == *ef
                 && a.local_key.as_ref().map(|s| s.name) == *ek
         })
 }
@@ -758,7 +758,7 @@ fn model_navigation() {
     assert!(location_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &location_nav.adj,
-        &[("Location", "id", Some("locationId"))]
+        &[("Location", Some("id"), Some("locationId"))]
     ));
 
     let weathers_nav = m
@@ -772,7 +772,7 @@ fn model_navigation() {
     assert!(!weathers_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &weathers_nav.adj,
-        &[("Weather", "reportId", None)]
+        &[("Weather", Some("reportId"), None)]
     ));
 
     let alerts_nav = m
@@ -785,7 +785,10 @@ fn model_navigation() {
         .unwrap();
     assert!(nav_adj_matches(
         &alerts_nav.adj,
-        &[("Alert", "regionId", None), ("Alert", "zoneId", None)]
+        &[
+            ("Alert", Some("regionId"), None),
+            ("Alert", Some("zoneId"), None)
+        ]
     ));
 }
 
@@ -830,7 +833,34 @@ fn model_route() {
     assert!(dog_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &dog_nav.adj,
-        &[("Dog", "ownerId", Some("id"))]
+        &[("Dog", Some("ownerId"), Some("id"))]
+    ));
+}
+
+#[test]
+fn model_keyless_singleton_nav() {
+    let ast = lex_and_ast(
+        r#"
+        model M {
+            nav Singleton { config }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+    let config_nav = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "config" => Some(n),
+            _ => None,
+        })
+        .unwrap();
+
+    assert!(!config_nav.is_one_to_one());
+    assert!(nav_adj_matches(
+        &config_nav.adj,
+        &[("Singleton", None, None)]
     ));
 }
 
@@ -933,6 +963,82 @@ fn kv_r2_bindings_fields() {
         .unwrap();
     assert_eq!(r2_thumb.binding.name, "BucketB");
     assert_eq!(r2_thumb.binding_template.name, "thumb");
+}
+
+#[test]
+fn optional_outer_parens() {
+    let ast = lex_and_ast(
+        r#"
+        kv Ns {
+            data(id: int) -> json { "data/{id}" }
+            paginated() -> paginated<json> { "list" }
+        }
+
+        r2 Bucket {
+            file(id: int) { "files/{id}" }
+        }
+
+        model M {
+            primary {
+                id: int
+            }
+
+            foreign Company::id { companyId }
+            foreign (Parent::orgId, Parent::userId) { orgId userId }
+
+            kv Ns::data(id) { cachedData }
+            kv (Ns::paginated) { pagedData }
+            r2 Bucket::file(id) { fileData }
+            r2 (Bucket::file(id)) { wrappedFileData }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+
+    // Single foreign without parens parses identically to the parenthesized form.
+    let company_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Company", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(company_fb.fields[0].name, "companyId");
+
+    assert!(m.blocks.iter().any(|spd| matches!(
+        &spd.inner,
+        ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")])
+    )));
+
+    // kv wrapped in outer parens with no args, and r2 wrapped in outer parens.
+    let paged = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) if kv.field.name == "pagedData" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(paged.binding.name, "Ns");
+    assert_eq!(paged.binding_template.name, "paginated");
+    assert!(paged.args.is_empty());
+
+    let wrapped = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::R2(r2) if r2.field.name == "wrappedFileData" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(wrapped.binding.name, "Bucket");
+    assert_eq!(wrapped.binding_template.name, "file");
+    assert_eq!(
+        wrapped.args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["id"]
+    );
 }
 
 #[test]

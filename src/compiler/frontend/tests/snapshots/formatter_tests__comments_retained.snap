@@ -1,5 +1,6 @@
 ---
 source: src/compiler/frontend/tests/formatter_tests.rs
+assertion_line: 145
 expression: formatted
 ---
 // 0
@@ -27,7 +28,7 @@ model BasicModel for db {
     } // 9
     
     // 14
-    foreign (OneToManyModel::id) {
+    foreign OneToManyModel::id {
         // E
         fk_to_model // 15
         // 16

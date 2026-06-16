@@ -1,11 +1,9 @@
-import { cloesce, CrudHaver, Parent, Child, Env } from "./backend.js";
+import { cloesce, CrudHaver, Parent, Child, CfEnv } from "./backend.js";
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
-    app.register(CrudHaver.impl({ notCrud() {} }));
-    app.register(Parent.impl({}));
-    app.register(Child.impl({}));
+    app.register(CrudHaver.impl({ notCrud() {} }), Parent.impl({}), Child.impl({}));
     return await app.run(request);
   },
 };

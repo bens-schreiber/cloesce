@@ -12,7 +12,7 @@
   "name": "cloesce",
   "r2_buckets": [
     {
-      "binding": "bucket",
+      "binding": "Bucket",
       "bucket_name": "replace-with-bucket-name"
     }
   ],

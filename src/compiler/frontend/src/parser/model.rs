@@ -7,21 +7,25 @@ use crate::{
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
 
-/// `foreign(AdjModel::field1, ...) [optional] { localField ... }`
+/// `foreign AdjModel::field [optional] { localField ... }`
+/// or `foreign (AdjModel::field1, ...) [optional] { localField ... }`
 fn foreign_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
-    let adj_ref = symbol()
-        .then_ignore(just(Token::DoubleColon))
-        .then(symbol());
+    let adj_ref = || {
+        symbol()
+            .then_ignore(just(Token::DoubleColon))
+            .then(symbol())
+    };
+
+    let composite = adj_ref()
+        .separated_by(just(Token::Comma))
+        .at_least(1)
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LParen), just(Token::RParen));
+    let single = adj_ref().map(|a| vec![a]);
 
     kw!(Foreign)
-        .ignore_then(
-            adj_ref
-                .separated_by(just(Token::Comma))
-                .at_least(1)
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)),
-        )
+        .ignore_then(composite.or(single))
         .then(kw!(Optional).or_not())
         .then(
             symbol()
@@ -36,12 +40,15 @@ fn foreign_block<'tokens, 'src: 'tokens>()
         })
 }
 
-/// `kv Binding::field(arg1, arg2, ...) { localField }`
-/// or `kv Binding::field { localField }`
-fn kv_field_block<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvFieldBlock<'src>, Extra<'tokens, 'src>> {
-    kw!(Kv)
-        .ignore_then(symbol())
+/// `Binding::field(arg1, arg2, ...)` or `Binding::field`, optionally wrapped in
+/// a single pair of outer parens.
+fn binding_ref<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    TokenInput<'tokens, 'src>,
+    (Symbol<'src>, Symbol<'src>, Vec<Symbol<'src>>),
+    Extra<'tokens, 'src>,
+> {
+    let inner = symbol()
         .then_ignore(just(Token::DoubleColon))
         .then(symbol())
         .then(
@@ -52,11 +59,26 @@ fn kv_field_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LParen), just(Token::RParen))
                 .or_not(),
         )
+        .map(|((binding, template), args)| (binding, template, args.unwrap_or_default()))
+        .boxed();
+
+    inner
+        .clone()
+        .delimited_by(just(Token::LParen), just(Token::RParen))
+        .or(inner)
+}
+
+/// `kv Binding::field(arg1, arg2, ...) { localField }`
+/// or `kv Binding::field { localField }`
+fn kv_field_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvFieldBlock<'src>, Extra<'tokens, 'src>> {
+    kw!(Kv)
+        .ignore_then(binding_ref())
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map(|(((binding, binding_field), args), field)| KvFieldBlock {
+        .map(|((binding, binding_template, args), field)| KvFieldBlock {
             binding,
-            binding_template: binding_field,
-            args: args.unwrap_or_default(),
+            binding_template,
+            args,
             field,
         })
 }
@@ -66,20 +88,11 @@ fn kv_field_block<'tokens, 'src: 'tokens>()
 fn r2_field_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2FieldBlock<'src>, Extra<'tokens, 'src>> {
     kw!(R2)
-        .ignore_then(symbol())
-        .then_ignore(just(Token::DoubleColon))
-        .then(symbol())
-        .then(
-            symbol()
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)),
-        )
+        .ignore_then(binding_ref())
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map(|(((binding, binding_field), args), field)| R2FieldBlock {
+        .map(|((binding, binding_template, args), field)| R2FieldBlock {
             binding,
-            binding_template: binding_field,
+            binding_template,
             args,
             field,
         })
@@ -133,7 +146,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     // `nav (Adj::f1, Adj::f2) { ident }`         (1:M composite)
     // `nav AdjModel::field(localKey) { ident }`  (1:1 single)
     // `nav (Adj::f1(l1), Adj::f2(l2)) { ident }` (1:1 composite)
+    // `nav Foo { ident }`                          (keyless singleton)
     let nav_block = {
+        // `Model::field` or `Model::field(localKey)`
         let nav_adj = || {
             symbol()
                 .then_ignore(just(Token::DoubleColon))
@@ -145,9 +160,18 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 )
                 .map(|((model, field), local_key)| NavAdj {
                     model,
-                    field,
+                    field: Some(field),
                     local_key,
                 })
+        };
+
+        // bare `Model` with no `::field`
+        let bare_adj = || {
+            symbol().map(|model| NavAdj {
+                model,
+                field: None,
+                local_key: None,
+            })
         };
 
         let composite = nav_adj()
@@ -155,7 +179,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .at_least(1)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen));
-        let single = nav_adj().map(|a| vec![a]);
+        let single = nav_adj().or(bare_adj()).map(|a| vec![a]);
 
         kw!(Nav)
             .ignore_then(composite.or(single))

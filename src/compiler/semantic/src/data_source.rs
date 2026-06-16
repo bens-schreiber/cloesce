@@ -67,9 +67,12 @@ impl<'src, 'p> DataSourceAnalysis {
                 continue;
             };
 
-            // Validate include tree via BFS
+            // Validate include tree via BFS. A missing tree falls back to the
+            // generated default during expansion and needs no validation.
             let mut q = VecDeque::new();
-            q.push_back((&ds.tree, model));
+            if let Some(tree) = &ds.tree {
+                q.push_back((tree, model));
+            }
             while let Some((node, parent_model)) = q.pop_front() {
                 for (field, child) in &node.0 {
                     // Check navigation properties
@@ -226,7 +229,14 @@ impl<'src, 'p> DataSourceAnalysis {
                 model_sym.name,
                 DataSource {
                     name: ds.symbol.name,
-                    tree: parsed_include_tree_to_idl(&ds.tree),
+                    tree: match &ds.tree {
+                        Some(tree) => parsed_include_tree_to_idl(tree),
+                        None => DataSourceExpansion::include_dfs(
+                            models,
+                            model_sym.name,
+                            &mut HashSet::new(),
+                        ),
+                    },
                     list,
                     get,
                     save,

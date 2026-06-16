@@ -11,7 +11,7 @@ export const FailModel = clo.FailModel.impl({
 });
 
 export default {
-  async fetch(request: Request, env: clo.Env): Promise<Response> {
+  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
     const app = clo.cloesce(env);
     app.register(FailModel);
 

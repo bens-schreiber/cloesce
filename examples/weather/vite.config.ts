@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
+import { fileURLToPath } from "url";
 
 export default defineConfig({
-    plugins: [tsconfigPaths()],
-    root: "./src/web"
+  root: "./src/web",
+  resolve: {
+    alias: { "@cloesce": fileURLToPath(new URL("./.cloesce", import.meta.url)) },
+  },
 });

@@ -8,9 +8,19 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db1: D1Database;
     db2: D1Database;
+}
+
+export namespace Env {
+}
+
+export type Env = CfEnv & {
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    return env as Env;
 }
 export namespace DB1Model {
     export const Tag = "DB1Model" as const;
@@ -33,10 +43,10 @@ export namespace DB1Model {
             tree: {},
             selectQuery: `SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model"`,
 
-            getQuery(env: { db1: Env["db1"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db1: CfEnv["db1"] }, id: number): D1PreparedStatement {
                 return env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db1: Env["db1"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db1: CfEnv["db1"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" > ?1 ORDER BY "DB1Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db1: Env["db1"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -76,16 +86,16 @@ export namespace DB1Model {
     }
 
     export namespace Orm {
-        export async function save(env: { db1: Env["db1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db1: CfEnv["db1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db1: Env["db1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db1: CfEnv["db1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db1: Env["db1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DB1Model.Self[]>> {
+        export async function list(env: { db1: CfEnv["db1"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DB1Model.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -94,7 +104,7 @@ export namespace DB1Model {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db1: Env["db1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db1: CfEnv["db1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -120,10 +130,10 @@ export namespace DB2Model {
             tree: {},
             selectQuery: `SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model"`,
 
-            getQuery(env: { db2: Env["db2"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db2: CfEnv["db2"] }, id: number): D1PreparedStatement {
                 return env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db2: Env["db2"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db2: CfEnv["db2"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" > ?1 ORDER BY "DB2Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db2: Env["db2"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -163,16 +173,16 @@ export namespace DB2Model {
     }
 
     export namespace Orm {
-        export async function save(env: { db2: Env["db2"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db2: CfEnv["db2"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db2: Env["db2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db2: CfEnv["db2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db2: Env["db2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DB2Model.Self[]>> {
+        export async function list(env: { db2: CfEnv["db2"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DB2Model.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -181,7 +191,7 @@ export namespace DB2Model {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db2: Env["db2"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db2: CfEnv["db2"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -207,15 +217,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5291/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5291/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

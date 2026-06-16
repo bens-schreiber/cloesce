@@ -95,7 +95,7 @@ model Comment for SubRedditDo(subId) {
         upvotes: int
     }
 
-    foreign (Post::id) {
+    foreign Post::id {
         postId
     }
 }

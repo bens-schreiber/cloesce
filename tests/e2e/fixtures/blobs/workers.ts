@@ -56,9 +56,9 @@ const BlobHaver = clo.BlobHaver.impl({
 });
 
 export default {
-  async fetch(request: Request, env: clo.Env): Promise<Response> {
+  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
     const app = clo.cloesce(env);
-    app.register(BlobService).register(BlobHaver);
+    app.register(BlobService, BlobHaver);
 
     return app.run(request);
   },

@@ -198,12 +198,16 @@ pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, Inclu
 pub enum NavigationFieldKind<'src> {
     OneToOne {
         /// The fields on the current model that reference the other model's primary key.
+        ///
         /// Multiple fields indicate a composite foreign key.
+        ///
+        /// No fields indicate a singleton.
         #[serde(borrow)]
         fields: Vec<&'src str>,
     },
     OneToMany {
         /// The columns on the other model that reference the current model's primary key.
+        ///
         /// Multiple columns indicate a composite foreign key.
         #[serde(borrow)]
         columns: Vec<&'src str>,

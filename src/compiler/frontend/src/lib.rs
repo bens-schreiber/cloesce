@@ -289,7 +289,7 @@ pub struct DataSourceBlock<'src> {
     /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
 
-    pub tree: ParsedIncludeTree<'src>,
+    pub tree: Option<ParsedIncludeTree<'src>>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
@@ -299,8 +299,8 @@ pub struct NavAdj<'src> {
     /// `AdjModel` in `AdjModel::field`
     pub model: Symbol<'src>,
 
-    /// `field` in `AdjModel::field`
-    pub field: Symbol<'src>,
+    /// `field` in `AdjModel::field`.
+    pub field: Option<Symbol<'src>>,
 
     /// The local FK column on the current model: the `(localKey)` part.
     /// `Some` => 1:1 entry, `None` => 1:M entry.

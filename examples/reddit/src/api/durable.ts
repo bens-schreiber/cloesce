@@ -6,54 +6,54 @@ import { Comment, Post, SubReddit, User } from "./models.js";
 import { AuthUser } from "./auth.js";
 
 export class UserDo extends clo.UserDo {
-    private app: CloesceApp;
-    private sessions: clo.Env["Sessions"];
+  private app: CloesceApp;
+  private sessions: clo.Env.Sessions;
 
-    constructor(ctx: DurableObjectState, env: clo.Env) {
-        super(ctx, env);
-        this.sessions = env.Sessions;
-        this.app = this.cloesce(env, [userDoInitial]);
-        this.app.register(User);
-    }
+  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+    super(ctx, env);
+    this.sessions = clo.upgradeEnv(env).Sessions;
+    this.app = this.cloesce(env, [userDoInitial]);
+    this.app.register(User);
+  }
 
-    async fetch(request: Request): Promise<Response> {
-        const authUser = await AuthUser.fromRequest(this.sessions, request);
-        this.app.register(authUser);
+  async fetch(request: Request): Promise<Response> {
+    const authUser = await AuthUser.fromRequest(this.sessions, request);
+    this.app.register(authUser);
 
-        return await this.app.run(request);
-    }
+    return await this.app.run(request);
+  }
 
-    async appendActivity(update: Partial<clo.Profile>): Promise<void> {
-        const current = this.profile.get() ?? { posts: [], comments: [], subReddits: [] };
-        const updated = {
-            posts: [...current.posts, ...(update.posts ?? [])],
-            comments: [...current.comments, ...(update.comments ?? [])],
-            subReddits: [...current.subReddits, ...(update.subReddits ?? [])],
-        };
+  async appendActivity(update: Partial<clo.Profile>): Promise<void> {
+    const current = this.profile.get() ?? { posts: [], comments: [], subReddits: [] };
+    const updated = {
+      posts: [...current.posts, ...(update.posts ?? [])],
+      comments: [...current.comments, ...(update.comments ?? [])],
+      subReddits: [...current.subReddits, ...(update.subReddits ?? [])],
+    };
 
-        this.profile.put(updated);
-    }
+    this.profile.put(updated);
+  }
 }
 
 export class SubRedditDo extends clo.SubRedditDo {
-    private app: CloesceApp;
-    private sessions: clo.Env["Sessions"];
+  private app: CloesceApp;
+  private sessions: clo.Env.Sessions;
 
-    constructor(ctx: DurableObjectState, env: clo.Env) {
-        super(ctx, env);
-        this.sessions = env.Sessions;
-        this.app = this.cloesce(env, [subRedditDoInitial]);
-        this.app.register(SubReddit).register(Post).register(Comment);
-    }
+  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+    super(ctx, env);
+    this.sessions = clo.upgradeEnv(env).Sessions;
+    this.app = this.cloesce(env, [subRedditDoInitial]);
+    this.app.register(SubReddit, Post, Comment);
+  }
 
-    async fetch(request: Request): Promise<Response> {
-        const authUser = await AuthUser.fromRequest(this.sessions, request);
-        this.app.register(authUser);
+  async fetch(request: Request): Promise<Response> {
+    const authUser = await AuthUser.fromRequest(this.sessions, request);
+    this.app.register(authUser);
 
-        return await this.app.run(request);
-    }
+    return await this.app.run(request);
+  }
 
-    async setMetadata(metadata: clo.SubRedditMeta): Promise<void> {
-        this.metadata.put(metadata);
-    }
+  async setMetadata(metadata: clo.SubRedditMeta): Promise<void> {
+    this.metadata.put(metadata);
+  }
 }

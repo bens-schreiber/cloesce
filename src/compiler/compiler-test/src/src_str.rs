@@ -74,7 +74,7 @@ model BasicModel for db {
         id: int
     }
 
-    foreign(OneToManyModel::id) {
+    foreign OneToManyModel::id {
         fk_to_model
     }
 }
@@ -103,7 +103,7 @@ model HasOneToOne for db {
         id: int
     }
 
-    foreign(BasicModel::id) {
+    foreign BasicModel::id {
         basicModelId
     }
 
@@ -225,7 +225,7 @@ model ModelWithCruds for db {
         name: string
     }
 
-    foreign(BasicModel::id) {
+    foreign BasicModel::id {
         categoryId
     }
 }
@@ -251,7 +251,7 @@ model ModelWithCustomDs for db {
         data
     }
 
-    foreign (OneToManyModel::id) {
+    foreign OneToManyModel::id {
         oneToManyId
     }
 

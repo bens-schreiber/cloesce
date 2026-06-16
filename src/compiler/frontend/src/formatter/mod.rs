@@ -562,10 +562,12 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             left.then(Doc::text("::")).then(right)
         });
 
-        let doc = Doc::kw(Keyword::Foreign)
-            .then(Doc::text(" ("))
-            .then(adjs)
-            .then(Doc::text(")"));
+        let refs = if self.adj.len() > 1 {
+            Doc::text(" (").then(adjs).then(Doc::text(")"))
+        } else {
+            Doc::text(" ").then(adjs)
+        };
+        let doc = Doc::kw(Keyword::Foreign).then(refs);
         let optional = if self.is_optional {
             Doc::text(" ").then(Doc::kw(Keyword::Optional))
         } else {
@@ -584,10 +586,10 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let entries = comma_separated(&self.adj, |adj| {
-            let mut d = ctx
-                .sym_doc(&adj.model, 0, true)
-                .then(Doc::text("::"))
-                .then(ctx.sym_doc(&adj.field, 0, true));
+            let mut d = ctx.sym_doc(&adj.model, 0, true);
+            if let Some(field) = &adj.field {
+                d = d.then(Doc::text("::")).then(ctx.sym_doc(field, 0, true));
+            }
             if let Some(local) = &adj.local_key {
                 d = d
                     .then(Doc::text("("))
@@ -610,32 +612,47 @@ impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     }
 }
 
+fn binding_ref_doc<'src>(
+    ctx: &FmtCtx<'src>,
+    binding: &'src Symbol<'src>,
+    binding_template: &'src Symbol<'src>,
+    args: &'src [Symbol<'src>],
+) -> Doc<'src> {
+    let mut doc = ctx
+        .sym_doc(binding, 0, true)
+        .then(Doc::text("::"))
+        .then(ctx.sym_doc(binding_template, 0, true));
+    if !args.is_empty() {
+        let args = comma_separated(args, |sym| ctx.sym_doc(sym, 0, true));
+        doc = doc.then(Doc::text("(")).then(args).then(Doc::text(")"));
+    }
+    doc
+}
+
 impl<'src> ToDoc<'src> for KvFieldBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let args = comma_separated(&self.args, |sym| ctx.sym_doc(sym, 0, true));
         Doc::kw(Keyword::Kv)
             .then(Doc::text(" "))
-            .then(ctx.sym_doc(&self.binding, 0, true))
-            .then(Doc::text("::"))
-            .then(ctx.sym_doc(&self.binding_template, 0, true))
-            .then(Doc::text("("))
-            .then(args)
-            .then(Doc::text(")"))
+            .then(binding_ref_doc(
+                ctx,
+                &self.binding,
+                &self.binding_template,
+                &self.args,
+            ))
             .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
 
 impl<'src> ToDoc<'src> for R2FieldBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let args = comma_separated(&self.args, |sym| ctx.sym_doc(sym, 0, true));
         Doc::kw(Keyword::R2)
             .then(Doc::text(" "))
-            .then(ctx.sym_doc(&self.binding, 0, true))
-            .then(Doc::text("::"))
-            .then(ctx.sym_doc(&self.binding_template, 0, true))
-            .then(Doc::text("("))
-            .then(args)
-            .then(Doc::text(")"))
+            .then(binding_ref_doc(
+                ctx,
+                &self.binding,
+                &self.binding_template,
+                &self.args,
+            ))
             .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
@@ -729,14 +746,14 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
             .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.model, 0, true));
 
-        let mut include = if self.tree.0.is_empty() {
-            Doc::hardline(1)
+        let mut include = match &self.tree {
+            None => Doc::nil(),
+            Some(tree) if tree.0.is_empty() => Doc::hardline(1)
                 .then(Doc::kw(Keyword::Include))
-                .then(Doc::text(" {}"))
-        } else {
-            Doc::hardline(1)
+                .then(Doc::text(" {}")),
+            Some(tree) => Doc::hardline(1)
                 .then(Doc::kw(Keyword::Include))
-                .then(ctx.block(self.tree.to_doc_at(ctx, 2), 2))
+                .then(ctx.block(tree.to_doc_at(ctx, 2), 2)),
         };
 
         for stub in [&self.get, &self.list, &self.save].into_iter().flatten() {

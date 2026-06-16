@@ -1,20 +1,20 @@
-env {
-    d1 {
-        db
-    }
-    r2 {
-        bucket
+d1 {
+    db
+}
+
+r2 Bucket {
+    photos(id: int) {
+        "weather/photos/{id}.jpg"
     }
 }
 
-[use db]
 [crud list, save, get]
-model WeatherReport {
+model WeatherReport for db {
     primary {
         id: int
     }
     
-    nav (Weather::weatherReportId) {
+    nav Weather::weatherReportId {
         weatherEntries
     }
     
@@ -24,22 +24,21 @@ model WeatherReport {
     }
 }
 
-[use db]
 [crud get, list, save]
-model Weather {
+model Weather for db {
     primary {
         id: int
     }
     
-    foreign (WeatherReport::id) {
+    foreign WeatherReport::id {
         weatherReportId
-        
-        nav {
-            weatherReport
-        }
+    }
+
+    nav WeatherReport::id(weatherReportId) {
+        weatherReport
     }
     
-    r2 (bucket, "weather/photos/{id}.jpg") {
+    r2 Bucket::photos(id) {
         photo
     }
     
@@ -52,7 +51,7 @@ model Weather {
 }
 
 api Weather {
-    [inject bucket]
+    [inject Bucket]
     post uploadPhoto(self, s: stream)
     
     get downloadPhoto([source R2Only] self) -> stream

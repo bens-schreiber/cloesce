@@ -526,15 +526,16 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       if (
         value[nav.field.name] === undefined &&
         !target.backing &&
-        target.route_fields.length > 0 &&
         typeof nav.kind === "object" &&
         "OneToOne" in nav.kind
       ) {
         const columns = nav.kind.OneToOne.fields;
         const assembled: any = {};
-        target.route_fields.forEach((field, i) => {
-          assembled[field.name] = value[columns[i]];
-        });
+        if (target.route_fields.length > 0) {
+          target.route_fields.forEach((field, i) => {
+            assembled[field.name] = value[columns[i]];
+          });
+        }
         value[nav.field.name] = assembled;
       }
 

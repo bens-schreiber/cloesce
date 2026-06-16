@@ -23,7 +23,7 @@ model Parent for db {
         id: int
     }
     
-    foreign (Child::id) optional  {
+    foreign Child::id optional  {
         favoriteChildId
     }
 
@@ -48,7 +48,7 @@ model Child for db {
         id: int
     }
     
-    foreign (Parent::id) {
+    foreign Parent::id {
         parentId
     }
 
