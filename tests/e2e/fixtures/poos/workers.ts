@@ -1,5 +1,5 @@
 import { HttpResult } from "cloesce";
-import { cloesce, Env, PooAcceptYield } from "./backend.js";
+import { cloesce, CfEnv, PooAcceptYield } from "./backend.js";
 
 export const PooAcceptYieldImpl = PooAcceptYield.impl({
   acceptPoos() {
@@ -15,7 +15,7 @@ export const PooAcceptYieldImpl = PooAcceptYield.impl({
 });
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
     app.register(PooAcceptYieldImpl);
     return await app.run(request);

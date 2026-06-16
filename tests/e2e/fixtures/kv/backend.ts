@@ -8,34 +8,54 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db: D1Database;
     namespace: KVNamespace;
     otherNamespace: KVNamespace;
 }
-export class namespace {
-    static readonly data = {
-        template: (id: number): string =>
-            `path/to/data/${id}`,
-        get: (ns: KVNamespace, id: number): Promise<unknown | null> =>
-            ns.get(namespace.data.template(id)) as any,
-        put: (ns: KVNamespace, id: number, value: unknown): Promise<void> =>
-            ns.put(namespace.data.template(id), value as any),
-    };
-    static readonly paginatedData = {
-        template: (): string =>
-            `path/to/data/`,
+function namespaceHelpers(namespace: KVNamespace) {
+    return {
+        data: {
+            template: (id: number): string =>
+                `path/to/data/${id}`,
+            get: (id: number): Promise<unknown | null> =>
+                namespace.get(`path/to/data/${id}`) as any,
+            put: (id: number, value: unknown): Promise<void> =>
+                namespace.put(`path/to/data/${id}`, value as any),
+        },
+        paginatedData: {
+            template: (): string =>
+                `path/to/data/`,
+        },
     };
 }
-export class otherNamespace {
-    static readonly otherData = {
-        template: (id: number): string =>
-            `path/to/other/${id}`,
-        get: (ns: KVNamespace, id: number): Promise<string | null> =>
-            ns.get(otherNamespace.otherData.template(id)) as any,
-        put: (ns: KVNamespace, id: number, value: string): Promise<void> =>
-            ns.put(otherNamespace.otherData.template(id), value as any),
+function otherNamespaceHelpers(namespace: KVNamespace) {
+    return {
+        otherData: {
+            template: (id: number): string =>
+                `path/to/other/${id}`,
+            get: (id: number): Promise<string | null> =>
+                namespace.get(`path/to/other/${id}`) as any,
+            put: (id: number, value: string): Promise<void> =>
+                namespace.put(`path/to/other/${id}`, value as any),
+        },
     };
+}
+
+export namespace Env {
+    export type namespace = CfEnv["namespace"] & ReturnType<typeof namespaceHelpers>;
+    export type otherNamespace = CfEnv["otherNamespace"] & ReturnType<typeof otherNamespaceHelpers>;
+}
+
+export type Env = CfEnv & {
+    namespace: Env.namespace;
+    otherNamespace: Env.otherNamespace;
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    Object.assign(env.namespace, namespaceHelpers(env.namespace));
+    Object.assign(env.otherNamespace, otherNamespaceHelpers(env.otherNamespace));
+    return env as Env;
 }
 export namespace KVOnly {
     export const Tag = "KVOnly" as const;
@@ -83,16 +103,16 @@ export namespace KVOnly {
     }
 
     export namespace Orm {
-        export async function save(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
-        export async function get(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(env: { namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { id: args.id,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(env: { namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -142,16 +162,16 @@ export namespace KVSibling {
     }
 
     export namespace Orm {
-        export async function save(env: { otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { otherNamespace: CfEnv["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
-        export async function get(env: { otherNamespace: Env["otherNamespace"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(env: { otherNamespace: CfEnv["otherNamespace"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { siblingId: args.siblingId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
-        export async function hydrate(env: { otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { otherNamespace: CfEnv["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -184,10 +204,10 @@ export namespace ModelWithKv {
             tree: {"paginatedItems":{},"someData":{},"someOtherData":{}},
             selectQuery: `SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithKv"."id" AS "id", "ModelWithKv"."someColumn" AS "someColumn", "ModelWithKv"."someOtherColumn" AS "someOtherColumn" FROM "ModelWithKv" WHERE "ModelWithKv"."id" > ?1 ORDER BY "ModelWithKv"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -227,16 +247,16 @@ export namespace ModelWithKv {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"], namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"], namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
+        export async function list(env: { db: CfEnv["db"], namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -245,7 +265,7 @@ export namespace ModelWithKv {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"], namespace: Env["namespace"], otherNamespace: Env["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"], namespace: CfEnv["namespace"], otherNamespace: CfEnv["otherNamespace"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -271,15 +291,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5416/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5416/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

@@ -6,9 +6,9 @@ export class AuthUser extends clo.AuthUser {
         super();
     }
 
-    static async fromRequest(sessions: clo.Env["Sessions"], request: Request): Promise<AuthUser> {
+    static async fromRequest(sessions: clo.Env.Sessions, request: Request): Promise<AuthUser> {
         const token = request.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
-        const username = token ? await clo.Sessions.session.get(sessions, token) : null;
+        const username = token ? await sessions.session.get(token) : null;
         return new AuthUser((username as string | null) ?? null);
     }
 

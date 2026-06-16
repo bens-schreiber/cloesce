@@ -8,8 +8,18 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db: D1Database;
+}
+
+export namespace Env {
+}
+
+export type Env = CfEnv & {
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    return env as Env;
 }
 export namespace Course {
     export const Tag = "Course" as const;
@@ -33,10 +43,10 @@ export namespace Course {
             tree: {"studentCourses":{}},
             selectQuery: `SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -76,16 +86,16 @@ export namespace Course {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Course.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Course.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -94,7 +104,7 @@ export namespace Course {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -123,10 +133,10 @@ export namespace Student {
             tree: {"studentCourses":{}},
             selectQuery: `SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName"`,
 
-            getQuery(env: { db: Env["db"] }, id: number, name: string): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number, name: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name);
             },
-            listQuery(env: { db: Env["db"] }, lastId: number, lastName: string, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastId: number, lastName: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastId, lastName, limit);
             },
             async get(env: { db: Env["db"] }, id: number, name: string): Promise<HttpResult<Self | null>> {
@@ -155,10 +165,10 @@ export namespace Student {
             tree: {"studentCourses":{}},
             selectQuery: `SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName"`,
 
-            getQuery(env: { db: Env["db"] }, id: number, name: string): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number, name: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, lastSeen_name: string, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, lastSeen_name: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastSeen_id, lastSeen_name, limit);
             },
             async get(env: { db: Env["db"] }, id: number, name: string): Promise<HttpResult<Self | null>> {
@@ -207,16 +217,16 @@ export namespace Student {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Student.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Student.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -225,7 +235,7 @@ export namespace Student {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -254,10 +264,10 @@ export namespace StudentCourse {
             tree: {},
             selectQuery: `SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse"`,
 
-            getQuery(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
             },
             async get(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): Promise<HttpResult<Self | null>> {
@@ -294,10 +304,10 @@ export namespace StudentCourse {
             tree: {"course":{"studentCourses":{}},"student":{"studentCourses":{}}},
             selectQuery: `SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId"`,
 
-            getQuery(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
             },
             async get(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): Promise<HttpResult<Self | null>> {
@@ -337,16 +347,16 @@ export namespace StudentCourse {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<StudentCourse.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<StudentCourse.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -355,7 +365,7 @@ export namespace StudentCourse {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -381,15 +391,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5139/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5139/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

@@ -1,8 +1,8 @@
-import { cloesce, Dog, Env } from "./backend.js";
+import { cloesce, Dog, CfEnv } from "./backend.js";
 import { HttpResult, DeepPartial } from "cloesce";
 
 export const DogImpl = Dog.impl({
-  async create(env: Env, dog: DeepPartial<Dog.Self>): Promise<Dog.Self> {
+  async create(env: CfEnv, dog: DeepPartial<Dog.Self>): Promise<Dog.Self> {
     return (await this.Orm.save(env, dog)).value!;
   },
 
@@ -12,7 +12,7 @@ export const DogImpl = Dog.impl({
 });
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
     app.register(DogImpl);
     return await app.run(request);

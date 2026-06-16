@@ -1,4 +1,4 @@
-import { cloesce, Student, Course, StudentCourse, Env } from "./backend.js";
+import { cloesce, Student, Course, StudentCourse, CfEnv } from "./backend.js";
 import { HttpResult } from "cloesce";
 
 const CoursesOrderedDescending = Student.CoursesOrderedDescending.impl({
@@ -25,7 +25,7 @@ const StudentImpl = Student.impl({
 });
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
     app.register(StudentImpl).register(Course.impl({})).register(StudentCourse.impl({}));
 

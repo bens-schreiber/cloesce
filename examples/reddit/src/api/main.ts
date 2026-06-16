@@ -12,7 +12,7 @@ const cors = {
 };
 
 export default {
-    async fetch(request: Request, env: clo.Env): Promise<Response> {
+    async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
         if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
         const app = clo.cloesce(env)
@@ -20,9 +20,12 @@ export default {
             .register(SubReddit)
             .register(Post)
             .register(Comment);
-        app.register(await AuthUser.fromRequest(env.Sessions, request));
+
+        const cloesceEnv = clo.upgradeEnv(env);
+        app.register(await AuthUser.fromRequest(cloesceEnv.Sessions, request));
 
         const res = await app.run(request);
+
         // Response headers from a forwarded DO fetch can be immutable, so rebuild.
         return new Response(res.body, { status: res.status, headers: { ...Object.fromEntries(res.headers), ...cors } });
     },

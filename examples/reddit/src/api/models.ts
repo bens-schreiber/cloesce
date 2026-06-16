@@ -12,7 +12,7 @@ export const User = clo.User.impl({
         env.ctx.profile.put(profile);
 
         const token = AuthUser.newToken();
-        await clo.Sessions.session.put(env.Sessions, token, username);
+        await env.Sessions.session.put(token, username);
 
         // TODO: KValue wrap is a bit awkward here
         const user = { username, profile: new KValue("profile", profile) } as clo.User.Self;
@@ -20,7 +20,7 @@ export const User = clo.User.impl({
     },
 
     async uploadAvatar(self, env, image: CfReadableStream) {
-        await env.Avatars.put(clo.Avatars.avatar.template(self.username), image);
+        await env.Avatars.avatar.put(self.username, image);
     },
 
     downloadAvatar: (self) =>
@@ -31,17 +31,17 @@ export const SubReddit = clo.SubReddit.impl({
     create: (env, meta) =>
         auth(env, async (username) => {
             const subId = crypto.randomUUID();
-            await SubRedditDo.Shard.instance<SubRedditDo>(subId, env.SubRedditDo).setMetadata(meta);
-            await UserDo.Shard.instance<UserDo>(username, env.UserDo).appendActivity({ subReddits: [subId] });
+            await env.SubRedditDo.instance<SubRedditDo>(subId).setMetadata(meta);
+            await env.UserDo.instance<UserDo>(username).appendActivity({ subReddits: [subId] });
 
             const entry: clo.SubRedditEntry = { subId, name: meta.name };
-            await env.SubReddits.put(clo.SubReddits.entry.template(subId), JSON.stringify(entry));
+            await env.SubReddits.put(env.SubReddits.entry.template(subId), JSON.stringify(entry));
 
             return { subId, metadata: new KValue("metadata", meta) } as clo.SubReddit.Self;
         }),
 
     async list(env) {
-        const { keys } = await env.SubReddits.list({ prefix: clo.SubReddits.directory.template() });
+        const { keys } = await env.SubReddits.list({ prefix: env.SubReddits.directory.template() });
         const results = await Promise.all(keys.map((k) => env.SubReddits.get(k.name, "json"))) as clo.SubRedditEntry[];
         return { results, cursor: null, complete: true };
     },
@@ -54,7 +54,7 @@ export const Post = clo.Post.impl({
     create: (env, subId, title, content) =>
         auth(env, async (username) => {
             const saved = await clo.Post.Orm.save(env.ctx, { subId, author: username, title, content, upvotes: 0 });
-            await UserDo.Shard.instance<UserDo>(username, env.UserDo).appendActivity({ posts: [saved.value!.id] });
+            await env.UserDo.instance<UserDo>(username).appendActivity({ posts: [saved.value!.id] });
             return saved.value!;
         }),
 
@@ -70,7 +70,7 @@ export const Comment = clo.Comment.impl({
     create: (env, subId, postId, content) =>
         auth(env, async (username) => {
             const saved = await clo.Comment.Orm.save(env.ctx, { subId, postId, author: username, content, upvotes: 0 });
-            await UserDo.Shard.instance<UserDo>(username, env.UserDo).appendActivity({ comments: [saved.value!.id] });
+            await env.UserDo.instance<UserDo>(username).appendActivity({ comments: [saved.value!.id] });
             return saved.value!;
         }),
 

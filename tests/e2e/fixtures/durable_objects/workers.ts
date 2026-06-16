@@ -31,25 +31,17 @@ const SubReddit = clo.SubReddit.impl({
 
 const PostCustomDs = clo.Post.Custom.impl({
   async get(env, id, subId) {
-    const row = await SubRedditDo.Shard.instance<SubRedditDo>(subId, env.SubRedditDo).getPost(
-      subId,
-      id,
-    );
+    const row = await env.SubRedditDo.instance<SubRedditDo>(subId).getPost(subId, id);
     return row === null ? HttpResult.fail(404) : HttpResult.ok(200, row);
   },
 
   async list(env, subId) {
-    const rows = await SubRedditDo.Shard.instance<SubRedditDo>(subId, env.SubRedditDo).listPosts(
-      subId,
-    );
+    const rows = await env.SubRedditDo.instance<SubRedditDo>(subId).listPosts(subId);
     return HttpResult.ok(200, rows);
   },
 
   async save(env, post, subId) {
-    const row = await SubRedditDo.Shard.instance<SubRedditDo>(subId, env.SubRedditDo).savePost(
-      subId,
-      post,
-    );
+    const row = await env.SubRedditDo.instance<SubRedditDo>(subId).savePost(subId, post);
     return row === null ? HttpResult.fail(404) : HttpResult.ok(200, row);
   },
 });
@@ -63,7 +55,7 @@ const Comment = clo.Comment.impl({});
 export class GlobalDo extends clo.GlobalDo {
   private app: CloesceApp;
 
-  constructor(ctx: DurableObjectState, env: clo.Env) {
+  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
     super(ctx, env);
     this.app = this.cloesce(env, [globalDoInitial]);
     this.app.register(Global);
@@ -77,7 +69,7 @@ export class GlobalDo extends clo.GlobalDo {
 export class SubRedditDo extends clo.SubRedditDo {
   private app: CloesceApp;
 
-  constructor(ctx: DurableObjectState, env: clo.Env) {
+  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
     super(ctx, env);
     this.app = this.cloesce(env, [subRedditDoInitial]);
     this.app.register(SubReddit);
@@ -105,7 +97,7 @@ export class SubRedditDo extends clo.SubRedditDo {
 }
 
 export default {
-  async fetch(request: Request, env: clo.Env): Promise<Response> {
+  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
     const app = clo.cloesce(env);
     app.register(Global).register(SubReddit).register(Post).register(Comment);
     return await app.run(request);

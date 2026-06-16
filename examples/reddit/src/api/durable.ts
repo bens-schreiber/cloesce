@@ -7,11 +7,11 @@ import { AuthUser } from "./auth.js";
 
 export class UserDo extends clo.UserDo {
     private app: CloesceApp;
-    private sessions: clo.Env["Sessions"];
+    private sessions: clo.Env.Sessions;
 
-    constructor(ctx: DurableObjectState, env: clo.Env) {
+    constructor(ctx: DurableObjectState, env: clo.CfEnv) {
         super(ctx, env);
-        this.sessions = env.Sessions;
+        this.sessions = clo.upgradeEnv(env).Sessions;
         this.app = this.cloesce(env, [userDoInitial]);
         this.app.register(User);
     }
@@ -37,11 +37,11 @@ export class UserDo extends clo.UserDo {
 
 export class SubRedditDo extends clo.SubRedditDo {
     private app: CloesceApp;
-    private sessions: clo.Env["Sessions"];
+    private sessions: clo.Env.Sessions;
 
-    constructor(ctx: DurableObjectState, env: clo.Env) {
+    constructor(ctx: DurableObjectState, env: clo.CfEnv) {
         super(ctx, env);
-        this.sessions = env.Sessions;
+        this.sessions = clo.upgradeEnv(env).Sessions;
         this.app = this.cloesce(env, [subRedditDoInitial]);
         this.app.register(SubReddit).register(Post).register(Comment);
     }

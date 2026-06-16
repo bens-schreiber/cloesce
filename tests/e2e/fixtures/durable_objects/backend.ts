@@ -8,24 +8,14 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     GlobalSubRedditMetadata: KVNamespace;
     GlobalDo: DurableObjectNamespace;
     SubRedditDo: DurableObjectNamespace;
 }
-export class GlobalSubRedditMetadata {
-    static readonly metadata = {
-        template: (subId: number): string =>
-            `metadata/${subId}`,
-        get: (ns: KVNamespace, subId: number): Promise<unknown | null> =>
-            ns.get(GlobalSubRedditMetadata.metadata.template(subId)) as any,
-        put: (ns: KVNamespace, subId: number, value: unknown): Promise<void> =>
-            ns.put(GlobalSubRedditMetadata.metadata.template(subId), value as any),
-    };
-}
 // @ts-ignore
-export abstract class GlobalDo extends DurableObject<Env> {
-    constructor(public state: DurableObjectState, env: Env) {
+export abstract class GlobalDo extends DurableObject<CfEnv> {
+    constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
 
@@ -34,9 +24,6 @@ export abstract class GlobalDo extends DurableObject<Env> {
             `GlobalDo`,
         id: (namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName(GlobalDo.Shard.template()),
-        instance<T extends GlobalDo = GlobalDo>(namespace: DurableObjectNamespace): DurableObjectStub & T {
-            return namespace.get(GlobalDo.Shard.id(namespace)) as DurableObjectStub & T;
-        },
     };
 
     readonly metadata = {
@@ -48,17 +35,17 @@ export abstract class GlobalDo extends DurableObject<Env> {
             this.state.storage.kv.put(this.metadata.template(), value),
     };
 
-    protected cloesce(env: Env, migrations: DurableMigration[] = []): CloesceApp {
+    protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
         if (migrations.length > 0) {
             this.state.blockConcurrencyWhile(() => applyDurableMigrations(this.state.storage, migrations));
         }
         // @ts-expect-error
-        return new CloesceApp(cidl as any, "http://localhost:5843/api", env, this);
+        return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env), this);
     }
 }
 // @ts-ignore
-export abstract class SubRedditDo extends DurableObject<Env> {
-    constructor(public state: DurableObjectState, env: Env) {
+export abstract class SubRedditDo extends DurableObject<CfEnv> {
+    constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
 
@@ -67,9 +54,6 @@ export abstract class SubRedditDo extends DurableObject<Env> {
             `SubRedditDo/${id}`,
         id: (id: number, namespace: DurableObjectNamespace): DurableObjectId =>
             namespace.idFromName(SubRedditDo.Shard.template(id)),
-        instance<T extends SubRedditDo = SubRedditDo>(id: number, namespace: DurableObjectNamespace): DurableObjectStub & T {
-            return namespace.get(SubRedditDo.Shard.id(id, namespace)) as DurableObjectStub & T;
-        },
     };
 
     readonly metadata = {
@@ -81,13 +65,56 @@ export abstract class SubRedditDo extends DurableObject<Env> {
             this.state.storage.kv.put(this.metadata.template(), value),
     };
 
-    protected cloesce(env: Env, migrations: DurableMigration[] = []): CloesceApp {
+    protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
         if (migrations.length > 0) {
             this.state.blockConcurrencyWhile(() => applyDurableMigrations(this.state.storage, migrations));
         }
         // @ts-expect-error
-        return new CloesceApp(cidl as any, "http://localhost:5843/api", env, this);
+        return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env), this);
     }
+}
+function GlobalSubRedditMetadataHelpers(namespace: KVNamespace) {
+    return {
+        metadata: {
+            template: (subId: number): string =>
+                `metadata/${subId}`,
+            get: (subId: number): Promise<unknown | null> =>
+                namespace.get(`metadata/${subId}`) as any,
+            put: (subId: number, value: unknown): Promise<void> =>
+                namespace.put(`metadata/${subId}`, value as any),
+        },
+    };
+}
+function GlobalDoHelpers(namespace: DurableObjectNamespace) {
+    return {
+        instance: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
+            namespace.get(GlobalDo.Shard.id(namespace)) as DurableObjectStub & T,
+    };
+}
+function SubRedditDoHelpers(namespace: DurableObjectNamespace) {
+    return {
+        instance: <T extends SubRedditDo = SubRedditDo>(id: number): DurableObjectStub & T =>
+            namespace.get(SubRedditDo.Shard.id(id, namespace)) as DurableObjectStub & T,
+    };
+}
+
+export namespace Env {
+    export type GlobalSubRedditMetadata = CfEnv["GlobalSubRedditMetadata"] & ReturnType<typeof GlobalSubRedditMetadataHelpers>;
+    export type GlobalDo = CfEnv["GlobalDo"] & ReturnType<typeof GlobalDoHelpers>;
+    export type SubRedditDo = CfEnv["SubRedditDo"] & ReturnType<typeof SubRedditDoHelpers>;
+}
+
+export type Env = CfEnv & {
+    GlobalSubRedditMetadata: Env.GlobalSubRedditMetadata;
+    GlobalDo: Env.GlobalDo;
+    SubRedditDo: Env.SubRedditDo;
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    Object.assign(env.GlobalSubRedditMetadata, GlobalSubRedditMetadataHelpers(env.GlobalSubRedditMetadata));
+    Object.assign(env.GlobalDo, GlobalDoHelpers(env.GlobalDo));
+    Object.assign(env.SubRedditDo, SubRedditDoHelpers(env.SubRedditDo));
+    return env as Env;
 }
 export namespace Global {
     export const Tag = "Global" as const;
@@ -442,15 +469,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5843/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

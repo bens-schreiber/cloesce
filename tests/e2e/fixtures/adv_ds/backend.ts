@@ -8,8 +8,18 @@ export type MaybePromise<T> = T | Promise<T>;
 export type MaybeHttpResult<T> = T | HttpResult<T>;
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
-export interface Env {
+export interface CfEnv {
     db: D1Database;
+}
+
+export namespace Env {
+}
+
+export type Env = CfEnv & {
+};
+
+export function upgradeEnv(env: CfEnv): Env {
+    return env as Env;
 }
 export namespace DefaultOverride {
     export const Tag = "DefaultOverride" as const;
@@ -32,10 +42,10 @@ export namespace DefaultOverride {
             tree: {},
             selectQuery: `SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride"`,
 
-            getQuery(env: { db: Env["db"] }): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }): D1PreparedStatement {
                 return env.db.prepare(`SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride" WHERE "DefaultOverride"."id" = ?1`).bind();
             },
-            listQuery(env: { db: Env["db"] }): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }): D1PreparedStatement {
                 return env.db.prepare(`SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride" WHERE "DefaultOverride"."id" > ?1 ORDER BY "DefaultOverride"."id" ASC LIMIT ?2`).bind();
             },
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
@@ -66,16 +76,16 @@ export namespace DefaultOverride {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DefaultOverride.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DefaultOverride.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -84,7 +94,7 @@ export namespace DefaultOverride {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -120,10 +130,10 @@ export namespace Hamburger {
             tree: {"toppings":{"topping":{}}},
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastId: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastId, limit);
             },
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -152,10 +162,10 @@ export namespace Hamburger {
             tree: {"toppings":{}},
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -192,10 +202,10 @@ export namespace Hamburger {
             tree: {"toppings":{"topping":{}}},
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
@@ -221,10 +231,10 @@ export namespace Hamburger {
             tree: {"toppings":{"topping":{}}},
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
@@ -280,16 +290,16 @@ export namespace Hamburger {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Hamburger.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Hamburger.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -298,7 +308,7 @@ export namespace Hamburger {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -325,10 +335,10 @@ export namespace Topping {
             tree: {"hamburgers":{}},
             selectQuery: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId"`,
 
-            getQuery(env: { db: Env["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" = ?1`).bind(id);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" > ?1 ORDER BY "Topping"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
@@ -368,16 +378,16 @@ export namespace Topping {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Topping.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Topping.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -386,7 +396,7 @@ export namespace Topping {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -414,10 +424,10 @@ export namespace HamburgerTopping {
             tree: {"hamburger":{"toppings":{}},"topping":{"hamburgers":{}}},
             selectQuery: `SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId"`,
 
-            getQuery(env: { db: Env["db"] }, hamburgerId: number, toppingId: number): D1PreparedStatement {
+            getQuery(env: { db: CfEnv["db"] }, hamburgerId: number, toppingId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") = (?1, ?2)`).bind(hamburgerId, toppingId);
             },
-            listQuery(env: { db: Env["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: CfEnv["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") > (?1, ?2) ORDER BY "HamburgerTopping"."hamburgerId" ASC, "HamburgerTopping"."toppingId" ASC LIMIT ?3`).bind(lastSeen_hamburgerId, lastSeen_toppingId, limit);
             },
             async get(env: { db: Env["db"] }, hamburgerId: number, toppingId: number): Promise<HttpResult<Self | null>> {
@@ -457,16 +467,16 @@ export namespace HamburgerTopping {
     }
 
     export namespace Orm {
-        export async function save(env: { db: Env["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
-        export async function get(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
-        export async function list(env: { db: Env["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HamburgerTopping.Self[]>> {
+        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HamburgerTopping.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -475,7 +485,7 @@ export namespace HamburgerTopping {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
-        export async function hydrate(env: { db: Env["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -501,15 +511,15 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
-export function cloesce(env: Env): CloesceApp {
+export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
-    return new CloesceApp(cidl as any, "http://localhost:5403/api", env);
+    return new CloesceApp(cidl as any, "http://localhost:5403/api", upgradeEnv(env));
 }
 
 // Default entrypoint for a Cloesce app.
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: CfEnv): Promise<Response> {
         const app = cloesce(env);
         return await app.run(request);
     }

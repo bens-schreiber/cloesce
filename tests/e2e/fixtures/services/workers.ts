@@ -1,4 +1,4 @@
-import { FooService, InjectedThing, cloesce, Env } from "./backend.js";
+import { FooService, InjectedThing, cloesce, CfEnv } from "./backend.js";
 import { HttpResult } from "cloesce";
 
 export class InjectedThingImpl extends InjectedThing {
@@ -14,7 +14,7 @@ export const FooServiceImpl = FooService.impl({
 });
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
     app.register(new InjectedThingImpl());
     app.register(FooServiceImpl);

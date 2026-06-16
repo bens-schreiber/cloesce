@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { upgradeEnv } from "../.cloesce/backend.js";
 import { Comment, Post, SubReddit, User } from "../src/api/main.js";
 import { env, inSub, inUser } from "./setup.js";
 
@@ -24,7 +25,7 @@ describe("Subreddits", () => {
 
     it("created subreddits appear in the global directory", async () => {
         const sub = await inSub("ignored", "alice", (e) => SubReddit.create(e, { name: "r/listed", description: "" }));
-        const dir = await SubReddit.list({ SubReddits: env.SubReddits });
+        const dir = await SubReddit.list({ SubReddits: upgradeEnv(env).SubReddits });
         expect(dir.results.map((s: any) => s.subId)).toContain(sub.subId);
         expect(dir.results.find((s: any) => s.subId === sub.subId)!.name).toBe("r/listed");
     });
