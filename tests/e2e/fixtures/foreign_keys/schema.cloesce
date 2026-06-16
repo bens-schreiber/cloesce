@@ -24,7 +24,7 @@ model A for db{
         id: int
     }
     
-    foreign (B::id) optional  {
+    foreign B::id optional  {
         bId
     }
 
@@ -83,7 +83,7 @@ model Dog for db {
         id: int
     }
     
-    foreign (Person::id) {
+    foreign Person::id {
         personId
     }
 
@@ -145,11 +145,11 @@ model Course for db {
 
 model CourseStudent for db {
     primary {
-        foreign (Course::id) {
+        foreign Course::id {
             courseId
         }
 
-        foreign (Student::id) {
+        foreign Student::id {
             studentId
         }
     }

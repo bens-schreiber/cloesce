@@ -936,6 +936,82 @@ fn kv_r2_bindings_fields() {
 }
 
 #[test]
+fn optional_outer_parens() {
+    let ast = lex_and_ast(
+        r#"
+        kv Ns {
+            data(id: int) -> json { "data/{id}" }
+            paginated() -> paginated<json> { "list" }
+        }
+
+        r2 Bucket {
+            file(id: int) { "files/{id}" }
+        }
+
+        model M {
+            primary {
+                id: int
+            }
+
+            foreign Company::id { companyId }
+            foreign (Parent::orgId, Parent::userId) { orgId userId }
+
+            kv Ns::data(id) { cachedData }
+            kv (Ns::paginated) { pagedData }
+            r2 Bucket::file(id) { fileData }
+            r2 (Bucket::file(id)) { wrappedFileData }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+
+    // Single foreign without parens parses identically to the parenthesized form.
+    let company_fb = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Company", "id")]) => Some(fb),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(company_fb.fields[0].name, "companyId");
+
+    assert!(m.blocks.iter().any(|spd| matches!(
+        &spd.inner,
+        ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")])
+    )));
+
+    // kv wrapped in outer parens with no args, and r2 wrapped in outer parens.
+    let paged = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) if kv.field.name == "pagedData" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(paged.binding.name, "Ns");
+    assert_eq!(paged.binding_template.name, "paginated");
+    assert!(paged.args.is_empty());
+
+    let wrapped = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::R2(r2) if r2.field.name == "wrappedFileData" => Some(r2),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(wrapped.binding.name, "Bucket");
+    assert_eq!(wrapped.binding_template.name, "file");
+    assert_eq!(
+        wrapped.args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["id"]
+    );
+}
+
+#[test]
 fn validator_tags() {
     let ast = lex_and_ast(
         r#"

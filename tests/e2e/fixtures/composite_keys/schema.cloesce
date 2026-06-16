@@ -45,7 +45,7 @@ model StudentCourse for db{
             studentName
         }
 
-        foreign (Course::id) {
+        foreign Course::id {
             courseId
         }
     }

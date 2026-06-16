@@ -43,11 +43,11 @@ model Topping for db {
 // Join table for the many-to-many relationship between Hamburger and Topping
 model HamburgerTopping for db {
     primary {
-        foreign (Hamburger::id) {
+        foreign Hamburger::id {
             hamburgerId
         }
 
-        foreign (Topping::id) {
+        foreign Topping::id {
             toppingId
         }
     }

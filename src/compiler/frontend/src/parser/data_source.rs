@@ -93,6 +93,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         .then(symbol())
         .then(
             include_tree
+                .or_not()
                 .then(get_method.or_not())
                 .then(list_method.or_not())
                 .then(save_method.or_not())
@@ -100,8 +101,9 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         )
         .map(
             |(((tags, symbol), model), (((include_entries, get), list), save))| {
-                let tree =
-                    ParsedIncludeTree(include_entries.into_iter().collect::<IndexMap<_, _>>());
+                let tree = include_entries.map(|entries| {
+                    ParsedIncludeTree(entries.into_iter().collect::<IndexMap<_, _>>())
+                });
                 DataSourceBlock {
                     symbol: Symbol { tags, ..symbol },
                     model,

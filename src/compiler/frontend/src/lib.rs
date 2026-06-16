@@ -289,7 +289,7 @@ pub struct DataSourceBlock<'src> {
     /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
 
-    pub tree: ParsedIncludeTree<'src>,
+    pub tree: Option<ParsedIncludeTree<'src>>,
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
