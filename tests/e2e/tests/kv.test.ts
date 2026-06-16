@@ -1,6 +1,6 @@
 import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ModelWithKv, KVOnly, KValue, Paginated } from "../fixtures/kv/client";
+import { ModelWithKv, KVOnly, KValue, Paginated, KVOnlyWithSingleton } from "../fixtures/kv/client";
 import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -104,5 +104,32 @@ describe("KVOnly (route model)", () => {
     expect(res.data?.sibling).toBeDefined();
     expect(res.data?.sibling?.siblingId).toBe(id);
     expect(res.data?.sibling?.siblingData.value).toBe(siblingData);
+  });
+});
+
+describe("KVOnlyWithSingleton (keyless singleton nav)", () => {
+  const id = 3;
+  const someData = { hello: "singleton" };
+  const configData = { appName: "cloesce" };
+
+  it("POST persists the model's KV and the singleton nav's KV", async () => {
+    const model = {
+      id,
+      someData: { raw: someData },
+      appConfig: {
+        config: { raw: configData },
+      },
+    };
+    const res = await KVOnlyWithSingleton.$save(model);
+    expectHttpResult(res, "POST should be OK");
+  });
+
+  it("GET hydrates the singleton nav alongside the model's own KV", async () => {
+    const res = await KVOnlyWithSingleton.$get(id);
+    expectHttpResult(res, "GET should be OK");
+    expect(res.data?.id).toBe(id);
+    expect(res.data?.someData.value).toEqual(someData);
+    expect(res.data?.appConfig).toBeDefined();
+    expect(res.data?.appConfig?.config.value).toEqual(configData);
   });
 });

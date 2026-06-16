@@ -1,16 +1,21 @@
 {
-  "hash": 14940836141014351143,
+  "hash": 14559387822706827383,
   "models": {
     "WeatherReport": {
-      "hash": 7422976606755515433,
+      "hash": 6360791453757933088,
       "name": "WeatherReport",
-      "d1_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -22,7 +27,8 @@
           "hash": 16671312646982238929,
           "field": {
             "name": "title",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -32,7 +38,8 @@
           "hash": 17301296087702549672,
           "field": {
             "name": "description",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -41,7 +48,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 15208662743300168546,
+          "hash": 33023718696911284,
           "field": {
             "name": "weatherEntries",
             "cidl_type": {
@@ -64,15 +71,20 @@
       ]
     },
     "Weather": {
-      "hash": 1015315907049628063,
+      "hash": 12108126940954995129,
       "name": "Weather",
-      "d1_binding": "db",
+      "backing": {
+        "binding": "db",
+        "fields": [],
+        "kind": "D1"
+      },
       "primary_columns": [
         {
           "hash": 6397878138472974760,
           "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -84,7 +96,8 @@
           "hash": 7870174905721178685,
           "field": {
             "name": "weatherReportId",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": {
             "model_name": "WeatherReport",
@@ -97,7 +110,8 @@
           "hash": 271759643018812086,
           "field": {
             "name": "dateTime",
-            "cidl_type": "DateIso"
+            "cidl_type": "DateIso",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -107,7 +121,8 @@
           "hash": 2151026909849323040,
           "field": {
             "name": "location",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -117,7 +132,8 @@
           "hash": 14090310185615507303,
           "field": {
             "name": "temperature",
-            "cidl_type": "Integer"
+            "cidl_type": "Int",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -127,7 +143,8 @@
           "hash": 4254261415713781052,
           "field": {
             "name": "condition",
-            "cidl_type": "String"
+            "cidl_type": "String",
+            "validators": []
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -136,7 +153,7 @@
       ],
       "navigation_fields": [
         {
-          "hash": 8417951033986697560,
+          "hash": 3000149014427972070,
           "field": {
             "name": "weatherReport",
             "cidl_type": {
@@ -148,7 +165,7 @@
           "model_reference": "WeatherReport",
           "kind": {
             "OneToOne": {
-              "columns": [
+              "fields": [
                 "weatherReportId"
               ]
             }

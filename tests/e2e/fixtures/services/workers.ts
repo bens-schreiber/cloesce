@@ -16,8 +16,7 @@ export const FooServiceImpl = FooService.impl({
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
-    app.register(new InjectedThingImpl());
-    app.register(FooServiceImpl);
+    app.register(new InjectedThingImpl(), FooServiceImpl);
 
     return await app.run(request);
   },

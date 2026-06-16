@@ -72,9 +72,7 @@ export class SubRedditDo extends clo.SubRedditDo {
   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
     super(ctx, env);
     this.app = this.cloesce(env, [subRedditDoInitial]);
-    this.app.register(SubReddit);
-    this.app.register(Post);
-    this.app.register(Comment);
+    this.app.register(SubReddit, Post, Comment);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -99,7 +97,7 @@ export class SubRedditDo extends clo.SubRedditDo {
 export default {
   async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
     const app = clo.cloesce(env);
-    app.register(Global).register(SubReddit).register(Post).register(Comment);
+    app.register(Global, SubReddit, Post, Comment);
     return await app.run(request);
   },
 };

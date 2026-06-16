@@ -4,8 +4,8 @@
   "scripts": {
     "lint": "oxlint src/runtime/ts tests/",
     "lint:fix": "oxlint --fix src/runtime/ts tests/",
-    "fmt": "oxfmt src/runtime/ts tests/ docs/ proposals/ CHANGELOG.md",
-    "fmt:check": "oxfmt --check src/runtime/ts tests/"
+    "fmt": "oxfmt src/runtime/ts tests/ examples/ docs/ proposals/ CHANGELOG.md",
+    "fmt:check": "oxfmt --check src/runtime/ts tests/ examples/"
   },
   "devDependencies": {
     "oxfmt": "^0.46.0",

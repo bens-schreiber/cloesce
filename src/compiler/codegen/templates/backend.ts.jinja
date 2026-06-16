@@ -189,7 +189,7 @@ export interface {{ poo.name }} {
 {%- endfor %}
 
 {%- for (_key, model) in &idl.models %}
-{%- if model.backing.is_none() && model.route_fields.is_empty() %}
+{%- if !model.has_data() %}
 export namespace {{ model.name }} {
     export const Tag = "{{ model.name }}" as const;
 

@@ -299,8 +299,8 @@ pub struct NavAdj<'src> {
     /// `AdjModel` in `AdjModel::field`
     pub model: Symbol<'src>,
 
-    /// `field` in `AdjModel::field`
-    pub field: Symbol<'src>,
+    /// `field` in `AdjModel::field`.
+    pub field: Option<Symbol<'src>>,
 
     /// The local FK column on the current model: the `(localKey)` part.
     /// `Some` => 1:1 entry, `None` => 1:M entry.

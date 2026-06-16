@@ -14,11 +14,11 @@ fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
 }
 
 /// Matches a nav block's adjacency entries against `(model, field, local_key)` triples.
-fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, &str, Option<&str>)]) -> bool {
+fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, Option<&str>, Option<&str>)]) -> bool {
     adj.len() == expected.len()
         && adj.iter().zip(expected).all(|(a, (em, ef, ek))| {
             a.model.name == *em
-                && a.field.name == *ef
+                && a.field.as_ref().map(|s| s.name) == *ef
                 && a.local_key.as_ref().map(|s| s.name) == *ek
         })
 }
@@ -758,7 +758,7 @@ fn model_navigation() {
     assert!(location_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &location_nav.adj,
-        &[("Location", "id", Some("locationId"))]
+        &[("Location", Some("id"), Some("locationId"))]
     ));
 
     let weathers_nav = m
@@ -772,7 +772,7 @@ fn model_navigation() {
     assert!(!weathers_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &weathers_nav.adj,
-        &[("Weather", "reportId", None)]
+        &[("Weather", Some("reportId"), None)]
     ));
 
     let alerts_nav = m
@@ -785,7 +785,10 @@ fn model_navigation() {
         .unwrap();
     assert!(nav_adj_matches(
         &alerts_nav.adj,
-        &[("Alert", "regionId", None), ("Alert", "zoneId", None)]
+        &[
+            ("Alert", Some("regionId"), None),
+            ("Alert", Some("zoneId"), None)
+        ]
     ));
 }
 
@@ -830,7 +833,34 @@ fn model_route() {
     assert!(dog_nav.is_one_to_one());
     assert!(nav_adj_matches(
         &dog_nav.adj,
-        &[("Dog", "ownerId", Some("id"))]
+        &[("Dog", Some("ownerId"), Some("id"))]
+    ));
+}
+
+#[test]
+fn model_keyless_singleton_nav() {
+    let ast = lex_and_ast(
+        r#"
+        model M {
+            nav Singleton { config }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "M");
+    let config_nav = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Navigation(n) if n.nav.inner.name == "config" => Some(n),
+            _ => None,
+        })
+        .unwrap();
+
+    assert!(!config_nav.is_one_to_one());
+    assert!(nav_adj_matches(
+        &config_nav.adj,
+        &[("Singleton", None, None)]
     ));
 }
 

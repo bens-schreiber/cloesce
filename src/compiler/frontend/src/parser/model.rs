@@ -146,7 +146,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     // `nav (Adj::f1, Adj::f2) { ident }`         (1:M composite)
     // `nav AdjModel::field(localKey) { ident }`  (1:1 single)
     // `nav (Adj::f1(l1), Adj::f2(l2)) { ident }` (1:1 composite)
+    // `nav Foo { ident }`                          (keyless singleton)
     let nav_block = {
+        // `Model::field` or `Model::field(localKey)`
         let nav_adj = || {
             symbol()
                 .then_ignore(just(Token::DoubleColon))
@@ -158,9 +160,18 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 )
                 .map(|((model, field), local_key)| NavAdj {
                     model,
-                    field,
+                    field: Some(field),
                     local_key,
                 })
+        };
+
+        // bare `Model` with no `::field`
+        let bare_adj = || {
+            symbol().map(|model| NavAdj {
+                model,
+                field: None,
+                local_key: None,
+            })
         };
 
         let composite = nav_adj()
@@ -168,7 +179,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .at_least(1)
             .collect::<Vec<_>>()
             .delimited_by(just(Token::LParen), just(Token::RParen));
-        let single = nav_adj().map(|a| vec![a]);
+        let single = nav_adj().or(bare_adj()).map(|a| vec![a]);
 
         kw!(Nav)
             .ignore_then(composite.or(single))

@@ -116,8 +116,10 @@ export class CloesceApp {
    * dependency with the router, making API methods, data source stubs, and
    * injections available for routing.
    */
-  public register<T extends { readonly tag: string }>(model: T): this {
-    this.modelRegistry.set(model.tag, model);
+  public register(...models: Array<{ readonly tag: string }>): this {
+    for (const model of models) {
+      this.modelRegistry.set(model.tag, model);
+    }
     return this;
   }
 

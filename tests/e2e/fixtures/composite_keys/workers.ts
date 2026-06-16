@@ -27,7 +27,7 @@ const StudentImpl = Student.impl({
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
-    app.register(StudentImpl).register(Course.impl({})).register(StudentCourse.impl({}));
+    app.register(StudentImpl, Course.impl({}), StudentCourse.impl({}));
 
     return await app.run(request);
   },

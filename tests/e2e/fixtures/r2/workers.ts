@@ -25,9 +25,7 @@ export const R2SiblingImpl = R2Sibling.impl({
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
     const app = cloesce(env);
-    app.register(D1BackedModelImpl);
-    app.register(R2OnlyImpl);
-    app.register(R2SiblingImpl);
+    app.register(D1BackedModelImpl, R2OnlyImpl, R2SiblingImpl);
     return await app.run(request);
   },
 };

@@ -586,10 +586,10 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let entries = comma_separated(&self.adj, |adj| {
-            let mut d = ctx
-                .sym_doc(&adj.model, 0, true)
-                .then(Doc::text("::"))
-                .then(ctx.sym_doc(&adj.field, 0, true));
+            let mut d = ctx.sym_doc(&adj.model, 0, true);
+            if let Some(field) = &adj.field {
+                d = d.then(Doc::text("::")).then(ctx.sym_doc(field, 0, true));
+            }
             if let Some(local) = &adj.local_key {
                 d = d
                     .then(Doc::text("("))

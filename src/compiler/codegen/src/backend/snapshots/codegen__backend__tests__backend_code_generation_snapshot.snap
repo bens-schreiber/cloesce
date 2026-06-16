@@ -173,12 +173,12 @@ export namespace Env {
     export type LeaderboardDo = CfEnv["LeaderboardDo"] & ReturnType<typeof LeaderboardDoHelpers>;
 }
 
-export interface Env extends CfEnv {
+export type Env = CfEnv & {
     MyKv: Env.MyKv;
     MyR2: Env.MyR2;
     GlobalDo: Env.GlobalDo;
     LeaderboardDo: Env.LeaderboardDo;
-}
+};
 
 export function upgradeEnv(env: CfEnv): Env {
     Object.assign(env.MyKv, MyKvHelpers(env.MyKv));

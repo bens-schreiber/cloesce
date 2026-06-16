@@ -10,6 +10,10 @@ kv namespace {
     paginatedData() -> paginated<json> {
         "path/to/data/"
     }
+
+    config() -> json {
+        "config"
+    }
 }
 
 kv otherNamespace {
@@ -69,4 +73,23 @@ model KVSibling {
     kv otherNamespace::otherData(siblingId) {
         siblingData
     }
+}
+
+model AppConfig {
+    kv namespace::config() {
+        config
+    }
+}
+
+[crud get, save]
+model KVOnlyWithSingleton {
+    route {
+        id: int
+    }
+
+    kv namespace::data(id) {
+        someData
+    }
+
+    nav AppConfig { appConfig }
 }

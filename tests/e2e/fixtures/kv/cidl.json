@@ -37,6 +37,17 @@
             },
             "params": [],
             "key_format": "path/to/data/"
+          },
+          {
+            "field": {
+              "name": "config",
+              "cidl_type": {
+                "KvObject": "Json"
+              },
+              "validators": []
+            },
+            "params": [],
+            "key_format": "config"
           }
         ]
       },
@@ -68,6 +79,69 @@
     "vars": []
   },
   "models": {
+    "AppConfig": {
+      "hash": 0,
+      "backing": null,
+      "name": "AppConfig",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "config",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "namespace",
+          "key_format": "config"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "route_fields": [],
+      "apis": [],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [],
+            "injected": [
+              "namespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "AppConfig"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "namespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": []
+    },
     "KVOnly": {
       "hash": 0,
       "backing": null,
@@ -212,6 +286,158 @@
             "injected": [
               "namespace",
               "otherNamespace"
+            ],
+            "is_stub": false
+          },
+          "include_query": "",
+          "get_query": "",
+          "list_query": "",
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Get",
+        "Save"
+      ]
+    },
+    "KVOnlyWithSingleton": {
+      "hash": 0,
+      "backing": null,
+      "name": "KVOnlyWithSingleton",
+      "primary_columns": [],
+      "columns": [],
+      "kv_fields": [
+        {
+          "field": {
+            "name": "someData",
+            "cidl_type": {
+              "KvObject": "Json"
+            },
+            "validators": []
+          },
+          "binding": "namespace",
+          "key_format": "path/to/data/{id}"
+        }
+      ],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 0,
+          "field": {
+            "name": "appConfig",
+            "cidl_type": {
+              "Object": {
+                "name": "AppConfig"
+              }
+            }
+          },
+          "model_reference": "AppConfig",
+          "kind": {
+            "OneToOne": {
+              "fields": []
+            }
+          }
+        }
+      ],
+      "route_fields": [
+        {
+          "name": "id",
+          "cidl_type": "Int",
+          "validators": []
+        }
+      ],
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnlyWithSingleton"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Int",
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace"
+          ],
+          "durable_target": null
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Object": {
+              "name": "KVOnlyWithSingleton"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "KVOnlyWithSingleton"
+                }
+              },
+              "validators": []
+            }
+          ],
+          "injected": [
+            "namespace"
+          ],
+          "durable_target": null
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [],
+            "injected": [],
+            "is_stub": false
+          },
+          "get": {
+            "parameters": [
+              {
+                "parameter": {
+                  "name": "id",
+                  "cidl_type": "Int",
+                  "validators": []
+                },
+                "instance_field": true
+              }
+            ],
+            "injected": [
+              "namespace"
+            ],
+            "is_stub": false
+          },
+          "save": {
+            "parameters": [
+              {
+                "name": "model",
+                "cidl_type": {
+                  "Partial": {
+                    "object_name": "KVOnlyWithSingleton"
+                  }
+                },
+                "validators": []
+              }
+            ],
+            "injected": [
+              "namespace"
             ],
             "is_stub": false
           },

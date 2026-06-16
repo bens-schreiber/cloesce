@@ -20,6 +20,8 @@
 - Upgraded the Cloudflare Env to the Cloesce Env which adds more methods to access bindings
 - Allow a missing `include` block (defaults to default include tree)
 - Allow dropping of outer parenthesis in statements that are not composite
+- Allow a `nav` field with no keys (1:1 to a singleton model).
+- Pass variardic args to `CloesceApp.register` instead of chaining calls
 
 ### Fixed
 
