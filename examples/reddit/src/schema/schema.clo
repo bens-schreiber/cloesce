@@ -73,10 +73,6 @@ kv SubReddits {
     entry(subId: string) -> SubRedditEntry {
         "subreddits/{subId}"
     }
-    
-    directory() -> SubRedditEntry {
-        "subreddits/"
-    }
 }
 
 durable SubRedditDo {

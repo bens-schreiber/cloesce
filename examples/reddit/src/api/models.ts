@@ -39,7 +39,7 @@ export const SubReddit = clo.SubReddit.impl({
     }),
 
   async list(env) {
-    const { keys } = await env.SubReddits.list({ prefix: env.SubReddits.directory.template() });
+    const { keys } = await env.SubReddits.entry.list();
     return (await Promise.all(
       keys.map((k) => env.SubReddits.get(k.name, "json")),
     )) as clo.SubRedditEntry[];
