@@ -442,22 +442,11 @@ async function validateRequest(
   return Either.right(params);
 
   function validateField(field: Field, value: unknown): Either<HttpResult, unknown> {
-    // Path/query values arrive as raw strings; try JSON-parsing so int/bool/null reach
-    // validate_type as their declared type. Falls back to the raw string when the
-    // value is a plain string (e.g. for `string`-typed fields).
-    let coerced = value;
-    if (typeof value === "string") {
-      try {
-        coerced = JSON.parse(value);
-      } catch {
-        coerced = value;
-      }
-    }
     const validateRes = invokeOrmWasm(
       wasm.validate_type,
       [
         WasmResource.fromString(JSON.stringify(field), wasm),
-        WasmResource.fromString(JSON.stringify(coerced), wasm),
+        WasmResource.fromString(JSON.stringify(value), wasm),
       ],
       wasm,
     );
