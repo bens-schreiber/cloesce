@@ -41,7 +41,7 @@ describe("Sharded Durable Object-backed model", () => {
   it("$save fans out KV writes to the DO storage and a Worker KV namespace", async () => {
     const saved = await SubReddit.$save(1, {
       subId: 1,
-      metadata: { raw: "r/cloesce" },
+      metadata: "r/cloesce",
       globalMetadata: { raw: "global-1" },
     });
     expectHttpResult(saved, "$save should be OK");
@@ -49,23 +49,24 @@ describe("Sharded Durable Object-backed model", () => {
     const got = await SubReddit.$get(1);
     expectHttpResult(got, "$get should be OK");
     expect(got.data!.subId).toBe(1);
-    expect(got.data!.metadata.value).toBe("r/cloesce");
+
+    expect(got.data!.metadata).toBe("r/cloesce");
     expect(got.data!.globalMetadata.value).toBe("global-1");
   });
 
   it("different shards resolve to isolated DO instances", async () => {
     await SubReddit.$save(2, {
       subId: 2,
-      metadata: { raw: "r/other" },
+      metadata: "r/other",
       globalMetadata: { raw: "global-2" },
     });
 
     const sub2 = await SubReddit.$get(2);
-    expect(sub2.data!.metadata.value).toBe("r/other");
+    expect(sub2.data!.metadata).toBe("r/other");
 
     // shard 1 is unaffected by shard 2's write.
     const sub1 = await SubReddit.$get(1);
-    expect(sub1.data!.metadata.value).toBe("r/cloesce");
+    expect(sub1.data!.metadata).toBe("r/cloesce");
   });
 
   it("rejects a subId that violates the inherited shard validator", async () => {

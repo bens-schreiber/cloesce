@@ -68,10 +68,6 @@ pub enum CidlType<'src> {
     #[serde(borrow)]
     Nullable(Box<CidlType<'src>>),
 
-    /// A paginated response containing list metadata and a page of results.
-    #[serde(borrow)]
-    Paginated(Box<CidlType<'src>>),
-
     /// A Cloudflare Workers KV object (GET value response)
     #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
@@ -83,7 +79,6 @@ impl<'src> CidlType<'src> {
             CidlType::Array(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
             CidlType::KvObject(inner) => inner.root_type(),
-            CidlType::Paginated(inner) => inner.root_type(),
             t => t,
         }
     }
@@ -99,10 +94,6 @@ impl<'src> CidlType<'src> {
         matches!(self, CidlType::Nullable(_))
     }
 
-    pub fn is_paginated(&self) -> bool {
-        matches!(self, CidlType::Paginated(_))
-    }
-
     pub fn is_kv_object(&self) -> bool {
         matches!(self, CidlType::KvObject(_))
     }
@@ -113,10 +104,6 @@ impl<'src> CidlType<'src> {
 
     pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
-    }
-
-    pub fn paginated(cidl_type: CidlType<'src>) -> CidlType<'src> {
-        CidlType::Paginated(Box::new(cidl_type))
     }
 }
 
@@ -346,6 +333,11 @@ impl DataSource<'_> {
 
 #[derive(Deserialize, Serialize)]
 pub struct KvField<'src> {
+    /// The field on the model that represents this KV binding.
+    ///
+    /// A KV field hydrated from some Workers KV binding will always
+    /// be wrapped in [CidlType::KvObject], but a KV field hydrated from
+    /// Durable Object storage _may_ not be.
     pub field: ValidatedField<'src>,
 
     /// The KV namespace being referenced.
@@ -459,6 +451,7 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub columns: Vec<Column<'src>>,
 
+    /// Contains both Workers KV and Durable Object KV
     #[serde(borrow)]
     pub kv_fields: Vec<KvField<'src>>,
 
@@ -557,6 +550,10 @@ pub struct BindingTemplate<'src> {
 
     #[serde(borrow)]
     pub key_format: &'src str,
+
+    /// Everything in `key_format` up to (not including) the first `{` placeholder.
+    /// Used both for `list` codegen and overlap detection.
+    pub prefix: String,
 }
 
 #[derive(Deserialize, Serialize)]

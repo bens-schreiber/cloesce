@@ -129,7 +129,7 @@
     },
     "generic-type": {
       "name": "support.type.generic.cloesce",
-      "match": "\\b(option|array|paginated|kvobject|partial)\\b"
+      "match": "\\b(option|array|kvobject|partial)\\b"
     },
     "type-name": {
       "comment": "PascalCase identifiers — visually distinguishes model/source/poo references",

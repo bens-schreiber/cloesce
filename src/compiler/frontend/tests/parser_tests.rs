@@ -43,10 +43,6 @@ fn top_level_bindings() {
             entry(id: string) -> json {
                 "cache/{id}"
             }
-
-            page() -> paginated<json> {
-                "cache/"
-            }
         }
 
         vars {
@@ -101,19 +97,13 @@ fn top_level_bindings() {
         })
         .expect("kv binding block to be present");
     assert_eq!(kv.symbol.name, "Cache");
-    assert_eq!(kv.templates.len(), 2);
+    assert_eq!(kv.templates.len(), 1);
 
     let entry = &kv.templates[0].inner;
     assert_eq!(entry.symbol.name, "entry");
     assert_eq!(entry.symbol.cidl_type, CidlType::Json);
     assert_eq!(entry.key_format, "cache/{id}");
     assert_eq!(entry.params.len(), 1);
-
-    let page = &kv.templates[1].inner;
-    assert_eq!(page.symbol.name, "page");
-    assert_eq!(page.symbol.cidl_type, CidlType::paginated(CidlType::Json));
-    assert_eq!(page.key_format, "cache/");
-    assert!(page.params.is_empty());
 
     // vars
     let vars = ast
@@ -871,7 +861,7 @@ fn kv_r2_bindings_fields() {
         }
 
         kv NsB {
-            page(cursor: string) -> paginated<json> {
+            page(cursor: string) -> json {
                 "list/{cursor}"
             }
         }
@@ -967,7 +957,7 @@ fn optional_outer_parens() {
         r#"
         kv Ns {
             data(id: int) -> json { "data/{id}" }
-            paginated() -> paginated<json> { "list" }
+            listing() -> json { "list" }
         }
 
         r2 Bucket {
@@ -983,7 +973,7 @@ fn optional_outer_parens() {
             foreign (Parent::orgId, Parent::userId) { orgId userId }
 
             kv Ns::data(id) { cachedData }
-            kv (Ns::paginated) { pagedData }
+            kv (Ns::listing) { pagedData }
             r2 Bucket::file(id) { fileData }
             r2 (Bucket::file(id)) { wrappedFileData }
         }
@@ -1018,7 +1008,7 @@ fn optional_outer_parens() {
         })
         .unwrap();
     assert_eq!(paged.binding.name, "Ns");
-    assert_eq!(paged.binding_template.name, "paginated");
+    assert_eq!(paged.binding_template.name, "listing");
     assert!(paged.args.is_empty());
 
     let wrapped = m

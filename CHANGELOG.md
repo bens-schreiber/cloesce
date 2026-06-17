@@ -10,6 +10,7 @@
 - Binding templates for `kv`, `r2`, and `durable` allowing the declaration to list all key locations
 - New Worker backed models to replace `keyfield`
 - Allow D1 backed models to have a navigation property to a Worker backed model, but not the other way around.
+- Semantic analysis for key formats overlapping
 
 ### Changed
 
@@ -22,6 +23,8 @@
 - Allow dropping of outer parenthesis in statements that are not composite
 - Allow a `nav` field with no keys (1:1 to a singleton model).
 - Pass variardic args to `CloesceApp.register` instead of chaining calls
+- Removed `paginated` from the schema, instead generating `list` methods on the binding templates for KV, R2 and Durable Objects.
+- Removed `prefix` from the `KValue` interface
 
 ### Fixed
 

@@ -22,7 +22,7 @@ describe("Subreddits", () => {
       SubReddit.create(e, { name: "r/dogs", description: "woof" }),
     );
     expect(sub.subId).toBeTypeOf("string");
-    expect(sub.metadata.value.name).toBe("r/dogs");
+    expect(sub.metadata.name).toBe("r/dogs");
   });
 
   it("created subreddits appear in the global directory", async () => {
@@ -30,8 +30,8 @@ describe("Subreddits", () => {
       SubReddit.create(e, { name: "r/listed", description: "" }),
     );
     const dir = await SubReddit.list({ SubReddits: upgradeEnv(env).SubReddits });
-    expect(dir.results.map((s: any) => s.subId)).toContain(sub.subId);
-    expect(dir.results.find((s: any) => s.subId === sub.subId)!.name).toBe("r/listed");
+    expect(dir.map((s: any) => s.subId)).toContain(sub.subId);
+    expect(dir.find((s: any) => s.subId === sub.subId)!.name).toBe("r/listed");
   });
 });
 

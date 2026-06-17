@@ -23,20 +23,8 @@
                 "validators": []
               }
             ],
-            "key_format": "path/to/data/{id}"
-          },
-          {
-            "field": {
-              "name": "paginatedData",
-              "cidl_type": {
-                "Paginated": {
-                  "KvObject": "Json"
-                }
-              },
-              "validators": []
-            },
-            "params": [],
-            "key_format": "path/to/data/"
+            "key_format": "path/to/data/{id}",
+            "prefix": "path/to/data/"
           },
           {
             "field": {
@@ -47,7 +35,8 @@
               "validators": []
             },
             "params": [],
-            "key_format": "config"
+            "key_format": "config",
+            "prefix": "config"
           }
         ]
       },
@@ -69,7 +58,8 @@
                 "validators": []
               }
             ],
-            "key_format": "path/to/other/{id}"
+            "key_format": "path/to/other/{id}",
+            "prefix": "path/to/other/"
           }
         ]
       }
@@ -597,19 +587,6 @@
           },
           "binding": "otherNamespace",
           "key_format": "path/to/other/{id}"
-        },
-        {
-          "field": {
-            "name": "paginatedItems",
-            "cidl_type": {
-              "Paginated": {
-                "KvObject": "Json"
-              }
-            },
-            "validators": []
-          },
-          "binding": "namespace",
-          "key_format": "path/to/data/"
         }
       ],
       "r2_fields": [],
@@ -617,24 +594,20 @@
       "route_fields": [],
       "apis": [
         {
-          "name": "acceptPaginated",
+          "name": "acceptKvObject",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Paginated": {
-              "KvObject": "Json"
-            }
+            "KvObject": "Json"
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "ps",
+              "name": "item",
               "cidl_type": {
-                "Paginated": {
-                  "KvObject": "Json"
-                }
+                "KvObject": "Json"
               },
               "validators": []
             }

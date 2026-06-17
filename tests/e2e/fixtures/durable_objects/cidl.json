@@ -21,7 +21,8 @@
                 "validators": []
               }
             ],
-            "key_format": "metadata/{subId}"
+            "key_format": "metadata/{subId}",
+            "prefix": "metadata/"
           }
         ]
       }
@@ -35,13 +36,12 @@
           {
             "field": {
               "name": "metadata",
-              "cidl_type": {
-                "KvObject": "Json"
-              },
+              "cidl_type": "Json",
               "validators": []
             },
             "params": [],
-            "key_format": "metadata"
+            "key_format": "metadata",
+            "prefix": "metadata"
           }
         ]
       },
@@ -64,13 +64,12 @@
           {
             "field": {
               "name": "metadata",
-              "cidl_type": {
-                "KvObject": "Json"
-              },
+              "cidl_type": "Json",
               "validators": []
             },
             "params": [],
-            "key_format": "metadata"
+            "key_format": "metadata",
+            "prefix": "metadata"
           }
         ]
       }
@@ -92,9 +91,7 @@
         {
           "field": {
             "name": "metadata",
-            "cidl_type": {
-              "KvObject": "Json"
-            },
+            "cidl_type": "Json",
             "validators": []
           },
           "binding": "GlobalDo",
@@ -698,9 +695,7 @@
         {
           "field": {
             "name": "metadata",
-            "cidl_type": {
-              "KvObject": "Json"
-            },
+            "cidl_type": "Json",
             "validators": []
           },
           "binding": "SubRedditDo",

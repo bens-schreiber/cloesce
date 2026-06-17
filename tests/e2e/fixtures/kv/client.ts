@@ -135,16 +135,15 @@ export class ModelWithKv {
   someOtherColumn: string;
   someData: KValue<unknown>;
   someOtherData: KValue<string>;
-  paginatedItems: Paginated<KValue<unknown>>;
-  static async acceptPaginated(
-    ps: Paginated<KValue<unknown>>,
+  static async acceptKvObject(
+    item: KValue<unknown>,
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
+  ): Promise<HttpResult<KValue<unknown>>> {
     const __$baseUrl = new URL(
-      `http://localhost:5416/api/ModelWithKv/acceptPaginated`
+      `http://localhost:5416/api/ModelWithKv/acceptKvObject`
     );
     const __$payload: any = {};
-    __$payload["ps"] = ps;
+    __$payload["item"] = item;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
@@ -229,11 +228,6 @@ export class ModelWithKv {
     const __$res = Object.assign(new ModelWithKv(), data);
     if (__$res.someData) __$res.someData = Object.assign(new KValue(), __$res.someData);
     if (__$res.someOtherData) __$res.someOtherData = Object.assign(new KValue(), __$res.someOtherData);
-    if (__$res.paginatedItems?.results) {
-      for (let i = 0; i < __$res.paginatedItems.results.length; i++) {
-        __$res.paginatedItems.results[i] = Object.assign(new KValue(), __$res.paginatedItems.results[i]);
-      }
-    }
     return __$res;
   }
 }
@@ -249,18 +243,11 @@ type DeepPartialInner<T> = T extends (infer U)[]
 export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
-  key!: string;
   raw: unknown | null;
   metadata: unknown | null;
   get value(): V | null {
     return this.raw as V | null;
   }
-}
-
-export interface Paginated<T> {
-  results: T[];
-  cursor: string | null;
-  complete: boolean;
 }
 
 export enum MediaType {

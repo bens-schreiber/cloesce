@@ -218,25 +218,10 @@ fn blob() {
 
 #[test]
 fn kv() {
-    // Missing key
-    {
-        let idl = empty_idl();
-        let value = json!({
-            "raw": "hello"
-        });
-        let result = validate(
-            CidlType::KvObject(Box::new(CidlType::String)),
-            Some(value),
-            &idl,
-        );
-        assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
-    }
-
     // Non object metadata
     {
         let idl = empty_idl();
         let value = json!({
-            "key": "my-key",
             "raw": "hello",
             "metadata": "not-an-object"
         });
@@ -252,7 +237,6 @@ fn kv() {
     {
         let idl = empty_idl();
         let value = json!({
-            "key": "my-key",
             "raw": "hello"
         });
         let result = validate(
@@ -499,63 +483,6 @@ fn json_value_type_accepts_anything() {
     ] {
         let result = validate(CidlType::Json, Some(val.clone()), &idl);
         assert_eq!(result.unwrap(), Some(val));
-    }
-}
-
-#[test]
-fn paginated() {
-    // Valid KV paginated result
-    {
-        let idl = empty_idl();
-        let value = json!({
-            "results": [
-                { "key": "item1", "raw": { "data": "value1" }, "metadata": null },
-                { "key": "item2", "raw": { "data": "value2" }, "metadata": { "custom": "field" } }
-            ],
-            "cursor": "next_page_cursor",
-            "complete": false
-        });
-        let result = validate(
-            CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::Json)))),
-            Some(value),
-            &idl,
-        );
-        assert!(result.is_ok());
-        let validated = result.unwrap().unwrap();
-        assert_eq!(
-            validated.get("cursor").and_then(|v| v.as_str()),
-            Some("next_page_cursor")
-        );
-        assert_eq!(
-            validated.get("complete").and_then(|v| v.as_bool()),
-            Some(false)
-        );
-    }
-
-    // Missing cursor defaults to null
-    {
-        let idl = empty_idl();
-        let value = json!({ "results": [], "complete": true });
-        let result = validate(
-            CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::Json)))),
-            Some(value),
-            &idl,
-        );
-        assert!(result.is_ok());
-        let validated = result.unwrap().unwrap();
-        assert!(validated.get("cursor").unwrap().is_null());
-    }
-
-    // Invalid cursor type fails
-    {
-        let idl = empty_idl();
-        let value = json!({ "results": [], "cursor": 123, "complete": true });
-        let result = validate(
-            CidlType::Paginated(Box::new(CidlType::R2Object)),
-            Some(value),
-            &idl,
-        );
-        assert!(matches!(result, Err(OrmErrorKind::TypeMismatch { .. })));
     }
 }
 
@@ -1005,7 +932,6 @@ fn validators_in_model() {
             "price": 100,
             "name": "Widget",
             "slug": {
-                "key": "product/1/meta",
                 "metadata": null,
                 "raw": "widget_123"
             },
@@ -1027,7 +953,6 @@ fn validators_in_model() {
             "price": 0,
             "name": "Widget",
             "slug": {
-                "key": "product/1/meta",
                 "metadata": null,
                 "raw": "widget_123"
             },
@@ -1050,7 +975,6 @@ fn validators_in_model() {
             "price": 100,
             "name": "Hi",
             "slug": {
-                "key": "product/1/meta",
                 "metadata": null,
                 "raw": "widget_123"
             },
@@ -1073,7 +997,6 @@ fn validators_in_model() {
             "price": 100,
             "name": "Widget",
             "slug": {
-                "key": "product/1/meta",
                 "metadata": null,
                 "raw": "widget_123"
             },

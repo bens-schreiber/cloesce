@@ -9,8 +9,8 @@ import {
 } from "./backend.js";
 
 const ModelWithKvImpl = ModelWithKv.impl({
-  acceptPaginated(ps) {
-    return ps;
+  acceptKvObject(item) {
+    return item;
   },
 });
 

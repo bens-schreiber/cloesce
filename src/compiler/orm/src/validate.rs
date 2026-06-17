@@ -158,20 +158,10 @@ pub fn validate_cidl_type(
                 fail!(type_mismatch_err(value));
             }
             let obj = value.as_object_mut().unwrap();
-            let key = obj.remove("key");
             let raw = obj.remove("raw");
             let metadata = obj.remove("metadata");
 
             let mut new_obj = serde_json::Map::<String, Value>::new();
-
-            // Key must exist and be a string
-            if !partial && !matches!(key, Some(Value::String(_))) {
-                fail!(OrmErrorKind::MissingField {
-                    expected: fmt_cidl_type(&CidlType::String),
-                    missing: "key".to_string(),
-                })
-            }
-            new_obj.insert("key".to_string(), key.unwrap_or(Value::Null));
 
             // Metadata must be an object or null if it exists
             if let Some(metadata) = metadata.to_owned()
@@ -337,60 +327,6 @@ pub fn validate_cidl_type(
                 }
             }
             Some(Value::Array(new_arr))
-        }
-
-        CidlType::Paginated(inner) => {
-            if !value.is_object() {
-                fail!(type_mismatch_err(value));
-            }
-            let obj = value.as_object_mut().unwrap();
-            let mut new_obj = serde_json::Map::<String, Value>::new();
-
-            // Validate results array
-            let results = obj.remove("results");
-
-            let results_value = validate_cidl_type(
-                &ValidatedField {
-                    name: "results".into(),
-                    cidl_type: CidlType::Array(inner.clone()),
-                    validators: vec![],
-                },
-                results,
-                idl,
-                is_partial,
-            )?;
-            if let Some(results_value) = results_value {
-                new_obj.insert("results".to_string(), results_value);
-            }
-
-            // Validate cursor (string | null)
-            let cursor = obj.remove("cursor");
-            if let Some(cursor_value) = cursor {
-                if !cursor_value.is_string() && !cursor_value.is_null() {
-                    fail!(type_mismatch_err(cursor_value));
-                }
-                new_obj.insert("cursor".to_string(), cursor_value);
-            } else {
-                new_obj.insert("cursor".to_string(), Value::Null);
-            }
-
-            // Validate complete (boolean)
-            let complete = obj.remove("complete");
-            let complete_value = validate_cidl_type(
-                &ValidatedField {
-                    name: "complete".into(),
-                    cidl_type: CidlType::Boolean,
-                    validators: vec![],
-                },
-                complete,
-                idl,
-                is_partial,
-            )?;
-            if let Some(complete_value) = complete_value {
-                new_obj.insert("complete".to_string(), complete_value);
-            }
-
-            Some(Value::Object(new_obj))
         }
 
         _ => unimplemented!(),

@@ -53,7 +53,7 @@ async function home() {
   // The global subreddit directory (a Worker KV index written on create).
   const subs = app.querySelector("#subs")!;
   const dir = await SubReddit.list();
-  const entries = dir.data?.results ?? [];
+  const entries = dir.data ?? [];
   if (entries.length === 0) subs.append(el(`<p class="muted">None yet — create one above.</p>`));
   for (const s of entries) {
     subs.append(el(`<div class="card"><a onclick="go('#/r/${s.subId}')">r/${s.name}</a></div>`));
@@ -62,7 +62,7 @@ async function home() {
 
 async function subreddit(id: string) {
   const sub = await SubReddit.$get(id);
-  const meta = sub.data?.metadata.value ?? { name: id, description: "" };
+  const meta = sub.data?.metadata ?? { name: id, description: "" };
   const posts = await Post.$list(id, 0, 100);
 
   app.replaceChildren(
@@ -102,7 +102,7 @@ async function postView(subId: string, postId: number) {
   if (!res.ok) return app.replaceChildren(el(`<p>Post not found.</p>`));
   const post = res.data!;
   const sub = await SubReddit.$get(subId);
-  const subName = sub.data?.metadata.value?.name ?? subId;
+  const subName = sub.data?.metadata?.name ?? subId;
 
   app.replaceChildren(
     el(`<div>

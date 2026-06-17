@@ -38,6 +38,7 @@ mod data_source;
 mod env;
 pub mod err;
 mod model;
+mod trie;
 
 /// Undergoes semantic analysis and expansion on the provided [Ast],
 /// returning either a valid [CloesceIdl] or a list of [SemanticError]s.
@@ -505,10 +506,6 @@ fn resolve_cidl_type<'src, 'p>(
         CidlType::Array(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
             Ok(CidlType::Array(Box::new(resolved_inner)))
-        }
-        CidlType::Paginated(inner) => {
-            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            Ok(CidlType::Paginated(Box::new(resolved_inner)))
         }
         CidlType::KvObject(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;

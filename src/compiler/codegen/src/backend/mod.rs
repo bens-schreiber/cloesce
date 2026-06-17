@@ -57,6 +57,10 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.interpolate_format(format, names)
     }
 
+    fn key_prefix(&self, prefix: &str) -> String {
+        self.mapper.interpolate_format(prefix, std::iter::empty())
+    }
+
     fn shard_template(&self, binding: &DurableBinding<'_>) -> String {
         let mut format = binding.name.to_string();
         for field in &binding.shard_fields {

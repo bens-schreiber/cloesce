@@ -147,29 +147,13 @@ export class {{ model.name }} {
 {%- for col in &model.columns %}{{ deserialize_field(col.field.name, &col.field.cidl_type) }}{%- endfor %}
 {%- for field in &model.route_fields %}{{ deserialize_field(field.name, &field.cidl_type) }}{%- endfor %}
 {%- for kv in &model.kv_fields %}
-{%- if self.is_paginated(&kv.field.cidl_type) %}
-    if (__$res.{{ kv.field.name }}?.results) {
-      for (let i = 0; i < __$res.{{ kv.field.name }}.results.length; i++) {
-        __$res.{{ kv.field.name }}.results[i] = Object.assign(new KValue(), __$res.{{ kv.field.name }}.results[i]);
-{%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
-        if (__$res.{{ kv.field.name }}.results[i].raw) __$res.{{ kv.field.name }}.results[i].raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(__$res.{{ kv.field.name }}.results[i].raw);
-{%- endif %}
-      }
-    }
-{%- else if !self.contains_stream(&kv.field.cidl_type) %}
+{%- if self.is_kv_object(&kv.field.cidl_type) && !self.contains_stream(&kv.field.cidl_type) %}
     if (__$res.{{ kv.field.name }}) __$res.{{ kv.field.name }} = Object.assign(new KValue(), __$res.{{ kv.field.name }});
 {%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
     if (__$res.{{ kv.field.name }}?.raw) __$res.{{ kv.field.name }}.raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(__$res.{{ kv.field.name }}.raw);
 {%- endif %}
-{%- endif %}
-{%- endfor %}
-{%- for r2 in &model.r2_fields %}
-{%- if self.is_paginated(&r2.field.cidl_type) %}
-    if (__$res.{{ r2.field.name }}?.results) {
-      for (let i = 0; i < __$res.{{ r2.field.name }}.results.length; i++) {
-        __$res.{{ r2.field.name }}.results[i] = Object.assign(new R2Object(), __$res.{{ r2.field.name }}.results[i]);
-      }
-    }
+{%- else if !self.is_kv_object(&kv.field.cidl_type) && self.is_object(&kv.field.cidl_type) %}
+    if (__$res.{{ kv.field.name }}) __$res.{{ kv.field.name }} = {{ self.object_name(&kv.field.cidl_type) }}.fromJson(__$res.{{ kv.field.name }});
 {%- endif %}
 {%- endfor %}
     return __$res;
@@ -190,18 +174,11 @@ type DeepPartialInner<T> = T extends (infer U)[]
 export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
-  key!: string;
   raw: unknown | null;
   metadata: unknown | null;
   get value(): V | null {
     return this.raw as V | null;
   }
-}
-
-export interface Paginated<T> {
-  results: T[];
-  cursor: string | null;
-  complete: boolean;
 }
 
 export enum MediaType {

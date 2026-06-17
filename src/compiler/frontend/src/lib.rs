@@ -79,7 +79,6 @@ contextual_keywords! {
     // Generic type
     GOption => "option",
     GArray => "array",
-    GPaginated => "paginated",
     GKvObject => "kvobject",
     GPartial => "partial",
 
@@ -134,9 +133,6 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
         }
         CidlType::Nullable(inner) => {
             format!("{}<{}>", Keyword::GOption.as_str(), fmt_cidl_type(inner))
-        }
-        CidlType::Paginated(inner) => {
-            format!("{}<{}>", Keyword::GPaginated.as_str(), fmt_cidl_type(inner))
         }
         CidlType::KvObject(inner) => {
             format!("{}<{}>", Keyword::GKvObject.as_str(), fmt_cidl_type(inner))
@@ -515,9 +511,6 @@ pub struct R2BindingTemplate<'src> {
 
     /// The key format string (e.g. `"key/{id}"`)
     pub key_format: &'src str,
-
-    /// If true, the field returns a `Paginated<R2Object>``
-    pub is_paginated: bool,
 }
 
 pub struct R2BindingBlock<'src> {

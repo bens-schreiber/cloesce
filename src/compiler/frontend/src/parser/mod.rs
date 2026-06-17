@@ -263,7 +263,6 @@ fn cidl_type<'tokens, 'src: 'tokens>()
         let generic = choice((
             kw!(GOption).to(Keyword::GOption),
             kw!(GArray).to(Keyword::GArray),
-            kw!(GPaginated).to(Keyword::GPaginated),
             kw!(GKvObject).to(Keyword::GKvObject),
             kw!(GPartial).to(Keyword::GPartial),
         ))
@@ -275,7 +274,6 @@ fn cidl_type<'tokens, 'src: 'tokens>()
         .try_map(|(wrapper, inner), span| match wrapper {
             Keyword::GOption => Ok(CidlType::nullable(inner)),
             Keyword::GArray => Ok(CidlType::array(inner)),
-            Keyword::GPaginated => Ok(CidlType::paginated(inner)),
             Keyword::GKvObject => Ok(CidlType::KvObject(Box::new(inner))),
             Keyword::GPartial => match inner {
                 CidlType::Object { name } => Ok(CidlType::Partial { object_name: name }),
