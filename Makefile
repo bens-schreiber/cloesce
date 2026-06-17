@@ -11,6 +11,9 @@ CARGO_MANIFEST := Cargo.toml
 # WASM target (ORM only)
 WASM_TARGET := wasm32-unknown-unknown
 
+CLOESCE_BIN := $(CURDIR)/target/release/cloesce
+EXAMPLES := $(notdir $(patsubst %/,%,$(wildcard examples/*/)))
+
 .PHONY: check-deps
 check-deps:
 	@echo "CLOESCE: Checking required dependencies..."
@@ -96,6 +99,16 @@ test:
 	pnpm --filter cloesce run test
 	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
 	pnpm --filter e2e run test
+	
+	@echo "CLOESCE: Compiling and testing examples..."
+	@for ex in $(EXAMPLES); do \
+		echo "CLOESCE: Compiling examples/$$ex..."; \
+		(cd examples/$$ex && $(CLOESCE_BIN) compile) || exit 1; \
+	done
+	@for ex in $(EXAMPLES); do \
+		echo "CLOESCE: Testing examples/$$ex..."; \
+		pnpm --filter examples-$$ex exec vitest run || exit 1; \
+	done
 
 .PHONY: build-docs
 build-docs:
