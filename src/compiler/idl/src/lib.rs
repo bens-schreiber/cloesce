@@ -1,7 +1,5 @@
 //! The Cloesce Interface Definition Language (CIDL) and related structures.
 //!
-//! # CIDL
-//!
 //! The CIDL represents the full structure of a Cloesce application, including models
 //! and plain old objects. It is the final output of the compiler's semantic analysis phase to
 //! be consumed by the code generation phase.
@@ -23,6 +21,8 @@ use serde::Serialize;
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
+    /// The absence of a value.
+    /// Not representable syntactically, only used internally.
     #[default]
     Void,
 
@@ -129,6 +129,14 @@ pub enum HttpVerb {
     Delete,
 }
 
+#[derive(Deserialize, Serialize, Hash)]
+pub struct Field<'src> {
+    pub name: Cow<'src, str>,
+
+    #[serde(borrow)]
+    pub cidl_type: CidlType<'src>,
+}
+
 #[derive(Deserialize, Serialize, Clone, Copy, Debug)]
 pub enum Number {
     Int(i64),
@@ -142,14 +150,6 @@ impl std::fmt::Display for Number {
             Number::Float(fl) => write!(f, "{fl}"),
         }
     }
-}
-
-#[derive(Deserialize, Serialize, Hash)]
-pub struct Field<'src> {
-    pub name: Cow<'src, str>,
-
-    #[serde(borrow)]
-    pub cidl_type: CidlType<'src>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -170,7 +170,7 @@ pub enum Validator<'src> {
     Regex(Cow<'src, str>),
 }
 
-/// A [Field] that can have some number of  [Validator]s applied to it.
+/// A [Field] that can have some number of [Validator]s applied to it.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct ValidatedField<'src> {
     pub name: Cow<'src, str>,
@@ -178,7 +178,6 @@ pub struct ValidatedField<'src> {
     #[serde(borrow)]
     pub cidl_type: CidlType<'src>,
 
-    // NOTE: Not all fields can have validators
     #[serde(borrow)]
     pub validators: Vec<Validator<'src>>,
 }
@@ -193,7 +192,7 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-/// Represents a relationship to another model
+/// A relationship to another model
 #[derive(Deserialize, Serialize, Hash)]
 pub enum NavigationFieldKind<'src> {
     OneToOne {
@@ -596,9 +595,9 @@ pub struct WranglerEnv<'src> {
     pub vars: Vec<Field<'src>>,
 }
 
-/// Represents the Cloesce Interface Definition Language (CIDL), describing a full stack app.
+/// The Cloesce Interface Definition Language (CIDL), describing a full stack app.
 ///
-/// Can be seen as the highest level IR of the compiler, as it is the last stage before code generation.
+/// Highest level IR of the compiler, last stage before code generation.
 #[derive(Deserialize, Serialize, Default)]
 pub struct CloesceIdl<'src> {
     #[serde(default)]

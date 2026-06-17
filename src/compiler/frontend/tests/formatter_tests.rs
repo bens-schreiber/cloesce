@@ -4,41 +4,39 @@ use compiler_test::COMPREHENSIVE_SRC;
 use frontend::{
     Ast,
     err::DisplayError,
-    formatter::Formatter,
-    lexer::{CloesceLexer, LexResult, LexTarget},
-    parser::CloesceParser,
+    formatter,
+    lexer::{self, FileTable, LexTarget, LexedFile},
+    parser,
 };
 
-fn lex_parse(src: &str) -> (Ast<'_>, LexResult<'_>) {
+fn lex_parse<'src>(src: &'src str) -> (Ast<'src>, Vec<LexedFile<'src>>, FileTable<'src>) {
     let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),
     };
 
-    let lexed = CloesceLexer::lex(vec![source]);
-    if lexed.has_errors() {
-        lexed.display_error(&lexed.file_table);
+    let (lex_results, file_table) = lexer::lex(vec![source]).unwrap_or_else(|(errors, ft)| {
+        errors.display_error(&ft);
         panic!("lexing should succeed");
-    }
+    });
 
-    let parse_ast = CloesceParser::parse(&lexed.results, &lexed.file_table);
-    if parse_ast.has_errors() {
-        parse_ast.display_error(&lexed.file_table);
+    let ast = parser::parse(&lex_results, &file_table).unwrap_or_else(|err| {
+        err.display_error(&file_table);
         panic!("parse should succeed");
-    }
+    });
 
-    (parse_ast.ast, lexed)
+    (ast, lex_results, file_table)
 }
 
 #[test]
 fn format_non_lossy() {
     // Arrange
-    let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
-    let comment_map = &lex_result.results[0].comment_map;
+    let (parse_ast, lex_results, _) = lex_parse(COMPREHENSIVE_SRC);
+    let comment_map = &lex_results[0].comment_map;
 
     // Act
-    let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
-    let (reparse_ast, _) = lex_parse(&formatted);
+    let formatted = formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
+    let (reparse_ast, _, _) = lex_parse(&formatted);
 
     // Assert
     assert_eq!(
@@ -51,17 +49,13 @@ fn format_non_lossy() {
 #[test]
 fn format_idempotent() {
     // Arrange
-    let (parse_ast, lex_result) = lex_parse(COMPREHENSIVE_SRC);
-    let comment_map = &lex_result.results[0].comment_map;
+    let (parse_ast, lex_results, _) = lex_parse(COMPREHENSIVE_SRC);
+    let comment_map = &lex_results[0].comment_map;
 
     // Act
-    let formatted = Formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
-    let (reparse_ast, relex_result) = lex_parse(&formatted);
-    let reformatted = Formatter::format(
-        &reparse_ast,
-        &relex_result.results[0].comment_map,
-        &formatted,
-    );
+    let formatted = formatter::format(&parse_ast, comment_map, COMPREHENSIVE_SRC);
+    let (reparse_ast, relex_results, _) = lex_parse(&formatted);
+    let reformatted = formatter::format(&reparse_ast, &relex_results[0].comment_map, &formatted);
 
     // Assert
     assert_eq!(
@@ -127,17 +121,17 @@ fn comments_retained() {
     }
     "#;
 
-    let (parse_ast, lex_result) = lex_parse(src);
-    let comment_map = &lex_result.results[0].comment_map;
+    let (parse_ast, lex_results, _) = lex_parse(src);
+    let comment_map = &lex_results[0].comment_map;
     let expected_retained = comment_map.entries.len();
 
     // Act
-    let formatted = Formatter::format(&parse_ast, comment_map, src);
-    let (_, res) = lex_parse(&formatted);
+    let formatted = formatter::format(&parse_ast, comment_map, src);
+    let (_, res, _) = lex_parse(&formatted);
 
     // // Assert
     assert_eq!(
-        res.results[0].comment_map.entries.len(),
+        res[0].comment_map.entries.len(),
         expected_retained,
         "should retain all comments"
     );

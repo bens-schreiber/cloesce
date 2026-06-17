@@ -1,3 +1,5 @@
+//! Parses for Cloudflare Environment bindings: D1, KV, R2, Durable Objects, and Variables
+
 use chumsky::prelude::*;
 
 use crate::{
@@ -7,8 +9,6 @@ use crate::{
     parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol, tags},
 };
 
-/// Parses a top-level D1 bindings block of the form:
-///
 /// ```cloesce
 /// d1 {
 ///     db
@@ -27,8 +27,6 @@ pub fn d1_binding_block<'tokens, 'src: 'tokens>()
         .map(|bindings| AstBlockKind::D1Binding(D1BindingBlock { bindings }))
 }
 
-/// Parses a top-level vars block of the form:
-///
 /// ```cloesce
 /// vars {
 ///     api_url: string
@@ -78,8 +76,6 @@ fn kv_template<'tokens, 'src: 'tokens>()
         )
 }
 
-/// Parses a top-level KV binding block of the form:
-///
 /// ```cloesce
 /// kv UserMetadata {
 ///     // template for fetching a single metadata object by id
@@ -106,8 +102,6 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
         .map(|(symbol, templates)| AstBlockKind::KvBinding(KvBindingBlock { symbol, templates }))
 }
 
-/// Parses a top-level R2 binding block of the form:
-///
 /// ```cloesce
 /// r2 UserAvatars {
 ///     // template for fetching a single avatar by id
@@ -118,8 +112,7 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
 /// ```
 ///
 /// R2 binding templates do not specify a return type, but may be marked with the
-/// `paginated` infix keyword to indicate the field returns a `Paginated<R2Object>`
-/// rather than a single `R2Object`.
+/// `paginated` infix keyword
 pub fn r2_binding_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
     // `name(params) [paginated] { "format" }`
@@ -156,8 +149,6 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
         .map(|(symbol, templates)| AstBlockKind::R2Binding(R2BindingBlock { symbol, templates }))
 }
 
-/// Parses a top-level Durable Object binding block of the form:
-///
 /// ```cloesce
 /// durable MyDurableObject {
 ///     shard {

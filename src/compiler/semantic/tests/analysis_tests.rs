@@ -1,8 +1,16 @@
 #![allow(unused_variables)]
 
 use compiler_test::lex_and_ast;
-use idl::{CidlType, MediaType, NavigationFieldKind, Number, Validator};
-use semantic::{SemanticAnalysis, err::SemanticError};
+use frontend::Ast;
+use idl::{CidlType, CloesceIdl, MediaType, NavigationFieldKind, Number, Validator};
+use semantic::err::SemanticError;
+
+fn analyze<'src, 'p>(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>) {
+    match semantic::analyze(ast) {
+        Ok(idl) => (idl, vec![]),
+        Err(errors) => (CloesceIdl::default(), errors),
+    }
+}
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -81,7 +89,7 @@ fn wrangler_duplicate_symbol() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -111,7 +119,7 @@ fn d1_model_basic_errors() {
     let parse = lex_and_ast(&src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     let model = expect_err!(errors,
@@ -193,7 +201,7 @@ fn d1_model_column_fk_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 10);
@@ -313,7 +321,7 @@ fn d1_model_nav_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     let inconsistent_model_adj = expect_err!(
@@ -383,7 +391,7 @@ fn d1_model_nav_one_to_one() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -432,7 +440,7 @@ fn d1_model_nav_one_to_many() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -482,7 +490,7 @@ fn route_model_valid() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -504,7 +512,7 @@ fn route_model_valid() {
     let NavigationFieldKind::OneToOne { fields } = &dog_nav.kind else {
         unreachable!()
     };
-    assert_eq!(fields, &vec!["id", "org"]);
+    assert_eq!(*fields, vec!["id", "org"]);
 
     // The default data source has no SQL and is keyed on the route fields.
     let ds = person.default_data_source().unwrap();
@@ -547,7 +555,7 @@ fn d1_model_navigates_to_worker_model() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -567,7 +575,7 @@ fn d1_model_navigates_to_worker_model() {
     let NavigationFieldKind::OneToOne { fields } = &person_nav.kind else {
         unreachable!()
     };
-    assert_eq!(fields, &vec!["org", "id"]);
+    assert_eq!(*fields, vec!["org", "id"]);
 }
 
 #[test]
@@ -599,7 +607,7 @@ fn d1_model_route_navigation_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+    let (_result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(
@@ -627,7 +635,7 @@ fn keyless_nav_to_routed_model_is_invalid() {
     "#;
 
     let parse = lex_and_ast(src);
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+    let (_result, errors) = analyze(&parse);
 
     assert!(
         count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }) > 0,
@@ -666,7 +674,7 @@ fn keyless_singleton_nav() {
     "#;
 
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
@@ -723,7 +731,7 @@ fn worker_model_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     expect_err!(
@@ -783,7 +791,7 @@ fn d1_model_cyclical_relationship_error() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -836,7 +844,7 @@ fn d1_model_nullability_prevents_cycle() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -861,7 +869,7 @@ fn kv_r2_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(
@@ -891,7 +899,7 @@ fn binding_key_format_unknown_param() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     let unknowns = errors
@@ -900,7 +908,7 @@ fn binding_key_format_unknown_param() {
             SemanticError::TemplateUnknownVariable { variable, .. } => Some(*variable),
             _ => None,
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<&str>>();
     assert!(
         unknowns.contains(&"bogus"),
         "expected 'bogus' to be flagged, got: {:?}",
@@ -932,7 +940,7 @@ fn binding_key_format_invalid_syntax() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(
@@ -985,7 +993,7 @@ fn kv_r2_templates_inherit_validators_update_key_format() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1075,7 +1083,7 @@ fn api_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 5);
@@ -1114,7 +1122,7 @@ fn api_sets_media_types() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1198,7 +1206,7 @@ fn data_source_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     expect_err!(
@@ -1254,7 +1262,7 @@ fn data_source_include_tree_kv_r2() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1275,7 +1283,7 @@ fn poo_errors() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (_result, errors) = SemanticAnalysis::analyze(&parse);
+    let (_result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -1303,7 +1311,7 @@ fn poo_with_model_reference() {
     "#;
 
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
     let poo = result.poos.get("PooWithComposition").unwrap();
@@ -1334,7 +1342,7 @@ fn cidl_types_resolve() {
 
     // Act
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1382,7 +1390,7 @@ fn fk_inherits_validators() {
         "#,
     );
     let parse = lex_and_ast(&src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1433,7 +1441,7 @@ fn validator_errors() {
         "#,
     );
     let parse = lex_and_ast(&src);
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(
@@ -1478,7 +1486,7 @@ fn validator_valid() {
         "#,
     );
     let parse = lex_and_ast(&src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1524,7 +1532,7 @@ fn inject_tag_populates_api_method_injected() {
     "#;
 
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
     let api = result
@@ -1556,7 +1564,7 @@ fn inject_tag_dedupes() {
     "#;
 
     let parse = lex_and_ast(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
     let api = result
@@ -1596,7 +1604,7 @@ fn context_tag_valid() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1643,7 +1651,7 @@ fn inject_binding_namespace_and_context() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1692,7 +1700,7 @@ fn context_tag_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     let unresolved: Vec<&str> = errors
@@ -1706,11 +1714,11 @@ fn context_tag_errors() {
     assert!(unresolved.contains(&"nope"), "got: {unresolved:?}");
 
     let (field, expected, got) = expect_err!(errors,
-        SemanticError::ArgCountMismatch { field, expected, got } => (*field, *expected, *got)
+        SemanticError::ArgCountMismatch { field, expected, got } => (*field, expected, got)
     );
     assert_eq!(field.name, "LeaderboardDo");
-    assert_eq!(expected, 1);
-    assert_eq!(got, 0);
+    assert_eq!(*expected, 1);
+    assert_eq!(*got, 0);
 
     let arg = expect_err!(errors,
         SemanticError::ArgTypeMismatch { arg, .. } => arg
@@ -1764,7 +1772,7 @@ fn durable_backing_valid() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1854,15 +1862,15 @@ fn durable_backing_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     let (field, expected, got) = expect_err!(errors,
-        SemanticError::ArgCountMismatch { field, expected, got } => (*field, *expected, *got)
+        SemanticError::ArgCountMismatch { field, expected, got } => (*field, expected, got)
     );
     assert_eq!(field.name, "LeaderboardDo");
-    assert_eq!(expected, 1);
-    assert_eq!(got, 0);
+    assert_eq!(*expected, 1);
+    assert_eq!(*got, 0);
 
     let unresolved = errors
         .iter()
@@ -1918,7 +1926,7 @@ fn route_model_durable_backing() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    let (result, errors) = analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -1985,7 +1993,7 @@ fn route_model_durable_backing_errors() {
     let parse = lex_and_ast(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(&parse);
+    let (_, errors) = analyze(&parse);
 
     // Assert
     expect_err!(errors, SemanticError::ModelMixesRoutesAndSql { .. });

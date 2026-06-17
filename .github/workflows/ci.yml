@@ -6,14 +6,12 @@ on:
     paths-ignore:
       - "**/*.md"
       - "docs/**"
-      - "examples/**"
 
   pull_request:
     branches: ["main", "release/*"]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
-      - "examples/**"
 
 env:
   CARGO_HOME: ${{ github.workspace }}/.cargo

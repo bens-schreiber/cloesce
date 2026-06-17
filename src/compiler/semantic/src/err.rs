@@ -209,6 +209,7 @@ pub enum SemanticError<'src, 'p> {
     },
 }
 
+/// A sink for accumulating semantic errors during analysis,
 #[derive(Debug, Default)]
 pub struct ErrorSink<'src, 'p> {
     pub errors: Vec<SemanticError<'src, 'p>>,
@@ -271,6 +272,7 @@ fn validator_name(tag: &Tag<'_>) -> &'static str {
     }
 }
 
+/// Displays a [SemanticError] to stderr using [ariadne]
 fn display(
     error: &SemanticError<'_, '_>,
     file_table: &FileTable,
@@ -313,12 +315,12 @@ fn display(
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "model '{}' has columns but no `[use]` binding is specified",
+                    "model '{}' has SQL blocks but no backing binding is specified",
                     model.name
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("add a `[use (\"<binding>\")]` tag to this model")
+                        .with_message("add a `[use \"<binding>\"]` tag to this model")
                         .with_color(Color::Red),
                 )
         }
@@ -326,10 +328,13 @@ fn display(
             let (model_path, model_range) = span_parts(&model.span, file_table);
             let (binding_path, binding_range) = span_parts(&binding.span, file_table);
             report!(binding_path.clone(), binding_range.clone())
-                .with_message(format!("'{}' is not a valid D1 binding", binding.name))
+                .with_message(format!(
+                    "'{}' is not a valid D1 or DO binding",
+                    binding.name
+                ))
                 .with_label(
                     Label::new((binding_path, binding_range))
-                        .with_message("this binding is not declared as a top-level `d1` binding")
+                        .with_message("must be declared as a top-level `d1` or `do` binding")
                         .with_color(Color::Red),
                 )
                 .with_label(
@@ -342,12 +347,12 @@ fn display(
             let (path, range) = span_parts(&model.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "D1 model '{}' does not declare a primary key",
+                    "model '{}' does not declare a primary key",
                     model.name
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("add a `primary { (\"<field>\") }` block to this model")
+                        .with_message("add a `primary { ... }` block to this model")
                         .with_color(Color::Red),
                 )
         }
@@ -369,15 +374,10 @@ fn display(
         SemanticError::InvalidColumnType { column } => {
             let (path, range) = span_parts(&column.span, file_table);
             report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "column '{}' has a type that is not a valid SQLite type",
-                    column.name
-                ))
+                .with_message(format!("'{}' is not a valid SQLite type", column.name))
                 .with_label(
                     Label::new((path, range))
-                        .with_message(
-                            "only string, int, real, date, json, bool, and blob are allowed",
-                        )
+                        .with_message("allowed types: string, int, real, date, json, bool, blob")
                         .with_color(Color::Red),
                 )
         }
@@ -598,14 +598,12 @@ fn display(
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "binding reference '{}' has the wrong number of arguments",
+                    "'{}' expects {expected} argument(s), got {got}",
                     field.name
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message(format!(
-                            "expected {expected} arg(s) to match the binding field's params, got {got}"
-                        ))
+                        .with_message(format!("expected {expected}, got {got}"))
                         .with_color(Color::Red),
                 )
         }
@@ -614,17 +612,17 @@ fn display(
             let (arg_path, arg_range) = span_parts(&arg.span, file_table);
             report!(arg_path.clone(), arg_range.clone())
                 .with_message(format!(
-                    "binding reference arg '{}' does not match the binding param's type",
-                    arg.name
+                    "argument '{}' has the wrong type for '{}'",
+                    arg.name, field.name
                 ))
                 .with_label(
                     Label::new((arg_path, arg_range))
-                        .with_message("type mismatch with the binding param")
+                        .with_message("type does not match the expected parameter type")
                         .with_color(Color::Red),
                 )
                 .with_label(
                     Label::new((path, range))
-                        .with_message(format!("on binding reference '{}'", field.name))
+                        .with_message(format!("'{}' declared here", field.name))
                         .with_color(Color::Yellow),
                 )
         }
@@ -703,16 +701,20 @@ fn display(
         }
         SemanticError::UnsupportedCrudOperation { model, crud } => {
             let (path, range) = span_parts(&model.span, file_table);
+            let op = match crud.inner {
+                CrudKind::Get => "get",
+                CrudKind::List => "list",
+                CrudKind::Save => "save",
+            };
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "model '{}' has unsupported CRUD operation '{:?}'",
-                    model.name, crud.inner
+                    "model '{}' does not support the `{}` CRUD operation",
+                    model.name, op
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(format!(
-                            "the backing store for this model does not support '{:?}'",
-                            crud.inner
+                            "`{op}` is not supported for this model's backing store"
                         ))
                         .with_color(Color::Red),
                 )
@@ -758,7 +760,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message("this return type is not valid for an API method")
+                        .with_message("`stream` must be the top-level return type, not wrapped")
                         .with_color(Color::Red),
                 )
         }
@@ -772,7 +774,7 @@ fn display(
                 ))
                 .with_label(
                     Label::new((param_path, param_range))
-                        .with_message("this parameter type is not valid for an API method")
+                        .with_message("object, r2object, and stream parameters are not allowed on GET methods; stream must be the only non-injected parameter")
                         .with_color(Color::Red),
                 )
                 .with_label(

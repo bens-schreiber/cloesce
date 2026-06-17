@@ -1,6 +1,4 @@
-//! Cloesce Semantic Analysis + Expansion phase.
-//!
-//! # Overview
+//! Semantic Analysis + Expansion phase.
 //!
 //! Semantic analysis is responsible for validating the [Ast] produced by the parser and converting it into the [CloesceIdl],
 //! a HIR that describes the full semantics of the program. This includes:
@@ -9,10 +7,10 @@
 //! - Tying APIs to their respective model namespaces
 //! - Validating that all symbols are uniquely defined and correctly used
 //! - Validating the Wrangler environment configuration (Cloudflares infrastructure bindings)
-//! - Various other semantic checks (see the [SemanticError] enum for details)
+//! - Various other semantic checks (see the [SemanticError] enum)
 //!
 //! Additionally, after semantic analysis, the IDL is expanded with synthetic APIs and data sources based on the presence of models
-//! and the configuration of existing data sources. This is done in the [CrudExpansion] and [DataSourceExpansion] structs.
+//! and the configuration of existing data sources.
 //!
 //! ## Error Sink
 //!
@@ -27,13 +25,9 @@ use frontend::{
 use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
-    api::ApiAnalysis,
-    crud::CrudExpansion,
-    data_source::{DataSourceAnalysis, DataSourceExpansion},
-    env::WranglerAnalysis,
     err::{BatchResult, ErrorSink, SemanticError},
     model::ModelAnalysis,
 };
@@ -45,126 +39,123 @@ mod env;
 pub mod err;
 mod model;
 
-pub struct SemanticAnalysis;
-impl<'src, 'p> SemanticAnalysis {
-    pub fn analyze(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>) {
-        let mut sink = ErrorSink::new();
-        let table = SymbolTable::from_ast(ast, &mut sink);
+/// Undergoes semantic analysis and expansion on the provided [Ast],
+/// returning either a valid [CloesceIdl] or a list of [SemanticError]s.
+pub fn analyze<'src, 'p>(
+    ast: &'p Ast<'src>,
+) -> Result<CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>> {
+    let mut sink = ErrorSink::new();
+    let table = SymbolTable::from_ast(ast, &mut sink);
 
-        let wrangler_env = WranglerAnalysis::analyze(&table, &mut sink);
+    let wrangler_env = env::analyze(&table, &mut sink);
 
-        let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
-            Ok(models) => models,
-            Err(errs) => {
-                sink.extend(errs);
-                IndexMap::default()
-            }
-        };
-
-        let data_source_map = DataSourceAnalysis::analyze(&models, &table, &mut sink);
-        let poos = Self::poos(&table, &mut sink);
-
-        let api_map = match ApiAnalysis::default().analyze(&table) {
-            Ok(apis) => apis,
-            Err(errs) => {
-                sink.extend(errs);
-                Vec::new()
-            }
-        };
-
-        for (namespace, apis) in api_map {
-            if let Some(model) = models.get_mut(&namespace) {
-                model.apis.extend(apis);
-            }
+    let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
+        Ok(models) => models,
+        Err(errs) => {
+            sink.extend(errs);
+            IndexMap::default()
         }
+    };
 
-        for (model_name, ds) in data_source_map {
-            if let Some(model) = models.get_mut(&model_name) {
-                model.data_sources.insert(ds.name, ds);
-            }
+    let data_source_map = data_source::analysis::analyze(&models, &table, &mut sink);
+    let poos = analyze_poos(&table, &mut sink);
+
+    let api_map = api::analyze(&mut sink, &table);
+
+    for (namespace, apis) in api_map {
+        if let Some(model) = models.get_mut(&namespace) {
+            model.apis.extend(apis);
         }
-
-        let injects = table
-            .injects
-            .iter()
-            .flat_map(|i| i.symbols.iter().map(|f| f.name))
-            .collect();
-
-        let mut idl = CloesceIdl {
-            hash: 0,
-            wrangler_env,
-            models,
-            poos,
-            injects,
-        };
-        let errs = sink.drain();
-        if !errs.is_empty() {
-            return (idl, errs);
-        }
-
-        DataSourceExpansion::expand(&mut idl);
-        CrudExpansion::expand(&mut idl);
-        idl.set_merkle_hash();
-
-        (idl, vec![])
     }
 
-    fn poos(
-        table: &SymbolTable<'src, 'p>,
-        sink: &mut ErrorSink<'src, 'p>,
-    ) -> BTreeMap<&'src str, PlainOldObject<'src>> {
-        let mut res = BTreeMap::new();
-
-        for poo in table.poos.values() {
-            let poo_name = poo.symbol.name;
-            let mut fields = Vec::new();
-
-            for field in &poo.fields {
-                let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
-                    Ok(t) => t,
-                    Err(err) => {
-                        sink.push(err);
-                        continue;
-                    }
-                };
-
-                match resolved_type.root_type() {
-                    CidlType::Stream => {
-                        sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
-                    }
-                    _ => {
-                        // All other types are valid
-                    }
-                }
-
-                let validators = match resolve_validator_tags(field) {
-                    Ok(v) => v,
-                    Err(errs) => {
-                        sink.extend(errs);
-                        Vec::new()
-                    }
-                };
-
-                fields.push(ValidatedField {
-                    name: field.name.into(),
-                    cidl_type: resolved_type,
-                    validators,
-                });
-            }
-
-            res.insert(
-                poo_name,
-                PlainOldObject {
-                    name: poo_name,
-                    fields,
-                },
-            );
+    for (model_name, ds) in data_source_map {
+        if let Some(model) = models.get_mut(&model_name) {
+            model.data_sources.insert(ds.name, ds);
         }
-
-        res
     }
+
+    let injects = table
+        .injects
+        .iter()
+        .flat_map(|i| i.symbols.iter().map(|f| f.name))
+        .collect();
+
+    let mut idl = CloesceIdl {
+        hash: 0,
+        wrangler_env,
+        models,
+        poos,
+        injects,
+    };
+    let errs = sink.drain();
+    if !errs.is_empty() {
+        return Err(errs);
+    }
+
+    data_source::expansion::expand(&mut idl);
+    crud::expand(&mut idl);
+    idl.set_merkle_hash();
+
+    Ok(idl)
 }
 
+fn analyze_poos<'src, 'p>(
+    table: &SymbolTable<'src, 'p>,
+    sink: &mut ErrorSink<'src, 'p>,
+) -> BTreeMap<&'src str, PlainOldObject<'src>> {
+    let mut res = BTreeMap::new();
+
+    for poo in table.poos.values() {
+        let poo_name = poo.symbol.name;
+        let mut fields = Vec::new();
+
+        for field in &poo.fields {
+            let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
+                Ok(t) => t,
+                Err(err) => {
+                    sink.push(err);
+                    continue;
+                }
+            };
+
+            match resolved_type.root_type() {
+                CidlType::Stream => {
+                    sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
+                }
+                _ => {
+                    // All other types are valid
+                }
+            }
+
+            let validators = match resolve_validator_tags(field) {
+                Ok(v) => v,
+                Err(errs) => {
+                    sink.extend(errs);
+                    Vec::new()
+                }
+            };
+
+            fields.push(ValidatedField {
+                name: field.name.into(),
+                cidl_type: resolved_type,
+                validators,
+            });
+        }
+
+        res.insert(
+            poo_name,
+            PlainOldObject {
+                name: poo_name,
+                fields,
+            },
+        );
+    }
+
+    res
+}
+
+/// Scopes for any symbol that is nested within some other symbol,
+/// (called a local symbol) e.g. a field within a model or a parameter within an API method.
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum LocalSymbolKind<'src> {
     BindingTemplate {
@@ -208,6 +199,7 @@ enum LocalSymbolKind<'src> {
     },
 }
 
+/// A table that maps a symbol name to its definition in the [Ast].
 #[derive(Default)]
 struct SymbolTable<'src, 'p> {
     // Globals
@@ -234,6 +226,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
         let mut st = SymbolTable::default();
         let mut global_names = HashMap::new();
 
+        // Insert a symbol into the global namespace, returning false if it was a duplicate.
         let mut insert_global = |sink: &mut ErrorSink<'src, 'p>, symbol: &'p Symbol<'src>| {
             if let Some(first) = global_names.insert(symbol.name, symbol) {
                 sink.push(SemanticError::DuplicateSymbol {
@@ -245,6 +238,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             true
         };
 
+        // Insert a symbol into the local namespace, returning false if it was a duplicate.
         let mut insert_local = |sink: &mut ErrorSink<'src, 'p>,
                                 symbol: &'p Symbol<'src>,
                                 kind: LocalSymbolKind<'src>| {
@@ -773,49 +767,4 @@ fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
             | CidlType::Boolean
             | CidlType::DateIso
     )
-}
-
-// Kahns algorithm for topological sort + cycle detection.
-// If no cycles, returns a map of name to position used for sorting the original collection.
-fn kahns<'src, 'p>(
-    graph: BTreeMap<&'src str, Vec<&'src str>>,
-    mut in_degree: BTreeMap<&'src str, usize>,
-    len: usize,
-) -> Result<HashMap<&'src str, usize>, SemanticError<'src, 'p>> {
-    let mut queue = in_degree
-        .iter()
-        .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
-        .collect::<VecDeque<_>>();
-
-    let mut rank = HashMap::with_capacity(len);
-    let mut counter = 0usize;
-
-    while let Some(name) = queue.pop_front() {
-        rank.insert(name, counter);
-        counter += 1;
-
-        if let Some(adjs) = graph.get(name) {
-            for adj in adjs {
-                let deg = in_degree.get_mut(adj).expect("names to be validated");
-                *deg -= 1;
-
-                if *deg == 0 {
-                    queue.push_back(adj);
-                }
-            }
-        }
-    }
-
-    if rank.len() != len {
-        let cycle: Vec<&str> = in_degree
-            .iter()
-            .filter_map(|(&n, &d)| (d > 0).then_some(n))
-            .collect();
-
-        if !cycle.is_empty() {
-            return Err(SemanticError::CyclicalRelationship { cycle });
-        }
-    }
-
-    Ok(rank)
 }

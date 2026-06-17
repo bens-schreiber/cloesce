@@ -557,13 +557,9 @@ fn api_context_tag() {
             .iter()
             .find_map(|t| match &t.inner {
                 Tag::Inject { entries } => entries.iter().find_map(|entry| match entry {
-                    InjectEntry::Context(initializer) => Some((
-                        initializer.symbol.name.to_string(),
-                        initializer
-                            .args
-                            .iter()
-                            .map(|a| a.name.to_string())
-                            .collect(),
+                    InjectEntry::Context { symbol, args } => Some((
+                        symbol.name.to_string(),
+                        args.iter().map(|a| a.name.to_string()).collect(),
                     )),
                     InjectEntry::Binding(_) => None,
                 }),

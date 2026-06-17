@@ -28,10 +28,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use frontend::{
-    err::DisplayError,
-    lexer::{CloesceLexer, LexTarget},
-};
+use frontend::{err::DisplayError, lexer::LexTarget};
 
 use clap::{Args, Parser, Subcommand};
 use serde::Deserialize;
@@ -343,8 +340,7 @@ mod compile {
         backend::BackendGenerator, client::ClientGenerator, wrangler::WranglerDefault,
         wrangler::WranglerGenerator,
     };
-    use frontend::parser::CloesceParser;
-    use semantic::SemanticAnalysis;
+    use frontend::{lexer, parser};
 
     use super::*;
 
@@ -394,30 +390,31 @@ mod compile {
                 "Failed to read source files".to_string()
             })?;
 
-        let lexed = CloesceLexer::lex(sources.iter().map(|(src, path)| LexTarget {
+        let (lex_results, file_table) = lexer::lex(sources.iter().map(|(src, path)| LexTarget {
             src: src.as_str(),
             path: path.clone(),
-        }));
-        if lexed.has_errors() {
-            lexed.display_error(&lexed.file_table);
-            return Err("lexing failed".into());
-        }
+        }))
+        .unwrap_or_else(|(errors, file_table)| {
+            errors.display_error(&file_table);
+            std::process::exit(1);
+        });
 
         // Parsing
-        let parse = CloesceParser::parse(&lexed.results, &lexed.file_table);
-        if parse.has_errors() {
-            parse.display_error(&lexed.file_table);
-            return Err("parsing failed".into());
-        }
+        let ast = parser::parse(&lex_results, &file_table).unwrap_or_else(|err| {
+            err.display_error(&file_table);
+            std::process::exit(1);
+        });
 
         // Semantic
-        let (idl, errors) = SemanticAnalysis::analyze(&parse.ast);
-        if !errors.is_empty() {
-            for error in &errors {
-                error.display_error(&lexed.file_table);
+        let idl = match semantic::analyze(&ast) {
+            Ok(idl) => idl,
+            Err(errors) => {
+                for error in errors {
+                    error.display_error(&file_table);
+                }
+                return Err("semantic analysis failed".into());
             }
-            return Err("semantic analysis failed".into());
-        }
+        };
 
         // Codegen
         let wrangler = {
@@ -1023,7 +1020,7 @@ mod version {
 }
 
 mod format {
-    use frontend::{formatter::Formatter, lexer::LexResult, parser::CloesceParser};
+    use frontend::{formatter, lexer, parser};
 
     use super::*;
 
@@ -1043,20 +1040,14 @@ mod format {
                 "Failed to read source files".to_string()
             })?;
 
-        let lexed = CloesceLexer::lex(sources.iter().map(|(src, path)| LexTarget {
+        let (results, file_table) = lexer::lex(sources.iter().map(|(src, path)| LexTarget {
             src: src.as_str(),
             path: path.clone(),
-        }));
-        if lexed.has_errors() {
-            lexed.display_error(&lexed.file_table);
-            return Err("lexing failed".into());
-        }
-
-        let LexResult {
-            results,
-            file_table,
-            ..
-        } = lexed;
+        }))
+        .unwrap_or_else(|(errors, file_table)| {
+            errors.display_error(&file_table);
+            std::process::exit(1);
+        });
 
         let mut any_diff = false;
 
@@ -1064,13 +1055,12 @@ mod format {
         for lex in &results {
             let (src, path) = file_table.resolve(lex.file_id);
 
-            let parse = CloesceParser::parse(std::slice::from_ref(lex), &file_table);
-            if parse.has_errors() {
-                parse.display_error(&file_table);
-                return Err("parsing failed".into());
-            }
+            let ast = parser::parse(std::slice::from_ref(lex), &file_table).unwrap_or_else(|err| {
+                err.display_error(&file_table);
+                std::process::exit(1);
+            });
 
-            let formatted = Formatter::format(&parse.ast, &lex.comment_map, src);
+            let formatted = formatter::format(&ast, &lex.comment_map, src);
 
             if args.check {
                 // TODO: sophisticated diffing

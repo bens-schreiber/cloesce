@@ -1,3 +1,5 @@
+//! A simple intermediate representation for formatting
+
 use crate::Keyword;
 
 /// Document IR for canonical formatting

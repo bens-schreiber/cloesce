@@ -1,8 +1,12 @@
+//! Error displays for the lexer and parser.
+
 use ariadne::{Color, Label, Report};
 use chumsky::error::RichReason;
 
-use crate::lexer::{FileTable, LexResult, Token};
-use crate::parser::ParserResult;
+use crate::{
+    lexer::{FileTable, LexError, Token},
+    parser::ParserError,
+};
 
 impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -38,11 +42,11 @@ pub trait DisplayError {
     fn display_error(&self, file_table: &FileTable);
 }
 
-impl DisplayError for LexResult<'_> {
+impl DisplayError for Vec<LexError> {
     fn display_error(&self, file_table: &FileTable) {
         let mut cache = file_table.cache();
 
-        for error in &self.errors {
+        for error in self {
             let (_, path) = file_table.resolve(error.file_id);
             let path_str = path.display().to_string();
 
@@ -63,11 +67,11 @@ impl DisplayError for LexResult<'_> {
     }
 }
 
-impl DisplayError for ParserResult<'_, '_> {
+impl DisplayError for ParserError<'_, '_> {
     fn display_error(&self, file_table: &FileTable) {
         let mut cache = file_table.cache();
 
-        for error in &self.errors {
+        for error in self {
             let span = error.span();
             let file_id = span.context;
             let (_, path) = file_table.resolve(file_id);

@@ -1,41 +1,31 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    ops::Not,
-};
+use std::collections::HashSet;
 
-use frontend::{ParsedIncludeTree, Spd, Symbol, Tag};
-use idl::{
-    CidlType, CloesceIdl, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
-    DataSourceMethod, IncludeTree, Model, NavigationFieldKind, Number, ValidatedField, Validator,
-    model_bindings,
-};
+use idl::{IncludeTree, Model, NavigationFieldKind};
 use indexmap::IndexMap;
-use orm::select::SelectModel;
 
-use crate::{
-    SymbolTable,
-    err::{ErrorSink, SemanticError},
-    is_valid_sql_type, resolve_injects, resolve_validator_tags,
-};
+pub mod analysis {
+    use std::ops::Not;
 
-enum DsMethodKind {
-    Scalar,
-    Body,
-}
+    use frontend::{ParsedIncludeTree, Spd, Symbol, Tag};
+    use idl::{
+        CidlType, DataSource, DataSourceGetMethod, DataSourceGetMethodParam, DataSourceMethod,
+        ValidatedField, Validator,
+    };
 
-#[derive(Default)]
-struct GeneratedDataSource<'src> {
-    include_query: String,
-    get_query: String,
-    list_query: String,
-    get: Option<DataSourceGetMethod<'src>>,
-    list: Option<DataSourceMethod<'src>>,
-    save: Option<DataSourceMethod<'src>>,
-}
+    use crate::{
+        SymbolTable,
+        err::{ErrorSink, SemanticError},
+        is_valid_sql_type, resolve_injects, resolve_validator_tags,
+    };
 
-pub struct DataSourceAnalysis;
-impl<'src, 'p> DataSourceAnalysis {
-    pub fn analyze(
+    use super::{IncludeTree, IndexMap, Model, include_dfs};
+
+    enum DsMethodKind {
+        Scalar,
+        Body,
+    }
+
+    pub fn analyze<'src, 'p>(
         models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
@@ -69,7 +59,7 @@ impl<'src, 'p> DataSourceAnalysis {
 
             // Validate include tree via BFS. A missing tree falls back to the
             // generated default during expansion and needs no validation.
-            let mut q = VecDeque::new();
+            let mut q = std::collections::VecDeque::new();
             if let Some(tree) = &ds.tree {
                 q.push_back((tree, model));
             }
@@ -127,7 +117,7 @@ impl<'src, 'p> DataSourceAnalysis {
                         .iter()
                         .map(|p| {
                             let (validators, instance_tag) =
-                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
+                                validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
                             if let Some(tag) = instance_tag {
                                 // Not allowed on list methods
                                 sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
@@ -158,7 +148,7 @@ impl<'src, 'p> DataSourceAnalysis {
                         .iter()
                         .map(|p| {
                             let (validators, instance_tag) =
-                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
+                                validate_ds_param(p, &ds.symbol, DsMethodKind::Scalar, sink);
 
                             if let Some(tag) = instance_tag {
                                 let is_field = model.columns.iter().any(|c| c.field.name == p.name)
@@ -204,7 +194,7 @@ impl<'src, 'p> DataSourceAnalysis {
                         .iter()
                         .map(|p| {
                             let (validators, instance_tag) =
-                                Self::validate_ds_param(p, &ds.symbol, DsMethodKind::Body, sink);
+                                validate_ds_param(p, &ds.symbol, DsMethodKind::Body, sink);
                             if let Some(tag) = instance_tag {
                                 // Not allowed on save methods
                                 sink.push(SemanticError::TagInvalidInContext { tag, symbol: p });
@@ -231,10 +221,10 @@ impl<'src, 'p> DataSourceAnalysis {
                     name: ds.symbol.name,
                     tree: match &ds.tree {
                         Some(tree) => parsed_include_tree_to_idl(tree),
-                        None => DataSourceExpansion::include_dfs(
+                        None => include_dfs(
                             models,
                             model_sym.name,
-                            &mut HashSet::new(),
+                            &mut std::collections::HashSet::new(),
                         ),
                     },
                     list,
@@ -255,7 +245,7 @@ impl<'src, 'p> DataSourceAnalysis {
     /// carries tags valid in a data source method parameter.
     ///
     /// Returns the resolved validators and the `instance` tag if present.
-    fn validate_ds_param(
+    fn validate_ds_param<'src, 'p>(
         param: &'p Symbol<'src>,
         source_sym: &'p Symbol<'src>,
         kind: DsMethodKind,
@@ -290,15 +280,41 @@ impl<'src, 'p> DataSourceAnalysis {
             }
         }
     }
+
+    fn parsed_include_tree_to_idl<'src>(tree: &ParsedIncludeTree<'src>) -> IncludeTree<'src> {
+        IncludeTree(
+            tree.0
+                .iter()
+                .map(|(sym, child)| (sym.name.into(), parsed_include_tree_to_idl(child)))
+                .collect(),
+        )
+    }
 }
 
-pub struct DataSourceExpansion;
-impl<'src> DataSourceExpansion {
+pub mod expansion {
+    use idl::{
+        CidlType, CloesceIdl, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
+        DataSourceMethod, Number, ValidatedField, Validator, model_bindings,
+    };
+    use orm::select::SelectModel;
+
+    use super::{HashSet, Model, include_dfs};
+
+    #[derive(Default)]
+    struct GeneratedDataSource<'src> {
+        include_query: String,
+        get_query: String,
+        list_query: String,
+        get: Option<DataSourceGetMethod<'src>>,
+        list: Option<DataSourceMethod<'src>>,
+        save: Option<DataSourceMethod<'src>>,
+    }
+
     /// Adds a `Default` [DataSource] to every model that doesn't have one.
     ///
     /// The default include tree contains all KV, R2, 1:1, 1:N and M:N relationships,
     /// but stops recursing after a 1:N or M:N to avoid join explosion.
-    pub fn expand(idl: &mut CloesceIdl<'src>) {
+    pub fn expand(idl: &mut CloesceIdl) {
         let needs_default = idl
             .models
             .values()
@@ -307,7 +323,7 @@ impl<'src> DataSourceExpansion {
             .collect::<Vec<&str>>();
 
         for name in needs_default {
-            let tree = Self::include_dfs(&idl.models, name, &mut HashSet::new());
+            let tree = include_dfs(&idl.models, name, &mut HashSet::new());
             idl.models.get_mut(name).unwrap().data_sources.insert(
                 "Default",
                 DataSource {
@@ -324,15 +340,15 @@ impl<'src> DataSourceExpansion {
             );
         }
 
-        let generated = idl
-            .models
-            .values()
-            .flat_map(|model| {
-                model.data_sources.iter().map(|(ds_name, ds)| {
-                    (model.name, *ds_name, Self::generate_source(idl, model, ds))
+        let generated =
+            idl.models
+                .values()
+                .flat_map(|model| {
+                    model.data_sources.iter().map(|(ds_name, ds)| {
+                        (model.name, *ds_name, generate_source(idl, model, ds))
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
 
         for (model_name, ds_name, generated) in generated {
             let Some(ds) = idl
@@ -360,7 +376,7 @@ impl<'src> DataSourceExpansion {
         }
     }
 
-    fn generate_source(
+    fn generate_source<'src>(
         idl: &CloesceIdl<'src>,
         model: &Model<'src>,
         ds: &DataSource<'src>,
@@ -420,8 +436,8 @@ impl<'src> DataSourceExpansion {
                 .collect::<Vec<_>>();
 
             return GeneratedDataSource {
-                get_query: Self::build_get_query(model, &include_query),
-                list_query: Self::build_list_query(model, &include_query),
+                get_query: build_get_query(model, &include_query),
+                list_query: build_list_query(model, &include_query),
                 include_query,
                 get: Some(DataSourceGetMethod {
                     parameters: get_params,
@@ -478,61 +494,6 @@ impl<'src> DataSourceExpansion {
         }
     }
 
-    fn include_dfs<'m>(
-        models: &'m IndexMap<&'src str, Model<'src>>,
-        current_model: &'src str,
-        visited: &mut HashSet<&'src str>,
-    ) -> IncludeTree<'src> {
-        if !visited.insert(current_model) {
-            return IncludeTree::default();
-        }
-
-        let mut current_node = IncludeTree::default();
-
-        let model = models.get(current_model).unwrap();
-        for nav in &model.navigation_fields {
-            match nav.kind {
-                NavigationFieldKind::OneToOne { .. } => {
-                    if nav.model_reference == current_model {
-                        // Self-referencing 1:1. Include but don't recurse.
-                        current_node
-                            .0
-                            .insert(nav.field.name.clone(), IncludeTree::default());
-                        continue;
-                    }
-
-                    if visited.contains(&nav.model_reference) {
-                        // Skip to avoid circular reference
-                        continue;
-                    }
-                    let new_node = Self::include_dfs(models, nav.model_reference, visited);
-                    current_node.0.insert(nav.field.name.clone(), new_node);
-                }
-                NavigationFieldKind::OneToMany { .. } => {
-                    // Include the related model as a leaf, but don't recurse.
-                    current_node
-                        .0
-                        .insert(nav.field.name.clone(), IncludeTree::default());
-                }
-            }
-        }
-
-        for kv in &model.kv_fields {
-            current_node
-                .0
-                .insert(kv.field.name.clone(), IncludeTree::default());
-        }
-
-        for r2 in &model.r2_fields {
-            current_node
-                .0
-                .insert(r2.field.name.clone(), IncludeTree::default());
-        }
-
-        visited.remove(current_model);
-        current_node
-    }
-
     /// Basic primary key fetch SELECT, e.g. `{include_query} WHERE "Model"."pk" = ?1`.
     fn build_get_query(model: &Model, include_query: &str) -> String {
         let cols = model
@@ -583,11 +544,57 @@ impl<'src> DataSourceExpansion {
     }
 }
 
-fn parsed_include_tree_to_idl<'src>(tree: &ParsedIncludeTree<'src>) -> IncludeTree<'src> {
-    IncludeTree(
-        tree.0
-            .iter()
-            .map(|(sym, child)| (sym.name.into(), parsed_include_tree_to_idl(child)))
-            .collect(),
-    )
+pub(super) fn include_dfs<'src>(
+    models: &IndexMap<&'src str, Model<'src>>,
+    current_model: &'src str,
+    visited: &mut HashSet<&'src str>,
+) -> IncludeTree<'src> {
+    if !visited.insert(current_model) {
+        return IncludeTree::default();
+    }
+
+    let mut current_node = IncludeTree::default();
+
+    let model = models.get(current_model).unwrap();
+    for nav in &model.navigation_fields {
+        match nav.kind {
+            NavigationFieldKind::OneToOne { .. } => {
+                if nav.model_reference == current_model {
+                    // Self-referencing 1:1. Include but don't recurse.
+                    current_node
+                        .0
+                        .insert(nav.field.name.clone(), IncludeTree::default());
+                    continue;
+                }
+
+                if visited.contains(&nav.model_reference) {
+                    // Skip to avoid circular reference
+                    continue;
+                }
+                let new_node = include_dfs(models, nav.model_reference, visited);
+                current_node.0.insert(nav.field.name.clone(), new_node);
+            }
+            NavigationFieldKind::OneToMany { .. } => {
+                // Include the related model as a leaf, but don't recurse.
+                current_node
+                    .0
+                    .insert(nav.field.name.clone(), IncludeTree::default());
+            }
+        }
+    }
+
+    for kv in &model.kv_fields {
+        current_node
+            .0
+            .insert(kv.field.name.clone(), IncludeTree::default());
+    }
+
+    for r2 in &model.r2_fields {
+        current_node
+            .0
+            .insert(r2.field.name.clone(), IncludeTree::default());
+    }
+
+    visited.remove(current_model);
+    current_node
 }

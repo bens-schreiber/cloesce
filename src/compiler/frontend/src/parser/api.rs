@@ -8,8 +8,6 @@ use crate::{
     parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol, tags},
 };
 
-/// Parses a block of the form:
-///
 /// ```cloesce
 /// api Namespace {
 ///     http_verb methodName(ident1: cidl_type, ...) -> cidl_type

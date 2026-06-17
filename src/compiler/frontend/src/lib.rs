@@ -1,16 +1,8 @@
 //! Responsible for lexing and parsing Cloesce source files into an [Ast], a direct representation of the
 //! parsed source code. Additionally, houses the formatter for Cloesce source files.
 //!
-//! # Cloesce AST
-//!
 //! The AST is a direct representation of the parsed source code, with the only transformations being
 //! the streaming of comments into a seperate "comment map" channel during lexing.
-//!
-//! ## Symbols
-//!
-//! The [Symbol] struct is used to represent any named entity in the source code, such as a model name, field name, API method name, etc.
-//! It contains the symbol's name, type, span, and any tags applied to it. Not all [Symbol]s will have a meaningful type, or any tags,
-//! but this struct is used for all named entities for consistency and ease of error reporting.
 
 pub mod err;
 pub mod formatter;
@@ -107,7 +99,7 @@ contextual_keywords! {
     Internal => "internal",
     Instance => "instance",
 
-    // Validator tag (numerical)
+    // Validator tag (numeric)
     LessThan => "lt",
     LessThanOrEqual => "lte",
     GreaterThan => "gt",
@@ -121,6 +113,7 @@ contextual_keywords! {
     Regex => "regex",
 }
 
+/// Formats a [CidlType] into its string representation via [Keyword::as_str]
 pub fn fmt_cidl_type(ty: &CidlType) -> String {
     match ty {
         CidlType::Int => Keyword::TInt.as_str().into(),
@@ -152,7 +145,7 @@ pub fn fmt_cidl_type(ty: &CidlType) -> String {
     }
 }
 
-/// A spanned value
+/// A wrapper around some spanned value
 #[derive(Debug, Clone)]
 pub struct Spd<T> {
     pub inner: T,
@@ -183,46 +176,65 @@ impl<T> SpdSlice<T> for Vec<Spd<T>> {
     }
 }
 
+/// Any literal argument passed in the Cloesce source.
+///
+/// Each has a [lexer::Token] variant that corresponds to it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentLiteral<'src> {
+    /// [lexer::Token::IntLit]
     Int(&'src str),
+
+    /// [lexer::Token::RealLit]
     Real(&'src str),
+
+    /// [lexer::Token::StringLit]
     Str(&'src str),
+
+    /// [lexer::Token::RegexLit]
     Regex(&'src str),
 }
 
-#[derive(Debug, Clone)]
-pub struct DurableInitializer<'src> {
-    pub symbol: Symbol<'src>,
-    pub args: Vec<Symbol<'src>>,
-}
-
-/// A single entry in an `[inject ...]` tag.
+/// A single entry in a [Tag::Inject] tag
 #[derive(Debug, Clone)]
 pub enum InjectEntry<'src> {
+    /// A flat binding that requires no initializers
     Binding(Symbol<'src>),
-    Context(DurableInitializer<'src>),
+
+    /// A binding that requires initializers, e.g. `binding(arg1, arg2)`
+    ///
+    /// NOTE: Currently used in only Durable Object Context injection
+    Context {
+        symbol: Symbol<'src>,
+        args: Vec<Symbol<'src>>,
+    },
 }
 
+/// Any `[tag]` attached to a symbol
 #[derive(Debug, Clone)]
 pub enum Tag<'src> {
-    Source {
-        name: Spd<&'src str>,
-    },
+    /// [source name]
+    Source { name: Spd<&'src str> },
+
+    /// `[internal]`
     Internal,
+
+    /// `[instance]`
     Instance,
-    Crud {
-        kinds: Vec<Spd<CrudKind>>,
-    },
-    Inject {
-        entries: Vec<InjectEntry<'src>>,
-    },
+
+    /// `[crud ...kinds]`
+    Crud { kinds: Vec<Spd<CrudKind>> },
+
+    /// `[inject]`
+    Inject { entries: Vec<InjectEntry<'src>> },
+
+    /// `[Keyword argument]` where [Keyword] _should_ be a validator keyword (e.g [Keyword::LessThan])
     Validator {
         name: Keyword,
         argument: ArgumentLiteral<'src>,
     },
 }
 
+/// A symbol representing a named entity in the source code.
 #[derive(Debug, Clone, Default)]
 pub struct Symbol<'src> {
     pub name: &'src str,
@@ -279,8 +291,10 @@ pub struct DataSourceBlockMethod<'src> {
     pub raw_sql: &'src str,
 }
 
-// Index map is used here to preserve declaration order
-pub struct ParsedIncludeTree<'src>(pub IndexMap<Symbol<'src>, ParsedIncludeTree<'src>>);
+pub struct ParsedIncludeTree<'src>(
+    // IndexMap is used to preserve declaration order
+    pub IndexMap<Symbol<'src>, ParsedIncludeTree<'src>>,
+);
 
 pub struct DataSourceBlock<'src> {
     /// The symbol for the data source itself, e.g. `SourceName`
@@ -289,7 +303,9 @@ pub struct DataSourceBlock<'src> {
     /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
 
+    /// `include { ... }` block
     pub tree: Option<ParsedIncludeTree<'src>>,
+
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
@@ -310,12 +326,12 @@ pub struct NavAdj<'src> {
 pub struct NavigationBlock<'src> {
     pub adj: Vec<NavAdj<'src>>,
 
-    // { navName }
+    // nav X::y { navName }
     pub nav: Spd<Symbol<'src>>,
 }
 
 impl<'src> NavigationBlock<'src> {
-    /// A nav is 1:1 iff it carries local keys
+    /// 1:1 iff it carries local keys
     pub fn is_one_to_one(&self) -> bool {
         self.adj
             .first()
@@ -370,12 +386,12 @@ pub enum SqlBlockKind<'src> {
 pub enum ModelBlockKind<'src> {
     Column(Vec<Symbol<'src>>),
     Foreign(ForeignBlock<'src>),
+    Primary(Vec<Spd<SqlBlockKind<'src>>>),
+    Unique(Vec<Symbol<'src>>),
     Navigation(NavigationBlock<'src>),
     Kv(KvFieldBlock<'src>),
     R2(R2FieldBlock<'src>),
-    Primary(Vec<Spd<SqlBlockKind<'src>>>),
     Route(Vec<Symbol<'src>>),
-    Unique(Vec<Symbol<'src>>),
 }
 
 impl<'src> ModelBlockKind<'src> {
@@ -552,6 +568,10 @@ pub struct Ast<'src> {
 }
 
 impl<'src> Ast<'src> {
+    /// Merges another [Ast] into this one by appending all of the blocks from the other into this one's blocks.
+    ///
+    /// NOTE: Cloesce does not have any import constructs, so this naive "merge blocks together" strategy
+    /// is sufficient for creating an AST representing the entirety of a multi-file project.
     fn merge(&mut self, mut other: Ast<'src>) {
         self.blocks.append(&mut other.blocks);
     }
