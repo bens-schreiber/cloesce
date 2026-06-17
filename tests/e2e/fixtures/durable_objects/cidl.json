@@ -21,7 +21,8 @@
                 "validators": []
               }
             ],
-            "key_format": "metadata/{subId}"
+            "key_format": "metadata/{subId}",
+            "prefix": "metadata/"
           }
         ]
       }
@@ -39,7 +40,8 @@
               "validators": []
             },
             "params": [],
-            "key_format": "metadata"
+            "key_format": "metadata",
+            "prefix": "metadata"
           }
         ]
       },
@@ -66,7 +68,8 @@
               "validators": []
             },
             "params": [],
-            "key_format": "metadata"
+            "key_format": "metadata",
+            "prefix": "metadata"
           }
         ]
       }

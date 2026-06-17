@@ -5,6 +5,7 @@ use crate::{
     SymbolTable,
     err::{ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
+    trie::PrefixTrie,
 };
 
 /// Builds the [WranglerEnv] from the symbol table, resolving and validating
@@ -52,16 +53,21 @@ pub fn analyze<'src, 'p>(
                 continue;
             }
 
-            templates.push(BindingTemplate {
-                field,
-                key_format: bf.key_format,
-                params,
-            });
+            let prefix = key_prefix(bf.key_format).to_string();
+            templates.push((
+                &bf.symbol,
+                BindingTemplate {
+                    field,
+                    prefix,
+                    key_format: bf.key_format,
+                    params,
+                },
+            ));
         }
 
         kv_bindings.push(Binding {
             name: block.symbol.name,
-            templates,
+            templates: finalize_templates(templates, sink),
         });
     }
 
@@ -87,16 +93,22 @@ pub fn analyze<'src, 'p>(
             {
                 continue;
             }
-            templates.push(BindingTemplate {
-                field,
-                key_format: bf.key_format,
-                params,
-            });
+
+            let prefix = key_prefix(bf.key_format).to_string();
+            templates.push((
+                &bf.symbol,
+                BindingTemplate {
+                    field,
+                    prefix,
+                    key_format: bf.key_format,
+                    params,
+                },
+            ));
         }
 
         r2_bindings.push(Binding {
             name: block.symbol.name,
-            templates,
+            templates: finalize_templates(templates, sink),
         });
     }
 
@@ -128,17 +140,22 @@ pub fn analyze<'src, 'p>(
                 continue;
             }
 
-            templates.push(BindingTemplate {
-                field,
-                key_format: bf.key_format,
-                params,
-            });
+            let prefix = key_prefix(bf.key_format).to_string();
+            templates.push((
+                &bf.symbol,
+                BindingTemplate {
+                    field,
+                    prefix,
+                    key_format: bf.key_format,
+                    params,
+                },
+            ));
         }
 
         durable_bindings.push(DurableBinding {
             name: block.symbol.name,
             shard_fields,
-            templates,
+            templates: finalize_templates(templates, sink),
         });
     }
 
@@ -234,4 +251,31 @@ fn validate_symbol<'src, 'p>(
         cidl_type,
         validators,
     })
+}
+
+/// Everything in a key format up to (not including) the first `{` placeholder.
+fn key_prefix(key_format: &str) -> &str {
+    match key_format.find('{') {
+        Some(i) => &key_format[..i],
+        None => key_format,
+    }
+}
+
+/// Runs overlap detection across a namespace's templates, emitting
+/// [SemanticError::KeyFormatOverlap] for any colliding key formats, then
+/// returns the bare templates for inclusion in the [WranglerEnv].
+fn finalize_templates<'src, 'p>(
+    templates: Vec<(&'p Symbol<'src>, BindingTemplate<'src>)>,
+    sink: &mut ErrorSink<'src, 'p>,
+) -> Vec<BindingTemplate<'src>> {
+    let mut trie = PrefixTrie::new();
+    for (symbol, template) in &templates {
+        if let Some(first) = trie.insert(template.key_format, symbol) {
+            sink.push(SemanticError::KeyFormatOverlap {
+                first,
+                second: symbol,
+            });
+        }
+    }
+    templates.into_iter().map(|(_, t)| t).collect()
 }

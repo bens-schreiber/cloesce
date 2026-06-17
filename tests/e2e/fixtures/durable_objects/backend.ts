@@ -32,6 +32,8 @@ export abstract class GlobalDo extends DurableObject<CfEnv> {
             this.state.storage.kv.get(this.metadata.template()),
         put: ( value: unknown) =>
             this.state.storage.kv.put(this.metadata.template(), value),
+        list: () =>
+            this.state.storage.kv.list({ prefix: `metadata` }),
     };
 
     protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
@@ -62,6 +64,8 @@ export abstract class SubRedditDo extends DurableObject<CfEnv> {
             this.state.storage.kv.get(this.metadata.template()),
         put: ( value: unknown) =>
             this.state.storage.kv.put(this.metadata.template(), value),
+        list: () =>
+            this.state.storage.kv.list({ prefix: `metadata` }),
     };
 
     protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
@@ -81,6 +85,8 @@ function GlobalSubRedditMetadataHelpers(namespace: KVNamespace) {
                 namespace.get(`metadata/${subId}`) as any,
             put: (subId: number, value: unknown): Promise<void> =>
                 namespace.put(`metadata/${subId}`, value as any),
+            list: (options?: { limit?: number, cursor?: string }) =>
+                namespace.list({ ...options, prefix: `metadata/` }),
         },
     };
 }

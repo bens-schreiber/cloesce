@@ -550,6 +550,10 @@ pub struct BindingTemplate<'src> {
 
     #[serde(borrow)]
     pub key_format: &'src str,
+
+    /// Everything in `key_format` up to (not including) the first `{` placeholder.
+    /// Used both for `list` codegen and overlap detection.
+    pub prefix: String,
 }
 
 #[derive(Deserialize, Serialize)]

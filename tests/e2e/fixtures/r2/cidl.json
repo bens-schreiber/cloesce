@@ -22,7 +22,8 @@
                 "validators": []
               }
             ],
-            "key_format": "path/to/data/{id}"
+            "key_format": "path/to/data/{id}",
+            "prefix": "path/to/data/"
           },
           {
             "field": {
@@ -37,7 +38,8 @@
                 "validators": []
               }
             ],
-            "key_format": "path/to/other/{id}"
+            "key_format": "path/to/other/{id}",
+            "prefix": "path/to/other/"
           }
         ]
       }

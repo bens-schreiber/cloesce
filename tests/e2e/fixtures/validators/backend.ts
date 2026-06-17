@@ -20,6 +20,8 @@ function storeHelpers(namespace: KVNamespace) {
                 namespace.get(`some_crap/${email}`) as any,
             put: (email: string, value: string): Promise<void> =>
                 namespace.put(`some_crap/${email}`, value as any),
+            list: (options?: { limit?: number, cursor?: string }) =>
+                namespace.list({ ...options, prefix: `some_crap/` }),
         },
     };
 }

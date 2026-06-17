@@ -31,7 +31,8 @@
                 ]
               }
             ],
-            "key_format": "some_crap/{email}"
+            "key_format": "some_crap/{email}",
+            "prefix": "some_crap/"
           }
         ]
       }

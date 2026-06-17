@@ -38,6 +38,7 @@ mod data_source;
 mod env;
 pub mod err;
 mod model;
+mod trie;
 
 /// Undergoes semantic analysis and expansion on the provided [Ast],
 /// returning either a valid [CloesceIdl] or a list of [SemanticError]s.

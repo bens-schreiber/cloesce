@@ -21,6 +21,8 @@ function namespaceHelpers(namespace: KVNamespace) {
                 namespace.get(`path/to/data/${id}`) as any,
             put: (id: number, value: unknown): Promise<void> =>
                 namespace.put(`path/to/data/${id}`, value as any),
+            list: (options?: { limit?: number, cursor?: string }) =>
+                namespace.list({ ...options, prefix: `path/to/data/` }),
         },
         config: {
             template: (): string =>
@@ -29,6 +31,8 @@ function namespaceHelpers(namespace: KVNamespace) {
                 namespace.get(`config`) as any,
             put: (value: unknown): Promise<void> =>
                 namespace.put(`config`, value as any),
+            list: (options?: { limit?: number, cursor?: string }) =>
+                namespace.list({ ...options, prefix: `config` }),
         },
     };
 }
@@ -41,6 +45,8 @@ function otherNamespaceHelpers(namespace: KVNamespace) {
                 namespace.get(`path/to/other/${id}`) as any,
             put: (id: number, value: string): Promise<void> =>
                 namespace.put(`path/to/other/${id}`, value as any),
+            list: (options?: { limit?: number, cursor?: string }) =>
+                namespace.list({ ...options, prefix: `path/to/other/` }),
         },
     };
 }

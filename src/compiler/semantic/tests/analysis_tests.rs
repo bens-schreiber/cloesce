@@ -952,6 +952,71 @@ fn binding_key_format_invalid_syntax() {
 }
 
 #[test]
+fn binding_template_prefix_is_computed() {
+    // Arrange
+    let src = r#"
+        kv NS {
+            a(id: int) -> json { "path/to/data/{id}" }
+            b(id: int) -> json { "data/{id}/value" }
+            c() -> json { "top" }
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (idl, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "{errors:#?}");
+
+    let ns = idl
+        .wrangler_env
+        .kv_bindings
+        .iter()
+        .find(|b| b.name == "NS")
+        .unwrap();
+    let prefix = |field: &str| {
+        &ns.templates
+            .iter()
+            .find(|t| t.field.name == field)
+            .unwrap()
+            .prefix
+    };
+    assert_eq!(prefix("a"), "path/to/data/");
+    assert_eq!(prefix("b"), "data/");
+    assert_eq!(prefix("c"), "top");
+}
+
+#[test]
+fn key_format_overlap_is_detected_and_scoped_per_namespace() {
+    let src = r#"
+        kv NS {
+            a(id: int) -> json { "foo/{id}" } // overlaps with b
+            b() -> json { "foo/bar" }
+        }
+        kv Other {
+            c(id: int) -> json { "foo/{id}" } // overlaps but diff NS
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (_, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::KeyFormatOverlap { .. }),
+        1,
+        "{errors:#?}"
+    );
+    let (first, second) = expect_err!(errors,
+        SemanticError::KeyFormatOverlap { first, second } => (first.name, second.name)
+    );
+    assert_eq!(first, "a");
+    assert_eq!(second, "b");
+}
+
+#[test]
 fn kv_r2_templates_inherit_validators_update_key_format() {
     // Arrange
     let src = r#"

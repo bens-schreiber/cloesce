@@ -20,6 +20,8 @@ function bucket1Helpers(bucket: R2Bucket) {
                 bucket.get(`path/to/data/${id}`),
             put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
                 bucket.put(`path/to/data/${id}`, value),
+            list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
+                bucket.list({ ...options, prefix: `path/to/data/` }),
         },
         otherData: {
             template: (id: number): string =>
@@ -28,6 +30,8 @@ function bucket1Helpers(bucket: R2Bucket) {
                 bucket.get(`path/to/other/${id}`),
             put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
                 bucket.put(`path/to/other/${id}`, value),
+            list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
+                bucket.list({ ...options, prefix: `path/to/other/` }),
         },
     };
 }

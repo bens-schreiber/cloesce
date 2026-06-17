@@ -7,29 +7,29 @@ d1 {
 
 kv MyKv {
     someValue(id1: string, id2: int) -> json {
-        "{id1}/{id2}"
+        "value/{id1}/{id2}"
     }
 
     streamValue(id1: string, id2: int) -> stream {
-        "{id1}/{id2}"
+        "stream/{id1}/{id2}"
     }
 }
 
 r2 MyR2 {
     fileData(id: string) {
-        "{id}"
+        "files/{id}"
     }
 
     metadata(ownerId: string, modelYear: int) {
-        "{ownerId}/{modelYear}"
+        "meta/{ownerId}/{modelYear}"
     }
 
     photoData(modelYear: int) {
-        "{modelYear}/photos"
+        "photos/{modelYear}"
     }
 
     customDsData(id: int) {
-        "{id}/data"
+        "custom/{id}/data"
     }
 }
 
