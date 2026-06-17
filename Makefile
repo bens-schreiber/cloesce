@@ -97,8 +97,6 @@ test:
 	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
 	cargo test --manifest-path $(CARGO_MANIFEST) --all-features
 	pnpm --filter cloesce run test
-	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
-	pnpm --filter e2e run test
 	
 	@echo "CLOESCE: Compiling and testing examples..."
 	@for ex in $(EXAMPLES); do \
@@ -109,6 +107,10 @@ test:
 		echo "CLOESCE: Testing examples/$$ex..."; \
 		pnpm --filter examples-$$ex exec vitest run || exit 1; \
 	done
+
+	@echo "CLOESCE: Running end-to-end tests..."
+	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
+	pnpm --filter e2e run test
 
 .PHONY: build-docs
 build-docs:
