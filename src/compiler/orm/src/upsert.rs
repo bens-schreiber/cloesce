@@ -147,36 +147,43 @@ impl<'a> UpsertModel<'a> {
             }),
         };
 
-        // KV objects
+        // KV Fields
         for kv in &model.kv_fields {
-            // TODO: Paginated KV fields represent a listing over a prefix; they are
-            // read-only and cannot be written via upsert.
-            if matches!(kv.field.cidl_type, CidlType::Paginated(_)) {
-                new_model.remove(kv.field.name.as_ref());
-                continue;
-            }
+            let (value, metadata) = if kv.field.cidl_type.is_kv_object() {
+                // Worker KV fields are wrapped as `KvObject<T>` (`{ raw, metadata }`).
+                let Some(Value::Object(mut kv_object)) = new_model.remove(kv.field.name.as_ref())
+                else {
+                    fail!(OrmErrorKind::TypeMismatch {
+                        expected: fmt_cidl_type(&kv.field.cidl_type),
+                        got: Value::Null
+                    })
+                };
 
-            let Some(Value::Object(mut kv_object)) = new_model.remove(kv.field.name.as_ref())
-            else {
-                fail!(OrmErrorKind::TypeMismatch {
-                    expected: fmt_cidl_type(&kv.field.cidl_type),
-                    got: Value::Null
-                })
-            };
+                let Some(value) = kv_object.remove("raw") else {
+                    fail!(OrmErrorKind::MissingField {
+                        missing: "raw".into(),
+                        expected: fmt_cidl_type(&kv.field.cidl_type),
+                    })
+                };
 
-            let Some(value) = kv_object.remove("raw") else {
-                fail!(OrmErrorKind::MissingField {
-                    missing: "raw".into(),
-                    expected: fmt_cidl_type(&kv.field.cidl_type),
-                })
+                let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
+                (value, metadata)
+            } else {
+                // Durable Object storage fields store their value directly, with no wrapper.
+                let Some(value) = new_model.remove(kv.field.name.as_ref()) else {
+                    fail!(OrmErrorKind::TypeMismatch {
+                        expected: fmt_cidl_type(&kv.field.cidl_type),
+                        got: Value::Null
+                    })
+                };
+                (value, Value::Null)
             };
-            let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
 
             let (key, placeholders_remain) =
                 key_format_interpolation(&kv.key_format, &new_model, model)?;
 
             if placeholders_remain {
-                let path_parts: Vec<String> = path.split('.').skip(1).map(String::from).collect();
+                let path_parts = path.split('.').skip(1).map(String::from).collect();
                 self.kv_delayed_upload_acc.push(DelayedKvUpload {
                     path: path_parts,
                     namespace_binding: kv.binding.to_string(),

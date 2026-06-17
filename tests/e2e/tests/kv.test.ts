@@ -1,6 +1,6 @@
 import { startWrangler, expectHttpResult } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ModelWithKv, KVOnly, KValue, Paginated, KVOnlyWithSingleton } from "../fixtures/kv/client";
+import { ModelWithKv, KVOnly, KValue, KVOnlyWithSingleton } from "../fixtures/kv/client";
 import config from "../fixtures/kv/cloesce.jsonc" with { type: "jsonc" };
 
 let stopWrangler: () => Promise<void>;
@@ -47,32 +47,14 @@ describe("ModelWithKv", () => {
     expect(item.id).toBeDefined();
   });
 
-  it("GET with paginated KV list returns paginated structure", async () => {
-    const res = await ModelWithKv.$get(id);
-    expectHttpResult(res, "GET should be OK");
+  it("accepts a KValue in POST", async () => {
+    const item = { raw: "test", metadata: null } as KValue<unknown>;
+
+    const res = await ModelWithKv.acceptKvObject(item);
+
+    expectHttpResult(res, "acceptKvObject should be OK");
     expect(res.data).toBeDefined();
-
-    expect(res.data?.paginatedItems).toBeDefined();
-    expect(res.data?.paginatedItems.results).toBeDefined();
-    expect(Array.isArray(res.data?.paginatedItems.results)).toBe(true);
-    expect(res.data?.paginatedItems.complete).toBeTypeOf("boolean");
-  });
-
-  it("accepts a paginated structure in POST", async () => {
-    const paginatedData: Paginated<KValue<unknown>> = {
-      results: [
-        { key: "item1", raw: "test", metadata: null } as KValue<unknown>,
-        { key: "item2", raw: "test2", metadata: null } as KValue<unknown>,
-      ],
-      cursor: "next-page-cursor",
-      complete: false,
-    };
-
-    const res = await ModelWithKv.acceptPaginated(paginatedData);
-
-    expectHttpResult(res, "acceptPaginated should be OK");
-    expect(res.data).toBeDefined();
-    expect(res.data).toEqual(paginatedData);
+    expect(res.data).toEqual(item);
   });
 });
 

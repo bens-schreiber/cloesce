@@ -6,11 +6,11 @@ import subRedditDoInitial from "./migrations/SubRedditDo/Initial.js";
 
 const Global = clo.Global.impl({
   newGlobal() {
-    return { metadata: { raw: "default" } } as clo.Global.Self;
+    return { metadata: "default" } as clo.Global.Self;
   },
 
   getMetadata(self) {
-    return self.metadata.value;
+    return self.metadata;
   },
 });
 
@@ -18,7 +18,7 @@ const SubReddit = clo.SubReddit.impl({
   newSubReddit() {
     return {
       subId: 0,
-      metadata: { raw: "default" },
+      metadata: "default",
       globalMetadata: { raw: "default" },
     } as clo.SubReddit.Self;
   },

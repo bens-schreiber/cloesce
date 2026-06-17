@@ -12,10 +12,7 @@ macro_rules! cidl_type_contains {
 
         loop {
             match cur {
-                CidlType::Array(inner)
-                | CidlType::Nullable(inner)
-                | CidlType::KvObject(inner)
-                | CidlType::Paginated(inner) => {
+                CidlType::Array(inner) | CidlType::Nullable(inner) | CidlType::KvObject(inner) => {
                     if matches!(cur, $pattern) {
                         break true;
                     }
@@ -61,13 +58,13 @@ impl ClientTemplate<'_> {
         self.mapper.cidl_type(&cidl_type, self.idl)
     }
 
+    fn is_kv_object(&self, ty: &CidlType<'_>) -> bool {
+        ty.is_kv_object()
+    }
+
     fn kv_inner_type<'t>(&self, ty: &'t CidlType<'t>) -> &'t CidlType<'t> {
         match ty {
             CidlType::KvObject(inner) => inner.as_ref(),
-            CidlType::Paginated(inner) => match inner.as_ref() {
-                CidlType::KvObject(inner) => inner.as_ref(),
-                _ => ty,
-            },
             _ => ty,
         }
     }
@@ -116,10 +113,6 @@ impl ClientTemplate<'_> {
 
     fn contains_stream(&self, ty: &CidlType<'_>) -> bool {
         cidl_type_contains!(ty, CidlType::Stream)
-    }
-
-    fn is_paginated(&self, ty: &CidlType<'_>) -> bool {
-        matches!(ty, CidlType::Paginated(_))
     }
 
     fn is_one_to_one(&self, nav: &NavigationField<'_>) -> bool {

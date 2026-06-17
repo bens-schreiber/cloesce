@@ -158,11 +158,10 @@ export class BasicService {
   }
 }
 export class GlobalSettings {
-  config: KValue<unknown>;
+  config: unknown;
 
   static fromJson(data: any): GlobalSettings {
     const __$res = Object.assign(new GlobalSettings(), data);
-    if (__$res.config) __$res.config = Object.assign(new KValue(), __$res.config);
     return __$res;
   }
 }
@@ -188,7 +187,7 @@ export class HasSqlColumnTypes {
 }
 export class Leaderboard {
   tenantId: number;
-  topEntries: KValue<unknown>;
+  topEntries: unknown;
   static async $get(
     tenantId: number,
     fetchImpl: typeof fetch = fetch
@@ -237,7 +236,6 @@ export class Leaderboard {
 
   static fromJson(data: any): Leaderboard {
     const __$res = Object.assign(new Leaderboard(), data);
-    if (__$res.topEntries) __$res.topEntries = Object.assign(new KValue(), __$res.topEntries);
     return __$res;
   }
 }
@@ -246,7 +244,7 @@ export class LeaderboardEntry {
   playerName: string;
   score: number;
   tenantId: number;
-  topEntries: KValue<unknown>;
+  topEntries: unknown;
   static async $get(
     tenantId: number,
     id: number,
@@ -321,7 +319,6 @@ export class LeaderboardEntry {
 
   static fromJson(data: any): LeaderboardEntry {
     const __$res = Object.assign(new LeaderboardEntry(), data);
-    if (__$res.topEntries) __$res.topEntries = Object.assign(new KValue(), __$res.topEntries);
     return __$res;
   }
 }
@@ -366,7 +363,6 @@ export class ModelWithKv {
   id1: string;
   id2: number;
   someValue: KValue<unknown>;
-  manyValues: Paginated<KValue<unknown>>;
   streamValue: KValue<void>;
   async instanceMethod(
     input: string,
@@ -446,18 +442,12 @@ export class ModelWithKv {
   static fromJson(data: any): ModelWithKv {
     const __$res = Object.assign(new ModelWithKv(), data);
     if (__$res.someValue) __$res.someValue = Object.assign(new KValue(), __$res.someValue);
-    if (__$res.manyValues?.results) {
-      for (let i = 0; i < __$res.manyValues.results.length; i++) {
-        __$res.manyValues.results[i] = Object.assign(new KValue(), __$res.manyValues.results[i]);
-      }
-    }
     return __$res;
   }
 }
 export class ModelWithR2 {
   id: string;
   fileData: R2Object;
-  manyFileDatas: Paginated<R2Object>;
   async hasR2ParamAndRes(
     input: R2Object,
     fetchImpl: typeof fetch = fetch
@@ -487,11 +477,6 @@ export class ModelWithR2 {
 
   static fromJson(data: any): ModelWithR2 {
     const __$res = Object.assign(new ModelWithR2(), data);
-    if (__$res.manyFileDatas?.results) {
-      for (let i = 0; i < __$res.manyFileDatas.results.length; i++) {
-        __$res.manyFileDatas.results[i] = Object.assign(new R2Object(), __$res.manyFileDatas.results[i]);
-      }
-    }
     return __$res;
   }
 }
@@ -852,18 +837,11 @@ type DeepPartialInner<T> = T extends (infer U)[]
 export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
-  key!: string;
   raw: unknown | null;
   metadata: unknown | null;
   get value(): V | null {
     return this.raw as V | null;
   }
-}
-
-export interface Paginated<T> {
-  results: T[];
-  cursor: string | null;
-  complete: boolean;
 }
 
 export enum MediaType {

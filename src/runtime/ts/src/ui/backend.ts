@@ -11,26 +11,23 @@ export type { SqlStatement } from "../router/orm.js";
 export type { R2ObjectBody } from "@cloudflare/workers-types";
 
 /**
- * Base class for a Cloudflare KV model or navigation property.
+ * Base class for a Cloudflare Workers KV model or navigation property.
  *
- * Consists of a `key`, `value`, and optional `metadata`.
+ * Consists of a `value` and optional `metadata`.
  *
  * @template V The type of the value stored in the KValue. Note that KV is schema-less,
  * so this type is not enforced at runtime, but serves as the type the client expects.
  *
  * @remarks
- * - The `key` is a string that uniquely identifies the entry in the KV store.
  * - The `value` is of generic type `V`, allowing flexibility in the type of data stored.
  * - `V` must be serializable to JSON.
  * - The `metadata` can hold any additional information associated with the KV entry.
  */
 export class KValue<V> {
-  key!: string;
   raw: unknown | null;
   metadata: unknown | null;
 
-  constructor(key: string, value: V | null, metadata: unknown | null = null) {
-    this.key = key;
+  constructor(value: V | null, metadata: unknown | null = null) {
     this.raw = value;
     this.metadata = metadata;
   }
@@ -48,26 +45,6 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
-
-/**
- * The result of a paginated query to Workers KV or R2.
- */
-export interface Paginated<T> {
-  /**
-   * The results of the pagination query. A maximum of 1000 results will be returned, but may be less.
-   */
-  results: T[];
-
-  /**
-   * A cursor to be used in the next pagination query. Will be `null` if there are no more results to paginate through.
-   */
-  cursor: string | null;
-
-  /**
-   * Whether the pagination query is complete, meaning there are no more results to paginate through. This is `true` if `cursor` is `null`, and `false` otherwise.
-   */
-  complete: boolean;
-}
 
 /**
  * The result of a Workers endpoint.

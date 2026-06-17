@@ -15,13 +15,12 @@ import {
   Cidl,
   getNavigationCidlType,
   KvField,
-  R2Field,
   isD1Backed,
   isDurableBacked,
   CONTEXT_INJECT_KEY,
 } from "../cidl.js";
 import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
-import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
+import { DeepPartial, IncludeTree, KValue } from "../ui/backend.js";
 
 /**
  * A SQL query plus its positional bindings, not bound to any database.
@@ -55,15 +54,15 @@ type DurableSql = {
 };
 
 interface KvRepository {
-  /** Reads `key` as the single value or full page the field's type calls for. */
-  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>>;
+  /** Reads the value stored at `key`. */
+  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | unknown>;
 
   put(key: string, value: any, metadata?: unknown): Promise<void> | void;
 }
 
 interface R2Repository {
-  /** Reads `key` as the single object or full page the field's type calls for. */
-  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>>;
+  /** Reads the object stored at `key`. */
+  hydrate(key: string): Promise<R2ObjectBody | null>;
 }
 
 interface SqlRepository {
@@ -549,8 +548,6 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     for (const kv of modelMeta.kv_fields) {
       const key = resolveKey(kv.key_format, value);
       if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        const empty = emptyHydration(kv.field.cidl_type);
-        if (empty) value[kv.field.name] = empty;
         continue;
       }
 
@@ -565,14 +562,12 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     for (const r2 of modelMeta.r2_fields) {
       const key = resolveKey(r2.key_format, value);
       if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        const empty = emptyHydration(r2.field.cidl_type);
-        if (empty) value[r2.field.name] = empty;
         continue;
       }
       const repo = r2RepositoryFor(r2.binding, args.env);
       args.promises.push(
         CloesceError.catchGeneric(async () => {
-          value[r2.field.name] = await repo.hydrate(r2, key);
+          value[r2.field.name] = await repo.hydrate(key);
         }),
       );
     }
@@ -696,38 +691,20 @@ function sqlRepositoryFor(
 class WorkerKvRepository implements KvRepository {
   constructor(private namespace: KVNamespace) {}
 
-  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
-    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
-  }
-
-  private async get(kv: KvField, key: string): Promise<KValue<unknown>> {
+  async hydrate(kv: KvField, key: string): Promise<KValue<unknown>> {
     // KV Fields are capable of holding a `Stream` of data, which must be retrieved
     // with the `type: "stream"` option and cannot be JSON-parsed.
-    //
-    // A field is a `Stream` if the root type is of `Stream`.
-    const isStreamField = (kv: KvField) => {
-      const inner =
-        typeof kv.field.cidl_type === "object" && "Paginated" in kv.field.cidl_type
-          ? kv.field.cidl_type.Paginated
-          : kv.field.cidl_type;
-      return inner === "Stream";
-    };
+    const inner =
+      typeof kv.field.cidl_type === "object" && "KvObject" in kv.field.cidl_type
+        ? kv.field.cidl_type.KvObject
+        : kv.field.cidl_type;
 
-    if (isStreamField(kv)) {
-      return new KValue(key, await this.namespace.get(key, { type: "stream" }), null);
+    if (inner === "Stream") {
+      return new KValue(await this.namespace.get(key, { type: "stream" }), null);
     }
 
     const { value: raw, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
-    return new KValue(key, raw, metadata);
-  }
-
-  private async list(kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
-    const res = await this.namespace.list({ prefix });
-    const cursor = !res.list_complete ? (res.cursor ?? null) : null;
-    const complete = res.list_complete || !cursor;
-
-    const results = await Promise.all(res.keys.map((k: any) => this.get(kv, k.name)));
-    return { results, cursor, complete };
+    return new KValue(raw, metadata);
   }
 
   put(key: string, value: any, metadata: unknown): Promise<void> {
@@ -738,21 +715,8 @@ class WorkerKvRepository implements KvRepository {
 class DurableKvRepository implements KvRepository {
   constructor(private ctx: DurableContext) {}
 
-  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | Paginated<KValue<unknown>>> {
-    return isPaginated(kv.field.cidl_type) ? this.list(kv, key) : this.get(kv, key);
-  }
-
-  private async get(_kv: KvField, key: string): Promise<KValue<unknown>> {
-    const raw = this.ctx.state.storage.kv.get(key);
-    return new KValue(key, raw ?? null, null);
-  }
-
-  // The SQLite-backed KV storage scans synchronously; the page is always complete.
-  private async list(_kv: KvField, prefix: string): Promise<Paginated<KValue<unknown>>> {
-    const results = [...this.ctx.state.storage.kv.list({ prefix })].map(
-      ([key, value]) => new KValue(key, value ?? null, null),
-    );
-    return { results, cursor: null, complete: true };
+  async hydrate(_kv: KvField, key: string): Promise<unknown> {
+    return this.ctx.state.storage.kv.get(key) ?? null;
   }
 
   put(key: string, value: any): void {
@@ -763,19 +727,8 @@ class DurableKvRepository implements KvRepository {
 class WorkerR2Repository implements R2Repository {
   constructor(private bucket: R2Bucket) {}
 
-  hydrate(r2: R2Field, key: string): Promise<R2ObjectBody | null | Paginated<R2ObjectBody>> {
-    return isPaginated(r2.field.cidl_type) ? this.list(key) : this.get(key);
-  }
-
-  private get(key: string): Promise<R2ObjectBody | null> {
+  hydrate(key: string): Promise<R2ObjectBody | null> {
     return this.bucket.get(key);
-  }
-
-  private async list(prefix: string): Promise<Paginated<R2ObjectBody>> {
-    const res = await this.bucket.list({ prefix });
-    const results = await Promise.all(res.objects.map((obj) => this.bucket.get(obj.key)));
-    const cursor = res.truncated ? (res.cursor ?? null) : null;
-    return { results, cursor, complete: !cursor } as Paginated<R2ObjectBody>;
   }
 }
 
@@ -824,12 +777,4 @@ function r2RepositoryFor(binding: string, env: any): R2Repository {
     throw new InternalError(`R2 Bucket binding "${binding}" not found.`);
   }
   return new WorkerR2Repository(bucket);
-}
-
-function isPaginated(cidlType: CidlType): boolean {
-  return typeof cidlType === "object" && "Paginated" in cidlType;
-}
-
-function emptyHydration(cidlType: CidlType): Paginated<never> | undefined {
-  return isPaginated(cidlType) ? { results: [], cursor: null, complete: true } : undefined;
 }

@@ -319,12 +319,10 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .kvField("config/{id}", "namespace1", "config", "Json")
-      .kvField("config/{id}", "namespace1", "configStream", "Stream")
-      .kvField("config", "namespace1", "configList", { Paginated: "Json" })
-      .kvField("emptyConfig", "namespace1", "emptyConfig", "Json")
+      .kvField("config/{id}", "namespace1", "config", { KvObject: "Json" })
+      .kvField("config/{id}", "namespace1", "configStream", { KvObject: "Stream" })
+      .kvField("emptyConfig", "namespace1", "emptyConfig", { KvObject: "Json" })
       .r2Field("images/{id}", "bucket1", "image")
-      .r2Field("images", "bucket1", "imageList", { Paginated: "R2Object" })
       .r2Field("emptyImage", "bucket1", "emptyImage")
       .build();
 
@@ -351,26 +349,16 @@ describe("ORM Hydrate Tests", () => {
       value: { setting: `${base.id} value` },
       metadata: { createdAt: Date.now() },
     };
-    const otherConfigItem = {
-      key: `config/0`,
-      value: { setting: `config list item 0` },
-    };
     await namespace1.put(baseConfigKV.key, JSON.stringify(baseConfigKV.value), {
       metadata: JSON.stringify(baseConfigKV.metadata),
     });
-    await namespace1.put(otherConfigItem.key, JSON.stringify(otherConfigItem.value));
 
     const bucket1 = await mf.getR2Bucket("bucket1");
     const baseImageObject = {
       key: `images/${base.id}`,
       body: `image data for ${base.id}`,
     };
-    const otherImageObject = {
-      key: `images/0`,
-      body: `image data for image 0`,
-    };
     await bucket1.put(baseImageObject.key, baseImageObject.body);
-    await bucket1.put(otherImageObject.key, otherImageObject.body);
 
     const idl = createIdl({
       models: [modelMeta],
@@ -400,17 +388,7 @@ describe("ORM Hydrate Tests", () => {
 
       // Assert
       expect(noIncludeTree.config).toBeUndefined();
-      expect(noIncludeTree.configList).toEqual({
-        results: [],
-        cursor: null,
-        complete: true,
-      });
       expect(noIncludeTree.image).toBeUndefined();
-      expect(noIncludeTree.imageList).toEqual({
-        results: [],
-        cursor: null,
-        complete: true,
-      });
     }
 
     {
@@ -424,10 +402,8 @@ describe("ORM Hydrate Tests", () => {
           includeTree: {
             config: {},
             configStream: {},
-            configList: {},
             emptyConfig: {},
             image: {},
-            imageList: {},
             emptyImage: {},
           },
           env,
@@ -440,115 +416,20 @@ describe("ORM Hydrate Tests", () => {
 
       // Assert
       expect(fullIncludeTree.config).toEqual({
-        key: baseConfigKV.key,
         raw: baseConfigKV.value,
         metadata: JSON.stringify(baseConfigKV.metadata),
       });
-      expect(fullIncludeTree.configList.results.length).toBe(2);
-      expect(fullIncludeTree.configList.complete).toBe(true);
-      expect(fullIncludeTree.configList.cursor).toBeNull();
-      expect(fullIncludeTree.configList.results).toEqual(
-        expect.arrayContaining([
-          {
-            key: baseConfigKV.key,
-            raw: baseConfigKV.value,
-            metadata: JSON.stringify(baseConfigKV.metadata),
-          },
-          {
-            key: otherConfigItem.key,
-            raw: otherConfigItem.value,
-            metadata: null,
-          },
-        ]),
-      );
       expect(fullIncludeTree.configStream.value).toBeInstanceOf(ReadableStream);
       expect(fullIncludeTree.emptyConfig.value).toBeNull();
 
       expect(fullIncludeTree.image).toBeDefined();
       expect(await fullIncludeTree.image.text()).toBe(baseImageObject.body);
-      expect(fullIncludeTree.imageList.results.length).toBe(2);
-      expect(fullIncludeTree.imageList.complete).toBe(true);
-      expect(fullIncludeTree.imageList.cursor).toBeNull();
-
-      const imageBodies: string[] = [];
-      for (const imgObj of fullIncludeTree.imageList.results) {
-        imageBodies.push(await imgObj.text());
-      }
-      expect(imageBodies).toEqual(
-        expect.arrayContaining([baseImageObject.body, otherImageObject.body]),
-      );
 
       expect(fullIncludeTree.emptyImage).toBeNull();
     }
   });
 
-  test("KV cursor paginates correctly from hydrated Paginated result", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("CursorModel")
-      .idPk()
-      .kvField("cursor-test", "namespace1", "configList", { Paginated: "Json" })
-      .build();
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-            export default {
-              async fetch(request, env, ctx) {
-                return new Response("Hello Miniflare!");
-              }
-            }
-            `,
-      kvNamespaces: ["namespace1"],
-    });
-
-    const namespace1 = await mf.getKVNamespace("namespace1");
-    const total = 1005;
-    for (let i = 0; i < total; i++) {
-      await namespace1.put(`cursor-test/${String(i).padStart(4, "0")}`, JSON.stringify({ i }));
-    }
-
-    const idl = createIdl({ models: [modelMeta] });
-
-    // Act
-    const promises: Promise<CloesceResult<void>>[] = [];
-    const hydrated = hydrateType(
-      { id: 1 },
-      { Object: { name: "CursorModel" } },
-      {
-        idl,
-        includeTree: { configList: {} },
-        env: { namespace1 },
-        durable: null,
-        promises,
-      },
-    );
-
-    await Promise.all(promises);
-
-    // Assert first page
-    expect(hydrated.configList.results.length).toBe(1000);
-    expect(hydrated.configList.complete).toBe(false);
-    expect(hydrated.configList.cursor).toBeTypeOf("string");
-
-    const firstPageKeys = new Set(
-      hydrated.configList.results.map((item: { key: string }) => item.key),
-    );
-
-    // Act on next page using hydrated cursor
-    const next = await namespace1.list({
-      prefix: "cursor-test",
-      cursor: hydrated.configList.cursor!,
-    });
-
-    // Assert cursor works for pagination
-    expect(next.keys.length).toBe(total - 1000);
-    expect(next.list_complete).toBe(true);
-    for (const key of next.keys) {
-      expect(firstPageKeys.has(key.name)).toBe(false);
-    }
-  }, 30000);
-
-  test("reads a Durable Object-backed model's KV field from the DO's own storage", async () => {
+  test("reads a Durable Object-backed model's KV field directly from the DO's own storage", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Leaderboard")
       .durable("LeaderboardDo", ["tenantId"])
@@ -575,46 +456,7 @@ describe("ORM Hydrate Tests", () => {
 
     await Promise.all(promises);
 
-    // Assert
-    expect(result.score.key).toBe("score/7");
-    expect(result.score.raw).toBe(42);
-  });
-
-  test("paginated Durable Object KV field prefix-scans the DO's SQL-backed storage", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Leaderboard")
-      .durable("LeaderboardDo", ["tenantId"])
-      .kvField("scores/{tenantId}", "LeaderboardDo", "scores", { Paginated: "Int" })
-      .build();
-
-    const idl = createIdl({ models: [modelMeta] });
-    const { ctx, store } = mockDurableContext();
-    store.set("scores/7/1", 10);
-    store.set("scores/7/2", 20);
-    store.set("scores/8/1", 99);
-
-    // Act
-    const promises: Promise<CloesceResult<void>>[] = [];
-    const result = hydrateType(
-      { tenantId: 7 },
-      { Object: { name: "Leaderboard" } },
-      {
-        ...createHydrateArgs(),
-        idl,
-        includeTree: { scores: {} },
-        durable: ctx,
-        promises,
-      },
-    );
-
-    await Promise.all(promises);
-
-    // Assert: only tenant 7's keys, as a complete page
-    expect(result.scores.complete).toBe(true);
-    expect(result.scores.cursor).toBeNull();
-    expect(result.scores.results).toEqual([
-      { key: "scores/7/1", raw: 10, metadata: null },
-      { key: "scores/7/2", raw: 20, metadata: null },
-    ]);
+    // Assert: DO storage values are stored directly, with no KValue wrapper.
+    expect(result.score).toBe(42);
   });
 });

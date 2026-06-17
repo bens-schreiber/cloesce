@@ -751,18 +751,11 @@ type DeepPartialInner<T> = T extends (infer U)[]
 export type DeepPartial<T> = DeepPartialInner<T> & { __$brand?: "Partial" };
 
 export class KValue<V> {
-  key!: string;
   raw: unknown | null;
   metadata: unknown | null;
   get value(): V | null {
     return this.raw as V | null;
   }
-}
-
-export interface Paginated<T> {
-  results: T[];
-  cursor: string | null;
-  complete: boolean;
 }
 
 export enum MediaType {

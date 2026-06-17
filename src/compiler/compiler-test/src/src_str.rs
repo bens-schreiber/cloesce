@@ -10,10 +10,6 @@ kv MyKv {
         "{id1}/{id2}"
     }
 
-    manyValues() -> paginated<json> {
-        ""
-    }
-
     streamValue(id1: string, id2: int) -> stream {
         "{id1}/{id2}"
     }
@@ -22,10 +18,6 @@ kv MyKv {
 r2 MyR2 {
     fileData(id: string) {
         "{id}"
-    }
-
-    manyFileDatas(id: string) paginated {
-        "{id}/files"
     }
 
     metadata(ownerId: string, modelYear: int) {
@@ -146,10 +138,6 @@ model ModelWithKv for db {
         someValue
     }
 
-    kv MyKv::manyValues() {
-        manyValues
-    }
-
     kv MyKv::streamValue(id1, id2) {
         streamValue
     }
@@ -169,10 +157,6 @@ model ModelWithR2 for db {
 
     r2 MyR2::fileData(id) {
         fileData
-    }
-
-    r2 MyR2::manyFileDatas(id) {
-        manyFileDatas
     }
 }
 

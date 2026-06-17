@@ -7,10 +7,6 @@ kv namespace {
         "path/to/data/{id}"
     }
 
-    paginatedData() -> paginated<json> {
-        "path/to/data/"
-    }
-
     config() -> json {
         "config"
     }
@@ -36,10 +32,6 @@ model ModelWithKv for db {
         someOtherData
     }
 
-    kv namespace::paginatedData() {
-        paginatedItems
-    }
-
     column {
         someColumn: real
         someOtherColumn: string
@@ -47,7 +39,7 @@ model ModelWithKv for db {
 }
 
 api ModelWithKv {
-    post acceptPaginated(ps: paginated<kvobject<json>>) -> paginated<kvobject<json>>
+    post acceptKvObject(item: kvobject<json>) -> kvobject<json>
 }
 
 [crud get, save]

@@ -83,9 +83,9 @@ fn kv_template<'tokens, 'src: 'tokens>()
 ///         "metadata/{id}"
 ///     }
 ///
-///     // template for fetching all metadata objects with a common prefix
-///     metas() -> paginated<json> {
-///         "metadata/"
+///     // template for fetching another metadata object by name
+///     named(name: string) -> json {
+///         "metadata/{name}"
 ///     }
 /// }
 /// ```
@@ -111,11 +111,10 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
 /// }
 /// ```
 ///
-/// R2 binding templates do not specify a return type, but may be marked with the
-/// `paginated` infix keyword
+/// R2 binding templates do not specify a return type.
 pub fn r2_binding_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    // `name(params) [paginated] { "format" }`
+    // `name(params) { "format" }`
     let template = symbol()
         .then(
             tagged_typed_symbol()
@@ -124,19 +123,15 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
-        .then(kw!(GPaginated).or_not())
         .then(
             select! { Token::StringLit(value) => value }
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_spanned(
-            |(((sym, params), paginated), key_format)| R2BindingTemplate {
-                symbol: sym,
-                params,
-                key_format,
-                is_paginated: paginated.is_some(),
-            },
-        );
+        .map_spanned(|((sym, params), key_format)| R2BindingTemplate {
+            symbol: sym,
+            params,
+            key_format,
+        });
 
     kw!(R2)
         .ignore_then(symbol())

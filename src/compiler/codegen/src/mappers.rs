@@ -82,7 +82,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
             CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, idl)),
-            CidlType::Paginated(inner) => format!("Paginated<{}>", self.cidl_type(inner, idl)),
             CidlType::R2Object => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
                 TypeScriptMapperKind::ClientApi => "R2Object".to_string(),

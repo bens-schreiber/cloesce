@@ -506,10 +506,6 @@ fn resolve_cidl_type<'src, 'p>(
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
             Ok(CidlType::Array(Box::new(resolved_inner)))
         }
-        CidlType::Paginated(inner) => {
-            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            Ok(CidlType::Paginated(Box::new(resolved_inner)))
-        }
         CidlType::KvObject(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
             Ok(CidlType::KvObject(Box::new(resolved_inner)))

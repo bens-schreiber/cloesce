@@ -843,11 +843,6 @@ impl<'src> ToDoc<'src> for KvBindingBlock<'src> {
 impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
-        let paginated = if self.is_paginated {
-            Doc::text(" ").then(Doc::kw(Keyword::GPaginated))
-        } else {
-            Doc::nil()
-        };
         let key_format = Doc::hardline(2)
             .then(Doc::text("\""))
             .then(Doc::text(self.key_format))
@@ -856,7 +851,6 @@ impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
             .then(Doc::text("("))
             .then(params)
             .then(Doc::text(")"))
-            .then(paginated)
             .then(ctx.block(key_format, 2))
     }
 }

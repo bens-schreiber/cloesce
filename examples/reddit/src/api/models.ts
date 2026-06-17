@@ -1,6 +1,6 @@
 import * as clo from "@cloesce/backend.js";
 import { CfReadableStream } from "@cloesce/backend.js";
-import { HttpResult, KValue } from "cloesce";
+import { HttpResult } from "cloesce";
 import { auth, AuthUser } from "./auth.js";
 import { SubRedditDo, UserDo } from "./durable.js";
 
@@ -13,8 +13,7 @@ export const User = clo.User.impl({
     const token = AuthUser.newToken();
     await env.Sessions.session.put(token, username);
 
-    // TODO: KValue wrap is a bit awkward here
-    const user = { username, profile: new KValue("profile", profile) } as clo.User.Self;
+    const user = { username, profile } as clo.User.Self;
     return { token, user };
   },
 
@@ -36,15 +35,14 @@ export const SubReddit = clo.SubReddit.impl({
       const entry: clo.SubRedditEntry = { subId, name: meta.name };
       await env.SubReddits.put(env.SubReddits.entry.template(subId), JSON.stringify(entry));
 
-      return { subId, metadata: new KValue("metadata", meta) } as clo.SubReddit.Self;
+      return { subId, metadata: meta } as clo.SubReddit.Self;
     }),
 
   async list(env) {
     const { keys } = await env.SubReddits.list({ prefix: env.SubReddits.directory.template() });
-    const results = (await Promise.all(
+    return (await Promise.all(
       keys.map((k) => env.SubReddits.get(k.name, "json")),
     )) as clo.SubRedditEntry[];
-    return { results, cursor: null, complete: true };
   },
 
   feed: async (_self, env, subId) =>

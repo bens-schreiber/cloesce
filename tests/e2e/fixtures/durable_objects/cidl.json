@@ -35,9 +35,7 @@
           {
             "field": {
               "name": "metadata",
-              "cidl_type": {
-                "KvObject": "Json"
-              },
+              "cidl_type": "Json",
               "validators": []
             },
             "params": [],
@@ -64,9 +62,7 @@
           {
             "field": {
               "name": "metadata",
-              "cidl_type": {
-                "KvObject": "Json"
-              },
+              "cidl_type": "Json",
               "validators": []
             },
             "params": [],
@@ -92,9 +88,7 @@
         {
           "field": {
             "name": "metadata",
-            "cidl_type": {
-              "KvObject": "Json"
-            },
+            "cidl_type": "Json",
             "validators": []
           },
           "binding": "GlobalDo",
@@ -698,9 +692,7 @@
         {
           "field": {
             "name": "metadata",
-            "cidl_type": {
-              "KvObject": "Json"
-            },
+            "cidl_type": "Json",
             "validators": []
           },
           "binding": "SubRedditDo",

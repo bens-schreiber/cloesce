@@ -74,7 +74,7 @@ kv SubReddits {
         "subreddits/{subId}"
     }
     
-    directory() -> paginated<SubRedditEntry> {
+    directory() -> SubRedditEntry {
         "subreddits/"
     }
 }
@@ -101,7 +101,7 @@ api SubReddit {
     post create(meta: SubRedditMeta) -> SubReddit
     
     [inject SubReddits]
-    get list() -> paginated<SubRedditEntry>
+    get list() -> array<SubRedditEntry>
     
     [inject SubRedditDo(subId)]
     get feed(self, subId: string) -> array<Post>

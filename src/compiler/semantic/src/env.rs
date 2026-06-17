@@ -37,14 +37,8 @@ pub fn analyze<'src, 'p>(
                 continue;
             };
 
-            // KV templates always return `KvObject<T>`
-            // (or `paginated<KvObject<T>>` if the template is paginated).
-            field.cidl_type = match &field.cidl_type {
-                CidlType::Paginated(inner) => {
-                    CidlType::paginated(CidlType::KvObject(inner.clone()))
-                }
-                other => CidlType::KvObject(Box::new(other.clone())),
-            };
+            // KV templates always return `KvObject<T>`.
+            field.cidl_type = CidlType::KvObject(Box::new(field.cidl_type.clone()));
 
             let params = bf
                 .params
@@ -79,12 +73,8 @@ pub fn analyze<'src, 'p>(
                 continue;
             };
 
-            // R2 templates always return `R2Object` (or `paginated<R2Object>` if the template is paginated).
-            field.cidl_type = if bf.is_paginated {
-                CidlType::Paginated(Box::new(CidlType::R2Object))
-            } else {
-                CidlType::R2Object
-            };
+            // R2 templates always return `R2Object`.
+            field.cidl_type = CidlType::R2Object;
 
             let params = bf
                 .params
@@ -121,16 +111,9 @@ pub fn analyze<'src, 'p>(
 
         let mut templates = Vec::new();
         for bf in block.templates.inners() {
-            let Some(mut field) = validate_symbol(&bf.symbol, sink, table) else {
+            // DO storage stores values directly
+            let Some(field) = validate_symbol(&bf.symbol, sink, table) else {
                 continue;
-            };
-
-            // DO storage templates follow KV semantics
-            field.cidl_type = match &field.cidl_type {
-                CidlType::Paginated(inner) => {
-                    CidlType::paginated(CidlType::KvObject(inner.clone()))
-                }
-                other => CidlType::KvObject(Box::new(other.clone())),
             };
 
             let params = bf

@@ -10,10 +10,6 @@ r2 bucket1 {
     otherData(id: int) {
         "path/to/other/{id}"
     }
-
-    allData() paginated {
-        "path/"
-    }
 }
 
 

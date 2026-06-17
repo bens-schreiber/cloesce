@@ -27,19 +27,6 @@
           },
           {
             "field": {
-              "name": "paginatedData",
-              "cidl_type": {
-                "Paginated": {
-                  "KvObject": "Json"
-                }
-              },
-              "validators": []
-            },
-            "params": [],
-            "key_format": "path/to/data/"
-          },
-          {
-            "field": {
               "name": "config",
               "cidl_type": {
                 "KvObject": "Json"
@@ -597,19 +584,6 @@
           },
           "binding": "otherNamespace",
           "key_format": "path/to/other/{id}"
-        },
-        {
-          "field": {
-            "name": "paginatedItems",
-            "cidl_type": {
-              "Paginated": {
-                "KvObject": "Json"
-              }
-            },
-            "validators": []
-          },
-          "binding": "namespace",
-          "key_format": "path/to/data/"
         }
       ],
       "r2_fields": [],
@@ -617,24 +591,20 @@
       "route_fields": [],
       "apis": [
         {
-          "name": "acceptPaginated",
+          "name": "acceptKvObject",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Paginated": {
-              "KvObject": "Json"
-            }
+            "KvObject": "Json"
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "ps",
+              "name": "item",
               "cidl_type": {
-                "Paginated": {
-                  "KvObject": "Json"
-                }
+                "KvObject": "Json"
               },
               "validators": []
             }

@@ -38,17 +38,6 @@
               }
             ],
             "key_format": "path/to/other/{id}"
-          },
-          {
-            "field": {
-              "name": "allData",
-              "cidl_type": {
-                "Paginated": "R2Object"
-              },
-              "validators": []
-            },
-            "params": [],
-            "key_format": "path/"
           }
         ]
       }
