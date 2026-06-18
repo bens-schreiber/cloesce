@@ -19,18 +19,10 @@ export interface CfEnv {
     LeaderboardDo: DurableObjectNamespace;
     MY_VAR: string;
 }
-// @ts-ignore
 export abstract class GlobalDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
-
-    static readonly Shard = {
-        template: (): string =>
-            `GlobalDo`,
-        id: (namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName(GlobalDo.Shard.template()),
-    };
 
     readonly config = {
         template: (): string =>
@@ -51,18 +43,10 @@ export abstract class GlobalDo extends DurableObject<CfEnv> {
         return new CloesceApp(cidl as any, "http://example.com/path/to/api", upgradeEnv(env), this);
     }
 }
-// @ts-ignore
 export abstract class LeaderboardDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
-
-    static readonly Shard = {
-        template: (tenantId: number): string =>
-            `LeaderboardDo/${tenantId}`,
-        id: (tenantId: number, namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName(LeaderboardDo.Shard.template(tenantId)),
-    };
 
     readonly topEntryCache = {
         template: (): string =>
@@ -164,14 +148,22 @@ function MyR2Helpers(bucket: R2Bucket) {
 }
 function GlobalDoHelpers(namespace: DurableObjectNamespace) {
     return {
-        instance: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
-            namespace.get(GlobalDo.Shard.id(namespace)) as DurableObjectStub & T,
+        template: (): string =>
+            `GlobalDo`,
+        id: (): DurableObjectId =>
+            namespace.idFromName(`GlobalDo`),
+        stub: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
+            namespace.get(namespace.idFromName(`GlobalDo`)) as DurableObjectStub & T,
     };
 }
 function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
     return {
-        instance: <T extends LeaderboardDo = LeaderboardDo>(tenantId: number): DurableObjectStub & T =>
-            namespace.get(LeaderboardDo.Shard.id(tenantId, namespace)) as DurableObjectStub & T,
+        template: (tenantId: number): string =>
+            `LeaderboardDo/${tenantId}`,
+        id: (tenantId: number): DurableObjectId =>
+            namespace.idFromName(`LeaderboardDo/${tenantId}`),
+        stub: <T extends LeaderboardDo = LeaderboardDo>(tenantId: number): DurableObjectStub & T =>
+            namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as DurableObjectStub & T,
     };
 }
 

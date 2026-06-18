@@ -1,6 +1,7 @@
 use clap::Parser;
 use glob::glob;
 
+use std::path::PathBuf;
 use std::{fs, io};
 
 #[derive(Parser)]
@@ -14,8 +15,13 @@ struct Cli {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
-    let pattern = "../e2e/fixtures/*";
-    let fixtures = glob(pattern)
+    let fixtures_dir = {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        manifest_dir.join("../e2e/fixtures")
+    };
+
+    let pattern = format!("{}/*", fixtures_dir.display());
+    let fixtures = glob(&pattern)
         .expect("valid glob pattern")
         .filter_map(Result::ok)
         .filter(|p| p.is_dir())
