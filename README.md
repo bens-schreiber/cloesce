@@ -1,4 +1,4 @@
-# cloesce (alpha, v0.4.0)
+# cloesce (alpha, v0.5.0)
 
 > [!WARNING]
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
