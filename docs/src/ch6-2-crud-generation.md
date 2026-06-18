@@ -5,66 +5,48 @@
 
 Creating the same CRUD operations for each Model can be tedious. Cloesce provides a way to automatically generate these operations based on your Model definitions and Data Source configurations.
 
-Each CRUD operation corresponds to an [ORM method](./ch7-0-orm-reference.md) that is generated for your Models. You can choose to generate any combination of the following operations:
+For every public Data Source defined on a Model, Cloesce will utilize the `get`, `save`, and `list` methods of that Data Source to generate CRUD API endpoints for that Model.
 
 ## Get
 
-The `get` operation retrieves a single record by its [primary key](./ch4-2-d1-constraints.md#primary-key) and [key fields](./ch4-4-kv-fields.md#key-fields-and-interpolation). For example:
+By default, the `get` operation retrieves a single record by its [primary key](./ch4-2-sqlite-constraints.md#primary-key), [shard fields](./ch3-3-durable-objects.md) and [route fields](./ch4-3-kv-fields.md#route-fields). For example:
 
 ```cloesce
-[use db]
 [crud get]
-model Person {
+model Person for PersonDo(tenant) {
     primary {
         id: int
-    }
-
-    keyfield {
-        name: string
     }
 }
 
 source Custom for Person {
-    include {}
-
-    sql get(special_id: int) {
-        "
-        ...
-        "
-    }
+    get(special_id: int)
 }
 ```
 
 The above schema will generate two API methods:
 
-- `GET /Person/$get`: Accepts arguments `id` and `name`, hydrates with the [Default Data Source](./ch5-1-overview.md#default-data-source), and returns a `Person` instance if a record is found
+- `GET /Person/$get`: Accepts arguments `tenant` and `id`, hydrates with the [Default Data Source](./ch5-1-overview.md#default-data-source), and returns a `Person` instance if a record is found
 
-- `GET /Person/$get_Custom`: Accepts arguments `id`, `name`, and `special_id`, hydrates with the [Custom Data Source](./ch5-2-custom-data-sources.md), and returns a `Person` instance if a record is found
+- `GET /Person/$get_Custom`: Accepts argument `special_id`, hydrates with the Custom Data Source, and returns a `Person` instance if a record is found
 
 ## List
 
 > [!IMPORTANT]
-> The `list` operation can only be used if your Model does not have _any_ key fields.
+> The `list` operation can only be used if your Model does not have _any_ [route fields](./ch4-3-kv-fields.md#route-fields).
 
 The `list` operation retrieves multiple records. By default, it will use a seek based pagination strategy. For example:
 
 ```cloesce
-[use db]
 [crud list]
-model Person {
+model Person for Db {
     primary {
         id: int
     }
 }
 
 source OffsetPagination for Person {
-    include {}
-
-    sql list(offset: int, limit: int) {
-        "
-        ...
-        "
-    }
+    list(offset: int, limit: int)
 }
 ```
 
@@ -81,15 +63,10 @@ The `save` operation creates or updates any record within a [Data Source's](./ch
 The only parameter `save` accepts is a [partial Model instance](./ch2-0-type-reference.md#generics), which is an object that may contain a subset of the Model's fields. For example:
 
 ```cloesce
-[use db]
 [crud save]
-model Person {
+model Person for Db {
     primary {
         id: int
-    }
-
-    keyfield {
-        name: string
     }
 }
 ```
@@ -112,21 +89,21 @@ const result = await Person.$save({
 
 ### R2 Fields
 
-If your Model contains an [R2 field](./ch4-5-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data. To work around this, you can define a custom [instance method](./ch6-1-rest-apis.md#instance-methods) on your Model that accepts a `stream` parameter:
+If your Model contains an [R2 field](./ch4-4-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data. To work around this, you can define a custom [instance method](./ch6-1-rest-apis.md#instance-methods) on your Model that accepts a `stream` parameter:
 
 ```cloesce
 model Person {
-    primary {
+    route {
         id: int
     }
 
-    r2 (bucket, "key/{id}") {
-        photo
+    r2 Bucket::photos(id) {
+        avatar
     }
 }
 
 api Person {
-    [inject bucket]
+    [inject Bucket]
     post upload_photo(self, photo: stream)
 }
 ```
@@ -136,8 +113,7 @@ import * as clo from "@cloesce/backend.js";
 
 export const Person = clo.Person.impl({
   async upload_photo(self, env, photo) {
-    const key = this.Key.photo(self.id);
-    await env.bucket.put(key, photo);
+    await env.Bucket.photos.put(photo);
   },
 });
 ```

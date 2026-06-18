@@ -1,6 +1,8 @@
 # Plain Old Objects
 
-In addition to [Models](./ch4-0-models.md), Cloesce also supports Plain Old Objects (POOs) that can be used for various purposes such as data transfer objects (DTOs), view models, or any other structured data that doesn't require database backing. POOs are defined using the `poo` keyword and can have fields just like Models, but they don't have any of the [ORM](./ch7-0-orm-reference.md) or [API](./ch6-1-rest-apis.md) capabilities that Models have.
+In addition to [Models](./ch4-0-models.md), Cloesce supports Plain Old Objects (POOs) for structured data that doesn't require database backing, such as data transfer objects (DTOs) or view models.
+
+POOs are defined with the `poo` keyword and can have fields just like Models, but they lack the [ORM](./ch7-0-orm-reference.md) and [API](./ch6-1-rest-apis.md) capabilities that Models have.
 
 ## Defining a POO
 

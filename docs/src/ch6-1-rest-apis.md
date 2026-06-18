@@ -9,7 +9,7 @@ By defining an API for a Model, you can specify REST endpoints that are generate
 Given some Model, we can define an API for it like so:
 
 ```cloesce
-model Person {
+model Person for Db {
     primary {
         id: int
     }
@@ -84,7 +84,7 @@ export class Person {
 With Cloesce, you can skip the step of manually hydrating and validating a Model instance. By passing the `self` keyword in the API method parameters, Cloesce will automatically hydrate the instance from the relevant data source and pass it as an argument to the method. For example:
 
 ```cloesce
-model Person {
+model Person for Db {
     primary {
         id: int
     }
@@ -113,12 +113,12 @@ export const Person = clo.Person.impl({
 By default, all API methods will use the [Default Data Source](./ch5-1-overview.md#default-data-source) to hydrate the `self` instance. However, you can specify a custom data source with the `source` tag:
 
 ```cloesce
-model Person {
+model Person for Db {
     primary {
         id: int
     }
 
-    r2 (bucket, "key/{id}") {
+    r2 Bucket::avatars(id) {
         avatar
     }
 }
@@ -135,6 +135,65 @@ api Person {
 ```
 
 In the above code, the `myself` API method will use the `WithoutAvatar` data source to hydrate the `self` instance, which excludes the `avatar` field. This allows you to have different API methods that return different subsets of the Model's data based on the data source used.
+
+## Execution Context
+
+[Durable Objects](./ch3-3-durable-objects.md) do not define just an area for storing data, but a single threaded execution context. Any method may be executed in the context of a Durable Object using [Dependency Injection](./ch6-3-dependency-injection.md). For example:
+
+```cloesce
+durable CounterDo {
+    shard {
+        tenant: string
+    }
+}
+
+model Counter {}
+api Counter {
+  [inject CounterDo(tenant)]
+  put increment(tenant: string) -> int
+}
+```
+
+Because `increment` injects an instantiated instance of `CounterDo`, any code within `increment` will be executed in the context of that Durable Object, allowing you to safely manipulate data stored in that Durable Object without worrying about race conditions.
+
+> [!IMPORTANT]
+> Only one instance of a Durable Object can be injected into a method at a time, since each instance represents a single threaded execution context.
+
+> [!NOTE]
+> If a Durable Object has no shard keys, it is effectively a singleton, and can be injected as:
+>
+> ```cloesce
+> [inject Global()]
+> put method()
+> ```
+
+> [!NOTE]
+> Injecting the Durable Object namespace is different than injecting an instance of that durable object. For example, `[inject CounterDo]` would inject the namespace, allowing you to create and manage instances of that Durable Object within your method, but not execute code within the context of any particular instance.
+
+### Data Source Execution Context
+
+Any method of a [Data Source](./ch5-0-data-sources.md) can also be executed in the context of a Durable Object by using the `inject` tag within that Data Source. The default implementation of a Data Source for some Durable Object backed Model will always be executed in the context of that Durable Object.
+
+Additionally, passing `self` to an API method will utilize the context defined in the `get` method of the Data Source. This means that if the `get` method of the Data Source is executed in the context of a Durable Object, then any API method that hydrates `self` from that Data Source will also be executed in that context. For example:
+
+```cloesce
+source Default for Counter {
+    [inject CounterDo(tenant)]
+    get([instance] tenant: string)
+}
+
+source OutsideContext for Counter {
+    get([instance] tenant: string)
+}
+
+api Counter {
+    // Executed inside of CounterDo
+    get myself(self) -> Counter
+
+    // Executed outside of CounterDo
+    get outside([source OutsideContext] self) -> Counter
+}
+```
 
 ## Streams
 
@@ -195,7 +254,7 @@ export class HttpResult<T = unknown> {
 For example, with the following schema:
 
 ```cloesce
-model Garfield {
+model Garfield for Db {
     primary {
         id: int
     }

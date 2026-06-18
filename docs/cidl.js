@@ -14,18 +14,19 @@ hljs.registerLanguage("cloesce", function (hljs) {
     "kv",
     "vars",
     "self",
+    "durable",
   ];
 
   // Contextual block / structural keywords
   const BLOCK_KEYWORDS = [
+    "route",
+    "shard",
     "primary",
     "optional",
     "unique",
     "foreign",
     "nav",
-    "keyfield",
     "column",
-    "paginated",
     "include",
     "for",
     "crud",

@@ -1,4 +1,4 @@
-# cloesce (alpha, v0.4.0)
+# cloesce (alpha, v0.5.0)
 
 > [!WARNING]
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
@@ -18,15 +18,22 @@
 ## How Easy can Full Stack Development Be?
 
 ```
-env {
-    d1 { db }
-    kv { namespace }
-    r2 { bucket }
+kv Namespace {
+    settings(id: int) -> json {
+        "user/settings/{id}"
+    }
 }
 
-[use db]
+r2 Bucket {
+    avatar(id: int) {
+        "user/avatars/{id}.png"
+    }
+}
+
+d1 { Db }
+
 [crud get, save, list]
-model User {
+model User for Db {
     primary {
         id: int
     }
@@ -35,15 +42,15 @@ model User {
         name: string
     }
 
-    nav(Posts::id) {
+    nav Posts::id {
         posts
     }
 
-    kv(namespace, "user/settings/{id}") {
-        settings: json
+    kv Namespace::settings(id) {
+        settings
     }
 
-    r2(bucket, "user/avatars/{id}.png") {
+    r2 Bucket::avatar(id) {
         avatar
     }
 }
