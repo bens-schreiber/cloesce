@@ -1,8 +1,5 @@
 # Installation
 
-> [!NOTE]
-> Only TypeScript compilation is currently supported. Support for additional languages will be added in future releases.
-
 ## Installing the Compiler
 
 **Linux and macOS**
@@ -25,7 +22,7 @@ cloesce version
 
 ## Starting a New Project
 
-The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template, which includes all necessary dependencies, configurations, a basic schema, and example tests to help get you started quickly.
+The fastest way to get a Cloesce project up and running is to use the `create-cloesce` template.
 
 ### Prerequisites
 

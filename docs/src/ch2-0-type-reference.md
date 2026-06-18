@@ -20,23 +20,23 @@ This section provides a reference for the types available in the Cloesce Schema 
 
 ### Generics
 
-| Type           | Description                                                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `option<T>`    | A nullable version of any type `T`                                                                                                   |
-| `array<T>`     | An array of any type `T`                                                                                                             |
-| `partial<T>`   | A version of a Model type `T` where all properties (recursive) are optional.                                                         |
-| `kvobject<T>`  | A Cloudflare KV object, which includes metadata and a value of type `T`.                                                             |
-| `paginated<T>` | A paginated list of items of type `T`, which includes the items and pagination metadata. Useful for wrapping KV and R2 prefix lists. |
+| Type          | Description                                                                  |
+| ------------- | ---------------------------------------------------------------------------- |
+| `option<T>`   | A nullable version of any type `T`                                           |
+| `array<T>`    | An array of any type `T`                                                     |
+| `partial<T>`  | A version of a Model type `T` where all properties (recursive) are optional. |
+| `kvobject<T>` | A Cloudflare KV object, which includes metadata and a value of type `T`.     |
 
 ### Objects
 
 Any [Model](./ch4-0-models.md) or [Plain Old Object](./ch6-5-plain-old-objects.md) defined in your schema can be referenced as a type. For example, to have a Plain Old Object that references a Model:
 
 ```cloesce
-model User {
+model User for Db {
     primary {
         id: int
     }
+
     column {
         name: string
     }
@@ -60,4 +60,6 @@ poo Profile {
 | `blob`   | BLOB             |
 | `json`   | TEXT (JSON)      |
 
-By default, all of these types are `NOT NULL` in the database. To allow `NULL` values, wrap the type in the `option` generic.
+By default, all of these types are `NOT NULL` in a SQLite database. 
+
+To allow `NULL` values, wrap the type in the `option` generic, e.g. `option<string>`.

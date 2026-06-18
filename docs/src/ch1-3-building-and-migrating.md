@@ -2,9 +2,7 @@
 
 ## Configuration
 
-Before compilation, a configuration file should be defined in your project root under `cloesce.jsonc`.
-
-This file specifies important settings for the Cloesce compiler, such as the paths to your schema files, the URL for your local Workers environment, and the format for generating Wrangler configuration files.
+Define a `cloesce.jsonc` file in your project root to configure the Cloesce compiler:
 
 ```json
 {
@@ -14,45 +12,51 @@ This file specifies important settings for the Cloesce compiler, such as the pat
 }
 ```
 
-Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`). Select the desired configuration file using the `--env` flag when running Cloesce commands:
-
-```bash
-cloesce --env staging ...
-```
+> [!TIP]
+> Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`). 
+>
+> Select the desired configuration file using the `--env` flag when running Cloesce commands:
+>
+> ```bash
+> cloesce --env staging ...
+> ```
 
 ## Compilation
 
-Compilation will transform your Cloesce schema into backend stubs and a client side API under the `.cloesce` directory. In your project directory, run the following command to compile your schema:
+Compilation will transform your Cloesce schema into backend stubs and a client side API under the `.cloesce` directory. In your root directory, run the following command to compile your schema:
 
 ```bash
 cloesce compile
 ```
 
-Any generated artifacts should not be modified directly or committed to source control. Simply import them into your backend and client code, relying on a build step to run the Cloesce compiler and keep the generated code up to date.
+> [!IMPORTANT]
+> Any generated artifacts should not be modified directly or committed to source control. Simply import them into your backend and client code, relying on a build step to run the Cloesce compiler and keep the generated code up to date.
 
 ## Migrations
 
 > [!TIP]
-> Any change to a [D1 backed model](./ch4-1-d1-backed-model.md) should be accompanied by a new migration. This ensures that your D1 database schema stays in sync with your Cloesce Models.
+> Schema modifications to a [SQLite backed Model](./ch4-1-sqlite-backed-model.md) should be accompanied by a new migration. This ensures that your database schema stays in sync with your Cloesce Models.
 
-Cloesce supports any number of [D1](https://developers.cloudflare.com/d1/) databases in a single project. To generate SQL migration files for a specific D1 binding, run the following command:
+Cloesce supports any number of SQLite databases in a single project. To generate SQL migration files for a specific binding, run the following command:
 
 ```bash
-cloesce migrate --binding <d1-binding> <migration-name>
+cloesce migrate --binding <binding> <migration-name>
 ```
 
-To generate migrations for all D1 bindings in your project, use the `--all` flag:
+To generate migrations for all bindings in your project, use the `--all` flag:
 
 ```bash
 cloesce migrate --all <migration-name>
 ```
 
-### Applying Migrations
+### Apply D1 Migrations
 
-Cloesce will only generate the SQL for migrations. You must apply the generated migrations to your D1 database using the Wrangler CLI:
+Cloesce generate the SQL for migrations, but not apply them,
+
+If a [D1 database](./ch3-2-d1.md) is being utilized, you must apply the generated migrations using the Wrangler CLI:
 
 ```bash
-npx wrangler d1 migrations apply <d1-binding-name>
+npx wrangler d1 migrations apply <binding-name>
 ```
 
 ## Running

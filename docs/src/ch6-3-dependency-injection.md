@@ -8,8 +8,7 @@ This allows you to easily access resources such as D1 databases, KV namespaces, 
 
 To inject an Environment Binding, add the `inject` tag to the API method and specify the name of the binding you want to inject:
 
-```cloesce
-env {
+<!-- env {
     d1 {
         db
     }
@@ -21,16 +20,25 @@ env {
     vars {
         secret_value: string
     }
+} -->
+
+```cloesce
+d1 { Db }
+
+r2 Bucket { }
+
+vars {
+    SECRET: string
 }
 
 model Person {
-    primary {
+    route{
         id: int
     }
 }
 
 api Person {
-    [inject db, bucket, secret_value]
+    [inject Db, Bucket, SECRET]
     get do_stuff(self) -> Person
 }
 ```
@@ -39,9 +47,9 @@ In the above code, the backend stub generated for the `do_stuff` API method will
 
 ```ts
 {
-  db: D1Database;
-  bucket: R2Bucket;
-  secret_value: string;
+  Db: D1Database;
+  Bucket: Bucket;
+  SECRET: string;
 }
 ```
 
@@ -78,7 +86,7 @@ class YouTubeApi extends clo.YouTubeApi {
 
 export default {
   async fetch(request: Request, env: clo.Env): Promise<Response> {
-    const app = await clo.cloesce();
+    const app = clo.cloesce();
     app.register(new YouTubeApi());
 
     return await app.run(request, env);

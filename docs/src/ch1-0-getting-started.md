@@ -2,7 +2,7 @@
 
 > [!TIP]
 > Cloesce runs on Cloudflare Workers. Familiarity with Workers and Wrangler is recommended.
-> If you are new to Workers, check out the [Cloudflare Workers documentation](https://developers.cloudflare.com/workers/).
+> If you are new to Workers, check out the [official Cloudflare Workers documentation](https://developers.cloudflare.com/workers/).
 
 Welcome to the Getting Started guide. This guide covers:
 

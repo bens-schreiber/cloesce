@@ -10,7 +10,7 @@ In addition to this, several _Validator Tags_ are also supported for more comple
 
 Validator Tags can be applied to any field (i.e. it follows the syntax `field: type`) in a [Model](./ch4-0-models.md), [API](./ch6-1-rest-apis.md) parameter, or [Data Source](./ch5-0-data-sources.md) parameter.
 
-A [foreign key](./ch4-2-d1-constraints.md#foreign-key) field will automatically inherit all validators from the field it references. For example:
+A [foreign key](./ch4-2-sqlite-constraints.md#foreign-key) field will automatically inherit all validators from the field it references. For example:
 
 ```cloesce
 model User {
