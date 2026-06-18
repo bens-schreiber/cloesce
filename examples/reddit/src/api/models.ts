@@ -29,8 +29,8 @@ export const SubReddit = clo.SubReddit.impl({
   create: (env, meta) =>
     auth(env, async (username) => {
       const subId = crypto.randomUUID();
-      await env.SubRedditDo.instance<SubRedditDo>(subId).setMetadata(meta);
-      await env.UserDo.instance<UserDo>(username).appendActivity({ subReddits: [subId] });
+      await env.SubRedditDo.stub<SubRedditDo>(subId).setMetadata(meta);
+      await env.UserDo.stub<UserDo>(username).appendActivity({ subReddits: [subId] });
 
       const entry: clo.SubRedditEntry = { subId, name: meta.name };
       await env.SubReddits.put(env.SubReddits.entry.template(subId), JSON.stringify(entry));
@@ -59,7 +59,7 @@ export const Post = clo.Post.impl({
         content,
         upvotes: 0,
       });
-      await env.UserDo.instance<UserDo>(username).appendActivity({ posts: [saved.value!.id] });
+      await env.UserDo.stub<UserDo>(username).appendActivity({ posts: [saved.value!.id] });
       return saved.value!;
     }),
 
@@ -81,7 +81,7 @@ export const Comment = clo.Comment.impl({
         content,
         upvotes: 0,
       });
-      await env.UserDo.instance<UserDo>(username).appendActivity({ comments: [saved.value!.id] });
+      await env.UserDo.stub<UserDo>(username).appendActivity({ comments: [saved.value!.id] });
       return saved.value!;
     }),
 

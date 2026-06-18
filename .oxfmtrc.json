@@ -11,5 +11,6 @@
     "tests/e2e/fixtures/*/backend.ts",
     "tests/e2e/fixtures/*/client.ts",
     "tests/e2e/fixtures/*/migrations/*/*.ts",
+    "**/.cloesce"
   ]
 }

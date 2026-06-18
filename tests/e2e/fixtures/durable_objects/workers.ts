@@ -31,17 +31,17 @@ const SubReddit = clo.SubReddit.impl({
 
 const PostCustomDs = clo.Post.Custom.impl({
   async get(env, id, subId) {
-    const row = await env.SubRedditDo.instance<SubRedditDo>(subId).getPost(subId, id);
+    const row = await env.SubRedditDo.stub<SubRedditDo>(subId).getPost(subId, id);
     return row === null ? HttpResult.fail(404) : HttpResult.ok(200, row);
   },
 
   async list(env, subId) {
-    const rows = await env.SubRedditDo.instance<SubRedditDo>(subId).listPosts(subId);
+    const rows = await env.SubRedditDo.stub<SubRedditDo>(subId).listPosts(subId);
     return HttpResult.ok(200, rows);
   },
 
   async save(env, post, subId) {
-    const row = await env.SubRedditDo.instance<SubRedditDo>(subId).savePost(subId, post);
+    const row = await env.SubRedditDo.stub<SubRedditDo>(subId).savePost(subId, post);
     return row === null ? HttpResult.fail(404) : HttpResult.ok(200, row);
   },
 });

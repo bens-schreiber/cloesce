@@ -56,18 +56,11 @@ export interface CfEnv {
 }
 
 {%- for binding in &idl.wrangler_env.durable_bindings %}
-// @ts-ignore
 export abstract class {{ binding.name }} extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
 
-    static readonly Shard = {
-        template: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
-            {{ shard_template(binding) }},
-        id: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName({{ binding.name }}.Shard.template({% for field in &binding.shard_fields %}{{ field.name }}{% if !loop.last %}, {% endif %}{% endfor %})),
-    };
 {%- for template in &binding.templates %}
 
     readonly {{ template.field.name }} = {
@@ -133,8 +126,12 @@ function {{ binding.name }}Helpers(bucket: R2Bucket) {
 {%- for binding in &idl.wrangler_env.durable_bindings %}
 function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
     return {
-        instance: <T extends {{ binding.name }} = {{ binding.name }}>({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): DurableObjectStub & T =>
-            namespace.get({{ binding.name }}.Shard.id({% for field in &binding.shard_fields %}{{ field.name }}, {% endfor %}namespace)) as DurableObjectStub & T,
+        template: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
+            {{ shard_template(binding) }},
+        id: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): DurableObjectId =>
+            namespace.idFromName({{ shard_template(binding) }}),
+        stub: <T extends {{ binding.name }} = {{ binding.name }}>({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): DurableObjectStub & T =>
+            namespace.get(namespace.idFromName({{ shard_template(binding) }})) as DurableObjectStub & T,
     };
 }
 {%- endfor %}

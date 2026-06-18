@@ -12,18 +12,10 @@ export interface CfEnv {
     GlobalDo: DurableObjectNamespace;
     SubRedditDo: DurableObjectNamespace;
 }
-// @ts-ignore
 export abstract class GlobalDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
-
-    static readonly Shard = {
-        template: (): string =>
-            `GlobalDo`,
-        id: (namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName(GlobalDo.Shard.template()),
-    };
 
     readonly metadata = {
         template: (): string =>
@@ -44,18 +36,10 @@ export abstract class GlobalDo extends DurableObject<CfEnv> {
         return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env), this);
     }
 }
-// @ts-ignore
 export abstract class SubRedditDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
-
-    static readonly Shard = {
-        template: (id: number): string =>
-            `SubRedditDo/${id}`,
-        id: (id: number, namespace: DurableObjectNamespace): DurableObjectId =>
-            namespace.idFromName(SubRedditDo.Shard.template(id)),
-    };
 
     readonly metadata = {
         template: (): string =>
@@ -92,14 +76,22 @@ function GlobalSubRedditMetadataHelpers(namespace: KVNamespace) {
 }
 function GlobalDoHelpers(namespace: DurableObjectNamespace) {
     return {
-        instance: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
-            namespace.get(GlobalDo.Shard.id(namespace)) as DurableObjectStub & T,
+        template: (): string =>
+            `GlobalDo`,
+        id: (): DurableObjectId =>
+            namespace.idFromName(`GlobalDo`),
+        stub: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
+            namespace.get(namespace.idFromName(`GlobalDo`)) as DurableObjectStub & T,
     };
 }
 function SubRedditDoHelpers(namespace: DurableObjectNamespace) {
     return {
-        instance: <T extends SubRedditDo = SubRedditDo>(id: number): DurableObjectStub & T =>
-            namespace.get(SubRedditDo.Shard.id(id, namespace)) as DurableObjectStub & T,
+        template: (id: number): string =>
+            `SubRedditDo/${id}`,
+        id: (id: number): DurableObjectId =>
+            namespace.idFromName(`SubRedditDo/${id}`),
+        stub: <T extends SubRedditDo = SubRedditDo>(id: number): DurableObjectStub & T =>
+            namespace.get(namespace.idFromName(`SubRedditDo/${id}`)) as DurableObjectStub & T,
     };
 }
 

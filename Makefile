@@ -92,6 +92,10 @@ build-src:
 
 	pnpm --filter cloesce run build
 
+.PHONY: regression
+regression:
+	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression
+
 .PHONY: test
 test:
 	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
