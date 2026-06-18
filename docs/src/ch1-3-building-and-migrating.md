@@ -13,7 +13,7 @@ Define a `cloesce.jsonc` file in your project root to configure the Cloesce comp
 ```
 
 > [!TIP]
-> Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`). 
+> Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`).
 >
 > Select the desired configuration file using the `--env` flag when running Cloesce commands:
 >

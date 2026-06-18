@@ -34,10 +34,10 @@ durable MyDurableObject {
 ```
 
 > [!NOTE]
-> Durable Object storage is only accessible from within the context of that Durable Object. 
+> Durable Object storage is only accessible from within the context of that Durable Object.
 >
 > If want to use a Durable Object as a KV namespace for some Model, that Model must be backed by that Durable Object
-> using `for`, e.g. `model User for MyDurableObject`. 
+> using `for`, e.g. `model User for MyDurableObject`.
 >
 > You will not be able to use a Durable Object as a KV namespace for a Model that is backed by D1 or has no backing at all.
 
@@ -64,13 +64,13 @@ model User {
 }
 ```
 
-The above snippet defines a Model `User` with a KV field `settings` that is stored in the namespace `MyNamespace` under the static key "settings". 
+The above snippet defines a Model `User` with a KV field `settings` that is stored in the namespace `MyNamespace` under the static key "settings".
 
 `settings` is typed as `json`, and Cloesce will automatically handle the serialization and deserialization of this field when reading from and writing to KV.
 
 ### Quirks of a non-SQLite backed Model
 
-Unlike a [SQLite backed Model](./ch4-1-sqlite-backed-model.md), the above `User` Model does not define a backing database with `for`. 
+Unlike a [SQLite backed Model](./ch4-1-sqlite-backed-model.md), the above `User` Model does not define a backing database with `for`.
 
 The `settings` field is therefore not associated with any particular row, and the Model has no underlying "backing": Cloesce simply hydrates `settings` from KV whenever you query for a `User`.
 
@@ -157,12 +157,14 @@ kv MyNamespace {
 ```
 
 In this example, the template
-- `"profile/{userId}/favNum"` 
+
+- `"profile/{userId}/favNum"`
 
 overlaps with
-- `"profile/{userId}"` 
 
-A prefix list on `"profile/"` would include `"profile/{userId}/favNum"` because it matches the prefix, even though it does not conform to the `profile` template. 
+- `"profile/{userId}"`
+
+A prefix list on `"profile/"` would include `"profile/{userId}/favNum"` because it matches the prefix, even though it does not conform to the `profile` template.
 
 Cloesce throws an error when validating this schema, preventing such ambiguities.
 
@@ -184,7 +186,7 @@ export class KValue<V> {
 }
 ```
 
-Cloesce will make **no effort** to validate that the `raw` value actually conforms to the expected type `V` (aside from [validating request parameters](./ch6-4-runtime-validation.md)). 
+Cloesce will make **no effort** to validate that the `raw` value actually conforms to the expected type `V` (aside from [validating request parameters](./ch6-4-runtime-validation.md)).
 
 It is up to you to ensure that the data stored in KV is of the correct shape, and to handle any cases where it is not.
 
@@ -208,15 +210,15 @@ kv MyNamespace {
 
 Cloesce will merge the `KVNamespace` or `DurableObject` interfaces with the following generated methods:
 
-| Method | Description |
-|--------|-------------|
-| `env.settings.template()` | Returns the key template for the `settings` field, which is simply "settings" in this case. |
-| `env.settings.get()` | Fetches the value at the key "settings" in `MyNamespace`. |
-| `env.settings.put(value)` | Puts the given value at the key "settings" in `MyNamespace`. |
-| `env.settings.list({...})` | Lists all keys in `MyNamespace` that match the prefix "settings". |
-| `env.profile.template(userId)` | Returns the key template for the `profile` field, which is `"profile/{userId}"` with `{userId}` replaced by the actual value of `userId`. |
-| `env.profile.get(userId)` | Fetches the value at the key `"profile/{userId}"` in `MyNamespace`, with `{userId}` replaced by the actual value of `userId`. |
-| `env.profile.put(userId, value)` | Puts the given value at the key `"profile/{userId}"` in `MyNamespace`, with `{userId}` replaced by the actual value of `userId`. |
-| `env.profile.list(userId, {...})` | Lists all keys in `MyNamespace` that match the prefix `"profile/{userId}"`, with `{userId}` replaced by the actual value of `userId`. |
+| Method                            | Description                                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `env.settings.template()`         | Returns the key template for the `settings` field, which is simply "settings" in this case.                                               |
+| `env.settings.get()`              | Fetches the value at the key "settings" in `MyNamespace`.                                                                                 |
+| `env.settings.put(value)`         | Puts the given value at the key "settings" in `MyNamespace`.                                                                              |
+| `env.settings.list({...})`        | Lists all keys in `MyNamespace` that match the prefix "settings".                                                                         |
+| `env.profile.template(userId)`    | Returns the key template for the `profile` field, which is `"profile/{userId}"` with `{userId}` replaced by the actual value of `userId`. |
+| `env.profile.get(userId)`         | Fetches the value at the key `"profile/{userId}"` in `MyNamespace`, with `{userId}` replaced by the actual value of `userId`.             |
+| `env.profile.put(userId, value)`  | Puts the given value at the key `"profile/{userId}"` in `MyNamespace`, with `{userId}` replaced by the actual value of `userId`.          |
+| `env.profile.list(userId, {...})` | Lists all keys in `MyNamespace` that match the prefix `"profile/{userId}"`, with `{userId}` replaced by the actual value of `userId`.     |
 
 where `env` is the Cloesce Environment.

@@ -60,6 +60,6 @@ poo Profile {
 | `blob`   | BLOB             |
 | `json`   | TEXT (JSON)      |
 
-By default, all of these types are `NOT NULL` in a SQLite database. 
+By default, all of these types are `NOT NULL` in a SQLite database.
 
 To allow `NULL` values, wrap the type in the `option` generic, e.g. `option<string>`.

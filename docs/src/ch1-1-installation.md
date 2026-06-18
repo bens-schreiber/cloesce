@@ -1,5 +1,10 @@
 # Installation
 
+> [!NOTE]
+> Only TypeScript compilation is supported.
+>
+> Support for additional languages will be added in future releases.
+
 ## Installing the Compiler
 
 **Linux and macOS**

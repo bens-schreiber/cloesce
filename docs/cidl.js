@@ -15,7 +15,6 @@ hljs.registerLanguage("cloesce", function (hljs) {
     "vars",
     "self",
     "durable",
-    
   ];
 
   // Contextual block / structural keywords

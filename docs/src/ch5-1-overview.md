@@ -1,6 +1,6 @@
 # Data Sources Overview
 
-If you query an instantiated [API](./ch6-1-rest-apis.md) endpoint of a [Model](./ch4-0-models.md), you may notice that Cloesce will leave undefined values or empty arrays in deeply nested compositions with other Models. 
+If you query an instantiated [API](./ch6-1-rest-apis.md) endpoint of a [Model](./ch4-0-models.md), you may notice that Cloesce will leave undefined values or empty arrays in deeply nested compositions with other Models.
 
 This is intentional, and an effect of Data Sources.
 

@@ -11,9 +11,9 @@ To describe them simply (_a task which is difficult to do justice_), Durable Obj
 Cloesce provides first class support for Durable Objects, allowing you to define them in your schema, generate a fully typed interface, [injecting execution context into your API implementations](./ch6-1-rest-apis.md#execution-context), and using them as a [Model backing](./ch4-1-sqlite-backed-model.md#with-durable-objects).
 
 > [!TIP]
-> Durable Objects are **not** a Model, but rather a place that any number of Models can be backed by. 
-> 
-> A Durable Object instance can store any number of Models within its SQLite and KV storage, and can execute any code necessary to manage those Models. 
+> Durable Objects are **not** a Model, but rather a place that any number of Models can be backed by.
+>
+> A Durable Object instance can store any number of Models within its SQLite and KV storage, and can execute any code necessary to manage those Models.
 >
 > For more on using Durable Objects as a Model backing, see the [Models chapter](./ch4-1-sqlite-backed-model.md#with-durable-objects).
 
@@ -53,7 +53,7 @@ The above example defines two Durable Object bindings:
 
 - `MyGlobalDo`: A global Durable Object, meaning Cloesce will treat it as if there is only one instance of the Durable Object, and will not allow any shard parameters to be defined.
 
-In both bindings, KV templates can be defined to generate a typed interface for interacting with the Durable Object's KV storage. 
+In both bindings, KV templates can be defined to generate a typed interface for interacting with the Durable Object's KV storage.
 
 In the case of `MyShardedDo`, the `userMap` template will generate an interface for storing user data in the Durable Object's KV storage, with keys formatted as `"user/{userId}"`.
 
@@ -77,7 +77,7 @@ For global Durable Objects (no shard fields), these helpers take no arguments.
 
 ### Extending the Durable Object Class
 
-The Cloesce Router will forward HTTP requests bound for a particular Durable Object from the Worker to the `fetch` method of the generated Durable Object class. 
+The Cloesce Router will forward HTTP requests bound for a particular Durable Object from the Worker to the `fetch` method of the generated Durable Object class.
 
 To implement custom logic for handling these requests, extend the generated Durable Object class and implement the `fetch` method:
 
@@ -99,7 +99,7 @@ export class MyShardedDo extends clo.MyShardedDo {
 }
 ```
 
-Here, the `MyShardedDo` class extends the generated `clo.MyShardedDo` class, and implements the `fetch` method to handle incoming HTTP requests. 
+Here, the `MyShardedDo` class extends the generated `clo.MyShardedDo` class, and implements the `fetch` method to handle incoming HTTP requests.
 
 The `cloesce` method is used to create a Cloesce application instance, which can be used to register API implementations and run the application.
 
@@ -123,3 +123,47 @@ new_sqlite_classes = [
 ]
 tag = "v1"
 ```
+
+## Backing Models
+
+A Model may be backed by a Durable Object, meaning the data for that Model can be pulled from an instance of a Durable Object. Declarations must explicitly state each shard field on the Model (aliased to any name in shard field order):
+
+```cloesce
+durable MyShardedDo {
+    shard {
+        tenant: int
+    }
+}
+
+model Tenant for MyShardedDo(tenant) {
+    // ...
+}
+
+// can alias `tenant` to anything
+model Tenant for MyShardedDo(aliasWhatever) {
+    // ...
+}
+```
+
+In this case, the `Tenant` Model is backed by the `MyShardedDo` Durable Object, and the `tenant` shard field is declared on the Model.
+
+Read more about backing Models with Durable Objects in the [Models chapter](./ch4-1-sqlite-backed-model.md#with-durable-objects).
+
+## Execution Context
+
+Durable Objects provide a single threaded execution context in which their internal storage may be accessed and mutated.
+
+Just because a Model is backed by a Durable Object does not mean that all [API methods](./ch6-1-rest-apis.md) and [Data Sources](./ch5-1-data-sources.md) that interact with that Model are executed within the Durable Object's execution context.
+
+Explicitly [inject](./ch6-1-rest-apis.md#execution-context) the Durable Object's execution context into any API method or Data Source method to interact with the Durable Object's internal storage. For example:
+
+```cloesce
+api AnyModel {
+    [inject MyShardedDo(tenant)]
+    get doSomething(tenant: int) -> json
+}
+```
+
+In order to instantiate the `MyShardedDo` execution context, the `tenant` shard parameter must be passed in as an argument to the API method, and the method must be decorated with the `inject` tag.
+
+Read more about execution context injection in the [API chapter](./ch6-1-rest-apis.md#execution-context) and the [Data Source chapter](./ch5-1-data-sources.md#execution-context).

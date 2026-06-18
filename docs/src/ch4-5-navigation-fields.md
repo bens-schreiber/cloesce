@@ -35,7 +35,7 @@ model Person {
 }
 ```
 
-Here, the `nav Profile::personId(id)` block inside the `Person` Model tells Cloesce to create a navigation field called `profile` on the `Person` Model. 
+Here, the `nav Profile::personId(id)` block inside the `Person` Model tells Cloesce to create a navigation field called `profile` on the `Person` Model.
 
 When you query for a `Person`, Cloesce will automatically populate the `profile` property with the corresponding `Profile` instance based on the matching value of `Person`'s `id` and `Profile`'s `personId`.
 
@@ -51,7 +51,7 @@ When you query for a `Person`, Cloesce will automatically populate the `profile`
 ### SQLite Models
 
 > [!NOTE]
-> Foreign key relationships and navigation fields are defined independently, but for SQLite backed models, navigation fields rely on the presence of a foreign key relationship to function. 
+> Foreign key relationships and navigation fields are defined independently, but for SQLite backed models, navigation fields rely on the presence of a foreign key relationship to function.
 >
 > Cloesce uses the foreign key relationship to determine how to populate the navigation field with the correct related data.
 

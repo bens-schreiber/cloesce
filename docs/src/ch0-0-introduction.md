@@ -1,16 +1,11 @@
 # The Cloesce Schema Language
 
 > [!NOTE]
-> Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare support across any language. 
+> Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare support across any language.
 >
 > The syntax and features described here are subject to change as the project evolves.
 
-> [!NOTE]
-> Only TypeScript compilation is supported. 
->
-> Support for additional languages will be added in future releases.
-
-**Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). 
+**Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com).
 
 | Feature                 | Support |
 | ----------------------- | ------- |

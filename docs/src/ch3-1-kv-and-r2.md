@@ -40,7 +40,7 @@ kv MyNamespace {
 }
 ```
 
-In the above example `MyNamespace` is the name of a KV namespace, and `settings` and `session` are "binding templates" defined on that namespace. 
+In the above example `MyNamespace` is the name of a KV namespace, and `settings` and `session` are "binding templates" defined on that namespace.
 
 Every binding template describes a location of data in the KV namespace, and the return type of the template describes the expected type of that data. The template string can be generated from any number of parameters, allowing for dynamic keys.
 
@@ -49,7 +49,7 @@ This definition will compile to an interface capable of querying the KV namespac
 ```ts
 settings: {
   template: () => `path/to/settings`,
-  
+
   get: () => namespace.get(`path/to/settings`),
 
   put: (value) => namespace.put(`path/to/settings`, value),
@@ -86,7 +86,7 @@ id = "replace_with_my_namespace_id"
 ## R2
 
 > [!NOTE]
-> R2 is used to store large unstructured data. For this reason, Cloesce will not query and buffer the full value of an R2 field into the Worker runtime. 
+> R2 is used to store large unstructured data. For this reason, Cloesce will not query and buffer the full value of an R2 field into the Worker runtime.
 >
 > Instead, only a `HEAD` request is made to R2 to check for existence and retrieve metadata.
 
