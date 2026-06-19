@@ -1,6 +1,6 @@
 //! Error displays for the lexer and parser.
 
-use ariadne::{Color, Label, Report};
+use ariadne::{Color, Config, IndexType, Label, Report};
 use chumsky::error::RichReason;
 
 use crate::{
@@ -53,6 +53,7 @@ impl DisplayError for Vec<LexError> {
             for span in &error.error_spans {
                 let report =
                     Report::build(ariadne::ReportKind::Error, (path_str.clone(), span.clone()))
+                        .with_config(Config::new().with_index_type(IndexType::Byte))
                         .with_message("unexpected token")
                         .with_label(
                             Label::new((path_str.clone(), span.clone()))
@@ -108,6 +109,7 @@ impl DisplayError for ParserError<'_, '_> {
                 ariadne::ReportKind::Error,
                 (path_str.clone(), ariadne_span.clone()),
             )
+            .with_config(Config::new().with_index_type(IndexType::Byte))
             .with_message(&message)
             .with_label(
                 Label::new((path_str.clone(), ariadne_span.clone()))

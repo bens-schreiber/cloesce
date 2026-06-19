@@ -176,7 +176,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -192,7 +193,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -209,7 +211,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"CrudHaver\".\"id\" AS \"id\", \"CrudHaver\".\"name\" AS \"name\" FROM \"CrudHaver\"",
           "get_query": "SELECT \"CrudHaver\".\"id\" AS \"id\", \"CrudHaver\".\"name\" AS \"name\" FROM \"CrudHaver\" WHERE \"CrudHaver\".\"id\" = ?1",
@@ -512,7 +515,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -528,7 +532,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -545,7 +550,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\"",
           "get_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" = ?1",
@@ -576,7 +582,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -592,7 +599,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -609,7 +617,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\"",
           "get_query": "SELECT \"Parent\".\"id\" AS \"id\", \"Parent\".\"favoriteChildId\" AS \"favoriteChildId\", \"Child_1\".\"id\" AS \"favoriteChild.id\", \"Child_1\".\"parentId\" AS \"favoriteChild.parentId\", \"Child_2\".\"id\" AS \"children.id\", \"Child_2\".\"parentId\" AS \"children.parentId\" FROM \"Parent\" LEFT JOIN \"Child\" AS \"Child_1\" ON \"Parent\".\"favoriteChildId\" = \"Child_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Parent\".\"id\" = ?1",
@@ -710,7 +719,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -726,7 +736,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -743,7 +754,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Child\".\"id\" AS \"id\", \"Child\".\"parentId\" AS \"parentId\", \"Parent_1\".\"id\" AS \"parent.id\", \"Parent_1\".\"favoriteChildId\" AS \"parent.favoriteChildId\", \"Child_2\".\"id\" AS \"parent.children.id\", \"Child_2\".\"parentId\" AS \"parent.children.parentId\" FROM \"Child\" LEFT JOIN \"Parent\" AS \"Parent_1\" ON \"Child\".\"parentId\" = \"Parent_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent_1\".\"id\" = \"Child_2\".\"parentId\"",
           "get_query": "SELECT \"Child\".\"id\" AS \"id\", \"Child\".\"parentId\" AS \"parentId\", \"Parent_1\".\"id\" AS \"parent.id\", \"Parent_1\".\"favoriteChildId\" AS \"parent.favoriteChildId\", \"Child_2\".\"id\" AS \"parent.children.id\", \"Child_2\".\"parentId\" AS \"parent.children.parentId\" FROM \"Child\" LEFT JOIN \"Parent\" AS \"Parent_1\" ON \"Child\".\"parentId\" = \"Parent_1\".\"id\" LEFT JOIN \"Child\" AS \"Child_2\" ON \"Parent_1\".\"id\" = \"Child_2\".\"parentId\" WHERE \"Child\".\"id\" = ?1",

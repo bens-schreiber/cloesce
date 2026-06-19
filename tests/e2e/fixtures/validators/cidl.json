@@ -384,7 +384,8 @@
               "db",
               "store"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -407,7 +408,8 @@
               "db",
               "store"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -425,7 +427,8 @@
               "db",
               "store"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
           "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",
@@ -462,7 +465,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -484,7 +488,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -501,7 +506,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\"",
           "get_query": "SELECT \"Validator\".\"id\" AS \"id\", \"Validator\".\"email\" AS \"email\" FROM \"Validator\" WHERE \"Validator\".\"id\" = ?1",

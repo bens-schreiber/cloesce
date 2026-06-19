@@ -1,4 +1,4 @@
-use idl::{ApiMethod, CidlType, CloesceIdl, IncludeTree, MediaType};
+use idl::{CidlType, CloesceIdl, IncludeTree, MediaType};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
@@ -9,10 +9,6 @@ pub trait LanguageTypeMapper {
 
     /// The type an injected `name` resolves to in a method's `env`.
     fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String;
-
-    /// Like [Self::inject_type], but resolves [idl::CONTEXT_INJECT_KEY] to the
-    /// method's Durable Object instance type.
-    fn api_injected_type(&self, idl: &CloesceIdl, api: &ApiMethod, name: &str) -> String;
 
     /// Converts a format string to the target languages string interpolation syntax,
     /// using the provided parameter names to identify placeholders.
@@ -102,17 +98,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
         } else {
             format!("Env[\"{name}\"]")
         }
-    }
-
-    fn api_injected_type(&self, idl: &CloesceIdl, api: &ApiMethod, name: &str) -> String {
-        if name == idl::CONTEXT_INJECT_KEY {
-            return api
-                .durable_target
-                .as_ref()
-                .map(|t| t.binding.to_string())
-                .unwrap();
-        }
-        self.inject_type(idl, name)
     }
 
     fn interpolate_format<'src>(

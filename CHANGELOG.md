@@ -1,3 +1,20 @@
+# [0.5.1] - 2026-6-19
+
+### Added
+
+- Optional `dir` field to `cloesce compile` command to specify the directory to compile in, defaulting to the cwd.
+
+### Changed
+
+- Calling `cloesce compile` in a directory with only a source file will correctly compile instead of throwing an error about a missing Wrangler config / `cloesce.jsonc`
+
+### Fixed
+
+- `self` methods would not inherit the durable context of its associated Data Sources `get` method
+- Durable Object shards would not always correctly source themselves from the request context
+- Extra Durable Object injects would be added to an API method if it used a DO's KV templates
+- Errors would sometimes return `{}` instead of enumerating the error fields due to a bug in the error serialization logic.
+
 # [0.5.0] - 2026-06-18
 
 ### Added

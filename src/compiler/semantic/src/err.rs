@@ -1,4 +1,4 @@
-use ariadne::{Color, Label, Report, ReportKind};
+use ariadne::{Color, Config, IndexType, Label, Report, ReportKind};
 use frontend::{FileTable, Span, Spd, Tag, err::DisplayError};
 use idl::CrudKind;
 
@@ -193,6 +193,10 @@ pub enum SemanticError<'src, 'p> {
         param: &'p Symbol<'src>,
     },
 
+    ApiInjectsDurableWhenSelfInjectsDurable {
+        method: &'p Symbol<'src>,
+    },
+
     ValidatorInvalidForType {
         validator: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
@@ -288,6 +292,7 @@ fn display(
     macro_rules! report {
         ($path:expr, $range:expr) => {
             Report::build(ReportKind::Error, ($path, $range))
+                .with_config(Config::new().with_index_type(IndexType::Byte))
         };
     }
 
@@ -807,6 +812,19 @@ fn display(
                     Label::new((method_path, method_range))
                         .with_message(format!("method '{}' declared here", method.name))
                         .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::ApiInjectsDurableWhenSelfInjectsDurable { method } => {
+            let (method_path, method_range) = span_parts(&method.span, file_table);
+            report!(method_path.clone(), method_range.clone())
+                .with_message(format!(
+                    "API method '{}' injects a Durable Object context but already inherits one from its data source",
+                    method.name
+                ))
+                .with_label(
+                    Label::new((method_path, method_range))
+                        .with_message("an instantiated method runs inside its data source's Durable Object; remove the explicit context injection")
+                        .with_color(Color::Red),
                 )
         }
         SemanticError::ValidatorInvalidArgument {

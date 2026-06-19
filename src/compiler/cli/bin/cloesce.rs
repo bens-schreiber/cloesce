@@ -196,10 +196,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    Compile,
+    Compile(CompileArgs),
     Migrate(MigrateArgs),
     Fmt(FormatArgs),
     Version,
+}
+
+#[derive(Args)]
+struct CompileArgs {
+    /// Directory to compile. Defaults to the current directory.
+    #[arg(default_value = ".")]
+    dir: PathBuf,
 }
 
 #[derive(Args)]
@@ -263,8 +270,16 @@ fn main() {
         let root = std::env::current_dir().map_err(|e| e.to_string())?;
 
         match cli.command {
-            Command::Compile => {
-                let config = CloesceConfig::load(&root, cli.env)?;
+            Command::Compile(args) => {
+                let root = if args.dir.is_absolute() {
+                    args.dir
+                } else {
+                    root.join(args.dir)
+                };
+                let mut config = CloesceConfig::load(&root, cli.env)?;
+                if config.parsed.src_paths.is_empty() {
+                    config.parsed.src_paths = vec!["./".to_string()];
+                }
                 let sources = config.collect_sources(&root);
                 compile::compile(config, sources)?;
 
@@ -350,24 +365,47 @@ mod compile {
             return Err("No cloesce source files found".into());
         }
 
-        // Load wrangler first to catch any errors before more expensive compilation steps
+        // Load wrangler first to catch any errors before more expensive compilation steps.
+        // If missing, create a default empty config.
         let (mut wrangler, mut wrangler_spec) = {
-            let wrangler_contents =
-                std::fs::read_to_string(config.wrangler_path()).map_err(|e| {
-                    format!(
+            let wrangler_path = config.wrangler_path();
+            let wrangler_contents = match std::fs::read_to_string(&wrangler_path) {
+                Ok(contents) => contents,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    tracing::warn!(
+                        "No wrangler config found at {}. Creating default.",
+                        wrangler_path.display()
+                    );
+                    let default = match config.parsed.wrangler_config_format {
+                        WranglerConfigFormat::Toml => String::new(),
+                        WranglerConfigFormat::Jsonc => "{}".to_string(),
+                    };
+                    open_file_or_create(&wrangler_path)?
+                        .write_all(default.as_bytes())
+                        .map_err(|e| {
+                            format!(
+                                "Failed to write default wrangler config at {}: {}",
+                                wrangler_path.display(),
+                                e
+                            )
+                        })?;
+                    default
+                }
+                Err(e) => {
+                    return Err(format!(
                         "Failed to read wrangler config at {}: {}",
-                        config.wrangler_path().display(),
+                        wrangler_path.display(),
                         e
-                    )
-                })?;
+                    ));
+                }
+            };
 
-            let generator =
-                WranglerGenerator::from_contents(wrangler_contents, &config.wrangler_path())?;
+            let generator = WranglerGenerator::from_contents(wrangler_contents, &wrangler_path)?;
             let env = config.env.as_deref();
             let spec = generator.as_spec(env).map_err(|e| {
                 format!(
                     "Failed to process wrangler config {}: {}",
-                    config.wrangler_path().display(),
+                    wrangler_path.display(),
                     e
                 )
             })?;

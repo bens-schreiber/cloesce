@@ -112,14 +112,16 @@
             "injected": [
               "db"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "get": {
             "parameters": [],
             "injected": [
               "db"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -136,7 +138,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"DefaultOverride\".\"id\" AS \"id\" FROM \"DefaultOverride\"",
           "get_query": "SELECT \"DefaultOverride\".\"id\" AS \"id\" FROM \"DefaultOverride\" WHERE \"DefaultOverride\".\"id\" = ?1",
@@ -391,7 +394,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -407,7 +411,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -424,7 +429,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\"",
           "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
@@ -455,7 +461,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -471,7 +478,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -488,7 +496,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\"",
           "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" WHERE \"Hamburger\".\"id\" = ?1",
@@ -519,7 +528,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -535,7 +545,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -552,7 +563,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\"",
           "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
@@ -583,7 +595,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -599,7 +612,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -616,7 +630,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\"",
           "get_query": "SELECT \"Hamburger\".\"id\" AS \"id\", \"Hamburger\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"toppings.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"toppings.toppingId\", \"Topping_2\".\"id\" AS \"toppings.topping.id\", \"Topping_2\".\"name\" AS \"toppings.topping.name\" FROM \"Hamburger\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Hamburger\".\"id\" = \"HamburgerTopping_1\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_2\" ON \"HamburgerTopping_1\".\"toppingId\" = \"Topping_2\".\"id\" WHERE \"Hamburger\".\"id\" = ?1",
@@ -744,7 +759,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -760,7 +776,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -777,7 +794,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"Topping\".\"id\" AS \"id\", \"Topping\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"hamburgers.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"hamburgers.toppingId\" FROM \"Topping\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Topping\".\"id\" = \"HamburgerTopping_1\".\"toppingId\"",
           "get_query": "SELECT \"Topping\".\"id\" AS \"id\", \"Topping\".\"name\" AS \"name\", \"HamburgerTopping_1\".\"hamburgerId\" AS \"hamburgers.hamburgerId\", \"HamburgerTopping_1\".\"toppingId\" AS \"hamburgers.toppingId\" FROM \"Topping\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_1\" ON \"Topping\".\"id\" = \"HamburgerTopping_1\".\"toppingId\" WHERE \"Topping\".\"id\" = ?1",
@@ -902,7 +920,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -926,7 +945,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -943,7 +963,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"HamburgerTopping\".\"hamburgerId\" AS \"hamburgerId\", \"HamburgerTopping\".\"toppingId\" AS \"toppingId\", \"Hamburger_1\".\"id\" AS \"hamburger.id\", \"Hamburger_1\".\"name\" AS \"hamburger.name\", \"HamburgerTopping_2\".\"hamburgerId\" AS \"hamburger.toppings.hamburgerId\", \"HamburgerTopping_2\".\"toppingId\" AS \"hamburger.toppings.toppingId\", \"Topping_3\".\"id\" AS \"topping.id\", \"Topping_3\".\"name\" AS \"topping.name\", \"HamburgerTopping_4\".\"hamburgerId\" AS \"topping.hamburgers.hamburgerId\", \"HamburgerTopping_4\".\"toppingId\" AS \"topping.hamburgers.toppingId\" FROM \"HamburgerTopping\" LEFT JOIN \"Hamburger\" AS \"Hamburger_1\" ON \"HamburgerTopping\".\"hamburgerId\" = \"Hamburger_1\".\"id\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger_1\".\"id\" = \"HamburgerTopping_2\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_3\" ON \"HamburgerTopping\".\"toppingId\" = \"Topping_3\".\"id\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_4\" ON \"Topping_3\".\"id\" = \"HamburgerTopping_4\".\"toppingId\"",
           "get_query": "SELECT \"HamburgerTopping\".\"hamburgerId\" AS \"hamburgerId\", \"HamburgerTopping\".\"toppingId\" AS \"toppingId\", \"Hamburger_1\".\"id\" AS \"hamburger.id\", \"Hamburger_1\".\"name\" AS \"hamburger.name\", \"HamburgerTopping_2\".\"hamburgerId\" AS \"hamburger.toppings.hamburgerId\", \"HamburgerTopping_2\".\"toppingId\" AS \"hamburger.toppings.toppingId\", \"Topping_3\".\"id\" AS \"topping.id\", \"Topping_3\".\"name\" AS \"topping.name\", \"HamburgerTopping_4\".\"hamburgerId\" AS \"topping.hamburgers.hamburgerId\", \"HamburgerTopping_4\".\"toppingId\" AS \"topping.hamburgers.toppingId\" FROM \"HamburgerTopping\" LEFT JOIN \"Hamburger\" AS \"Hamburger_1\" ON \"HamburgerTopping\".\"hamburgerId\" = \"Hamburger_1\".\"id\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_2\" ON \"Hamburger_1\".\"id\" = \"HamburgerTopping_2\".\"hamburgerId\" LEFT JOIN \"Topping\" AS \"Topping_3\" ON \"HamburgerTopping\".\"toppingId\" = \"Topping_3\".\"id\" LEFT JOIN \"HamburgerTopping\" AS \"HamburgerTopping_4\" ON \"Topping_3\".\"id\" = \"HamburgerTopping_4\".\"toppingId\" WHERE (\"HamburgerTopping\".\"hamburgerId\", \"HamburgerTopping\".\"toppingId\") = (?1, ?2)",

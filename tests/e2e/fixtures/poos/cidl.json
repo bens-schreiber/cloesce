@@ -119,7 +119,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -135,7 +136,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -152,7 +154,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"PooAcceptYield\".\"id\" AS \"id\" FROM \"PooAcceptYield\"",
           "get_query": "SELECT \"PooAcceptYield\".\"id\" AS \"id\" FROM \"PooAcceptYield\" WHERE \"PooAcceptYield\".\"id\" = ?1",

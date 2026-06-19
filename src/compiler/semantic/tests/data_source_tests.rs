@@ -736,8 +736,13 @@ fn default_data_source_durable_sqlite() {
     assert_eq!(save_params, vec!["tenantId", "model"]);
 
     // All methods run inside the DO.
-    for injected in [&ds.get.injected, &ds.list.injected, &ds.save.injected] {
-        assert!(injected.contains(&idl::CONTEXT_INJECT_KEY));
+    for target in [
+        &ds.get.durable_target,
+        &ds.list.durable_target,
+        &ds.save.durable_target,
+    ] {
+        let target = target.as_ref().expect("durable target");
+        assert_eq!(target.binding, "LeaderboardDo");
     }
 
     // CRUD routes carry the durable target for Worker-to-DO forwarding.

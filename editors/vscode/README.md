@@ -11,6 +11,5 @@ Syntax highlighting for the Cloesce schema language (`.clo`, `.cloesce`)
 ## Features
 
 - Full syntax highlighting for the Cloesce schema language
-- SQL highlighting inside `sql` blocks
 - Bracket matching and auto-closing
 - Region folding (`//#region` / `//#endregion`)

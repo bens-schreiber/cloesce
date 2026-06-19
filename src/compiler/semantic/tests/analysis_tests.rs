@@ -1680,7 +1680,6 @@ fn context_tag_valid() {
     let target = top.durable_target.as_ref().expect("durable target");
     assert_eq!(target.binding, "LeaderboardDo");
     assert_eq!(target.shard_args, vec!["tenantId"]);
-    assert!(top.injected.contains(&idl::CONTEXT_INJECT_KEY));
 
     // The shard field's `[gt 0]` validator is inherited onto the matching param.
     let tenant = top
@@ -1725,7 +1724,6 @@ fn inject_binding_namespace_and_context() {
 
     // `GlobalDo` injects the binding namespace; `GlobalDo()` the DO context.
     assert!(api.injected.contains(&"GlobalDo"));
-    assert!(api.injected.contains(&idl::CONTEXT_INJECT_KEY));
     let target = api.durable_target.as_ref().expect("durable target");
     assert_eq!(target.binding, "GlobalDo");
 }
@@ -1791,6 +1789,80 @@ fn context_tag_errors() {
     assert_eq!(arg.name, "tenantId");
 
     expect_err!(errors, SemanticError::TagInvalidInContext { .. });
+}
+
+#[test]
+fn instantiated_method_inherits_durable_target() {
+    // Arrange
+    let src = r#"
+        durable SubRedditDo {
+            shard {
+                id: int
+            }
+        }
+
+        model SubReddit for SubRedditDo(subId) {
+            primary { pid: int }
+        }
+
+        api SubReddit {
+            get feed(self, subId: int) -> json
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let feed = result
+        .models
+        .get("SubReddit")
+        .unwrap()
+        .apis
+        .iter()
+        .find(|a| a.name == "feed")
+        .unwrap();
+    let target = feed
+        .durable_target
+        .as_ref()
+        .expect("inherited durable target");
+    assert_eq!(target.binding, "SubRedditDo");
+    assert_eq!(target.shard_args, vec!["subId"]);
+    assert!(feed.injected.is_empty());
+}
+
+#[test]
+fn instantiated_method_injecting_durable_conflicts() {
+    // Arrange
+    let src = r#"
+        durable SubRedditDo {
+            shard {
+                id: int
+            }
+        }
+
+        model SubReddit for SubRedditDo(subId) {
+            primary { pid: int }
+        }
+
+        api SubReddit {
+            [inject SubRedditDo(subId)]
+            get feed(self, subId: int) -> json
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = analyze(&parse);
+
+    // Assert
+    let method = expect_err!(errors,
+        SemanticError::ApiInjectsDurableWhenSelfInjectsDurable { method } => method
+    );
+    assert_eq!(method.name, "feed");
 }
 
 #[test]

@@ -176,7 +176,7 @@ impl Hash for ValidatedField<'_> {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
 /// A relationship to another model
@@ -267,6 +267,10 @@ pub struct DataSourceMethod<'src> {
     /// True if the user declared this method as a stub in the schema (must be implemented
     /// by the user). False if the compiler synthesized the default PK/seek-pagination impl.
     pub is_stub: bool,
+
+    /// If present, the method executes inside this Durable Object's context.
+    #[serde(borrow)]
+    pub durable_target: Option<DurableTarget<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -291,6 +295,10 @@ pub struct DataSourceGetMethod<'src> {
     /// True if the user declared this method as a stub in the schema (must be implemented
     /// by the user). False if the compiler synthesized the default PK fetch.
     pub is_stub: bool,
+
+    /// If present, the method executes inside this Durable Object's context.
+    #[serde(borrow)]
+    pub durable_target: Option<DurableTarget<'src>>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -365,9 +373,8 @@ pub enum MediaType {
     Octet,
 }
 
-/// A key that signifies an [ApiMethod::durable_target] should be injected.
-pub const CONTEXT_INJECT_KEY: &str = "ctx";
 pub const DEFAULT_DATA_SOURCE_NAME: &str = "Default";
+pub const ENV_DURABLE_TARGET_KEY: &str = "ctx";
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct DurableTarget<'src> {
@@ -377,7 +384,7 @@ pub struct DurableTarget<'src> {
     /// The API method parameter names supplying the DO's shard values,
     /// in shard-field order.
     #[serde(borrow)]
-    pub shard_args: Vec<&'src str>,
+    pub shard_args: Vec<Cow<'src, str>>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -744,7 +751,8 @@ pub fn model_bindings<'src>(
         }
 
         for kv in &model.kv_fields {
-            if included(kv.field.name.as_ref()) {
+            if included(kv.field.name.as_ref()) && !do_bindings.contains(kv.binding) {
+                // Again, ignore Durable Object bindings
                 bindings.insert(kv.binding);
             }
         }

@@ -17,7 +17,7 @@ import {
   KvField,
   isD1Backed,
   isDurableBacked,
-  CONTEXT_INJECT_KEY,
+  ENV_DURABLE_TARGET_KEY,
 } from "../cidl.js";
 import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue } from "../ui/backend.js";
@@ -90,7 +90,7 @@ export class Orm {
   ) {}
 
   static fromEnv(env: any): Orm {
-    const durable = env[CONTEXT_INJECT_KEY] as DurableContext | undefined;
+    const durable = env[ENV_DURABLE_TARGET_KEY] as DurableContext | undefined;
     return new Orm(env, durable ?? null);
   }
 

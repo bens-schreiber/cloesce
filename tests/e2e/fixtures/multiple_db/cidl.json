@@ -165,7 +165,8 @@
             "injected": [
               "db1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -181,7 +182,8 @@
             "injected": [
               "db1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -198,7 +200,8 @@
             "injected": [
               "db1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"DB1Model\".\"id\" AS \"id\", \"DB1Model\".\"someColumn\" AS \"someColumn\" FROM \"DB1Model\"",
           "get_query": "SELECT \"DB1Model\".\"id\" AS \"id\", \"DB1Model\".\"someColumn\" AS \"someColumn\" FROM \"DB1Model\" WHERE \"DB1Model\".\"id\" = ?1",
@@ -366,7 +369,8 @@
             "injected": [
               "db2"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -382,7 +386,8 @@
             "injected": [
               "db2"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -399,7 +404,8 @@
             "injected": [
               "db2"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"DB2Model\".\"id\" AS \"id\", \"DB2Model\".\"someColumn\" AS \"someColumn\" FROM \"DB2Model\"",
           "get_query": "SELECT \"DB2Model\".\"id\" AS \"id\", \"DB2Model\".\"someColumn\" AS \"someColumn\" FROM \"DB2Model\" WHERE \"DB2Model\".\"id\" = ?1",
