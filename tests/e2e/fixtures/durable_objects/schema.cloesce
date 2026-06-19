@@ -14,7 +14,6 @@ model Global for GlobalDo {
 api Global {
     post newGlobal() -> Global
 
-    [inject GlobalDo()]
     get getMetadata(self) -> json
 }
 // #endregion
@@ -51,7 +50,6 @@ model SubReddit for SubRedditDo(subId) {
 api SubReddit {
     post newSubReddit() -> SubReddit
 
-    [inject SubRedditDo(subId)]
     get feed(self, subId: int) -> array<Post>
 }
 

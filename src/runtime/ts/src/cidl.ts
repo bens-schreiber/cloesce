@@ -73,10 +73,10 @@ export interface R2Field {
 export type MediaType = "Json" | "Octet";
 
 /**
- * Durable Object context is implicitly injected to API methods under
- * this key.
+ * Methods that run inside a Durable Object's context receive that DO instance
+ * in their `env` under this key.
  */
-export const CONTEXT_INJECT_KEY = "ctx";
+export const ENV_DURABLE_TARGET_KEY = "ctx";
 
 export interface DurableTarget {
   binding: string;
@@ -139,6 +139,7 @@ export interface DataSourceMethod {
   parameters: ValidatedField[];
   injected: string[];
   is_stub: boolean;
+  durable_target?: DurableTarget | null;
 }
 
 export interface DataSourceGetMethodParam {
@@ -150,6 +151,7 @@ export interface DataSourceGetMethod {
   parameters: DataSourceGetMethodParam[];
   injected: string[];
   is_stub: boolean;
+  durable_target?: DurableTarget | null;
 }
 
 export interface DataSource {

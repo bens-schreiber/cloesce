@@ -1,7 +1,6 @@
 use askama::Template;
 use idl::{
-    ApiMethod, CidlType, CloesceIdl, DurableBinding, IncludeTree, Model, ValidatedField,
-    model_bindings,
+    CidlType, CloesceIdl, DurableBinding, IncludeTree, Model, ValidatedField, model_bindings,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -27,19 +26,6 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.inject_type(self.idl, name)
     }
 
-    fn api_injected_type(&self, api: &ApiMethod, name: &str) -> String {
-        self.mapper.api_injected_type(self.idl, api, name)
-    }
-
-    fn ds_injected_type(&self, model: &Model<'_>, name: &str) -> String {
-        match &model.backing {
-            Some(backing) if model.is_durable_backed() && name == idl::CONTEXT_INJECT_KEY => {
-                backing.binding.to_string()
-            }
-            _ => self.mapper.inject_type(self.idl, name),
-        }
-    }
-
     fn backing_binding(&self, model: &Model<'_>) -> String {
         model
             .backing
@@ -48,8 +34,8 @@ impl<'src> BackendTemplate<'src> {
             .unwrap_or_default()
     }
 
-    fn context_inject_key(&self) -> &'static str {
-        idl::CONTEXT_INJECT_KEY
+    fn env_durable_target_key(&self) -> &'static str {
+        idl::ENV_DURABLE_TARGET_KEY
     }
 
     fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {

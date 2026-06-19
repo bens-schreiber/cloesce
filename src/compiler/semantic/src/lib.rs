@@ -22,7 +22,7 @@ use frontend::{
     DataSourceBlock, DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, ModelBlock,
     PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, VarsBlock,
 };
-use idl::{CidlType, CloesceIdl, Number, PlainOldObject, ValidatedField, Validator};
+use idl::{CidlType, CloesceIdl, DurableTarget, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
 
 use std::collections::{BTreeMap, HashMap};
@@ -33,7 +33,6 @@ use crate::{
 };
 
 mod api;
-mod crud;
 mod data_source;
 mod env;
 pub mod err;
@@ -47,8 +46,8 @@ pub fn analyze<'src, 'p>(
 ) -> Result<CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>> {
     let mut sink = ErrorSink::new();
     let table = SymbolTable::from_ast(ast, &mut sink);
-
     let wrangler_env = env::analyze(&table, &mut sink);
+    let poos = analyze_poos(&table, &mut sink);
 
     let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
         Ok(models) => models,
@@ -59,19 +58,16 @@ pub fn analyze<'src, 'p>(
     };
 
     let data_source_map = data_source::analysis::analyze(&models, &table, &mut sink);
-    let poos = analyze_poos(&table, &mut sink);
-
-    let api_map = api::analyze(&mut sink, &table);
-
-    for (namespace, apis) in api_map {
-        if let Some(model) = models.get_mut(&namespace) {
-            model.apis.extend(apis);
-        }
-    }
-
     for (model_name, ds) in data_source_map {
         if let Some(model) = models.get_mut(&model_name) {
             model.data_sources.insert(ds.name, ds);
+        }
+    }
+
+    let api_map = api::analysis::analyze(&models, &mut sink, &table);
+    for (namespace, apis) in api_map {
+        if let Some(model) = models.get_mut(&namespace) {
+            model.apis.extend(apis);
         }
     }
 
@@ -94,7 +90,7 @@ pub fn analyze<'src, 'p>(
     }
 
     data_source::expansion::expand(&mut idl);
-    crud::expand(&mut idl);
+    api::expansion::expand(&mut idl);
     idl.set_merkle_hash();
 
     Ok(idl)
@@ -684,20 +680,20 @@ fn resolve_validator_tags<'src, 'p>(
     }
 }
 
-/// Resolves the `[inject ...]` tags on a method's symbol into a deduplicated list of binding names.
+/// Resolves the `[inject ...]` tags on a method's symbol into a [ResolvedInjects].
 ///
-/// Each binding name must resolve to one of:
-/// - an env binding (D1 / KV / R2 / Durable Object),
-/// - an env var,
-/// - an `inject { ... }` block symbol.
-///
-/// Context entries (`Do(args)`) are skipped here; they are resolved separately.
-fn resolve_injects<'src, 'p>(
+/// Each `[inject]` entry is either:
+/// - A plain binding name that must resolve to an env binding (D1 / KV / R2 / Durable Object),
+///   an env var, or an `inject { ... }` block symbol.
+/// - A context entry (`Do(args)`) that resolves to a [DurableTarget].
+fn resolve_inject<'src, 'p>(
     method: &'p Symbol<'src>,
+    parameters: &mut [ValidatedField<'src>],
     table: &SymbolTable<'src, 'p>,
     sink: &mut ErrorSink<'src, 'p>,
-) -> Vec<&'src str> {
-    let mut injected: Vec<&'src str> = Vec::new();
+) -> (Vec<&'src str>, Option<DurableTarget<'src>>) {
+    let mut injected = Vec::new();
+    let mut durable_target = None;
 
     for tag in &method.tags {
         let Tag::Inject { entries } = &tag.inner else {
@@ -709,43 +705,130 @@ fn resolve_injects<'src, 'p>(
         };
 
         for entry in entries {
-            let InjectEntry::Binding(binding) = entry else {
-                continue;
-            };
-            let name = binding.name;
+            match entry {
+                InjectEntry::Context {
+                    symbol: binding,
+                    args,
+                } => {
+                    if durable_target.is_some() {
+                        sink.push(SemanticError::TagInvalidInContext {
+                            tag,
+                            symbol: method,
+                        });
+                        continue;
+                    }
 
-            let is_d1 = table
-                .d1_bindings
-                .iter()
-                .flat_map(|b| b.bindings.iter())
-                .any(|s| s.name == name);
-            let is_kv = table.kv_bindings.contains_key(name);
-            let is_r2 = table.r2_bindings.contains_key(name);
-            let is_durable = table.durable_bindings.contains_key(name);
-            let is_env_var = table
+                    durable_target = resolve_durable_target(binding, args, parameters, table, sink);
+                }
+                InjectEntry::Binding(binding) => {
+                    resolve_binding(binding, table, sink, &mut injected);
+                }
+            }
+        }
+    }
+
+    return (injected, durable_target);
+
+    fn resolve_binding<'src, 'p>(
+        binding: &'p Symbol<'src>,
+        table: &SymbolTable<'src, 'p>,
+        sink: &mut ErrorSink<'src, 'p>,
+        injected: &mut Vec<&'src str>,
+    ) {
+        let name = binding.name;
+
+        let is_known = table
+            .d1_bindings
+            .iter()
+            .flat_map(|b| b.bindings.iter())
+            .any(|s| s.name == name)
+            || table.kv_bindings.contains_key(name)
+            || table.r2_bindings.contains_key(name)
+            || table.durable_bindings.contains_key(name)
+            || table
                 .vars_blocks
                 .iter()
                 .flat_map(|v| v.vars.iter())
-                .any(|s| s.name == name);
-
-            let is_inject_block_symbol = table
+                .any(|s| s.name == name)
+            || table
                 .injects
                 .iter()
                 .flat_map(|i| i.symbols.iter())
                 .any(|s| s.name == name);
 
-            if !is_d1 && !is_kv && !is_r2 && !is_durable && !is_env_var && !is_inject_block_symbol {
-                sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
-                continue;
-            }
+        if !is_known {
+            sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
+            return;
+        }
 
-            if !injected.contains(&name) {
-                injected.push(name);
-            }
+        if !injected.contains(&name) {
+            injected.push(name);
         }
     }
 
-    injected
+    fn resolve_durable_target<'src, 'p>(
+        binding: &'p Symbol<'src>,
+        args: &'p [Symbol<'src>],
+        parameters: &mut [ValidatedField<'src>],
+        table: &SymbolTable<'src, 'p>,
+        sink: &mut ErrorSink<'src, 'p>,
+    ) -> Option<DurableTarget<'src>> {
+        let Some(durable) = table.durable_bindings.get(binding.name) else {
+            sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
+            return None;
+        };
+
+        let shard_fields: Vec<&Symbol> = durable
+            .shard_blocks
+            .inners()
+            .flat_map(|s| &s.fields)
+            .collect();
+
+        if shard_fields.len() != args.len() {
+            sink.push(SemanticError::ArgCountMismatch {
+                field: binding,
+                expected: shard_fields.len(),
+                got: args.len(),
+            });
+            return None;
+        }
+
+        let mut shard_args = Vec::with_capacity(args.len());
+        for (arg, shard_field) in args.iter().zip(&shard_fields) {
+            let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
+                sink.push(SemanticError::UnresolvedSymbol { symbol: arg });
+                continue;
+            };
+
+            let shard_type = match resolve_cidl_type(shard_field, &shard_field.cidl_type, table) {
+                Ok(t) => t,
+                Err(e) => {
+                    sink.push(e);
+                    continue;
+                }
+            };
+            if param.cidl_type != shard_type {
+                sink.push(SemanticError::ArgTypeMismatch {
+                    field: binding,
+                    arg,
+                });
+                continue;
+            }
+
+            // Inherit the shard field's validators
+            match resolve_validator_tags(shard_field) {
+                Ok(validators) => param.validators.extend(validators),
+                Err(errs) => sink.extend(errs),
+            }
+
+            shard_args.push(arg.name.into());
+        }
+
+        Some(DurableTarget {
+            binding: binding.name,
+            shard_args,
+        })
+    }
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type

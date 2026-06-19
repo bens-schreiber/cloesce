@@ -139,7 +139,7 @@ export namespace Global {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"metadata":{}},
-            async get(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: GlobalDo }): Promise<HttpResult<Self | null>> {
                 const base = {  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
                 if (res.errors.length > 0) {
@@ -147,7 +147,7 @@ export namespace Global {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async save(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }, model: DeepPartial<Global.Self>): Promise<HttpResult<Self | null>> {
+            async save(env: { ctx: GlobalDo }, model: DeepPartial<Global.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
@@ -318,7 +318,7 @@ export namespace SubReddit {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"globalMetadata":{},"metadata":{}},
-            async get(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"], SubRedditDo: Env["SubRedditDo"] }, subId: number): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"] }, subId: number): Promise<HttpResult<Self | null>> {
                 const base = { subId } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
                 if (res.errors.length > 0) {
@@ -326,7 +326,7 @@ export namespace SubReddit {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async save(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"], SubRedditDo: Env["SubRedditDo"] }, subId: number, model: DeepPartial<SubReddit.Self>): Promise<HttpResult<Self | null>> {
+            async save(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"] }, subId: number, model: DeepPartial<SubReddit.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));

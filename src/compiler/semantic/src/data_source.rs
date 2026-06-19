@@ -15,7 +15,7 @@ pub mod analysis {
     use crate::{
         SymbolTable,
         err::{ErrorSink, SemanticError},
-        is_valid_sql_type, resolve_injects, resolve_validator_tags,
+        is_valid_sql_type, resolve_inject, resolve_validator_tags,
     };
 
     use super::{IncludeTree, IndexMap, Model, include_dfs};
@@ -25,6 +25,7 @@ pub mod analysis {
         Body,
     }
 
+    /// Validates every [DataSource], returning a list of Model namespaces and their associated [DataSource]s.
     pub fn analyze<'src, 'p>(
         models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
@@ -111,7 +112,7 @@ pub mod analysis {
                 .list
                 .as_ref()
                 .map(|method| {
-                    let parameters = method
+                    let mut parameters = method
                         .inner
                         .parameters
                         .iter()
@@ -128,12 +129,16 @@ pub mod analysis {
                                 validators,
                             }
                         })
-                        .collect();
+                        .collect::<Vec<_>>();
+
+                    let (injected, durable_target) =
+                        resolve_inject(&method.inner.method, &mut parameters, table, sink);
 
                     DataSourceMethod {
                         parameters,
-                        injected: resolve_injects(&method.inner.method, table, sink),
+                        injected,
                         is_stub: true,
+                        durable_target,
                     }
                 })
                 .unwrap_or_default();
@@ -142,7 +147,7 @@ pub mod analysis {
                 .get
                 .as_ref()
                 .map(|method| {
-                    let parameters = method
+                    let (mut fields, instance_fields): (Vec<_>, Vec<_>) = method
                         .inner
                         .parameters
                         .iter()
@@ -165,21 +170,34 @@ pub mod analysis {
                                 }
                             }
 
-                            DataSourceGetMethodParam {
-                                parameter: ValidatedField {
+                            (
+                                ValidatedField {
                                     name: p.name.into(),
                                     cidl_type: p.cidl_type.clone(),
                                     validators,
                                 },
-                                instance_field: instance_tag.is_some(),
-                            }
+                                instance_tag.is_some(),
+                            )
+                        })
+                        .unzip();
+
+                    let (injected, durable_target) =
+                        resolve_inject(&method.inner.method, &mut fields, table, sink);
+
+                    let parameters = fields
+                        .into_iter()
+                        .zip(instance_fields)
+                        .map(|(parameter, instance_field)| DataSourceGetMethodParam {
+                            parameter,
+                            instance_field,
                         })
                         .collect();
 
                     DataSourceGetMethod {
                         parameters,
-                        injected: resolve_injects(&method.inner.method, table, sink),
+                        injected,
                         is_stub: true,
+                        durable_target,
                     }
                 })
                 .unwrap_or_default();
@@ -188,7 +206,7 @@ pub mod analysis {
                 .save
                 .as_ref()
                 .map(|method| {
-                    let parameters = method
+                    let mut parameters = method
                         .inner
                         .parameters
                         .iter()
@@ -205,12 +223,16 @@ pub mod analysis {
                                 validators,
                             }
                         })
-                        .collect();
+                        .collect::<Vec<_>>();
+
+                    let (injected, durable_target) =
+                        resolve_inject(&method.inner.method, &mut parameters, table, sink);
 
                     DataSourceMethod {
                         parameters,
-                        injected: resolve_injects(&method.inner.method, table, sink),
+                        injected,
                         is_stub: true,
+                        durable_target,
                     }
                 })
                 .unwrap_or_default();
@@ -293,8 +315,9 @@ pub mod analysis {
 
 pub mod expansion {
     use idl::{
-        CidlType, CloesceIdl, DataSource, DataSourceGetMethod, DataSourceGetMethodParam,
-        DataSourceMethod, Number, ValidatedField, Validator, model_bindings,
+        BackingKind, CidlType, CloesceIdl, DataSource, DataSourceGetMethod,
+        DataSourceGetMethodParam, DataSourceMethod, DurableTarget, ModelBacking, Number,
+        ValidatedField, Validator, model_bindings,
     };
     use orm::select::SelectModel;
 
@@ -381,20 +404,33 @@ pub mod expansion {
         model: &Model<'src>,
         ds: &DataSource<'src>,
     ) -> GeneratedDataSource<'src> {
-        let mut injected = model_bindings(idl, model, Some(&ds.tree));
-        let shard_fields = if model.is_durable_backed() {
-            // Default Durable Object methods run inside the DO context
-            injected.insert(0, idl::CONTEXT_INJECT_KEY);
-
-            let backing_fields = &model.backing.as_ref().unwrap().fields;
-            model
+        // If a model is Durable Object backed, by default data source methods
+        // will include each shard field, and execute in that DO's context
+        let (shard_fields, durable_target) = if let Some(ModelBacking {
+            kind: BackingKind::DurableObject,
+            fields,
+            ..
+        }) = &model.backing
+        {
+            let shard_fields = model
                 .route_fields
                 .iter()
-                .filter(|f| backing_fields.iter().any(|bf| *bf == f.name))
+                .filter(|f| fields.iter().any(|bf| *bf == f.name))
                 .map(|f| (*f).clone())
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+
+            let durable_target = DurableTarget {
+                binding: model.backing.as_ref().unwrap().binding,
+                shard_args: shard_fields
+                    .iter()
+                    .map(|f| &f.name)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            };
+
+            (shard_fields, Some(durable_target))
         } else {
-            vec![]
+            (vec![], None)
         };
 
         let save_model_param = || ValidatedField {
@@ -421,6 +457,8 @@ pub mod expansion {
                 }))
         };
 
+        let injected = model_bindings(idl, model, Some(&ds.tree));
+
         if model.uses_sqlite() {
             let include_query =
                 SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
@@ -443,11 +481,13 @@ pub mod expansion {
                     parameters: get_params,
                     injected: injected.clone(),
                     is_stub: false,
+                    durable_target: durable_target.clone(),
                 }),
                 list: Some(DataSourceMethod {
                     parameters: shard_fields.iter().cloned().chain(list_params()).collect(),
                     injected: injected.clone(),
                     is_stub: false,
+                    durable_target: durable_target.clone(),
                 }),
                 save: Some(DataSourceMethod {
                     parameters: shard_fields
@@ -457,6 +497,7 @@ pub mod expansion {
                         .collect(),
                     injected,
                     is_stub: false,
+                    durable_target,
                 }),
             };
         }
@@ -474,6 +515,7 @@ pub mod expansion {
                     .collect(),
                 injected: injected.clone(),
                 is_stub: false,
+                durable_target: durable_target.clone(),
             }),
             // Save does not need all route fields, just the shard fields to populate the
             // DO context.
@@ -489,6 +531,7 @@ pub mod expansion {
                     .collect(),
                 injected: injected.clone(),
                 is_stub: false,
+                durable_target: durable_target.clone(),
             }),
             ..GeneratedDataSource::default()
         }
@@ -544,7 +587,7 @@ pub mod expansion {
     }
 }
 
-pub(super) fn include_dfs<'src>(
+pub fn include_dfs<'src>(
     models: &IndexMap<&'src str, Model<'src>>,
     current_model: &'src str,
     visited: &mut HashSet<&'src str>,

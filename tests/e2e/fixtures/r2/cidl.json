@@ -274,7 +274,8 @@
               "bucket1",
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -291,7 +292,8 @@
               "bucket1",
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -309,7 +311,8 @@
               "bucket1",
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"D1BackedModel\".\"id\" AS \"id\", \"D1BackedModel\".\"someColumn\" AS \"someColumn\", \"D1BackedModel\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"D1BackedModel\"",
           "get_query": "SELECT \"D1BackedModel\".\"id\" AS \"id\", \"D1BackedModel\".\"someColumn\" AS \"someColumn\", \"D1BackedModel\".\"someOtherColumn\" AS \"someOtherColumn\" FROM \"D1BackedModel\" WHERE \"D1BackedModel\".\"id\" = ?1",
@@ -420,7 +423,8 @@
           "list": {
             "parameters": [],
             "injected": [],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -436,7 +440,8 @@
             "injected": [
               "bucket1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -453,7 +458,8 @@
             "injected": [
               "bucket1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "",
           "get_query": "",
@@ -518,7 +524,8 @@
           "list": {
             "parameters": [],
             "injected": [],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -534,7 +541,8 @@
             "injected": [
               "bucket1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -551,7 +559,8 @@
             "injected": [
               "bucket1"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "",
           "get_query": "",

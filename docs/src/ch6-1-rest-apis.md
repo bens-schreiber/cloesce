@@ -195,6 +195,17 @@ api Counter {
 }
 ```
 
+> [!IMPORTANT]
+> An instantiated method inherits its execution context from the `get` method of its Data Source, so it must **not** also inject one explicitly. Doing so is a compile error:
+>
+> ```cloesce
+> api Counter {
+>     // Error: `self` already runs inside CounterDo via the Data Source's `get`
+>     [inject CounterDo(tenant)]
+>     get myself(self, tenant: string) -> Counter
+> }
+> ```
+
 ## Streams
 
 Cloesce buffers the full body of an incoming request by default, which is suitable for most use cases. However, for certain scenarios such as file uploads or real-time data processing, you may want to handle the request body as a stream.

@@ -250,7 +250,7 @@ export namespace GlobalSettings {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"config":{}},
-            async get(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: GlobalDo }): Promise<HttpResult<Self | null>> {
                 const base = {  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
                 if (res.errors.length > 0) {
@@ -258,7 +258,7 @@ export namespace GlobalSettings {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async save(env: { ctx: GlobalDo, GlobalDo: Env["GlobalDo"] }, model: DeepPartial<GlobalSettings.Self>): Promise<HttpResult<Self | null>> {
+            async save(env: { ctx: GlobalDo }, model: DeepPartial<GlobalSettings.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
@@ -407,7 +407,7 @@ export namespace Leaderboard {
     export namespace GeneratedSource {
         export const Default = {
             tree: {"topEntries":{}},
-            async get(env: { ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: LeaderboardDo }, tenantId: number): Promise<HttpResult<Self | null>> {
                 const base = { tenantId } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
                 if (res.errors.length > 0) {
@@ -415,7 +415,7 @@ export namespace Leaderboard {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async save(env: { ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, model: DeepPartial<Leaderboard.Self>): Promise<HttpResult<Self | null>> {
+            async save(env: { ctx: LeaderboardDo }, tenantId: number, model: DeepPartial<Leaderboard.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, tenantId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
@@ -479,7 +479,7 @@ export namespace LeaderboardEntry {
             listQuery(lastSeen_id: number, limit: number): SqlStatement {
                 return { query: `SELECT "LeaderboardEntry"."id" AS "id", "LeaderboardEntry"."playerName" AS "playerName", "LeaderboardEntry"."score" AS "score" FROM "LeaderboardEntry" WHERE "LeaderboardEntry"."id" > ?1 ORDER BY "LeaderboardEntry"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
             },
-            async get(env: { ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, id: number): Promise<HttpResult<Self | null>> {
+            async get(env: { ctx: LeaderboardDo }, tenantId: number, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(id);
                 const seed = { tenantId,  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree, seed);
@@ -491,7 +491,7 @@ export namespace LeaderboardEntry {
                 }
                 return HttpResult.ok(200, res.value);
             },
-            async list(env: { ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
+            async list(env: { ctx: LeaderboardDo }, tenantId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(lastSeen_id, limit);
                 const seed = { tenantId,  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree, seed);
@@ -500,7 +500,7 @@ export namespace LeaderboardEntry {
                 }
                 return HttpResult.ok(200, res.value!);
             },
-            async save(env: { ctx: LeaderboardDo, LeaderboardDo: Env["LeaderboardDo"] }, tenantId: number, model: DeepPartial<LeaderboardEntry.Self>): Promise<HttpResult<Self | null>> {
+            async save(env: { ctx: LeaderboardDo }, tenantId: number, model: DeepPartial<LeaderboardEntry.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, tenantId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));

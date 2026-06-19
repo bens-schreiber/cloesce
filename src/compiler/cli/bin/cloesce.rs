@@ -400,8 +400,7 @@ mod compile {
                 }
             };
 
-            let generator =
-                WranglerGenerator::from_contents(wrangler_contents, &wrangler_path)?;
+            let generator = WranglerGenerator::from_contents(wrangler_contents, &wrangler_path)?;
             let env = config.env.as_deref();
             let spec = generator.as_spec(env).map_err(|e| {
                 format!(

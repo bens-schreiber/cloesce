@@ -1,5 +1,13 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, DataSource, Field, CONTEXT_INJECT_KEY } from "../cidl.js";
+import {
+  Cidl,
+  Model,
+  ApiMethod,
+  DataSource,
+  DurableTarget,
+  Field,
+  ENV_DURABLE_TARGET_KEY,
+} from "../cidl.js";
 import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
@@ -158,13 +166,20 @@ export class CloesceApp {
     }
 
     // Hydration
-    const hydrated = await hydrate(this.modelRegistry, di, route, this.env);
+    const hydrated = await hydrate(this.modelRegistry, di, route, this.env, this.durableContext);
     if (hydrated?.isLeft()) {
       return hydrated.value;
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated?.unwrap(), di, route, params, this.env);
+    return await methodDispatch(
+      hydrated?.unwrap(),
+      di,
+      route,
+      params,
+      this.env,
+      this.durableContext,
+    );
   }
 
   /**
@@ -176,7 +191,6 @@ export class CloesceApp {
   public async run(request: Request): Promise<Response> {
     await RuntimeContainer.init(this.idl);
     const di = new DependencyContainer();
-    di.set({ tag: CONTEXT_INJECT_KEY }, this.durableContext);
 
     try {
       const result = await this.router(request, di, this.workerUrl);
@@ -493,6 +507,7 @@ async function hydrate(
   di: DependencyContainer,
   route: MatchedRoute,
   env: any,
+  durableContext: unknown,
 ): Promise<Either<HttpResult, any>> {
   if (route.method.is_static) {
     // No hydration necessary
@@ -523,11 +538,19 @@ async function hydrate(
   try {
     // [injected, ...get params]
     const args = [];
-    if (dataSource.get.injected.length > 0) {
-      const injectedArgsRes = resolveInjectedArgs(di, env, dataSource.get.injected);
+    if (dataSource.get.injected.length > 0 || dataSource.get.durable_target != null) {
+      const injectedArgsRes = resolveInjectedArgs(
+        di,
+        env,
+        dataSource.get.injected,
+        dataSource.get.durable_target,
+        durableContext,
+      );
+
       if (injectedArgsRes.isLeft()) {
         return Either.left(injectedArgsRes.unwrapLeft());
       }
+
       args.push(injectedArgsRes.unwrap());
     }
     for (const param of dataSource.get.parameters) {
@@ -571,14 +594,23 @@ async function methodDispatch(
   route: MatchedRoute,
   params: Record<string, unknown>,
   env: any,
+  durableContext: unknown,
 ): Promise<HttpResult<unknown>> {
   const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
-  if (route.method.injected.length > 0) {
-    const injectedArgsRes = resolveInjectedArgs(di, env, route.method.injected);
+  if (route.method.injected.length > 0 || route.method.durable_target != null) {
+    const injectedArgsRes = resolveInjectedArgs(
+      di,
+      env,
+      route.method.injected,
+      route.method.durable_target,
+      durableContext,
+    );
+
     if (injectedArgsRes.isLeft()) {
       return injectedArgsRes.unwrapLeft();
     }
+
     paramArray.push(injectedArgsRes.unwrap());
   }
 
@@ -621,8 +653,16 @@ function resolveInjectedArgs(
   di: DependencyContainer,
   env: any,
   injectedNames: string[],
+  durableTarget: DurableTarget | null | undefined,
+  durableContext: unknown,
 ): Either<HttpResult, Record<string, unknown>> {
   const injected: Record<string, unknown> = {};
+
+  // Methods with a Durable Object target run inside that DO's context, which is
+  // surfaced to the handler under the well-known `ctx` key.
+  if (durableTarget != null) {
+    injected[ENV_DURABLE_TARGET_KEY] = durableContext;
+  }
 
   for (const name of injectedNames) {
     if (di.has({ tag: name })) {

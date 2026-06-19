@@ -127,9 +127,7 @@
           "return_type": "Json",
           "parameters_media": "Json",
           "parameters": [],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "GlobalDo",
             "shard_args": []
@@ -142,15 +140,17 @@
           "list": {
             "parameters": [],
             "injected": [],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [],
-            "injected": [
-              "ctx",
-              "GlobalDo"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "GlobalDo",
+              "shard_args": []
+            }
           },
           "save": {
             "parameters": [
@@ -164,11 +164,12 @@
                 "validators": []
               }
             ],
-            "injected": [
-              "ctx",
-              "GlobalDo"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "GlobalDo",
+              "shard_args": []
+            }
           },
           "include_query": "",
           "get_query": "",
@@ -291,12 +292,7 @@
           "injected": [
             "SubRedditDo"
           ],
-          "durable_target": {
-            "binding": "SubRedditDo",
-            "shard_args": [
-              "subId"
-            ]
-          }
+          "durable_target": null
         },
         {
           "name": "$get",
@@ -328,9 +324,7 @@
               "validators": []
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -362,12 +356,7 @@
           "injected": [
             "SubRedditDo"
           ],
-          "durable_target": {
-            "binding": "SubRedditDo",
-            "shard_args": [
-              "subId"
-            ]
-          }
+          "durable_target": null
         },
         {
           "name": "$list",
@@ -412,9 +401,7 @@
               ]
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -453,12 +440,7 @@
           "injected": [
             "SubRedditDo"
           ],
-          "durable_target": {
-            "binding": "SubRedditDo",
-            "shard_args": [
-              "subId"
-            ]
-          }
+          "durable_target": null
         },
         {
           "name": "$save",
@@ -494,9 +476,7 @@
               "validators": []
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -519,7 +499,8 @@
             "injected": [
               "SubRedditDo"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -543,7 +524,8 @@
             "injected": [
               "SubRedditDo"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -565,7 +547,8 @@
             "injected": [
               "SubRedditDo"
             ],
-            "is_stub": true
+            "is_stub": true,
+            "durable_target": null
           },
           "include_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\" FROM \"Post\"",
           "get_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\" FROM \"Post\" WHERE \"Post\".\"id\" = ?1",
@@ -604,10 +587,14 @@
                 ]
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "get": {
             "parameters": [
@@ -634,10 +621,14 @@
                 "instance_field": true
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "save": {
             "parameters": [
@@ -662,10 +653,14 @@
                 "validators": []
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "include_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\", \"Comment_1\".\"id\" AS \"comments.id\", \"Comment_1\".\"content\" AS \"comments.content\", \"Comment_1\".\"upvotes\" AS \"comments.upvotes\", \"Comment_1\".\"postId\" AS \"comments.postId\" FROM \"Post\" LEFT JOIN \"Comment\" AS \"Comment_1\" ON \"Post\".\"id\" = \"Comment_1\".\"postId\"",
           "get_query": "SELECT \"Post\".\"id\" AS \"id\", \"Post\".\"title\" AS \"title\", \"Post\".\"content\" AS \"content\", \"Comment_1\".\"id\" AS \"comments.id\", \"Comment_1\".\"content\" AS \"comments.content\", \"Comment_1\".\"upvotes\" AS \"comments.upvotes\", \"Comment_1\".\"postId\" AS \"comments.postId\" FROM \"Post\" LEFT JOIN \"Comment\" AS \"Comment_1\" ON \"Post\".\"id\" = \"Comment_1\".\"postId\" WHERE \"Post\".\"id\" = ?1",
@@ -763,18 +758,10 @@
             {
               "name": "subId",
               "cidl_type": "Int",
-              "validators": [
-                {
-                  "GreaterThan": {
-                    "Int": 0
-                  }
-                }
-              ]
+              "validators": []
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -808,9 +795,7 @@
             }
           ],
           "injected": [
-            "ctx",
-            "GlobalSubRedditMetadata",
-            "SubRedditDo"
+            "GlobalSubRedditMetadata"
           ],
           "durable_target": {
             "binding": "SubRedditDo",
@@ -854,9 +839,7 @@
             }
           ],
           "injected": [
-            "ctx",
-            "GlobalSubRedditMetadata",
-            "SubRedditDo"
+            "GlobalSubRedditMetadata"
           ],
           "durable_target": {
             "binding": "SubRedditDo",
@@ -872,7 +855,8 @@
           "list": {
             "parameters": [],
             "injected": [],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -892,11 +876,15 @@
               }
             ],
             "injected": [
-              "ctx",
-              "GlobalSubRedditMetadata",
-              "SubRedditDo"
+              "GlobalSubRedditMetadata"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "save": {
             "parameters": [
@@ -922,11 +910,15 @@
               }
             ],
             "injected": [
-              "ctx",
-              "GlobalSubRedditMetadata",
-              "SubRedditDo"
+              "GlobalSubRedditMetadata"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "include_query": "",
           "get_query": "",
@@ -1047,9 +1039,7 @@
               "validators": []
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -1100,9 +1090,7 @@
               ]
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -1144,9 +1132,7 @@
               "validators": []
             }
           ],
-          "injected": [
-            "ctx"
-          ],
+          "injected": [],
           "durable_target": {
             "binding": "SubRedditDo",
             "shard_args": [
@@ -1188,10 +1174,14 @@
                 ]
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "get": {
             "parameters": [
@@ -1218,10 +1208,14 @@
                 "instance_field": true
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "save": {
             "parameters": [
@@ -1246,10 +1240,14 @@
                 "validators": []
               }
             ],
-            "injected": [
-              "ctx"
-            ],
-            "is_stub": false
+            "injected": [],
+            "is_stub": false,
+            "durable_target": {
+              "binding": "SubRedditDo",
+              "shard_args": [
+                "subId"
+              ]
+            }
           },
           "include_query": "SELECT \"Comment\".\"id\" AS \"id\", \"Comment\".\"content\" AS \"content\", \"Comment\".\"upvotes\" AS \"upvotes\", \"Comment\".\"postId\" AS \"postId\" FROM \"Comment\"",
           "get_query": "SELECT \"Comment\".\"id\" AS \"id\", \"Comment\".\"content\" AS \"content\", \"Comment\".\"upvotes\" AS \"upvotes\", \"Comment\".\"postId\" AS \"postId\" FROM \"Comment\" WHERE \"Comment\".\"id\" = ?1",

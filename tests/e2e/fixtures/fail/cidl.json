@@ -291,7 +291,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "get": {
             "parameters": [
@@ -307,7 +308,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "save": {
             "parameters": [
@@ -324,7 +326,8 @@
             "injected": [
               "db"
             ],
-            "is_stub": false
+            "is_stub": false,
+            "durable_target": null
           },
           "include_query": "SELECT \"FailModel\".\"id\" AS \"id\", \"FailModel\".\"name\" AS \"name\" FROM \"FailModel\"",
           "get_query": "SELECT \"FailModel\".\"id\" AS \"id\", \"FailModel\".\"name\" AS \"name\" FROM \"FailModel\" WHERE \"FailModel\".\"id\" = ?1",

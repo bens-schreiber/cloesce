@@ -99,7 +99,6 @@ api SubReddit {
     [inject SubReddits]
     get list() -> array<SubRedditEntry>
     
-    [inject SubRedditDo(subId)]
     get feed(self, subId: string) -> array<Post>
 }
 // #endregion
@@ -127,7 +126,7 @@ api Post {
     [inject SubRedditDo(subId), AuthUser, UserDo]
     post create(subId: string, title: string, content: string) -> Post
     
-    [inject SubRedditDo(subId), AuthUser]
+    [inject AuthUser]
     post vote(self, subId: string, delta: int) -> Post
 }
 // #endregion
@@ -154,7 +153,7 @@ api Comment {
     [inject SubRedditDo(subId), AuthUser, UserDo]
     post create(subId: string, postId: int, content: string) -> Comment
     
-    [inject SubRedditDo(subId), AuthUser]
+    [inject AuthUser]
     post vote(self, subId: string, delta: int) -> Comment
 }
 // #endregion
