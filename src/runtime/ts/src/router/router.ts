@@ -485,14 +485,16 @@ async function forward(
 ): Promise<Response> {
   const target = route.method.durable_target!;
 
-  // The shard values that locate the DO are always top-level method parameters
-  // (generated CRUD methods take them explicitly), never read from a partial body.
-  const idSeed = [target.binding, ...target.shard_args.map((name) => String(params[name]))].join(
-    "/",
-  );
+  // Shard values that locate the DO are top-level method parameters: for an
+  // instantiated (`self`) method they arrive as route/path params, for a static
+  // method they arrive in the body/search params.
+  const name = [
+    target.binding,
+    ...target.shard_args.map((name) => String(route.getParamValues[name] ?? params[name])),
+  ].join("/");
 
   const namespace = env[target.binding] as DurableObjectNamespace;
-  const stub = namespace.get(namespace.idFromName(idSeed));
+  const stub = namespace.get(namespace.idFromName(name));
   const forwarded = new Request(request);
   forwarded.headers.set("cloesce-forwarded", "true");
   return await stub.fetch(forwarded);

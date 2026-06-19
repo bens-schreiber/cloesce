@@ -97,6 +97,9 @@ export class CloesceError {
 
   static displayErrors(result: CloesceResult<unknown>): string {
     function display(v: unknown): string {
+      if (v instanceof Error) {
+        return v.stack ?? `${v.name}: ${v.message}`;
+      }
       try {
         return JSON.stringify(v);
       } catch {
