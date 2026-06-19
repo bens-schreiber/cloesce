@@ -1,4 +1,4 @@
-use ariadne::{Color, Label, Report, ReportKind};
+use ariadne::{Color, Config, IndexType, Label, Report, ReportKind};
 use frontend::{FileTable, Span, Spd, Tag, err::DisplayError};
 use idl::CrudKind;
 
@@ -288,6 +288,7 @@ fn display(
     macro_rules! report {
         ($path:expr, $range:expr) => {
             Report::build(ReportKind::Error, ($path, $range))
+                .with_config(Config::new().with_index_type(IndexType::Byte))
         };
     }
 
