@@ -2,8 +2,6 @@ import { ChildProcess, execSync, spawn } from "child_process";
 import fs from "fs/promises";
 import kill from "tree-kill";
 
-// const DEBUG_PORT = 9230;
-
 /**
  * Buffers all console output per Wrangler process and flushes it on demand.
  * Allows us to capture logs without interleaving them with other test output.

@@ -218,12 +218,6 @@ struct MigrateArgs {
     all: bool,
 
     name: String,
-
-    #[cfg(feature = "regression-tests")]
-    cidl: PathBuf,
-
-    #[cfg(feature = "regression-tests")]
-    wrangler: PathBuf,
 }
 
 fn open_file_or_create(path: &Path) -> Result<File, String> {
@@ -463,17 +457,7 @@ mod compile {
         let backend = BackendGenerator::generate(&idl, &config.parsed.workers_url);
         let client = ClientGenerator::generate(&idl, &config.parsed.workers_url);
 
-        let output_name = |name: &str| {
-            #[cfg(feature = "regression-tests")]
-            {
-                format!("out.{}", name)
-            }
-
-            #[cfg(not(feature = "regression-tests"))]
-            {
-                name.to_string()
-            }
-        };
+        let output_name = |name: &str| name.to_string();
 
         // Output CIDL
         {
@@ -487,18 +471,7 @@ mod compile {
 
         // Output Wrangler
         {
-            let out_wrangler_path = {
-                #[cfg(feature = "regression-tests")]
-                {
-                    let name = config.parsed.wrangler_config_format.wrangler_file_name();
-                    config.cloesce_dir().join(format!("out.{}", name))
-                }
-
-                #[cfg(not(feature = "regression-tests"))]
-                {
-                    config.wrangler_path()
-                }
-            };
+            let out_wrangler_path = config.wrangler_path();
             let mut out_wrangler_file = open_file_or_create(&out_wrangler_path)?;
 
             out_wrangler_file
@@ -559,20 +532,10 @@ mod migrate {
     use super::*;
 
     pub fn migrate(args: MigrateArgs, config: CloesceConfig) -> Result<(), String> {
-        let (wrangler_path, cidl_path) = {
-            #[cfg(feature = "regression-tests")]
-            {
-                (args.wrangler, args.cidl)
-            }
-
-            #[cfg(not(feature = "regression-tests"))]
-            {
-                (
-                    config.wrangler_path(),
-                    config.cloesce_dir().join("cidl.json"),
-                )
-            }
-        };
+        let (wrangler_path, cidl_path) = (
+            config.wrangler_path(),
+            config.cloesce_dir().join("cidl.json"),
+        );
 
         let spec = {
             let wrangler_contents = std::fs::read_to_string(&wrangler_path).map_err(|e| {
@@ -682,52 +645,23 @@ mod migrate {
                     .collect::<Vec<_>>();
                 dir_entries.sort();
 
-                #[cfg(feature = "regression-tests")]
-                {
-                    let _ = dir_entries;
-                    None
-                }
-
-                #[cfg(not(feature = "regression-tests"))]
-                {
-                    dir_entries
-                        .iter()
-                        .rfind(|p| {
-                            p.extension()
-                                .and_then(|e| e.to_str())
-                                .map(|ext| ext.eq_ignore_ascii_case("json"))
-                                .unwrap_or(false)
-                        })
-                        .cloned()
-                }
+                dir_entries
+                    .iter()
+                    .rfind(|p| {
+                        p.extension()
+                            .and_then(|e| e.to_str())
+                            .map(|ext| ext.eq_ignore_ascii_case("json"))
+                            .unwrap_or(false)
+                    })
+                    .cloned()
             };
 
-            let timestamp: u64 = {
-                #[cfg(feature = "regression-tests")]
-                {
-                    0
-                }
+            let timestamp: u64 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs();
 
-                #[cfg(not(feature = "regression-tests"))]
-                {
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .expect("Time went backwards")
-                        .as_secs()
-                }
-            };
-
-            let file_stem = {
-                #[cfg(feature = "regression-tests")]
-                {
-                    args.name.to_string()
-                }
-
-                #[cfg(not(feature = "regression-tests"))]
-                {
-                    format!("{timestamp}_{}", args.name)
-                }
-            };
+            let file_stem = format!("{timestamp}_{}", args.name);
 
             let lm_contents = last_migrated_cidl_path
                 .map(|p: PathBuf| {

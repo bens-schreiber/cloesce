@@ -125,7 +125,7 @@ export interface CfEnv {
  *     this.app.register(MyModel);
  *   }
  *
- *   async myRpcMethod(arg: string): Promise<void> {
+ *   myRpcMethod(arg: string) {
  *     // ...
  *   }
  * }
@@ -134,7 +134,7 @@ export interface CfEnv {
  * @example Get a typed stub (always pass `<T>` or RPC methods won't be visible)
  * ```ts
  * const stub = env.{{ binding.name }}.stub<{{ binding.name }}>(...);
- * await stub.myRpcMethod("hello");
+ * stub.myRpcMethod("hello");
  * ```
  */
 export abstract class {{ binding.name }} extends DurableObject<CfEnv> {
@@ -375,7 +375,7 @@ export function upgradeEnv(env: CfEnv): Env {
 
 
 {%- for inject in &idl.injects %}
-/** Marker base class for the `{{ inject }}` injected service. Cloesce injects the registered instance into `env` at runtime. */
+/** Marker base class for the `{{ inject }}` injected service. */
 export abstract class {{ inject }} {
     readonly tag = "{{ inject }}";
 }

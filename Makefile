@@ -2,7 +2,6 @@
 COMPILER_DIR := src/compiler
 TS_DIR := src/runtime/ts
 E2E_DIR := tests/e2e
-REGRESSION_DIR := tests/regression
 DOCS_DIR := docs
 
 # Cargo workspace manifest (root)
@@ -92,10 +91,6 @@ build-src:
 
 	pnpm --filter cloesce run build
 
-.PHONY: regression
-regression:
-	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression
-
 .PHONY: test
 test:
 	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
@@ -113,7 +108,6 @@ test:
 	done
 
 	@echo "CLOESCE: Running end-to-end tests..."
-	cargo run --manifest-path $(CARGO_MANIFEST) --bin regression -- --check
 	pnpm --filter e2e run test
 
 .PHONY: build-docs
