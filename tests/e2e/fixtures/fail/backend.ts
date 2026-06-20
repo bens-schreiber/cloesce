@@ -2,33 +2,144 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, CloesceResult, CloesceError, SqlStatement, applyDurableMigrations, DurableMigration } from "cloesce";
 import { DurableObject } from "cloudflare:workers";
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
     db: D1Database;
 }
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
     return env as Env;
 }
+/**
+ * Generated surface for the `FailModel` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const FailModel = clo.FailModel.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await FailModel.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace FailModel {
+    /** @internal */
     export const Tag = "FailModel" as const;
+    /** @internal */
     export const Meta = cidl.models.FailModel as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         name: string;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         throwingMethod(
             self: FailModel.Self,
@@ -49,22 +160,39 @@ export namespace FailModel {
             regexField: string,
         ): ApiResult<void>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "FailModel"."id" AS "id", "FailModel"."name" AS "name" FROM "FailModel" WHERE "FailModel"."id" > ?1 ORDER BY "FailModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load a single `FailModel`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -76,6 +204,11 @@ export namespace FailModel {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `FailModel` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -84,6 +217,11 @@ export namespace FailModel {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `FailModel` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -97,48 +235,129 @@ export namespace FailModel {
         };
     }
 
+    /**
+     * Register your implementation of `FailModel`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const FailModel = clo.FailModel.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await FailModel.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("FailModel", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `FailModel.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `FailModel` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<FailModel.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `FailModel` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `FailModel` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for `UnregisteredService` (no persisted data, pure API).
+ *
+ * Implement via {@link impl}. Do **not** use this namespace directly in handlers, but instead the implementation you define via {@link impl}.
+ *
+ * @example
+ * ```ts
+ * export const UnregisteredService = clo.UnregisteredService.impl({
+ *   // implement each method declared in your schema
+ * });
+ * ```
+ */
 export namespace UnregisteredService {
+    /** @internal */
     export const Tag = "UnregisteredService" as const;
 
+    /** Methods to implement for `UnregisteredService`. Each returns an {@link ApiResult}. */
     export interface Api {
         unregistered(
         ): ApiResult<string>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /**
+     * Register your implementation. Use `this` to call sibling methods.
+     *
+     * @param implObj - Object implementing each {@link Api} method.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     */
     export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
         return _impl("UnregisteredService", {}, implObj);
     }
 }
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -148,6 +367,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -159,6 +379,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "http://localhost:5409/api", upgradeEnv(env));

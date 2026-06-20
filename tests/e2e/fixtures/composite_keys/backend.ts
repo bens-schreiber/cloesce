@@ -2,52 +2,180 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, CloesceResult, CloesceError, SqlStatement, applyDurableMigrations, DurableMigration } from "cloesce";
 import { DurableObject } from "cloudflare:workers";
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
     db: D1Database;
 }
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
     return env as Env;
 }
+/**
+ * Generated surface for the `Course` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Course = clo.Course.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Course.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Course {
+    /** @internal */
     export const Tag = "Course" as const;
+    /** @internal */
     export const Meta = cidl.models.Course as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         title: string;
         studentCourses: StudentCourse.Self[];
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"studentCourses":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Course"."id" AS "id", "Course"."title" AS "title", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Course" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Course"."id" = "StudentCourse_1"."courseId" WHERE "Course"."id" > ?1 ORDER BY "Course"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load a single `Course`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -59,6 +187,11 @@ export namespace Course {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Course` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -67,6 +200,11 @@ export namespace Course {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Course` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -80,38 +218,115 @@ export namespace Course {
         };
     }
 
+    /**
+     * Register your implementation of `Course`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Course = clo.Course.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Course.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Course", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Course.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `Course` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Course.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `Course` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `Course` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `Student` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Student = clo.Student.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Student.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Student {
+    /** @internal */
     export const Tag = "Student" as const;
+    /** @internal */
     export const Meta = cidl.models.Student as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         name: string;
@@ -119,25 +334,43 @@ export namespace Student {
         studentCourses: StudentCourse.Self[];
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
         CoursesOrderedDescending: CoursesOrderedDescending.Impl;
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `CoursesOrderedDescending` data source. Provides `get`, `list`, and `save` operations. */
         export const CoursesOrderedDescending = {
+            /** The include tree this data source hydrates. */
             tree: {"studentCourses":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number, name: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastId: number, lastName: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastId, lastName, limit);
             },
+            /**
+             * Load a single `Student`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number, name: string): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id, name);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -149,6 +382,11 @@ export namespace Student {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `Student` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -160,16 +398,26 @@ export namespace Student {
                 return HttpResult.ok(200, res.value);
             },
         };
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"studentCourses":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number, name: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") = (?1, ?2)`).bind(id, name);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, lastSeen_name: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Student"."id" AS "id", "Student"."name" AS "name", "Student"."favoriteColor" AS "favoriteColor", "StudentCourse_1"."studentId" AS "studentCourses.studentId", "StudentCourse_1"."studentName" AS "studentCourses.studentName", "StudentCourse_1"."courseId" AS "studentCourses.courseId" FROM "Student" LEFT JOIN "StudentCourse" AS "StudentCourse_1" ON "Student"."id" = "StudentCourse_1"."studentId" AND "Student"."name" = "StudentCourse_1"."studentName" WHERE ("Student"."id", "Student"."name") > (?1, ?2) ORDER BY "Student"."id" ASC, "Student"."name" ASC LIMIT ?3`).bind(lastSeen_id, lastSeen_name, limit);
             },
+            /**
+             * Load a single `Student`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number, name: string): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id, name);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -181,6 +429,11 @@ export namespace Student {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Student` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, lastSeen_name: string, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, lastSeen_name, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -189,6 +442,11 @@ export namespace Student {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Student` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -201,48 +459,149 @@ export namespace Student {
             },
         };
     }
+    /** The `CoursesOrderedDescending` data source with custom CRUD you must implement via {@link CoursesOrderedDescending.impl}. */
     export namespace CoursesOrderedDescending {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             list(env: { db: Env["db"] }, lastId: number, lastName: string, limit: number): ApiResult<Self[]>;
         }
+        /** The full `CoursesOrderedDescending` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.CoursesOrderedDescending & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const CoursesOrderedDescending = clo.Student.CoursesOrderedDescending.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const Student = clo.Student.impl({
+         *   CoursesOrderedDescending,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.CoursesOrderedDescending & I>): typeof GeneratedSource.CoursesOrderedDescending & I {
             return _implDs(GeneratedSource.CoursesOrderedDescending, implObj);
         }
     }
 
+    /**
+     * Register your implementation of `Student`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Student = clo.Student.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Student.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Student", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Student.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `Student` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Student.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `Student` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `Student` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `StudentCourse` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const StudentCourse = clo.StudentCourse.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await StudentCourse.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace StudentCourse {
+    /** @internal */
     export const Tag = "StudentCourse" as const;
+    /** @internal */
     export const Meta = cidl.models.StudentCourse as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         studentId: number;
         studentName: string;
@@ -251,24 +610,42 @@ export namespace StudentCourse {
         course: Course.Self;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId" FROM "StudentCourse" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
             },
+            /**
+             * Load a single `StudentCourse`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, studentId, studentName, courseId);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -280,6 +657,11 @@ export namespace StudentCourse {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `StudentCourse` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -288,6 +670,11 @@ export namespace StudentCourse {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `StudentCourse` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -299,16 +686,26 @@ export namespace StudentCourse {
                 return HttpResult.ok(200, res.value);
             },
         };
+        /** The `WithStudentCourse` data source. Provides `get`, `list`, and `save` operations. */
         export const WithStudentCourse = {
+            /** The include tree this data source hydrates. */
             tree: {"course":{"studentCourses":{}},"student":{"studentCourses":{}}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, studentId: number, studentName: string, courseId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") = (?1, ?2, ?3)`).bind(studentId, studentName, courseId);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "StudentCourse"."studentId" AS "studentId", "StudentCourse"."studentName" AS "studentName", "StudentCourse"."courseId" AS "courseId", "Student_1"."id" AS "student.id", "Student_1"."name" AS "student.name", "Student_1"."favoriteColor" AS "student.favoriteColor", "StudentCourse_2"."studentId" AS "student.studentCourses.studentId", "StudentCourse_2"."studentName" AS "student.studentCourses.studentName", "StudentCourse_2"."courseId" AS "student.studentCourses.courseId", "Course_3"."id" AS "course.id", "Course_3"."title" AS "course.title", "StudentCourse_4"."studentId" AS "course.studentCourses.studentId", "StudentCourse_4"."studentName" AS "course.studentCourses.studentName", "StudentCourse_4"."courseId" AS "course.studentCourses.courseId" FROM "StudentCourse" LEFT JOIN "Student" AS "Student_1" ON "StudentCourse"."studentId" = "Student_1"."id" AND "StudentCourse"."studentName" = "Student_1"."name" LEFT JOIN "StudentCourse" AS "StudentCourse_2" ON "Student_1"."id" = "StudentCourse_2"."studentId" AND "Student_1"."name" = "StudentCourse_2"."studentName" LEFT JOIN "Course" AS "Course_3" ON "StudentCourse"."courseId" = "Course_3"."id" LEFT JOIN "StudentCourse" AS "StudentCourse_4" ON "Course_3"."id" = "StudentCourse_4"."courseId" WHERE ("StudentCourse"."studentId", "StudentCourse"."studentName", "StudentCourse"."courseId") > (?1, ?2, ?3) ORDER BY "StudentCourse"."studentId" ASC, "StudentCourse"."studentName" ASC, "StudentCourse"."courseId" ASC LIMIT ?4`).bind(lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
             },
+            /**
+             * Load a single `StudentCourse`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, studentId: number, studentName: string, courseId: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, studentId, studentName, courseId);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -320,6 +717,11 @@ export namespace StudentCourse {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `StudentCourse` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_studentId: number, lastSeen_studentName: string, lastSeen_courseId: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_studentId, lastSeen_studentName, lastSeen_courseId, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -328,6 +730,11 @@ export namespace StudentCourse {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `StudentCourse` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -341,35 +748,95 @@ export namespace StudentCourse {
         };
     }
 
+    /**
+     * Register your implementation of `StudentCourse`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const StudentCourse = clo.StudentCourse.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await StudentCourse.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default; WithStudentCourse: typeof GeneratedSource.WithStudentCourse } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default; WithStudentCourse: typeof GeneratedSource.WithStudentCourse } & Impl {
         return _impl("StudentCourse", { Orm, Default: GeneratedSource.Default, WithStudentCourse: GeneratedSource.WithStudentCourse }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `StudentCourse.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `StudentCourse` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<StudentCourse.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `StudentCourse` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `StudentCourse` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -379,6 +846,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -390,6 +858,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "http://localhost:5139/api", upgradeEnv(env));

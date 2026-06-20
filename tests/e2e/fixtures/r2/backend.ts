@@ -2,56 +2,177 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, CloesceResult, CloesceError, SqlStatement, applyDurableMigrations, DurableMigration } from "cloesce";
 import { DurableObject } from "cloudflare:workers";
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
     db: D1Database;
     bucket1: R2Bucket;
 }
+/** @internal */
 function bucket1Helpers(bucket: R2Bucket) {
     return {
+        /** Typed helpers for `data` on `env.bucket1`. */
         data: {
+            /** Build the interpolated R2 object key. */
             template: (id: number): string =>
                 `path/to/data/${id}`,
+            /** Fetch the R2 object at the templated key. Returns `null` if absent. */
             get: (id: number): Promise<R2ObjectBody | null> =>
                 bucket.get(`path/to/data/${id}`),
+            /** Upload a value at the templated key. */
             put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
                 bucket.put(`path/to/data/${id}`, value),
+            /** List all objects under this pattern's prefix. */
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
                 bucket.list({ ...options, prefix: `path/to/data/` }),
         },
+        /** Typed helpers for `otherData` on `env.bucket1`. */
         otherData: {
+            /** Build the interpolated R2 object key. */
             template: (id: number): string =>
                 `path/to/other/${id}`,
+            /** Fetch the R2 object at the templated key. Returns `null` if absent. */
             get: (id: number): Promise<R2ObjectBody | null> =>
                 bucket.get(`path/to/other/${id}`),
+            /** Upload a value at the templated key. */
             put: (id: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
                 bucket.put(`path/to/other/${id}`, value),
+            /** List all objects under this pattern's prefix. */
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
                 bucket.list({ ...options, prefix: `path/to/other/` }),
         },
     };
 }
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
     export type bucket1 = CfEnv["bucket1"] & ReturnType<typeof bucket1Helpers>;
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
     bucket1: Env.bucket1;
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
     Object.assign(env.bucket1, bucket1Helpers(env.bucket1));
     return env as Env;
 }
+/**
+ * Generated surface for the `D1BackedModel` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const D1BackedModel = clo.D1BackedModel.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await D1BackedModel.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace D1BackedModel {
+    /** @internal */
     export const Tag = "D1BackedModel" as const;
+    /** @internal */
     export const Meta = cidl.models.D1BackedModel as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         someColumn: number;
@@ -60,38 +181,56 @@ export namespace D1BackedModel {
         someOtherData: R2ObjectBody;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         uploadData(
             self: D1BackedModel.Self,
             env: {
                 bucket1: Env["bucket1"],
             },
-            data: CfReadableStream,
+            data: ReadableStream,
         ): ApiResult<void>;
         uploadOtherData(
             self: D1BackedModel.Self,
             env: {
                 bucket1: Env["bucket1"],
             },
-            data: CfReadableStream,
+            data: ReadableStream,
         ): ApiResult<void>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"someData":{},"someOtherData":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "D1BackedModel"."id" AS "id", "D1BackedModel"."someColumn" AS "someColumn", "D1BackedModel"."someOtherColumn" AS "someOtherColumn" FROM "D1BackedModel" WHERE "D1BackedModel"."id" > ?1 ORDER BY "D1BackedModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load a single `D1BackedModel`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { bucket1: Env["bucket1"], db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -103,6 +242,11 @@ export namespace D1BackedModel {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `D1BackedModel` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { bucket1: Env["bucket1"], db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -111,6 +255,11 @@ export namespace D1BackedModel {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `D1BackedModel` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { bucket1: Env["bucket1"], db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -124,61 +273,153 @@ export namespace D1BackedModel {
         };
     }
 
+    /**
+     * Register your implementation of `D1BackedModel`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const D1BackedModel = clo.D1BackedModel.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await D1BackedModel.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("D1BackedModel", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `D1BackedModel.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `D1BackedModel` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<D1BackedModel.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `D1BackedModel` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `D1BackedModel` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { bucket1: CfEnv["bucket1"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `R2Only` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const R2Only = clo.R2Only.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await R2Only.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace R2Only {
+    /** @internal */
     export const Tag = "R2Only" as const;
+    /** @internal */
     export const Meta = cidl.models.R2Only as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         sibling: R2Sibling.Self;
         someData: R2ObjectBody;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         uploadData(
             self: R2Only.Self,
             env: {
                 bucket1: Env["bucket1"],
             },
-            data: CfReadableStream,
+            data: ReadableStream,
         ): ApiResult<void>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"sibling":{"siblingData":{}},"someData":{}},
+            /**
+             * Load a single `R2Only`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { bucket1: Env["bucket1"] }, id: number): Promise<HttpResult<Self | null>> {
                 const base = { id } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
@@ -187,6 +428,11 @@ export namespace R2Only {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `R2Only` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { bucket1: Env["bucket1"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -200,51 +446,128 @@ export namespace R2Only {
         };
     }
 
+    /**
+     * Register your implementation of `R2Only`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const R2Only = clo.R2Only.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await R2Only.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("R2Only", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `R2Only.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `R2Only` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { bucket1: CfEnv["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
+        /**
+         * Load a single `R2Only` by its route key.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(env: { bucket1: CfEnv["bucket1"] }, args: { id: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { id: args.id,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `R2Only` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { bucket1: CfEnv["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `R2Sibling` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const R2Sibling = clo.R2Sibling.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await R2Sibling.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace R2Sibling {
+    /** @internal */
     export const Tag = "R2Sibling" as const;
+    /** @internal */
     export const Meta = cidl.models.R2Sibling as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         siblingId: number;
         siblingData: R2ObjectBody;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         uploadData(
             self: R2Sibling.Self,
             env: {
                 bucket1: Env["bucket1"],
             },
-            data: CfReadableStream,
+            data: ReadableStream,
         ): ApiResult<void>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"siblingData":{}},
+            /**
+             * Load a single `R2Sibling`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { bucket1: Env["bucket1"] }, siblingId: number): Promise<HttpResult<Self | null>> {
                 const base = { siblingId } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
@@ -253,6 +576,11 @@ export namespace R2Sibling {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `R2Sibling` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { bucket1: Env["bucket1"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -266,26 +594,71 @@ export namespace R2Sibling {
         };
     }
 
+    /**
+     * Register your implementation of `R2Sibling`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const R2Sibling = clo.R2Sibling.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await R2Sibling.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("R2Sibling", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `R2Sibling.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `R2Sibling` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { bucket1: CfEnv["bucket1"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
+        /**
+         * Load a single `R2Sibling` by its route key.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(env: { bucket1: CfEnv["bucket1"] }, args: { siblingId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { siblingId: args.siblingId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `R2Sibling` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { bucket1: CfEnv["bucket1"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -295,6 +668,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -306,6 +680,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "http://localhost:5538/api", upgradeEnv(env));

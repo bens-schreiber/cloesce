@@ -1,5 +1,4 @@
 import * as clo from "@cloesce/backend.js";
-import { CfReadableStream } from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
 import { auth, AuthUser } from "./auth.js";
 import { SubRedditDo, UserDo } from "./durable.js";
@@ -17,7 +16,7 @@ export const User = clo.User.impl({
     return { token, user };
   },
 
-  async uploadAvatar(self, env, image: CfReadableStream) {
+  async uploadAvatar(self, env, image) {
     await env.Avatars.avatar.put(self.username, image);
   },
 

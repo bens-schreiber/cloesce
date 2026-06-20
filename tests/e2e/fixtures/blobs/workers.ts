@@ -17,7 +17,7 @@ const BlobService = clo.BlobService.impl({
 
 const BlobHaver = clo.BlobHaver.impl({
   // Returns a stream of its own blob1 column
-  yieldStream(self: clo.BlobHaver.Self): HttpResult<clo.CfReadableStream> {
+  yieldStream(self: clo.BlobHaver.Self): HttpResult<ReadableStream> {
     const blob1 = self.blob1;
     return HttpResult.ok(
       200,
@@ -35,7 +35,7 @@ const BlobHaver = clo.BlobHaver.impl({
   },
 
   // Accepts some stream and validates that it sent [1, 2, 3, 4, 5]
-  async inputStream(stream: clo.CfReadableStream) {
+  async inputStream(stream) {
     if (!(stream instanceof ReadableStream)) {
       throw new Error("Did not receive a stream");
     }

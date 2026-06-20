@@ -2,51 +2,179 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, CloesceResult, CloesceError, SqlStatement, applyDurableMigrations, DurableMigration } from "cloesce";
 import { DurableObject } from "cloudflare:workers";
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
     db: D1Database;
 }
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
     return env as Env;
 }
+/**
+ * Generated surface for the `DefaultOverride` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const DefaultOverride = clo.DefaultOverride.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await DefaultOverride.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace DefaultOverride {
+    /** @internal */
     export const Tag = "DefaultOverride" as const;
+    /** @internal */
     export const Meta = cidl.models.DefaultOverride as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
         Default: Default.Impl;
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }): D1PreparedStatement {
                 return env.db.prepare(`SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride" WHERE "DefaultOverride"."id" = ?1`).bind();
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }): D1PreparedStatement {
                 return env.db.prepare(`SELECT "DefaultOverride"."id" AS "id" FROM "DefaultOverride" WHERE "DefaultOverride"."id" > ?1 ORDER BY "DefaultOverride"."id" ASC LIMIT ?2`).bind();
             },
+            /**
+             * Insert or update a `DefaultOverride` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -59,55 +187,157 @@ export namespace DefaultOverride {
             },
         };
     }
+    /** The `Default` data source with custom CRUD you must implement via {@link Default.impl}. */
     export namespace Default {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             get(env: { db: Env["db"] }): ApiResult<Self>;
             list(env: { db: Env["db"] }): ApiResult<Self[]>;
         }
+        /** The full `Default` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.Default & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const Default = clo.DefaultOverride.Default.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const DefaultOverride = clo.DefaultOverride.impl({
+         *   Default,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.Default & I>): typeof GeneratedSource.Default & I {
             return _implDs(GeneratedSource.Default, implObj);
         }
     }
 
+    /**
+     * Register your implementation of `DefaultOverride`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const DefaultOverride = clo.DefaultOverride.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await DefaultOverride.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm } & Impl>): { tag: string; Orm: typeof Orm } & Impl {
         return _impl("DefaultOverride", { Orm }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `DefaultOverride.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `DefaultOverride` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<DefaultOverride.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `DefaultOverride` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `DefaultOverride` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `Hamburger` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Hamburger = clo.Hamburger.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Hamburger.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Hamburger {
+    /** @internal */
     export const Tag = "Hamburger" as const;
+    /** @internal */
     export const Meta = cidl.models.Hamburger as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         name: string;
         toppings: HamburgerTopping.Self[];
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         noLettuceToppings(
             self: Hamburger.Self,
@@ -116,25 +346,42 @@ export namespace Hamburger {
             self: Hamburger.Self,
         ): ApiResult<Topping.Self[]>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
         BurgersWithLettuceOrdered: BurgersWithLettuceOrdered.Impl;
         NoLettuce: NoLettuce.Impl;
         OnlyBacon: OnlyBacon.Impl;
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `BurgersWithLettuceOrdered` data source. Provides `get`, `list`, and `save` operations. */
         export const BurgersWithLettuceOrdered = {
+            /** The include tree this data source hydrates. */
             tree: {"toppings":{"topping":{}}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastId, limit);
             },
+            /**
+             * Load a single `Hamburger`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -146,6 +393,11 @@ export namespace Hamburger {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `Hamburger` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -157,16 +409,26 @@ export namespace Hamburger {
                 return HttpResult.ok(200, res.value);
             },
         };
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"toppings":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load a single `Hamburger`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -178,6 +440,11 @@ export namespace Hamburger {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Hamburger` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -186,6 +453,11 @@ export namespace Hamburger {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Hamburger` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -197,16 +469,26 @@ export namespace Hamburger {
                 return HttpResult.ok(200, res.value);
             },
         };
+        /** The `NoLettuce` data source. Provides `get`, `list`, and `save` operations. */
         export const NoLettuce = {
+            /** The include tree this data source hydrates. */
             tree: {"toppings":{"topping":{}}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load all matching `Hamburger` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -215,6 +497,11 @@ export namespace Hamburger {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Hamburger` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -226,16 +513,26 @@ export namespace Hamburger {
                 return HttpResult.ok(200, res.value);
             },
         };
+        /** The `OnlyBacon` data source. Provides `get`, `list`, and `save` operations. */
         export const OnlyBacon = {
+            /** The include tree this data source hydrates. */
             tree: {"toppings":{"topping":{}}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "toppings.hamburgerId", "HamburgerTopping_1"."toppingId" AS "toppings.toppingId", "Topping_2"."id" AS "toppings.topping.id", "Topping_2"."name" AS "toppings.topping.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Hamburger"."id" = "HamburgerTopping_1"."hamburgerId" LEFT JOIN "Topping" AS "Topping_2" ON "HamburgerTopping_1"."toppingId" = "Topping_2"."id" WHERE "Hamburger"."id" > ?1 ORDER BY "Hamburger"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load all matching `Hamburger` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -244,6 +541,11 @@ export namespace Hamburger {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Hamburger` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -256,90 +558,257 @@ export namespace Hamburger {
             },
         };
     }
+    /** The `BurgersWithLettuceOrdered` data source with custom CRUD you must implement via {@link BurgersWithLettuceOrdered.impl}. */
     export namespace BurgersWithLettuceOrdered {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             list(env: { db: Env["db"] }, lastId: number, limit: number): ApiResult<Self[]>;
         }
+        /** The full `BurgersWithLettuceOrdered` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.BurgersWithLettuceOrdered & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const BurgersWithLettuceOrdered = clo.Hamburger.BurgersWithLettuceOrdered.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const Hamburger = clo.Hamburger.impl({
+         *   BurgersWithLettuceOrdered,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.BurgersWithLettuceOrdered & I>): typeof GeneratedSource.BurgersWithLettuceOrdered & I {
             return _implDs(GeneratedSource.BurgersWithLettuceOrdered, implObj);
         }
     }
+    /** The `NoLettuce` data source with custom CRUD you must implement via {@link NoLettuce.impl}. */
     export namespace NoLettuce {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             get(env: { db: Env["db"] }, id: number): ApiResult<Self>;
         }
+        /** The full `NoLettuce` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.NoLettuce & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const NoLettuce = clo.Hamburger.NoLettuce.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const Hamburger = clo.Hamburger.impl({
+         *   NoLettuce,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.NoLettuce & I>): typeof GeneratedSource.NoLettuce & I {
             return _implDs(GeneratedSource.NoLettuce, implObj);
         }
     }
+    /** The `OnlyBacon` data source with custom CRUD you must implement via {@link OnlyBacon.impl}. */
     export namespace OnlyBacon {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             get(env: { db: Env["db"] }, id: number): ApiResult<Self>;
         }
+        /** The full `OnlyBacon` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.OnlyBacon & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const Hamburger = clo.Hamburger.impl({
+         *   OnlyBacon,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.OnlyBacon & I>): typeof GeneratedSource.OnlyBacon & I {
             return _implDs(GeneratedSource.OnlyBacon, implObj);
         }
     }
 
+    /**
+     * Register your implementation of `Hamburger`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Hamburger = clo.Hamburger.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Hamburger.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Hamburger", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Hamburger.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `Hamburger` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Hamburger.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `Hamburger` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `Hamburger` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `Topping` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Topping = clo.Topping.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Topping.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Topping {
+    /** @internal */
     export const Tag = "Topping" as const;
+    /** @internal */
     export const Meta = cidl.models.Topping as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         name: string;
         hamburgers: HamburgerTopping.Self[];
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"hamburgers":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" = ?1`).bind(id);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "Topping"."id" AS "id", "Topping"."name" AS "name", "HamburgerTopping_1"."hamburgerId" AS "hamburgers.hamburgerId", "HamburgerTopping_1"."toppingId" AS "hamburgers.toppingId" FROM "Topping" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_1" ON "Topping"."id" = "HamburgerTopping_1"."toppingId" WHERE "Topping"."id" > ?1 ORDER BY "Topping"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
+            /**
+             * Load a single `Topping`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, id);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -351,6 +820,11 @@ export namespace Topping {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Topping` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_id, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -359,6 +833,11 @@ export namespace Topping {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Topping` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -372,38 +851,115 @@ export namespace Topping {
         };
     }
 
+    /**
+     * Register your implementation of `Topping`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Topping = clo.Topping.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Topping.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Topping", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Topping.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `Topping` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Topping.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `Topping` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `Topping` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `HamburgerTopping` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const HamburgerTopping = clo.HamburgerTopping.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await HamburgerTopping.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace HamburgerTopping {
+    /** @internal */
     export const Tag = "HamburgerTopping" as const;
+    /** @internal */
     export const Meta = cidl.models.HamburgerTopping as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         hamburgerId: number;
         toppingId: number;
@@ -411,24 +967,42 @@ export namespace HamburgerTopping {
         topping: Topping.Self;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"hamburger":{"toppings":{}},"topping":{"hamburgers":{}}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId"`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { db: CfEnv["db"] }, hamburgerId: number, toppingId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") = (?1, ?2)`).bind(hamburgerId, toppingId);
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { db: CfEnv["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HamburgerTopping"."hamburgerId" AS "hamburgerId", "HamburgerTopping"."toppingId" AS "toppingId", "Hamburger_1"."id" AS "hamburger.id", "Hamburger_1"."name" AS "hamburger.name", "HamburgerTopping_2"."hamburgerId" AS "hamburger.toppings.hamburgerId", "HamburgerTopping_2"."toppingId" AS "hamburger.toppings.toppingId", "Topping_3"."id" AS "topping.id", "Topping_3"."name" AS "topping.name", "HamburgerTopping_4"."hamburgerId" AS "topping.hamburgers.hamburgerId", "HamburgerTopping_4"."toppingId" AS "topping.hamburgers.toppingId" FROM "HamburgerTopping" LEFT JOIN "Hamburger" AS "Hamburger_1" ON "HamburgerTopping"."hamburgerId" = "Hamburger_1"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger_1"."id" = "HamburgerTopping_2"."hamburgerId" LEFT JOIN "Topping" AS "Topping_3" ON "HamburgerTopping"."toppingId" = "Topping_3"."id" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_4" ON "Topping_3"."id" = "HamburgerTopping_4"."toppingId" WHERE ("HamburgerTopping"."hamburgerId", "HamburgerTopping"."toppingId") > (?1, ?2) ORDER BY "HamburgerTopping"."hamburgerId" ASC, "HamburgerTopping"."toppingId" ASC LIMIT ?3`).bind(lastSeen_hamburgerId, lastSeen_toppingId, limit);
             },
+            /**
+             * Load a single `HamburgerTopping`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { db: Env["db"] }, hamburgerId: number, toppingId: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(env, hamburgerId, toppingId);
                 const res = await CloesceOrm.fromEnv(env).get<Self>(Meta, stmt, this.tree);
@@ -440,6 +1014,11 @@ export namespace HamburgerTopping {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `HamburgerTopping` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { db: Env["db"] }, lastSeen_hamburgerId: number, lastSeen_toppingId: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(env, lastSeen_hamburgerId, lastSeen_toppingId, limit);
                 const res = await CloesceOrm.fromEnv(env).list<Self>(Meta, stmt, this.tree);
@@ -448,6 +1027,11 @@ export namespace HamburgerTopping {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `HamburgerTopping` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { db: Env["db"] }, model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -461,35 +1045,95 @@ export namespace HamburgerTopping {
         };
     }
 
+    /**
+     * Register your implementation of `HamburgerTopping`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const HamburgerTopping = clo.HamburgerTopping.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await HamburgerTopping.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("HamburgerTopping", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `HamburgerTopping.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
+        /**
+         * Insert or update `HamburgerTopping` and its included relations.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HamburgerTopping.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `HamburgerTopping` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 
+        /**
+         * Hydrate a partial `HamburgerTopping` into a full row, loading the included relations.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
 }
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -499,6 +1143,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -510,6 +1155,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "http://localhost:5403/api", upgradeEnv(env));

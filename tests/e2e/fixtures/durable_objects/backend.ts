@@ -2,32 +2,145 @@
 import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPartial, CloesceResult, CloesceError, SqlStatement, applyDurableMigrations, DurableMigration } from "cloesce";
 import { DurableObject } from "cloudflare:workers";
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
     GlobalSubRedditMetadata: KVNamespace;
     GlobalDo: DurableObjectNamespace;
     SubRedditDo: DurableObjectNamespace;
 }
+/**
+ * Base class for the `GlobalDo` Durable Object.
+ *
+ * Extend this to add your constructor, RPC methods, and storage logic.
+ *
+ * @example
+ * ```ts
+ * export class GlobalDo extends clo.GlobalDo {
+ *   private app: CloesceApp;
+ *
+ *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+ *     super(ctx, env);
+ *     this.app = this.cloesce(env, [myMigration]);
+ *     this.app.register(MyModel);
+ *   }
+ *
+ *   async myRpcMethod(arg: string): Promise<void> {
+ *     // ...
+ *   }
+ * }
+ * ```
+ *
+ * @example Get a typed stub (always pass `<T>` or RPC methods won't be visible)
+ * ```ts
+ * const stub = env.GlobalDo.stub<GlobalDo>(...);
+ * await stub.myRpcMethod("hello");
+ * ```
+ */
 export abstract class GlobalDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
 
+    /**
+     * Typed accessor for the `metadata` key on this DO's transactional storage.
+     *
+     * Provides `template(...)`, `get(...)`, `put(..., value)`, and `list()`.
+     *
+     * @example Inside an RPC method on your DO subclass
+     * ```ts
+     * async myRpcMethod(key: string, value: string): Promise<void> {
+     *   this.metadata.put(key, value);
+     *   const current = this.metadata.get(key);
+     * }
+     * ```
+     */
     readonly metadata = {
+        /** Build the interpolated storage key string. */
         template: (): string =>
             `metadata`,
+        /** Read the value at the templated key. Returns `null` or `undefined` if absent. */
         get: (): unknown | null | undefined =>
             this.state.storage.kv.get(this.metadata.template()),
+        /** Write a value at the templated key. */
         put: ( value: unknown) =>
             this.state.storage.kv.put(this.metadata.template(), value),
+        /** List all entries under this key's prefix. */
         list: () =>
             this.state.storage.kv.list({ prefix: `metadata` }),
     };
 
+    /**
+     * Build the Cloesce app for this Durable Object.
+     *
+     * Call in your constructor. Migrations are applied once via `blockConcurrencyWhile`.
+     *
+     * @param env - The raw Cloudflare Workers environment.
+     * @param migrations - DO SQLite migrations to apply on first construction.
+     * @returns A {@link CloesceApp} ready to register models and handle requests.
+     *
+     * @example
+     * ```ts
+     * export class GlobalDo extends clo.GlobalDo {
+     *   private app: CloesceApp;
+     *
+     *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+     *     super(ctx, env);
+     *     this.app = this.cloesce(env, [myMigration]);
+     *     this.app.register(MyModel);
+     *   }
+     * }
+     * ```
+     */
     protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
         if (migrations.length > 0) {
             this.state.blockConcurrencyWhile(() => applyDurableMigrations(this.state.storage, migrations));
@@ -36,22 +149,89 @@ export abstract class GlobalDo extends DurableObject<CfEnv> {
         return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env), this);
     }
 }
+/**
+ * Base class for the `SubRedditDo` Durable Object.
+ *
+ * Extend this to add your constructor, RPC methods, and storage logic.
+ *
+ * @example
+ * ```ts
+ * export class SubRedditDo extends clo.SubRedditDo {
+ *   private app: CloesceApp;
+ *
+ *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+ *     super(ctx, env);
+ *     this.app = this.cloesce(env, [myMigration]);
+ *     this.app.register(MyModel);
+ *   }
+ *
+ *   async myRpcMethod(arg: string): Promise<void> {
+ *     // ...
+ *   }
+ * }
+ * ```
+ *
+ * @example Get a typed stub (always pass `<T>` or RPC methods won't be visible)
+ * ```ts
+ * const stub = env.SubRedditDo.stub<SubRedditDo>(...);
+ * await stub.myRpcMethod("hello");
+ * ```
+ */
 export abstract class SubRedditDo extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
     }
 
+    /**
+     * Typed accessor for the `metadata` key on this DO's transactional storage.
+     *
+     * Provides `template(...)`, `get(...)`, `put(..., value)`, and `list()`.
+     *
+     * @example Inside an RPC method on your DO subclass
+     * ```ts
+     * async myRpcMethod(key: string, value: string): Promise<void> {
+     *   this.metadata.put(key, value);
+     *   const current = this.metadata.get(key);
+     * }
+     * ```
+     */
     readonly metadata = {
+        /** Build the interpolated storage key string. */
         template: (): string =>
             `metadata`,
+        /** Read the value at the templated key. Returns `null` or `undefined` if absent. */
         get: (): unknown | null | undefined =>
             this.state.storage.kv.get(this.metadata.template()),
+        /** Write a value at the templated key. */
         put: ( value: unknown) =>
             this.state.storage.kv.put(this.metadata.template(), value),
+        /** List all entries under this key's prefix. */
         list: () =>
             this.state.storage.kv.list({ prefix: `metadata` }),
     };
 
+    /**
+     * Build the Cloesce app for this Durable Object.
+     *
+     * Call in your constructor. Migrations are applied once via `blockConcurrencyWhile`.
+     *
+     * @param env - The raw Cloudflare Workers environment.
+     * @param migrations - DO SQLite migrations to apply on first construction.
+     * @returns A {@link CloesceApp} ready to register models and handle requests.
+     *
+     * @example
+     * ```ts
+     * export class SubRedditDo extends clo.SubRedditDo {
+     *   private app: CloesceApp;
+     *
+     *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+     *     super(ctx, env);
+     *     this.app = this.cloesce(env, [myMigration]);
+     *     this.app.register(MyModel);
+     *   }
+     * }
+     * ```
+     */
     protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
         if (migrations.length > 0) {
             this.state.blockConcurrencyWhile(() => applyDurableMigrations(this.state.storage, migrations));
@@ -60,67 +240,182 @@ export abstract class SubRedditDo extends DurableObject<CfEnv> {
         return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env), this);
     }
 }
+/** @internal */
 function GlobalSubRedditMetadataHelpers(namespace: KVNamespace) {
     return {
+        /** Typed helpers for `metadata` on `env.GlobalSubRedditMetadata`. */
         metadata: {
+            /** Build the interpolated KV key string. */
             template: (subId: number): string =>
                 `metadata/${subId}`,
+            /** Read the value at the templated key. Returns `null` if absent. */
             get: (subId: number): Promise<unknown | null> =>
                 namespace.get(`metadata/${subId}`) as any,
+            /** Write a value at the templated key. */
             put: (subId: number, value: unknown): Promise<void> =>
                 namespace.put(`metadata/${subId}`, value as any),
+            /** List all keys under this pattern's prefix. */
             list: (options?: { limit?: number, cursor?: string }) =>
                 namespace.list({ ...options, prefix: `metadata/` }),
         },
     };
 }
+/** @internal */
 function GlobalDoHelpers(namespace: DurableObjectNamespace) {
     return {
+        /** Build the deterministic name string for a `GlobalDo` shard. */
         template: (): string =>
             `GlobalDo`,
+        /** Resolve the {@link DurableObjectId} for this shard. */
         id: (): DurableObjectId =>
             namespace.idFromName(`GlobalDo`),
+        /**
+         * Get a typed stub for the `GlobalDo` shard.
+         *
+         * **Always pass your implementation class as `<T>`** or RPC methods won't be callable.
+         *
+         * @example
+         * ```ts
+         * export const MyModel = clo.MyModel.impl({
+         *   async callDo(self, env) {
+         *     // ✅ correct: pass your implementation class as <T>
+         *     const stub = env.GlobalDo.stub<GlobalDo>(self.id);
+         *     return await stub.myRpcMethod();
+         *
+         *     // ❌ wrong: without <T>, myRpcMethod is not on the stub type
+         *     // env.GlobalDo.stub(self.id).myRpcMethod();
+         *   },
+         * });
+         * ```
+         */
         stub: <T extends GlobalDo = GlobalDo>(): DurableObjectStub & T =>
             namespace.get(namespace.idFromName(`GlobalDo`)) as DurableObjectStub & T,
     };
 }
+/** @internal */
 function SubRedditDoHelpers(namespace: DurableObjectNamespace) {
     return {
+        /** Build the deterministic name string for a `SubRedditDo` shard. */
         template: (id: number): string =>
             `SubRedditDo/${id}`,
+        /** Resolve the {@link DurableObjectId} for this shard. */
         id: (id: number): DurableObjectId =>
             namespace.idFromName(`SubRedditDo/${id}`),
+        /**
+         * Get a typed stub for the `SubRedditDo` shard.
+         *
+         * **Always pass your implementation class as `<T>`** or RPC methods won't be callable.
+         *
+         * @example
+         * ```ts
+         * export const MyModel = clo.MyModel.impl({
+         *   async callDo(self, env) {
+         *     // ✅ correct: pass your implementation class as <T>
+         *     const stub = env.SubRedditDo.stub<SubRedditDo>(self.id);
+         *     return await stub.myRpcMethod();
+         *
+         *     // ❌ wrong: without <T>, myRpcMethod is not on the stub type
+         *     // env.SubRedditDo.stub(self.id).myRpcMethod();
+         *   },
+         * });
+         * ```
+         */
         stub: <T extends SubRedditDo = SubRedditDo>(id: number): DurableObjectStub & T =>
             namespace.get(namespace.idFromName(`SubRedditDo/${id}`)) as DurableObjectStub & T,
     };
 }
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
     export type GlobalSubRedditMetadata = CfEnv["GlobalSubRedditMetadata"] & ReturnType<typeof GlobalSubRedditMetadataHelpers>;
     export type GlobalDo = CfEnv["GlobalDo"] & ReturnType<typeof GlobalDoHelpers>;
     export type SubRedditDo = CfEnv["SubRedditDo"] & ReturnType<typeof SubRedditDoHelpers>;
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
     GlobalSubRedditMetadata: Env.GlobalSubRedditMetadata;
     GlobalDo: Env.GlobalDo;
     SubRedditDo: Env.SubRedditDo;
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
     Object.assign(env.GlobalSubRedditMetadata, GlobalSubRedditMetadataHelpers(env.GlobalSubRedditMetadata));
     Object.assign(env.GlobalDo, GlobalDoHelpers(env.GlobalDo));
     Object.assign(env.SubRedditDo, SubRedditDoHelpers(env.SubRedditDo));
     return env as Env;
 }
+/**
+ * Generated surface for the `Global` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Global = clo.Global.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Global.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Global {
+    /** @internal */
     export const Tag = "Global" as const;
+    /** @internal */
     export const Meta = cidl.models.Global as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         metadata: unknown;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         newGlobal(
         ): ApiResult<Global.Self>;
@@ -131,14 +426,28 @@ export namespace Global {
             },
         ): ApiResult<unknown>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"metadata":{}},
+            /**
+             * Load a single `Global`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { ctx: GlobalDo }): Promise<HttpResult<Self | null>> {
                 const base = {  } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
@@ -147,6 +456,11 @@ export namespace Global {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `Global` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { ctx: GlobalDo }, model: DeepPartial<Global.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
@@ -160,31 +474,93 @@ export namespace Global {
         };
     }
 
+    /**
+     * Register your implementation of `Global`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Global = clo.Global.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Global.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Global", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Global.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
 
+        /**
+         * Insert or update `Global` inside its backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(ctx: GlobalDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Load a single `Global` by its route key from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(ctx: GlobalDo, args: { include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = {  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `Global` into a full row from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(ctx: GlobalDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `Post` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Post = clo.Post.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Post.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Post {
+    /** @internal */
     export const Tag = "Post" as const;
+    /** @internal */
     export const Meta = cidl.models.Post as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         title: string;
@@ -193,36 +569,59 @@ export namespace Post {
         comments: Comment.Self[];
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
         Custom: Custom.Impl;
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Custom` data source. Provides `get`, `list`, and `save` operations. */
         export const Custom = {
+            /** The include tree this data source hydrates. */
             tree: {},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post"`,
 
+            /** Build the `SqlStatement` for this data source's `get` against DO SQLite storage. */
             getQuery(subId: number): SqlStatement {
                 return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post" WHERE "Post"."id" = ?1`, values: [subId] };
             },
+            /** Build the `SqlStatement` for this data source's `list` against DO SQLite storage. */
             listQuery(): SqlStatement {
                 return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content" FROM "Post" WHERE "Post"."id" > ?1 ORDER BY "Post"."id" ASC LIMIT ?2`, values: [] };
             },
         };
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"comments":{}},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId"`,
 
+            /** Build the `SqlStatement` for this data source's `get` against DO SQLite storage. */
             getQuery(id: number): SqlStatement {
                 return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId" WHERE "Post"."id" = ?1`, values: [id] };
             },
+            /** Build the `SqlStatement` for this data source's `list` against DO SQLite storage. */
             listQuery(lastSeen_id: number, limit: number): SqlStatement {
                 return { query: `SELECT "Post"."id" AS "id", "Post"."title" AS "title", "Post"."content" AS "content", "Comment_1"."id" AS "comments.id", "Comment_1"."content" AS "comments.content", "Comment_1"."upvotes" AS "comments.upvotes", "Comment_1"."postId" AS "comments.postId" FROM "Post" LEFT JOIN "Comment" AS "Comment_1" ON "Post"."id" = "Comment_1"."postId" WHERE "Post"."id" > ?1 ORDER BY "Post"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
             },
+            /**
+             * Load a single `Post`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { ctx: SubRedditDo }, subId: number, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(id);
                 const seed = { subId,  } as DeepPartial<Self>;
@@ -235,6 +634,11 @@ export namespace Post {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Post` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { ctx: SubRedditDo }, subId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(lastSeen_id, limit);
                 const seed = { subId,  } as DeepPartial<Self>;
@@ -244,6 +648,11 @@ export namespace Post {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Post` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { ctx: SubRedditDo }, subId: number, model: DeepPartial<Post.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
@@ -256,49 +665,136 @@ export namespace Post {
             },
         };
     }
+    /** The `Custom` data source with custom CRUD you must implement via {@link Custom.impl}. */
     export namespace Custom {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
             get(env: { SubRedditDo: Env["SubRedditDo"] }, id: number, subId: number): ApiResult<Self>;
             list(env: { SubRedditDo: Env["SubRedditDo"] }, subId: number): ApiResult<Self[]>;
             save(env: { SubRedditDo: Env["SubRedditDo"] }, post: DeepPartial<Post.Self>, subId: number): ApiResult<Self>;
         }
+        /** The full `Custom` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.Custom & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const Custom = clo.Post.Custom.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const Post = clo.Post.impl({
+         *   Custom,
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.Custom & I>): typeof GeneratedSource.Custom & I {
             return _implDs(GeneratedSource.Custom, implObj);
         }
     }
 
+    /**
+     * Register your implementation of `Post`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Post = clo.Post.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Post.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Post", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Post.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
 
+        /**
+         * Insert or update `Post` inside its backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Load a single `Post` by its route key from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { subId: args.subId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `Post` into a full row from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `SubReddit` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const SubReddit = clo.SubReddit.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await SubReddit.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace SubReddit {
+    /** @internal */
     export const Tag = "SubReddit" as const;
+    /** @internal */
     export const Meta = cidl.models.SubReddit as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         subId: number;
         metadata: unknown;
         globalMetadata: KValue<unknown>;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
         newSubReddit(
         ): ApiResult<SubReddit.Self>;
@@ -310,14 +806,28 @@ export namespace SubReddit {
             subId: number,
         ): ApiResult<Post.Self[]>;
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {"globalMetadata":{},"metadata":{}},
+            /**
+             * Load a single `SubReddit`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"] }, subId: number): Promise<HttpResult<Self | null>> {
                 const base = { subId } as DeepPartial<Self>;
                 const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, this.tree);
@@ -326,6 +836,11 @@ export namespace SubReddit {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Insert or update a `SubReddit` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { ctx: SubRedditDo, GlobalSubRedditMetadata: Env["GlobalSubRedditMetadata"] }, subId: number, model: DeepPartial<SubReddit.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
@@ -339,31 +854,93 @@ export namespace SubReddit {
         };
     }
 
+    /**
+     * Register your implementation of `SubReddit`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const SubReddit = clo.SubReddit.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await SubReddit.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("SubReddit", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `SubReddit.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
 
+        /**
+         * Insert or update `SubReddit` inside its backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Load a single `SubReddit` by its route key from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { subId: args.subId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `SubReddit` into a full row from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }
+/**
+ * Generated surface for the `Comment` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const Comment = clo.Comment.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await Comment.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace Comment {
+    /** @internal */
     export const Tag = "Comment" as const;
+    /** @internal */
     export const Meta = cidl.models.Comment as any;
 
+    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
     export interface Self {
         id: number;
         content: string;
@@ -372,24 +949,42 @@ export namespace Comment {
         subId: number;
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
+        /** The `Default` data source. Provides `get`, `list`, and `save` operations. */
         export const Default = {
+            /** The include tree this data source hydrates. */
             tree: {},
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment"`,
 
+            /** Build the `SqlStatement` for this data source's `get` against DO SQLite storage. */
             getQuery(id: number): SqlStatement {
                 return { query: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment" WHERE "Comment"."id" = ?1`, values: [id] };
             },
+            /** Build the `SqlStatement` for this data source's `list` against DO SQLite storage. */
             listQuery(lastSeen_id: number, limit: number): SqlStatement {
                 return { query: `SELECT "Comment"."id" AS "id", "Comment"."content" AS "content", "Comment"."upvotes" AS "upvotes", "Comment"."postId" AS "postId" FROM "Comment" WHERE "Comment"."id" > ?1 ORDER BY "Comment"."id" ASC LIMIT ?2`, values: [lastSeen_id, limit] };
             },
+            /**
+             * Load a single `Comment`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(env: { ctx: SubRedditDo }, subId: number, id: number): Promise<HttpResult<Self | null>> {
                 const stmt = this.getQuery(id);
                 const seed = { subId,  } as DeepPartial<Self>;
@@ -402,6 +997,11 @@ export namespace Comment {
                 }
                 return HttpResult.ok(200, res.value);
             },
+            /**
+             * Load all matching `Comment` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(env: { ctx: SubRedditDo }, subId: number, lastSeen_id: number, limit: number): Promise<HttpResult<Self[]>> {
                 const stmt = this.listQuery(lastSeen_id, limit);
                 const seed = { subId,  } as DeepPartial<Self>;
@@ -411,6 +1011,11 @@ export namespace Comment {
                 }
                 return HttpResult.ok(200, res.value!);
             },
+            /**
+             * Insert or update a `Comment` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(env: { ctx: SubRedditDo }, subId: number, model: DeepPartial<Comment.Self>): Promise<HttpResult<Self | null>> {
                 const res = await CloesceOrm.fromEnv(env).upsert<Self>(Meta, { ...model, subId } as DeepPartial<Self>, this.tree);
                 if (res.errors.length > 0) {
@@ -424,28 +1029,73 @@ export namespace Comment {
         };
     }
 
+    /**
+     * Register your implementation of `Comment`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const Comment = clo.Comment.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await Comment.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl>): { tag: string; Orm: typeof Orm; Default: typeof GeneratedSource.Default } & Impl {
         return _impl("Comment", { Orm, Default: GeneratedSource.Default }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `Comment.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
 
+        /**
+         * Insert or update `Comment` inside its backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(ctx: SubRedditDo, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Load a single `Comment` by its route key from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(ctx: SubRedditDo, args: { subId: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { subId: args.subId,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `Comment` into a full row from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(ctx: SubRedditDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, base, include);
         }
     }
 }
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -455,6 +1105,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -466,6 +1117,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "http://localhost:5843/api", upgradeEnv(env));
