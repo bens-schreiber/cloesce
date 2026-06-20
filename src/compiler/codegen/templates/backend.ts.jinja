@@ -293,12 +293,15 @@ function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
 /** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
 {%- for b in &idl.wrangler_env.kv_bindings %}
+    /** Upgraded `{{ b.name }}` KV binding with typed `<field>.get/put/list` helpers. Raw `KVNamespace` methods remain available. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
+    /** Upgraded `{{ b.name }}` R2 binding with typed `<field>.get/put/list` helpers. Raw `R2Bucket` methods remain available. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
+    /** Upgraded `{{ b.name }}` Durable Object binding with `stub<T>(...)`, `id(...)`, and `template(...)` helpers. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 }
@@ -375,7 +378,22 @@ export function upgradeEnv(env: CfEnv): Env {
 
 
 {%- for inject in &idl.injects %}
-/** Marker base class for the `{{ inject }}` injected service. */
+/**
+ * Marker base class for the `{{ inject }}` injected service.
+ *
+ * Extend this class with your implementation, then register it on the app so Cloesce
+ * injects it into `env` at runtime for any API method that declares `[inject {{ inject }}]`.
+ *
+ * @example
+ * ```ts
+ * class My{{ inject }} extends clo.{{ inject }} {
+ *   doSomething() { /* ... *\/ }
+ * }
+ *
+ * const app = clo.cloesce(env);
+ * app.inject(new My{{ inject }}());
+ * ```
+ */
 export abstract class {{ inject }} {
     readonly tag = "{{ inject }}";
 }
@@ -451,7 +469,11 @@ export namespace {{ model.name }} {
     /** @internal */
     export const Meta = cidl.models.{{ model.name }} as any;
 
-    /** Hydrated row type. Passed as `self` to instance methods and returned by data-source reads. */
+    /**
+     * A hydrated object representing `{{ model.name }}`.
+     *
+     * Passed as `self` to instance API methods, and returned by data source `get` / `list` / `save` operations.
+     */
     export interface Self {
 {%- for col in &model.primary_columns %}
         {{ col.field.name }}: {{ map_type(&col.field.cidl_type) }};

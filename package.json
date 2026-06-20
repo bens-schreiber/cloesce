@@ -2,8 +2,8 @@
   "name": "root",
   "private": true,
   "scripts": {
-    "lint": "oxlint src/runtime/ts tests/",
-    "lint:fix": "oxlint --fix src/runtime/ts tests/",
+    "lint": "oxlint src/runtime/ts tests/ examples/",
+    "lint:fix": "oxlint --fix src/runtime/ts tests/ examples/",
     "fmt": "oxfmt src/runtime/ts tests/ examples/ docs/ proposals/ CHANGELOG.md",
     "fmt:check": "oxfmt --check src/runtime/ts tests/ examples/"
   },

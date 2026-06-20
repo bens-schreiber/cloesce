@@ -96,7 +96,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
         if idl.injects.contains(&name) {
             name.to_string()
         } else {
-            format!("Env[\"{name}\"]")
+            format!("Env.{name}")
         }
     }
 

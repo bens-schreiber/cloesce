@@ -17,13 +17,7 @@ export class AuthUser extends clo.AuthUser {
   }
 }
 
-// TODO: Reintroduce Cloesce middleware so impls don't have to opt in by hand.
-export function auth<T>(
-  env: { AuthUser: clo.AuthUser },
-  fn: (username: string) => Promise<T>,
-): Promise<T | HttpResult<never>> {
+export function auth(env: { AuthUser: clo.AuthUser }): string | HttpResult<never> {
   const { username } = env.AuthUser as AuthUser;
-  return username === null
-    ? Promise.resolve(HttpResult.fail(401, "You must be logged in."))
-    : fn(username);
+  return username === null ? HttpResult.fail(401, "You must be logged in.") : username;
 }

@@ -1,6 +1,6 @@
 import * as clo from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
-import { auth, AuthUser } from "./auth.js";
+import { AuthUser, auth } from "./auth.js";
 import { SubRedditDo, UserDo } from "./durable.js";
 
 export const User = clo.User.impl({
@@ -25,17 +25,19 @@ export const User = clo.User.impl({
 });
 
 export const SubReddit = clo.SubReddit.impl({
-  create: (env, meta) =>
-    auth(env, async (username) => {
-      const subId = crypto.randomUUID();
-      await env.SubRedditDo.stub<SubRedditDo>(subId).setMetadata(meta);
-      await env.UserDo.stub<UserDo>(username).appendActivity({ subReddits: [subId] });
+  async create(env, meta) {
+    const username = auth(env);
+    if (username instanceof HttpResult) return username;
 
-      const entry: clo.SubRedditEntry = { subId, name: meta.name };
-      await env.SubReddits.put(env.SubReddits.entry.template(subId), JSON.stringify(entry));
+    const subId = crypto.randomUUID();
+    await env.SubRedditDo.stub<SubRedditDo>(subId).setMetadata(meta);
+    await env.UserDo.stub<UserDo>(username).appendActivity({ subReddits: [subId] });
 
-      return { subId, metadata: meta } as clo.SubReddit.Self;
-    }),
+    const entry = { subId, name: meta.name };
+    await env.SubReddits.put(env.SubReddits.entry.template(subId), JSON.stringify(entry));
+
+    return { subId, metadata: meta };
+  },
 
   async list(env) {
     const { keys } = await env.SubReddits.entry.list();
@@ -44,53 +46,66 @@ export const SubReddit = clo.SubReddit.impl({
     )) as clo.SubRedditEntry[];
   },
 
-  feed: async (_self, env, subId) =>
-    (await clo.Post.GeneratedSource.Default.list(env, subId, 0, 100)).data ?? [],
+  async feed(self, env, subId) {
+    const res = (await Post.Default.list(env, subId, 0, 100)).data ?? [];
+    return res;
+  },
 });
 
 export const Post = clo.Post.impl({
-  create: (env, subId, title, content) =>
-    auth(env, async (username) => {
-      const saved = await clo.Post.Orm.save(env.ctx, {
-        subId,
-        author: username,
-        title,
-        content,
-        upvotes: 0,
-      });
-      await env.UserDo.stub<UserDo>(username).appendActivity({ posts: [saved.value!.id] });
-      return saved.value!;
-    }),
+  async create(env, subId, title, content) {
+    const username = auth(env);
+    if (username instanceof HttpResult) return username;
 
-  vote: (self, env, subId, delta) =>
-    auth(env, async () => {
-      const clampDelta = delta >= 0 ? 1 : -1;
-      const res = await clo.Post.Orm.save(env.ctx, { ...self, upvotes: self.upvotes + clampDelta });
-      return res.value!;
-    }),
+    const saved = await this.Default.save(env, subId, {
+      author: username,
+      title,
+      content,
+      upvotes: 0,
+    });
+
+    await env.UserDo.stub<UserDo>(username).appendActivity({ posts: [saved.data!.id] });
+    return saved.data!;
+  },
+
+  async vote(self, env, subId, delta) {
+    const username = auth(env);
+    if (username instanceof HttpResult) return username;
+
+    const clampDelta = delta >= 0 ? 1 : -1;
+    const res = await this.Default.save(env, subId, {
+      ...self,
+      upvotes: self.upvotes + clampDelta,
+    });
+    return res.data!;
+  },
 });
 
 export const Comment = clo.Comment.impl({
-  create: (env, subId, postId, content) =>
-    auth(env, async (username) => {
-      const saved = await clo.Comment.Orm.save(env.ctx, {
-        subId,
-        postId,
-        author: username,
-        content,
-        upvotes: 0,
-      });
-      await env.UserDo.stub<UserDo>(username).appendActivity({ comments: [saved.value!.id] });
-      return saved.value!;
-    }),
+  async create(env, subId, postId, content) {
+    const username = auth(env);
+    if (username instanceof HttpResult) return username;
 
-  vote: (self, env, subId, delta) =>
-    auth(env, async () => {
-      const clampDelta = delta >= 0 ? 1 : -1;
-      const res = await clo.Comment.Orm.save(env.ctx, {
-        ...self,
-        upvotes: self.upvotes + clampDelta,
-      });
-      return res.value!;
-    }),
+    const saved = await this.Default.save(env, subId, {
+      subId,
+      postId,
+      author: username,
+      content,
+      upvotes: 0,
+    });
+    await env.UserDo.stub<UserDo>(username).appendActivity({ comments: [saved.data!.id] });
+    return saved.data!;
+  },
+
+  async vote(self, env, subId, delta) {
+    const username = auth(env);
+    if (username instanceof HttpResult) return username;
+
+    const clampDelta = delta >= 0 ? 1 : -1;
+    const res = await this.Default.save(env, subId, {
+      ...self,
+      upvotes: self.upvotes + clampDelta,
+    });
+    return res.data!;
+  },
 });
