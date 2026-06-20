@@ -74,7 +74,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 format!("DeepPartial<{}>", self.namespace(idl, object_name))
             }
             CidlType::Stream => match self.kind {
-                TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),
+                TypeScriptMapperKind::BackendTypes => "ReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
             CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, idl)),
@@ -96,7 +96,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
         if idl.injects.contains(&name) {
             name.to_string()
         } else {
-            format!("Env[\"{name}\"]")
+            format!("Env.{name}")
         }
     }
 

@@ -20,7 +20,3 @@ tracing-subscriber = { workspace = true }
 [[bin]]
 name = "cloesce"
 path = "bin/cloesce.rs"
-
-
-[features]
-regression-tests = []

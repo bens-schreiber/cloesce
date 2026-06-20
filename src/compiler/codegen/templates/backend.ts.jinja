@@ -39,11 +39,57 @@ import { DurableObject } from "cloudflare:workers";
         ): ApiResult<{{ map_type(&api.return_type) }}>;
 {%- endmacro %}
 
-export type CfReadableStream = ReadableStream;
+/** @internal */
 export type MaybePromise<T> = T | Promise<T>;
+/** @internal */
 export type MaybeHttpResult<T> = T | HttpResult<T>;
+
+/**
+ * Return type for all API method implementations.
+ *
+ * Accepts a raw `T`, an {@link HttpResult}<T>, or a `Promise` of either.
+ * Only mark your method `async` if it actually awaits something.
+ *
+ * To signal an error, either `throw` or return a non-200 {@link HttpResult}. Build results with
+ * the `HttpResult.ok(status, data?)` / `HttpResult.fail(status, message?)` statics, imported from
+ * the `cloesce` runtime package (the generated namespaces come from `@cloesce/backend.js`):
+ *
+ * ```ts
+ * import * as clo from "@cloesce/backend.js";
+ * import { HttpResult } from "cloesce";
+ * ```
+ *
+ * @example
+ * ```ts
+ * export const User = clo.User.impl({
+ *   // Synchronous: return a raw value
+ *   displayName(self) {
+ *     return `@${self.username}`;
+ *   },
+ *
+ *   // Async: return an HttpResult
+ *   async rename(self, env, name) {
+ *     const saved = await User.Default.save(env, { ...self, name });
+ *     return HttpResult.ok(200, saved.data!);
+ *   },
+ *
+ *   // Error: throw or return a non-200 HttpResult
+ *   delete(self, env) {
+ *     if (!allowed) return HttpResult.fail(403, "Forbidden");
+ *     // ...
+ *   },
+ * });
+ * ```
+ */
 export type ApiResult<T> = MaybePromise<MaybeHttpResult<T>>;
 
+/**
+ * Raw Cloudflare Workers environment with one property per `wrangler.toml` binding.
+ *
+ * Does **not** include Cloesce helpers. Prefer {@link Env} in your handlers.
+ *
+ * @see {@link Env}
+ */
 export interface CfEnv {
 {%- for binding in &idl.wrangler_env.d1_bindings %}
     {{ binding }}: D1Database;
@@ -63,6 +109,34 @@ export interface CfEnv {
 }
 
 {%- for binding in &idl.wrangler_env.durable_bindings %}
+/**
+ * Base class for the `{{ binding.name }}` Durable Object.
+ *
+ * Extend this to add your constructor, RPC methods, and storage logic.
+ *
+ * @example
+ * ```ts
+ * export class {{ binding.name }} extends clo.{{ binding.name }} {
+ *   private app: CloesceApp;
+ *
+ *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+ *     super(ctx, env);
+ *     this.app = this.cloesce(env, [myMigration]);
+ *     this.app.register(MyModel);
+ *   }
+ *
+ *   myRpcMethod(arg: string) {
+ *     // ...
+ *   }
+ * }
+ * ```
+ *
+ * @example Get a typed stub (always pass `<T>` or RPC methods won't be visible)
+ * ```ts
+ * const stub = env.{{ binding.name }}.stub<{{ binding.name }}>(...);
+ * stub.myRpcMethod("hello");
+ * ```
+ */
 export abstract class {{ binding.name }} extends DurableObject<CfEnv> {
     constructor(public state: DurableObjectState, env: CfEnv) {
         super(state, env);
@@ -70,18 +144,57 @@ export abstract class {{ binding.name }} extends DurableObject<CfEnv> {
 
 {%- for template in &binding.templates %}
 
+    /**
+     * Typed accessor for the `{{ template.field.name }}` key on this DO's transactional storage.
+     *
+     * Provides `template(...)`, `get(...)`, `put(..., value)`, and `list()`.
+     *
+     * @example Inside an RPC method on your DO subclass
+     * ```ts
+     * async myRpcMethod(key: string, value: string): Promise<void> {
+     *   this.{{ template.field.name }}.put(key, value);
+     *   const current = this.{{ template.field.name }}.get(key);
+     * }
+     * ```
+     */
     readonly {{ template.field.name }} = {
+        /** Build the interpolated storage key string. */
         template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
             {{ interpolate_key_format(template.key_format, &template.params) }},
+        /** Read the value at the templated key. Returns `null` or `undefined` if absent. */
         get: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}, {% endfor %}): {{ map_type(&template.field.cidl_type) }} | null | undefined =>
             this.state.storage.kv.get(this.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %})),
+        /** Write a value at the templated key. */
         put: ({% for param in &template.params %} {{ param.name }}: {{ map_type(&param.cidl_type) }},{% endfor %} value: {{ map_type(&template.field.cidl_type) }}) =>
             this.state.storage.kv.put(this.{{ template.field.name }}.template({% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %}), value),
+        /** List all entries under this key's prefix. */
         list: () =>
             this.state.storage.kv.list({ prefix: {{ key_prefix(template.prefix) }} }),
     };
 {%- endfor %}
 
+    /**
+     * Build the Cloesce app for this Durable Object.
+     *
+     * Call in your constructor. Migrations are applied once via `blockConcurrencyWhile`.
+     *
+     * @param env - The raw Cloudflare Workers environment.
+     * @param migrations - DO SQLite migrations to apply on first construction.
+     * @returns A {@link CloesceApp} ready to register models and handle requests.
+     *
+     * @example
+     * ```ts
+     * export class {{ binding.name }} extends clo.{{ binding.name }} {
+     *   private app: CloesceApp;
+     *
+     *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
+     *     super(ctx, env);
+     *     this.app = this.cloesce(env, [myMigration]);
+     *     this.app.register(MyModel);
+     *   }
+     * }
+     * ```
+     */
     protected cloesce(env: CfEnv, migrations: DurableMigration[] = []): CloesceApp {
         if (migrations.length > 0) {
             this.state.blockConcurrencyWhile(() => applyDurableMigrations(this.state.storage, migrations));
@@ -93,17 +206,23 @@ export abstract class {{ binding.name }} extends DurableObject<CfEnv> {
 {%- endfor %}
 
 {%- for binding in &idl.wrangler_env.kv_bindings %}
+/** @internal */
 function {{ binding.name }}Helpers(namespace: KVNamespace) {
     return {
 {%- for template in &binding.templates %}
+        /** Typed helpers for `{{ template.field.name }}` on `env.{{ binding.name }}`. */
         {{ template.field.name }}: {
+            /** Build the interpolated KV key string. */
             template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
                 {{ interpolate_key_format(template.key_format, &template.params) }},
 {%- if template.field.cidl_type.is_kv_object() %}
+            /** Read the value at the templated key. Returns `null` if absent. */
             get: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): Promise<{{ map_type(&template.field.cidl_type.unwrap_kv()) }} | null> =>
                 namespace.get({{ interpolate_key_format(template.key_format, &template.params) }}) as any,
+            /** Write a value at the templated key. */
             put: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}, {% endfor %}value: {{ map_type(&template.field.cidl_type.unwrap_kv()) }}): Promise<void> =>
                 namespace.put({{ interpolate_key_format(template.key_format, &template.params) }}, value as any),
+            /** List all keys under this pattern's prefix. */
             list: (options?: { limit?: number, cursor?: string }) =>
                 namespace.list({ ...options, prefix: {{ key_prefix(template.prefix) }} }),
 {%- endif %}
@@ -113,16 +232,22 @@ function {{ binding.name }}Helpers(namespace: KVNamespace) {
 }
 {%- endfor %}
 {%- for binding in &idl.wrangler_env.r2_bindings %}
+/** @internal */
 function {{ binding.name }}Helpers(bucket: R2Bucket) {
     return {
 {%- for template in &binding.templates %}
+        /** Typed helpers for `{{ template.field.name }}` on `env.{{ binding.name }}`. */
         {{ template.field.name }}: {
+            /** Build the interpolated R2 object key. */
             template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
                 {{ interpolate_key_format(template.key_format, &template.params) }},
+            /** Fetch the R2 object at the templated key. Returns `null` if absent. */
             get: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): Promise<R2ObjectBody | null> =>
                 bucket.get({{ interpolate_key_format(template.key_format, &template.params) }}),
+            /** Upload a value at the templated key. */
             put: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}, {% endfor %}value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
                 bucket.put({{ interpolate_key_format(template.key_format, &template.params) }}, value),
+            /** List all objects under this pattern's prefix. */
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
                 bucket.list({ ...options, prefix: {{ key_prefix(template.prefix) }} }),
         },
@@ -131,30 +256,93 @@ function {{ binding.name }}Helpers(bucket: R2Bucket) {
 }
 {%- endfor %}
 {%- for binding in &idl.wrangler_env.durable_bindings %}
+/** @internal */
 function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
     return {
+        /** Build the deterministic name string for a `{{ binding.name }}` shard. */
         template: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
             {{ shard_template(binding) }},
+        /** Resolve the {@link DurableObjectId} for this shard. */
         id: ({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): DurableObjectId =>
             namespace.idFromName({{ shard_template(binding) }}),
+        /**
+         * Get a typed stub for the `{{ binding.name }}` shard.
+         *
+         * **Always pass your implementation class as `<T>`** or RPC methods won't be callable.
+         *
+         * @example
+         * ```ts
+         * export const MyModel = clo.MyModel.impl({
+         *   async callDo(self, env) {
+         *     // ✅ correct: pass your implementation class as <T>
+         *     const stub = env.{{ binding.name }}.stub<{{ binding.name }}>(self.id);
+         *     return await stub.myRpcMethod();
+         *
+         *     // ❌ wrong: without <T>, myRpcMethod is not on the stub type
+         *     // env.{{ binding.name }}.stub(self.id).myRpcMethod();
+         *   },
+         * });
+         * ```
+         */
         stub: <T extends {{ binding.name }} = {{ binding.name }}>({% for field in &binding.shard_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): DurableObjectStub & T =>
             namespace.get(namespace.idFromName({{ shard_template(binding) }})) as DurableObjectStub & T,
     };
 }
 {%- endfor %}
 
+/** @internal Per-binding upgraded types. Use the top-level {@link Env} type instead. */
 export namespace Env {
 {%- for b in &idl.wrangler_env.kv_bindings %}
+    /** Upgraded `{{ b.name }}` KV binding with typed `<field>.get/put/list` helpers. Raw `KVNamespace` methods remain available. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
+    /** Upgraded `{{ b.name }}` R2 binding with typed `<field>.get/put/list` helpers. Raw `R2Bucket` methods remain available. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
+    /** Upgraded `{{ b.name }}` Durable Object binding with `stub<T>(...)`, `id(...)`, and `template(...)` helpers. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
 }
 
+/**
+ * Cloesce-upgraded environment. This is the `env` you receive in API implementations.
+ *
+ * Extends {@link CfEnv} with typed helpers on each binding:
+ * - **KV / R2**: `env.MyKv.<field>.get/put/list` (raw Cloudflare API still available)
+ * - **Durable Object**: `env.MyDo.stub<MyDoImpl>(...)` / `template` / `id`
+ *
+ * @remarks
+ * The injected `env` is guaranteed to contain everything declared in your schema.
+ * A missing binding throws a 500 at runtime. When inside a DO data source `get`,
+ * `env` also contains a `ctx` property with the Durable Object context.
+ *
+ * @example KV field helpers (`<binding>.<field>.get/put/list`)
+ * ```ts
+ * // For a KV field declared on a binding `Sessions`:
+ * const token = "abc";
+ * await env.Sessions.session.put(token, username);   // typed value
+ * const username = await env.Sessions.session.get(token);
+ * const { keys } = await env.Sessions.session.list();
+ *
+ * // The raw Cloudflare KV API is still available on the same binding:
+ * await env.Sessions.delete(env.Sessions.session.template(token));
+ * ```
+ *
+ * @example R2 field helpers
+ * ```ts
+ * // For an R2 field `avatar` declared on a binding `Avatars`:
+ * await env.Avatars.avatar.put(userId, bytes);
+ * const obj = await env.Avatars.avatar.get(userId); // R2ObjectBody | null
+ * ```
+ *
+ * @example Durable Object stub (always pass `<T>`)
+ * ```ts
+ * const stub = env.CounterDo.stub<CounterDo>(tenant);
+ * await stub.increment();
+ * ```
+ */
 export type Env = CfEnv & {
 {%- for b in &idl.wrangler_env.kv_bindings %}
     {{ b.name }}: Env.{{ b.name }};
@@ -167,6 +355,14 @@ export type Env = CfEnv & {
 {%- endfor %}
 };
 
+/**
+ * Upgrade a raw {@link CfEnv} into a Cloesce {@link Env}.
+ *
+ * Called automatically by the generated entrypoint. Only needed for custom `fetch` handlers.
+ *
+ * @param env - The raw Cloudflare Workers environment to upgrade.
+ * @returns The same object, mutated in place with Cloesce helpers attached.
+ */
 export function upgradeEnv(env: CfEnv): Env {
 {%- for b in &idl.wrangler_env.kv_bindings %}
     Object.assign(env.{{ b.name }}, {{ b.name }}Helpers(env.{{ b.name }}));
@@ -182,12 +378,29 @@ export function upgradeEnv(env: CfEnv): Env {
 
 
 {%- for inject in &idl.injects %}
+/**
+ * Marker base class for the `{{ inject }}` injected service.
+ *
+ * Extend this class with your implementation, then register it on the app so Cloesce
+ * injects it into `env` at runtime for any API method that declares `[inject {{ inject }}]`.
+ *
+ * @example
+ * ```ts
+ * class My{{ inject }} extends clo.{{ inject }} {
+ *   doSomething() { /* ... *\/ }
+ * }
+ *
+ * const app = clo.cloesce(env);
+ * app.inject(new My{{ inject }}());
+ * ```
+ */
 export abstract class {{ inject }} {
     readonly tag = "{{ inject }}";
 }
 {%- endfor %}
 
 {%- for (_key, poo) in &idl.poos %}
+/** Serializable plain object. No database backing. */
 export interface {{ poo.name }} {
 {%- for field in &poo.fields %}
     {{ field.name }}: {{ map_type(&field.cidl_type) }};
@@ -197,9 +410,23 @@ export interface {{ poo.name }} {
 
 {%- for (_key, model) in &idl.models %}
 {%- if !model.has_data() %}
+/**
+ * Generated surface for `{{ model.name }}` (no persisted data, pure API).
+ *
+ * Implement via {@link impl}. Do **not** use this namespace directly in handlers, but instead the implementation you define via {@link impl}.
+ *
+ * @example
+ * ```ts
+ * export const {{ model.name }} = clo.{{ model.name }}.impl({
+ *   // implement each method declared in your schema
+ * });
+ * ```
+ */
 export namespace {{ model.name }} {
+    /** @internal */
     export const Tag = "{{ model.name }}" as const;
 
+    /** Methods to implement for `{{ model.name }}`. Each returns an {@link ApiResult}. */
     export interface Api {
 {%- for api in &model.apis -%}
 {%- if !is_generated_method(api.name) -%}
@@ -207,17 +434,46 @@ export namespace {{ model.name }} {
 {%- endif -%}
 {%- endfor %}
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /**
+     * Register your implementation. Use `this` to call sibling methods.
+     *
+     * @param implObj - Object implementing each {@link Api} method.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     */
     export function impl<Impl extends Api>(implObj: Impl): Impl & { tag: typeof Tag } {
         return _impl("{{ model.name }}", {}, implObj);
     }
 }
 {%- else %}
+/**
+ * Generated surface for the `{{ model.name }}` model.
+ *
+ * Implement via {@link impl}. Access data through data sources, not this namespace directly.
+ *
+ * @example
+ * ```ts
+ * export const {{ model.name }} = clo.{{ model.name }}.impl({
+ *   async someApi(self, env, arg) {
+ *     const row = await {{ model.name }}.Default.get(env, arg);
+ *     return this.otherApi(self, env);
+ *   },
+ * });
+ * ```
+ */
 export namespace {{ model.name }} {
+    /** @internal */
     export const Tag = "{{ model.name }}" as const;
+    /** @internal */
     export const Meta = cidl.models.{{ model.name }} as any;
 
+    /**
+     * A hydrated object representing `{{ model.name }}`.
+     *
+     * Passed as `self` to instance API methods, and returned by data source `get` / `list` / `save` operations.
+     */
     export interface Self {
 {%- for col in &model.primary_columns %}
         {{ col.field.name }}: {{ map_type(&col.field.cidl_type) }};
@@ -239,6 +495,7 @@ export namespace {{ model.name }} {
 {%- endfor %}
     }
 
+    /** API methods to implement. Instance methods receive `self`; static methods do not. Each returns an {@link ApiResult}. */
     export interface Api {
 {%- for api in &model.apis -%}
 {%- if !is_generated_method(api.name) -%}
@@ -246,8 +503,10 @@ export namespace {{ model.name }} {
 {%- endif -%}
 {%- endfor %}
     }
+    /** @internal */
     export const _api = undefined as unknown as Api;
 
+    /** Data sources with custom (stubbed) CRUD that you must implement. */
     export interface Sources {
 {%- for ds in model.data_sources.values() %}
 {%- if ds.has_stubs() %}
@@ -256,22 +515,37 @@ export namespace {{ model.name }} {
 {%- endfor %}
     }
 
+    /**
+     * Generated data sources with ready-to-call `get` / `list` / `save` operations.
+     *
+     * Prefer these over {@link Orm}. Use `Orm` only when you need a custom include tree or query.
+     */
     export namespace GeneratedSource {
 {%- for ds in model.data_sources.values() %}
+        /** The `{{ ds.name }}` data source. Provides `get`, `list`, and `save` operations. */
         export const {{ ds.name }} = {
+            /** The include tree this data source hydrates. */
             tree: {{ mapper.include_tree(&ds.tree) }},
 {%- if model.is_d1_backed() %}
 {%- let db = backing_binding(model) %}
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `{{ ds.include_query }}`,
 
+            /** Build the bound `D1PreparedStatement` for this data source's `get`. */
             getQuery(env: { {{ db }}: CfEnv["{{ db }}"] }{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): D1PreparedStatement {
                 return env.{{ db }}.prepare(`{{ ds.get_query }}`).bind({% for (i, param) in ds.get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endfor %});
             },
+            /** Build the bound `D1PreparedStatement` for this data source's `list`. */
             listQuery(env: { {{ db }}: CfEnv["{{ db }}"] }{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): D1PreparedStatement {
                 return env.{{ db }}.prepare(`{{ ds.list_query }}`).bind({% for (i, param) in ds.list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endfor %});
             },
 {%- if !ds.get.is_stub %}
 {%- let get_has_env = !ds.get.injected.is_empty() || ds.get.durable_target.is_some() %}
+            /**
+             * Load a single `{{ model.name }}`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(
                 {%- if get_has_env %}env: {{ inject_env(ds.get.durable_target, ds.get.injected) }}
                 {%- for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}
@@ -293,6 +567,11 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- if !ds.list.is_stub %}
 {%- let list_has_env = !ds.list.injected.is_empty() || ds.list.durable_target.is_some() %}
+            /**
+             * Load all matching `{{ model.name }}` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(
                 {%- if list_has_env %}env: {{ inject_env(ds.list.durable_target, ds.list.injected) }}
                 {%- for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}
@@ -311,16 +590,24 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- else if model.is_durable_backed() %}
 {%- if model.uses_sqlite() %}
+            /** Raw SQL `SELECT` with joins for this data source's include tree. */
             selectQuery: `{{ ds.include_query }}`,
 
+            /** Build the `SqlStatement` for this data source's `get` against DO SQLite storage. */
             getQuery({% for (i, param) in ds.get.parameters.iter().enumerate() %}{% if i >= model.route_fields.len() %}{{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endif %}{% endfor %}): SqlStatement {
                 return { query: `{{ ds.get_query }}`, values: [{% for (i, param) in ds.get.parameters.iter().enumerate() %}{% if i >= model.route_fields.len() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endif %}{% endfor %}] };
             },
+            /** Build the `SqlStatement` for this data source's `list` against DO SQLite storage. */
             listQuery({% for (i, param) in ds.list.parameters.iter().enumerate() %}{% if i >= model.route_fields.len() %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endif %}{% endfor %}): SqlStatement {
                 return { query: `{{ ds.list_query }}`, values: [{% for (i, param) in ds.list.parameters.iter().enumerate() %}{% if i >= model.route_fields.len() %}{{ param.name }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endif %}{% endfor %}] };
             },
 {%- if !ds.get.is_stub %}
 {%- let get_has_env = !ds.get.injected.is_empty() || ds.get.durable_target.is_some() %}
+            /**
+             * Load a single `{{ model.name }}`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(
                 {%- if get_has_env %}env: {{ inject_env(ds.get.durable_target, ds.get.injected) }}
                 {%- for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}
@@ -341,6 +628,11 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- if !ds.list.is_stub %}
 {%- let list_has_env = !ds.list.injected.is_empty() || ds.list.durable_target.is_some() %}
+            /**
+             * Load all matching `{{ model.name }}` rows.
+             *
+             * @returns An {@link HttpResult} with the rows, or 400 on validation errors.
+             */
             async list(
                 {%- if list_has_env %}env: {{ inject_env(ds.list.durable_target, ds.list.injected) }}
                 {%- for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}
@@ -359,6 +651,11 @@ export namespace {{ model.name }} {
 {%- else %}
 {%- if !ds.get.is_stub %}
 {%- let get_has_env = !ds.get.injected.is_empty() || ds.get.durable_target.is_some() %}
+            /**
+             * Load a single `{{ model.name }}`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(
                 {%- if get_has_env %}env: {{ inject_env(ds.get.durable_target, ds.get.injected) }}
                 {%- for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}
@@ -376,6 +673,11 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- if !ds.save.is_stub %}
 {%- let save_has_env = !ds.save.injected.is_empty() || ds.save.durable_target.is_some() %}
+            /**
+             * Insert or update a `{{ model.name }}` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save(
                 {%- if save_has_env %}env: {{ inject_env(ds.save.durable_target, ds.save.injected) }}
                 {%- for param in ds.save.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}
@@ -395,6 +697,11 @@ export namespace {{ model.name }} {
 {%- else %}
 {%- if !ds.get.is_stub %}
 {%- let get_has_env = !ds.get.injected.is_empty() || ds.get.durable_target.is_some() %}
+            /**
+             * Load a single `{{ model.name }}`.
+             *
+             * @returns An {@link HttpResult} with the row, 404 if not found, or 400 on validation errors.
+             */
             async get(
                 {%- if get_has_env %}env: {{ inject_env(ds.get.durable_target, ds.get.injected) }}
                 {%- for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}
@@ -412,6 +719,11 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- if !model.is_durable_backed() && !ds.save.is_stub %}
 {%- let save_has_env = !ds.save.injected.is_empty() || ds.save.durable_target.is_some() %}
+            /**
+             * Insert or update a `{{ model.name }}` and its included relations.
+             *
+             * @returns An {@link HttpResult} with the saved row, 404 if target vanished, or 400 on validation errors.
+             */
             async save({% if save_has_env %}env: {{ inject_env(ds.save.durable_target, ds.save.injected) }}, {% endif %}model: DeepPartial<Self>): Promise<HttpResult<Self | null>> {
                 let res = await CloesceOrm.fromEnv({% if save_has_env %}env{% else %}{}{% endif %}).upsert<Self>(Meta, model, this.tree);
                 if (res.errors.length > 0) {
@@ -429,7 +741,9 @@ export namespace {{ model.name }} {
 
 {%- for ds in model.data_sources.values() %}
 {%- if ds.has_stubs() %}
+    /** The `{{ ds.name }}` data source with custom CRUD you must implement via {@link {{ ds.name }}.impl}. */
     export namespace {{ ds.name }} {
+        /** Custom CRUD operations to implement. Generated operations are inherited automatically. */
         export interface Crud {
 {%- if ds.get.is_stub %}
 {%- let get_has_env = !ds.get.injected.is_empty() || ds.get.durable_target.is_some() %}
@@ -450,7 +764,29 @@ export namespace {{ model.name }} {
                 {%- for param in ds.save.parameters %}{% if !loop.first || save_has_env %}, {% endif %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): ApiResult<Self>;
 {%- endif %}
         }
+        /** The full `{{ ds.name }}` data source: generated operations plus your {@link Crud}. */
         export type Impl = typeof GeneratedSource.{{ ds.name }} & Crud;
+        /**
+         * Provide custom CRUD. Use `this` to call generated operations (e.g. `this.getQuery(...)`).
+         *
+         * @param implObj - Object implementing the stubbed {@link Crud} methods.
+         * @returns The merged data source with generated + custom operations.
+         *
+         * @example
+         * ```ts
+         * const {{ ds.name }} = clo.{{ model.name }}.{{ ds.name }}.impl({
+         *   async get(env, id) {
+         *     const query = this.getQuery(env, id);
+         *     // custom logic...
+         *   },
+         * });
+         *
+         * export const {{ model.name }} = clo.{{ model.name }}.impl({
+         *   {{ ds.name }},
+         *   // ...other Api methods
+         * });
+         * ```
+         */
         export function impl<I extends Crud>(implObj: I & ThisType<typeof GeneratedSource.{{ ds.name }} & I>): typeof GeneratedSource.{{ ds.name }} & I {
             return _implDs(GeneratedSource.{{ ds.name }}, implObj);
         }
@@ -458,48 +794,131 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- endfor %}
 
+    /**
+     * Register your implementation of `{{ model.name }}`.
+     *
+     * Use `this` to call sibling methods and access generated data sources.
+     *
+     * @param implObj - Object implementing each {@link Api} method and any custom {@link Sources}.
+     * @returns The bound implementation that Cloesce dispatches requests to.
+     *
+     * @example
+     * ```ts
+     * export const {{ model.name }} = clo.{{ model.name }}.impl({
+     *   async myApi(self, env, arg) {
+     *     const res = await {{ model.name }}.Default.get(env, arg);
+     *     return res.data!;
+     *   },
+     * });
+     * ```
+     */
     export function impl<Impl extends Api & Sources>(implObj: Impl & ThisType<{ tag: string; Orm: typeof Orm{% for ds in model.data_sources.values() %}{% if !ds.has_stubs() %}; {{ ds.name }}: typeof GeneratedSource.{{ ds.name }}{% endif %}{% endfor %} } & Impl>): { tag: string; Orm: typeof Orm{% for ds in model.data_sources.values() %}{% if !ds.has_stubs() %}; {{ ds.name }}: typeof GeneratedSource.{{ ds.name }}{% endif %}{% endfor %} } & Impl {
         return _impl("{{ model.name }}", { Orm{% for ds in model.data_sources.values() %}{% if !ds.has_stubs() %}, {{ ds.name }}: GeneratedSource.{{ ds.name }}{% endif %}{% endfor %} }, implObj) as any;
     }
 
+    /**
+     * Lower-level ORM access with explicit {@link IncludeTree}. Returns raw `CloesceResult`.
+     *
+     * Prefer data sources (e.g. `{{ model.name }}.Default.save(...)`) unless you need a custom tree or query.
+     */
     export namespace Orm {
 {%- if model.is_durable_backed() %}
 {% let ctx_type = backing_binding(model) %}
+        /**
+         * Insert or update `{{ model.name }}` inside its backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save(ctx: {{ ctx_type }}, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({ {{ env_durable_target_key() }}: ctx }).upsert<Self>(Meta, newModel, include);
         }
 
+        /**
+         * Load a single `{{ model.name }}` by its route key from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get(ctx: {{ ctx_type }}, args: { {% for field in &model.route_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { {% for field in &model.route_fields %}{{ field.name }}: args.{{ field.name }}, {% endfor %} } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv({ {{ env_durable_target_key() }}: ctx }).hydrate<Self>(Meta, base, include);
         }
 
+        /**
+         * Hydrate a partial `{{ model.name }}` into a full row from the backing Durable Object.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate(ctx: {{ ctx_type }}, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({ {{ env_durable_target_key() }}: ctx }).hydrate<Self>(Meta, base, include);
         }
 {%- else %}
 {%- let orm_bindings = model_bindings(model, None) %}
+        /**
+         * Insert or update `{{ model.name }}` and its included relations.
+         *
+{%- if !orm_bindings.is_empty() %}
+         * @param env - Environment with the required database binding(s).
+{%- endif %}
+         * @param newModel - Partial row data to upsert.
+         * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
+         * @returns The saved row, or `null` if the target vanished.
+         */
         export async function save({% if !orm_bindings.is_empty() %}env: {{ env_type(orm_bindings) }}, {% endif %}newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv({% if !orm_bindings.is_empty() %}env{% else %}{}{% endif %}).upsert<Self>(Meta, newModel, include);
         }
 
 {%- if model.is_d1_backed() %}
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate the first result.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns The hydrated row, or `null` if no row matches.
+         */
         export async function get(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Run a custom `D1PreparedStatement` and hydrate all results.
+         *
+         * @param env - Environment with the required database binding(s).
+         * @param args - Optional `query` (defaults to this model's select) and `include` tree.
+         * @returns All matching hydrated rows.
+         */
         export async function list(env: {{ env_type(orm_bindings) }}, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<{{ model.name }}.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
 
+        /**
+         * Hydrate an already-fetched `D1Result` into `{{ model.name }}` rows.
+         *
+         * @param result - The raw D1 query result to hydrate.
+         * @param include - Include tree controlling nested object assembly. Defaults to `Default.tree`.
+         * @returns The hydrated rows.
+         */
         export function map(result: D1Result, include: IncludeTree<Self> = GeneratedSource.Default.tree): Self[] {
             return CloesceOrm.map<Self>(Meta, result, include);
         }
 {%- else %}
+        /**
+         * Load a single `{{ model.name }}` by its route key.
+         *
+{%- if !orm_bindings.is_empty() %}
+         * @param env - Environment with the required binding(s).
+{%- endif %}
+         * @param args - Route key fields and an optional `include` tree override.
+         */
         export async function get({% if !orm_bindings.is_empty() %}env: {{ env_type(orm_bindings) }}, {% endif %}args: { {% for field in &model.route_fields %}{{ field.name }}: {{ map_type(&field.cidl_type) }}, {% endfor %}include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { {% for field in &model.route_fields %}{{ field.name }}: args.{{ field.name }}, {% endfor %} } as DeepPartial<Self>;
@@ -507,6 +926,15 @@ export namespace {{ model.name }} {
         }
 {%- endif %}
 
+        /**
+         * Hydrate a partial `{{ model.name }}` into a full row, loading the included relations.
+         *
+{%- if !orm_bindings.is_empty() %}
+         * @param env - Environment with the required binding(s).
+{%- endif %}
+         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
         export async function hydrate({% if !orm_bindings.is_empty() %}env: {{ env_type(orm_bindings) }}, {% endif %}base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv({% if !orm_bindings.is_empty() %}env{% else %}{}{% endif %}).hydrate<Self>(Meta, base, include);
         }
@@ -516,6 +944,7 @@ export namespace {{ model.name }} {
 {%- endif %}
 {%- endfor %}
 
+/** @internal */
 function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     const base: any = { ...implObj, ...extras, tag: modelName };
     for (const key of Object.keys(base)) {
@@ -525,6 +954,7 @@ function _impl(modelName: string, extras: Record<string, any>, implObj: any) {
     return base;
 }
 
+/** @internal */
 function _implDs(generated: Record<string, any>, user: Record<string, any>) {
     const merged: any = { ...generated, ...user };
     for (const key of Object.keys(merged)) {
@@ -536,6 +966,22 @@ function _implDs(generated: Record<string, any>, user: Record<string, any>) {
 
 import cidl from "./cidl.json" with { type: "json" };
 
+/**
+ * Build the Cloesce application. Upgrades {@link CfEnv} and wires up routing.
+ *
+ * @param env - The raw Cloudflare Workers environment.
+ * @returns A {@link CloesceApp} ready to handle requests via `app.run(request)`.
+ *
+ * @example Custom fetch handler
+ * ```ts
+ * export default {
+ *   async fetch(request: Request, env: CfEnv): Promise<Response> {
+ *     const app = cloesce(env);
+ *     return app.run(request);
+ *   },
+ * };
+ * ```
+ */
 export function cloesce(env: CfEnv): CloesceApp {
     // @ts-expect-error
     return new CloesceApp(cidl as any, "{{ worker_url }}", upgradeEnv(env));

@@ -337,13 +337,20 @@ tmp/
 .wrangler
 
 
-# ----------- CLOESCE VVV  ----------- 
+# ----------- CLOESCE VVV  -----------
 .generated
 .cloesce
 tmp.*
 examples/*/package-lock.json
 src/runtime/ts/package-lock.json
 !docs/cidl.js
+
+tests/e2e/fixtures/*/cloesce.jsonc
+tests/e2e/fixtures/*/wrangler.toml
+tests/e2e/fixtures/*/cidl.json
+tests/e2e/fixtures/*/backend.ts
+tests/e2e/fixtures/*/client.ts
+tests/e2e/fixtures/*/migrations/
 
 # ----------- MDBOOK VVV  ----------- 
 book

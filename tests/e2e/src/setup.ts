@@ -2,8 +2,6 @@ import { ChildProcess, execSync, spawn } from "child_process";
 import fs from "fs/promises";
 import kill from "tree-kill";
 
-// const DEBUG_PORT = 9230;
-
 /**
  * Buffers all console output per Wrangler process and flushes it on demand.
  * Allows us to capture logs without interleaving them with other test output.
@@ -87,9 +85,6 @@ async function _startWrangler(
   workersUrl: string,
   buffer: ConsoleBuffer,
 ): Promise<ChildProcess> {
-  await fs.rm(`${fixturesPath}/.wrangler`, { recursive: true, force: true });
-  await fs.rm(`${fixturesPath}/dist`, { recursive: true, force: true });
-
   const d1Bindings = await getD1Bindings(fixturesPath);
   for (const binding of d1Bindings) {
     await runCmd(

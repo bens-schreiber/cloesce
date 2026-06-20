@@ -1,3 +1,13 @@
+# [0.5.2] - Unreleased
+
+### Added
+
+- In-depth documentation with examples for all generated code.
+
+### Changed
+
+### Fixed
+
 # [0.5.1] - 2026-6-19
 
 ### Added

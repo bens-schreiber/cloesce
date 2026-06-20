@@ -8,7 +8,6 @@ members = [
   "src/compiler/compiler-test",
   "src/compiler/migrations",
   "src/compiler/orm",
-  "tests/regression",
 ]
 resolver = "3"
 

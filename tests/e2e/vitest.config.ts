@@ -13,4 +13,7 @@ function jsoncPlugin() {
 
 export default defineConfig({
   plugins: [wasm(), jsoncPlugin()],
+  test: {
+    globalSetup: ["./src/globalSetup.ts"],
+  },
 });
