@@ -1,4 +1,4 @@
-import { execFileSync } from "child_process";
+import { execFile } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,40 +11,62 @@ const CLOESCE_BIN = path.resolve(E2E_ROOT, "../../target/release/cloesce");
 // Each fixture runs on its own worker in parallel, starting with this port seed.
 const PORT_SEED = 5000;
 
-export default function setup() {
+export default async function setup() {
   if (!fs.existsSync(CLOESCE_BIN)) {
     throw new Error(
       `cloesce binary not found at ${CLOESCE_BIN}. Run \`make build-src\` before the e2e tests.`,
     );
   }
 
+  console.info("Compiling fixtures...");
   const fixtures = fs
     .readdirSync(FIXTURES_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => path.join(FIXTURES_DIR, e.name));
+  console.info(
+    `Found ${fixtures.length} fixture(s): ${fixtures.map((f) => path.basename(f)).join(", ")}`,
+  );
 
-  fixtures.forEach((fixtureDir, i) => {
+  const tasks = fixtures.map(async (fixtureDir, i) => {
     const name = path.basename(fixtureDir);
     cleanFixture(fixtureDir);
     writeCloesceConfig(fixtureDir, PORT_SEED + i);
 
-    // Compile and migrate every fixture such that the tests can use
-    // all generated artifacts without worrying about setup.
     try {
-      run(CLOESCE_BIN, ["compile"], fixtureDir);
-      run(CLOESCE_BIN, ["migrate", "--all", "Initial"], fixtureDir);
+      console.log(`[${name}] compiling...`);
+      await run(CLOESCE_BIN, ["compile"], fixtureDir);
+
+      console.log(`[${name}] migrating...`);
+      await run(CLOESCE_BIN, ["migrate", "--all", "Initial"], fixtureDir);
     } catch (err) {
-      const e = err as { stderr?: Buffer; stdout?: Buffer; message: string };
-      const details = e.stderr?.toString() || e.stdout?.toString() || e.message;
-      throw new Error(`Failed to compile fixture "${name}":\n${details}`);
+      const e = err as { stderr?: string; stdout?: string; message: string };
+      const details = e.stderr || e.stdout || e.message;
+      return { ok: false, message: `Failed to compile fixture "${name}":\n${details}` };
     }
 
     normalizeMigrationNames(fixtureDir);
+    console.log(`[${name}] ready`);
+    return { ok: true };
   });
 
-  function run(bin: string, args: string[], cwd: string) {
-    execFileSync(bin, args, { cwd, stdio: "pipe" });
+  const results = await Promise.all(tasks);
+  const failed = results.filter((r): r is { ok: false; message: string } => !r.ok);
+  if (failed.length > 0) {
+    const messages = failed.map((f) => f.message).join("\n");
+    throw new Error(`Failed to compile ${failed.length} fixture(s):\n${messages}`);
   }
+}
+
+function run(bin: string, args: string[], cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(bin, args, { cwd }, (error, stdout, stderr) => {
+      if (error) {
+        reject({ message: error.message, stdout, stderr });
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 // Basic `cloesce.jsonc` config with a dynamic port.
@@ -59,14 +81,16 @@ function writeCloesceConfig(fixtureDir: string, port: number) {
 
 /**
  * Removes the generated artifacts from a previous run so each run starts from a
- * clean slate. Crucially, a leftover migrations directory would be read as the
- * "last migrated" state and yield an empty diff, so it must be cleared.
+ * clean slate.
  */
 function cleanFixture(fixtureDir: string) {
   for (const name of ["cidl.json", "wrangler.toml", "backend.ts", "client.ts"]) {
     fs.rmSync(path.join(fixtureDir, name), { force: true });
   }
-  fs.rmSync(path.join(fixtureDir, "migrations"), { recursive: true, force: true });
+
+  for (const dir of ["migrations", "dist", ".wrangler"]) {
+    fs.rmSync(path.join(fixtureDir, dir), { recursive: true, force: true });
+  }
 }
 
 /**

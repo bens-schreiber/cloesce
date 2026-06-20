@@ -85,9 +85,6 @@ async function _startWrangler(
   workersUrl: string,
   buffer: ConsoleBuffer,
 ): Promise<ChildProcess> {
-  await fs.rm(`${fixturesPath}/.wrangler`, { recursive: true, force: true });
-  await fs.rm(`${fixturesPath}/dist`, { recursive: true, force: true });
-
   const d1Bindings = await getD1Bindings(fixturesPath);
   for (const binding of d1Bindings) {
     await runCmd(
