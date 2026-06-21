@@ -4,6 +4,7 @@ use idl::{CidlType, CloesceIdl, Number, ValidatedField, Validator};
 
 use base64::{Engine, prelude::BASE64_STANDARD};
 use frontend::fmt_cidl_type;
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{OrmErrorKind, fail};
@@ -100,10 +101,7 @@ pub fn validate_cidl_type(
         },
 
         CidlType::DateIso => {
-            let valid = value
-                .as_str()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .is_some();
+            let valid = value.as_str().is_some_and(is_valid_rfc3339);
             if valid {
                 Some(value)
             } else {
@@ -138,13 +136,13 @@ pub fn validate_cidl_type(
                 size: i64,
                 etag: String,
                 http_etag: String,
-                uploaded: chrono::DateTime<chrono::Utc>,
+                uploaded: String,
                 custom_metadata: Option<HashMap<String, String>>,
             }
 
             let valid = value
                 .as_object()
-                .and_then(|obj| serde_json::from_value::<R2Object>(Value::Object(obj.clone())).ok())
+                .and_then(|obj| R2Object::deserialize(obj).ok())
                 .is_some();
             if valid {
                 Some(value)
@@ -310,18 +308,17 @@ pub fn validate_cidl_type(
         }
 
         CidlType::Array(cidl_type) => {
-            if !value.is_array() {
+            let Value::Array(arr) = value else {
                 fail!(type_mismatch_err(value));
-            }
-            let arr = value.as_array().unwrap();
-            let mut new_arr = Vec::<Value>::new();
+            };
+            let mut new_arr = Vec::<Value>::with_capacity(arr.len());
             let field = ValidatedField {
                 name: field.name.clone(),
                 cidl_type: *cidl_type.clone(),
                 validators: field.validators.clone(),
             };
             for item in arr {
-                let res = validate_cidl_type(&field, Some(item.clone()), idl, is_partial)?;
+                let res = validate_cidl_type(&field, Some(item), idl, is_partial)?;
                 if let Some(res) = res {
                     new_arr.push(res);
                 }
@@ -464,7 +461,9 @@ fn run_validators(value: &Value, validators: &[Validator]) -> Result<(), OrmErro
             }
             Validator::Regex(r) => {
                 let value_str = value.as_str().expect("type validation to have run");
-                if !regex::Regex::new(r).unwrap().is_match(value_str) {
+                // TODO: this recompiles the regex on every value (once per array
+                // element).
+                if !regex_lite::Regex::new(r).unwrap().is_match(value_str) {
                     fail!(OrmErrorKind::UnmatchedRegex {
                         got: value.clone(),
                         pattern: r.to_string(),
@@ -475,4 +474,138 @@ fn run_validators(value: &Value, validators: &[Validator]) -> Result<(), OrmErro
     }
 
     Ok(())
+}
+
+// Adapted from chrono 0.4.44 (MIT/Apache-2.0, Copyright 2014--2026 Kang Seonghoon and contributors)
+// https://github.com/chronotope/chrono
+// See: src/format/parse.rs `parse_rfc3339`, `digit`
+// See: src/format/scan.rs `nanosecond`, `timezone_offset`
+fn is_valid_rfc3339(s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.len() < 19 {
+        return false;
+    }
+
+    #[inline]
+    fn digit(b: &[u8], i: usize) -> Option<u8> {
+        match b[i] {
+            c @ b'0'..=b'9' => Some(c - b'0'),
+            _ => None,
+        }
+    }
+
+    // date-fullyear "-" date-month "-" date-mday
+    let _year = (|| {
+        Some(
+            digit(b, 0)? as u16 * 1000
+                + digit(b, 1)? as u16 * 100
+                + digit(b, 2)? as u16 * 10
+                + digit(b, 3)? as u16,
+        )
+    })();
+    if b[4] != b'-' {
+        return false;
+    }
+    let month = (|| Some(digit(b, 5)? * 10 + digit(b, 6)?))();
+    if b[7] != b'-' {
+        return false;
+    }
+    let day = (|| Some(digit(b, 8)? * 10 + digit(b, 9)?))();
+
+    let (Some(_year), Some(month), Some(day)) = (_year, month, day) else {
+        return false;
+    };
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return false;
+    }
+
+    // "T" / "t" / " "
+    if !matches!(b[10], b'T' | b't' | b' ') {
+        return false;
+    }
+
+    // time-hour ":" time-minute ":" time-second
+    let hour = (|| Some(digit(b, 11)? * 10 + digit(b, 12)?))();
+    if b[13] != b':' {
+        return false;
+    }
+    let min = (|| Some(digit(b, 14)? * 10 + digit(b, 15)?))();
+    if b[16] != b':' {
+        return false;
+    }
+    let sec = (|| Some(digit(b, 17)? * 10 + digit(b, 18)?))();
+
+    let (Some(hour), Some(min), Some(sec)) = (hour, min, sec) else {
+        return false;
+    };
+    // sec == 60 is allowed for leap seconds per RFC 3339
+    if hour > 23 || min > 59 || sec > 60 {
+        return false;
+    }
+
+    // [time-secfrac]: "." 1*DIGIT
+    let mut i = 19;
+    if b.get(i) == Some(&b'.') {
+        i += 1;
+        if i >= b.len() || !b[i].is_ascii_digit() {
+            return false;
+        }
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+    }
+
+    // time-offset: "Z" / time-numoffset
+    match b.get(i) {
+        Some(b'Z' | b'z') => i += 1,
+        Some(b'+' | b'-') => {
+            // time-numoffset: ("+" / "-") time-hour ":" time-minute
+            if i + 6 > b.len() {
+                return false;
+            }
+            let oh = (|| Some(digit(b, i + 1)? * 10 + digit(b, i + 2)?))();
+            let om = (|| Some(digit(b, i + 4)? * 10 + digit(b, i + 5)?))();
+            match (oh, om) {
+                (Some(oh), Some(om)) if oh <= 23 && om <= 59 && b[i + 3] == b':' => {}
+                _ => return false,
+            }
+            i += 6;
+        }
+        _ => return false,
+    }
+
+    i == b.len()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_rfc3339;
+
+    #[test]
+    fn valid_rfc3339() {
+        assert!(is_valid_rfc3339("2024-01-15T10:30:00Z"));
+        assert!(is_valid_rfc3339("2024-01-15t10:30:00z"));
+        assert!(is_valid_rfc3339("2024-01-15 10:30:00Z"));
+        assert!(is_valid_rfc3339("2024-01-15T10:30:00+05:30"));
+        assert!(is_valid_rfc3339("2024-01-15T10:30:00-08:00"));
+        assert!(is_valid_rfc3339("2024-01-15T10:30:00.123Z"));
+        assert!(is_valid_rfc3339("2024-01-15T10:30:00.123456789Z"));
+        assert!(is_valid_rfc3339("2024-01-15T23:59:60Z")); // leap second
+    }
+
+    #[test]
+    fn invalid_rfc3339() {
+        assert!(!is_valid_rfc3339(""));
+        assert!(!is_valid_rfc3339("not-a-date"));
+        assert!(!is_valid_rfc3339("2024-01-15 10:30:00")); // missing timezone
+        assert!(!is_valid_rfc3339("2024-01-15T10:30:00")); // missing timezone
+        assert!(!is_valid_rfc3339("2024-13-15T10:30:00Z")); // month 13
+        assert!(!is_valid_rfc3339("2024-01-32T10:30:00Z")); // day 32
+        assert!(!is_valid_rfc3339("2024-01-15T25:30:00Z")); // hour 25
+        assert!(!is_valid_rfc3339("2024-01-15T10:60:00Z")); // minute 60
+        assert!(!is_valid_rfc3339("2024-01-15T10:30:00.Z")); // dot with no digits
+        assert!(!is_valid_rfc3339("2024-01-15T10:30:00Zextra")); // trailing chars
+        assert!(!is_valid_rfc3339("2024-01-15T10:30:00+25:00")); // offset hour 25
+        assert!(!is_valid_rfc3339("2024-01-15T10:30:00+05:60")); // offset min 60
+    }
 }

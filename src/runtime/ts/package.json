@@ -37,7 +37,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json && pnpm run copy-rs-orm-wasm",
-    "copy-rs-orm-wasm": "cp ../../../target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm"
+    "copy-rs-orm-wasm": "cp ../../../target/wasm32-unknown-unknown/wasm-release/orm.wasm ./dist/orm.wasm"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",

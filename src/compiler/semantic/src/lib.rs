@@ -562,7 +562,7 @@ fn resolve_validator_tags<'src, 'p>(
             MinLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MinLength),
             MaxLen => parse_usize(arg, symbol, spd, &mut sink).map(Validator::MaxLength),
             Regex => match arg {
-                ArgumentLiteral::Regex(s) => match regex::Regex::new(s) {
+                ArgumentLiteral::Regex(s) => match regex_lite::Regex::new(s) {
                     Ok(_) => Some(Validator::Regex(std::borrow::Cow::Borrowed(s))),
                     Err(e) => {
                         sink.push(SemanticError::ValidatorInvalidArgument {

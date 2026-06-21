@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use idl::CloesceIdl;
 use idl::Model;
 use idl::NavigationFieldKind;
-use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -30,7 +31,7 @@ pub fn map_sql(
         return Ok(vec![]);
     }
 
-    let mut result_map = IndexMap::new();
+    let mut result_map = HashMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
     for row in rows.iter() {
@@ -61,8 +62,8 @@ pub fn map_sql(
             let mut m = serde_json::Map::new();
 
             // Set primary key columns
-            for (name, value) in &pk_values {
-                m.insert(name.clone(), value.clone());
+            for (name, value) in pk_values {
+                m.insert(name, value);
             }
 
             // Set scalar columns
@@ -124,18 +125,23 @@ fn process_navigation_properties(
             continue;
         }
 
-        // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
+        // Nested properties always use their navigation path prefix (e.g. "cat.toy.id").
+        let mut prefixed_key = if prefix.is_empty() {
+            nav_prop.field.name.to_string()
+        } else {
+            format!("{}.{}", prefix, nav_prop.field.name)
+        };
+        prefixed_key.push('.');
+        let base_len = prefixed_key.len();
+
         // Check all primary key columns for the nested model
         let mut nested_pk_values = Vec::new();
         let mut all_nested_pks_present = true;
 
         for pk in &nested_model.primary_columns {
             let nested_pk_name = &pk.field.name;
-            let prefixed_key = if prefix.is_empty() {
-                format!("{}.{}", nav_prop.field.name, nested_pk_name)
-            } else {
-                format!("{}.{}.{}", prefix, nav_prop.field.name, nested_pk_name)
-            };
+            prefixed_key.truncate(base_len);
+            prefixed_key.push_str(nested_pk_name);
 
             if let Some(nested_pk_value) = row.get(&prefixed_key) {
                 if nested_pk_value.is_null() {
@@ -162,11 +168,8 @@ fn process_navigation_properties(
         // Set nested scalar columns
         for col in &nested_model.columns {
             let name = &col.field.name;
-            let prefixed_key = if prefix.is_empty() {
-                format!("{}.{}", nav_prop.field.name, name)
-            } else {
-                format!("{}.{}.{}", prefix, nav_prop.field.name, name)
-            };
+            prefixed_key.truncate(base_len);
+            prefixed_key.push_str(name);
             let val = row.get(&prefixed_key).cloned();
 
             if let Some(v) = val {
