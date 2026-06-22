@@ -7,7 +7,7 @@ ariadne = { workspace = true }
 idl = { path = "../idl" }
 frontend = { path = "../frontend" }
 indexmap = { workspace = true }
-regex = { workspace = true }
+regex-lite = { workspace = true }
 orm = { path = "../orm" }
 
 [dev-dependencies]

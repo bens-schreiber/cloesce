@@ -1,4 +1,4 @@
-# [0.5.2] - Unreleased
+# [0.5.2] - 6/21/2026
 
 ### Added
 
@@ -6,9 +6,11 @@
 
 ### Changed
 
+- Modified ORM code to reduce the WASM binary by 1.3MB
+
 ### Fixed
 
-# [0.5.1] - 2026-6-19
+# [0.5.1] - 6/19/2026
 
 ### Added
 
@@ -25,7 +27,7 @@
 - Extra Durable Object injects would be added to an API method if it used a DO's KV templates
 - Errors would sometimes return `{}` instead of enumerating the error fields due to a bug in the error serialization logic.
 
-# [0.5.0] - 2026-06-18
+# [0.5.0] - 6/18/2026
 
 ### Added
 
@@ -57,7 +59,7 @@
 
 - A bug with `date` serialization and deserialization using improper ISO strings
 
-# [0.4.1] - 2026-5-20
+# [0.4.1] - 5/20/2026
 
 ### Added
 
@@ -70,7 +72,7 @@
 
 ### Fixed
 
-# [0.4.0] - 2026-5-19
+# [0.4.0] - 5/19/2026
 
 ### Added
 
@@ -98,7 +100,7 @@
 
 ### Fixed
 
-# [0.3.9] - 2026-4-19
+# [0.3.9] - 4/19/2026
 
 ### Added
 
@@ -108,7 +110,7 @@
 
 - A bug where the `impl` function would widen the return type to `ApiResult` instead of inferring the specific return type of the method, making it difficult to work with the results without manually type asserting.
 
-# [0.3.8] - 2026-4-17
+# [0.3.8] - 4/17/2026
 
 ### Added
 
@@ -119,7 +121,7 @@
 
 ### Fixed
 
-# [0.3.7] - 2026-4-17
+# [0.3.7] - 4/17/2026
 
 ### Added
 
@@ -130,7 +132,7 @@
 - Misc bugs in `cloesce fmt`
 - `"Default"` was not correctly overriding on client crud methods, making users manually specify it.
 
-# [0.3.6] - 2026-4-15
+# [0.3.6] - 4/15/2026
 
 ### Added
 
@@ -142,7 +144,7 @@
 
 ### Fixed
 
-# [0.3.5] - 2026-4-9
+# [0.3.5] - 4/9/2026
 
 ### Added
 
@@ -153,7 +155,7 @@
 
 ### Fixed
 
-# [0.3.4] - 2026-4-8
+# [0.3.4] - 4/8/2026
 
 ### Added
 
@@ -166,7 +168,7 @@
 
 - GitHub API rate limit issues
 
-# [0.3.3] - 2026-4-8
+# [0.3.3] - 4/8/2026
 
 ### Added
 
@@ -183,7 +185,7 @@
 - Miscellaneous bug fixes in the CLI
 - Timestamp name bug in the migrations CLI
 
-# [0.3.2] - 2026-4-6
+# [0.3.2] - 4/6/2026
 
 ### Added
 
@@ -199,7 +201,7 @@
 
 ### Fixed
 
-# [0.3.1] - 2026-4-6
+# [0.3.1] - 4/6/2026
 
 ### Added
 
@@ -209,7 +211,7 @@
 
 - A bug where Windows could not run migrations due to file path issues.
 
-# [0.3.0] - 2026-4-6
+# [0.3.0] - 4/6/2026
 
 ### Added
 
@@ -222,7 +224,7 @@
 
 ### Fixed
 
-# [0.2.3] - 2026-3-24
+# [0.2.3] - 3/24/2026
 
 ### Added
 
@@ -232,7 +234,7 @@
 
 - Fixed Windows compilation issues.
 
-# [0.2.2] - 2026-3-14
+# [0.2.2] - 3/14/2026
 
 ### Added
 
@@ -243,7 +245,7 @@
 
 ### Fixed
 
-# [0.2.0] - 2026-03-14
+# [0.2.0] - 3/14/2026
 
 ### Added
 
@@ -267,7 +269,7 @@
 
 ### Fixed
 
-# [0.1.5] - 2026-2-20
+# [0.1.5] - 2/20/2026
 
 ### Added
 
@@ -277,7 +279,7 @@
 
 - A bug where `upsert` would not properly replace an undefined value with `null` when the column is nullable.
 
-# [0.1.3] - 2026-2-12
+# [0.1.3] - 2/12/2026
 
 ### Added
 
@@ -288,7 +290,7 @@
 - A single missing value from the wrangler `d1_databases` would crash the generator
 - `wrangler` tests were not being ran in CI/CD because of misnamed test folder
 
-# [0.1.2] - 2026-2-3
+# [0.1.2] - 2/3/2026
 
 ### Added
 
@@ -299,7 +301,7 @@
 - boolean data types in the `upsert` expected integers
 - boolean data types after `hydrate` should be booleans, not integers
 
-# [0.1.1] - 2026-2-3
+# [0.1.1] - 2/3/2026
 
 ### Added
 

@@ -6,8 +6,8 @@ Below is a template for writing a proposal for changes to Cloesce. Any significa
 
 - **Author(s):** <Name(s)>
 - **Status:** Draft | Review | Accepted | Rejected | Implemented
-- **Created:** YYYY-MM-DD
-- **Last Updated:** YYYY-MM-DD
+- **Created:** M/D/YYYY
+- **Last Updated:** M/D/YYYY
 
 ---
 

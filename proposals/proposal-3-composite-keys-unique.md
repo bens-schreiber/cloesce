@@ -2,8 +2,8 @@
 
 - **Author(s):** Ben Schreiber
 - **Status:** Draft | Review | Accepted | Rejected | **Implemented**
-- **Created:** 2026-02-26
-- **Last Updated:** 2026-02-26
+- **Created:** 2/26/2026
+- **Last Updated:** 2/26/2026
 
 ---
 

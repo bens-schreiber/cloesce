@@ -5,8 +5,8 @@
 
 - **Author(s):** Ben Schreiber
 - **Status:** Draft | Review | Accepted | Rejected | **Implemented**
-- **Created:** 2026-04-06
-- **Last Updated:** 2026-04-06
+- **Created:** 4/6/2026
+- **Last Updated:** 4/6/2026
 
 ---
 

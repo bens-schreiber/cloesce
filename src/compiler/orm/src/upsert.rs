@@ -5,7 +5,7 @@ use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationFieldKind, Validat
 use frontend::fmt_cidl_type;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
 use sea_query::{Expr, Query};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
 
@@ -91,13 +91,15 @@ impl<'a> UpsertModel<'a> {
         let model = idl.models.get(model_name).expect("Model to exist");
         if model.uses_sqlite() {
             // Final select to return the upserted model
-            let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
-            let include_tree_typed: IncludeTree =
-                serde_json::from_str(&include_tree_json_str).unwrap_or_default();
-            let select_query =
+            let select_query = {
+                let include_tree_value = Value::Object(include_tree.clone());
+                let include_tree_typed: IncludeTree =
+                    IncludeTree::deserialize(&include_tree_value).unwrap_or_default();
+
                 SelectModel::query(model_name, None, Some(&include_tree_typed), idl)?
                     .trim_start_matches("SELECT ")
-                    .to_string();
+                    .to_string()
+            };
 
             let mut select = Query::select();
             let mut select_root_model = select.expr(Expr::cust(&select_query));
@@ -115,9 +117,7 @@ impl<'a> UpsertModel<'a> {
                 );
             }
 
-            generator
-                .sql_acc
-                .push(build_sqlite(select_root_model.to_owned()));
+            generator.sql_acc.push(build_sqlite(select_root_model));
             generator.sql_acc.push(SqlStatement {
                 query: VariablesTable::delete_all(),
                 values: vec![],
@@ -255,10 +255,13 @@ impl<'a> UpsertModel<'a> {
             )?;
 
             // Map each key column to the path in the context wheere its value can be found
+            let columns_by_name: HashMap<_, _> = model
+                .all_columns()
+                .map(|(c, _)| (c.field.name.as_ref(), c))
+                .collect();
             for field in fields {
-                let (col, _) = model
-                    .all_columns()
-                    .find(|(c, _)| c.field.name == *field)
+                let col = columns_by_name
+                    .get(field)
                     .expect("key column to exist in model");
 
                 let fk = col
@@ -489,8 +492,7 @@ impl VariablesTable {
                 .into_table(alias(VARIABLES_TABLE_NAME))
                 .columns(vec![alias("path"), alias("primary_key")])
                 .values_panic(vec![Expr::val(path).into(), Expr::cust(&json_expr)])
-                .replace()
-                .to_owned(),
+                .replace(),
         )
     }
 }
@@ -613,7 +615,7 @@ impl<'a> SqlUpsertBuilder<'a> {
                     update_stmt.and_where(Expr::col(alias(pk_field.name.as_ref())).eq(expr));
             }
 
-            return Ok(build_sqlite(update_stmt.to_owned()));
+            return Ok(build_sqlite(update_stmt));
         }
 
         // Build an INSERT
@@ -629,9 +631,10 @@ impl<'a> SqlUpsertBuilder<'a> {
             }
         }
 
-        insert.columns(cols.clone()).values_panic(vals);
         if cols.is_empty() {
             insert.or_default_values();
+        } else {
+            insert.columns(cols).values_panic(vals);
         }
 
         // If the key is fully known and there are non-key columns, conflicting on
@@ -657,7 +660,7 @@ impl<'a> SqlUpsertBuilder<'a> {
             );
         }
 
-        Ok(build_sqlite(insert))
+        Ok(build_sqlite(&insert))
     }
 }
 
@@ -743,7 +746,7 @@ fn sea_query_to_serde(v: sea_query::Value) -> serde_json::Value {
     }
 }
 
-fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
+fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: &T) -> SqlStatement {
     let (query, vs) = qb.build(SqliteQueryBuilder);
     SqlStatement {
         query,

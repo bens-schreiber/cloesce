@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use idl::CloesceIdl;
 use idl::Model;
 use idl::NavigationFieldKind;
-use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -30,7 +31,10 @@ pub fn map_sql(
         return Ok(vec![]);
     }
 
-    let mut result_map = IndexMap::new();
+    // Result must come back in the order that it was returned
+    // by the SQL query.
+    let mut result_index = HashMap::<Value, usize>::new();
+    let mut results = Vec::<Value>::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
     for row in rows.iter() {
@@ -56,13 +60,13 @@ pub fn map_sql(
         let composite_key = Value::Array(pk_values.iter().map(|(_, v)| v.clone()).collect());
 
         // A particular primary key will only exist once. If that key does not yet
-        // exist, put a new model into the result map.
-        let model_json = result_map.entry(composite_key).or_insert_with(|| {
+        // exist, put a new model into the results vec.
+        let idx = *result_index.entry(composite_key).or_insert_with(|| {
             let mut m = serde_json::Map::new();
 
             // Set primary key columns
-            for (name, value) in &pk_values {
-                m.insert(name.clone(), value.clone());
+            for (name, value) in pk_values {
+                m.insert(name, value);
             }
 
             // Set scalar columns
@@ -81,7 +85,8 @@ pub fn map_sql(
                 }
             }
 
-            serde_json::Value::Object(m)
+            results.push(serde_json::Value::Object(m));
+            results.len() - 1
         });
 
         // Given some include tree, we can traverse navigation properties, adding only those that
@@ -90,12 +95,12 @@ pub fn map_sql(
             continue;
         };
 
-        if let Value::Object(model_json) = model_json {
+        if let Value::Object(model_json) = &mut results[idx] {
             process_navigation_properties(model_json, model, "", tree, row, idl)?;
         }
     }
 
-    Ok(result_map.into_values().collect())
+    Ok(results)
 }
 
 fn process_navigation_properties(
@@ -124,18 +129,23 @@ fn process_navigation_properties(
             continue;
         }
 
-        // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
+        // Nested properties always use their navigation path prefix (e.g. "cat.toy.id").
+        let mut prefixed_key = if prefix.is_empty() {
+            nav_prop.field.name.to_string()
+        } else {
+            format!("{}.{}", prefix, nav_prop.field.name)
+        };
+        prefixed_key.push('.');
+        let base_len = prefixed_key.len();
+
         // Check all primary key columns for the nested model
         let mut nested_pk_values = Vec::new();
         let mut all_nested_pks_present = true;
 
         for pk in &nested_model.primary_columns {
             let nested_pk_name = &pk.field.name;
-            let prefixed_key = if prefix.is_empty() {
-                format!("{}.{}", nav_prop.field.name, nested_pk_name)
-            } else {
-                format!("{}.{}.{}", prefix, nav_prop.field.name, nested_pk_name)
-            };
+            prefixed_key.truncate(base_len);
+            prefixed_key.push_str(nested_pk_name);
 
             if let Some(nested_pk_value) = row.get(&prefixed_key) {
                 if nested_pk_value.is_null() {
@@ -162,11 +172,8 @@ fn process_navigation_properties(
         // Set nested scalar columns
         for col in &nested_model.columns {
             let name = &col.field.name;
-            let prefixed_key = if prefix.is_empty() {
-                format!("{}.{}", nav_prop.field.name, name)
-            } else {
-                format!("{}.{}.{}", prefix, nav_prop.field.name, name)
-            };
+            prefixed_key.truncate(base_len);
+            prefixed_key.push_str(name);
             let val = row.get(&prefixed_key).cloned();
 
             if let Some(v) = val {

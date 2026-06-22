@@ -87,7 +87,7 @@ build-src:
 
 	@echo "CLOESCE: Building Rust and TypeScript code..."
 	cargo build --release --manifest-path $(CARGO_MANIFEST) --bin cloesce
-	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
+	cargo build --target $(WASM_TARGET) --profile wasm-release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
 
 	pnpm --filter cloesce run build
 
