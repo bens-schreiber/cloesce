@@ -450,6 +450,10 @@ export namespace Env {
     export type GlobalDo = CfEnv["GlobalDo"] & ReturnType<typeof GlobalDoHelpers>;
     /** Upgraded `LeaderboardDo` Durable Object binding with `stub<T>(...)`, `id(...)`, and `template(...)` helpers. */
     export type LeaderboardDo = CfEnv["LeaderboardDo"] & ReturnType<typeof LeaderboardDoHelpers>;
+    /** The `db` D1 database binding. No Cloesce helpers; identical to the raw {@link CfEnv} field. */
+    export type db = CfEnv["db"];
+    /** The `MY_VAR` environment variable. No Cloesce helpers; identical to the raw {@link CfEnv} field. */
+    export type MY_VAR = CfEnv["MY_VAR"];
 }
 
 /**
@@ -804,11 +808,11 @@ export namespace HasSqlColumnTypes {
             selectQuery: `SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HasSqlColumnTypes"."id" AS "id", "HasSqlColumnTypes"."str" AS "str", "HasSqlColumnTypes"."integer" AS "integer", "HasSqlColumnTypes"."dub" AS "dub", "HasSqlColumnTypes"."boo" AS "boo", "HasSqlColumnTypes"."dat" AS "dat", "HasSqlColumnTypes"."strNull" AS "strNull", "HasSqlColumnTypes"."integerNull" AS "integerNull", "HasSqlColumnTypes"."dubNull" AS "dubNull", "HasSqlColumnTypes"."booNull" AS "booNull", "HasSqlColumnTypes"."dateNull" AS "dateNull" FROM "HasSqlColumnTypes" WHERE "HasSqlColumnTypes"."id" > ?1 ORDER BY "HasSqlColumnTypes"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -894,7 +898,7 @@ export namespace HasSqlColumnTypes {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -905,7 +909,7 @@ export namespace HasSqlColumnTypes {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -917,7 +921,7 @@ export namespace HasSqlColumnTypes {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HasSqlColumnTypes.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HasSqlColumnTypes.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -940,7 +944,7 @@ export namespace HasSqlColumnTypes {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -1334,11 +1338,11 @@ export namespace ModelWithCompositePk {
             selectQuery: `SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, tenantId: string, rowId: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, tenantId: string, rowId: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") = (?1, ?2)`).bind(tenantId, rowId);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_tenantId: string, lastSeen_rowId: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_tenantId: string, lastSeen_rowId: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCompositePk"."tenantId" AS "tenantId", "ModelWithCompositePk"."rowId" AS "rowId", "ModelWithCompositePk"."name" AS "name" FROM "ModelWithCompositePk" WHERE ("ModelWithCompositePk"."tenantId", "ModelWithCompositePk"."rowId") > (?1, ?2) ORDER BY "ModelWithCompositePk"."tenantId" ASC, "ModelWithCompositePk"."rowId" ASC LIMIT ?3`).bind(lastSeen_tenantId, lastSeen_rowId, limit);
             },
             /**
@@ -1424,7 +1428,7 @@ export namespace ModelWithCompositePk {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -1435,7 +1439,7 @@ export namespace ModelWithCompositePk {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -1447,7 +1451,7 @@ export namespace ModelWithCompositePk {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCompositePk.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCompositePk.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -1470,7 +1474,7 @@ export namespace ModelWithCompositePk {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -1546,11 +1550,11 @@ export namespace ModelWithKv {
             selectQuery: `SELECT "ModelWithKv"."id1" AS "id1", "ModelWithKv"."id2" AS "id2" FROM "ModelWithKv"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id1: string, id2: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id1: string, id2: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithKv"."id1" AS "id1", "ModelWithKv"."id2" AS "id2" FROM "ModelWithKv" WHERE ("ModelWithKv"."id1", "ModelWithKv"."id2") = (?1, ?2)`).bind(id1, id2);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id1: string, lastSeen_id2: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id1: string, lastSeen_id2: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithKv"."id1" AS "id1", "ModelWithKv"."id2" AS "id2" FROM "ModelWithKv" WHERE ("ModelWithKv"."id1", "ModelWithKv"."id2") > (?1, ?2) ORDER BY "ModelWithKv"."id1" ASC, "ModelWithKv"."id2" ASC LIMIT ?3`).bind(lastSeen_id1, lastSeen_id2, limit);
             },
             /**
@@ -1636,7 +1640,7 @@ export namespace ModelWithKv {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { MyKv: CfEnv["MyKv"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyKv: Env.MyKv, db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -1647,7 +1651,7 @@ export namespace ModelWithKv {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { MyKv: CfEnv["MyKv"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyKv: Env.MyKv, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -1659,7 +1663,7 @@ export namespace ModelWithKv {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { MyKv: CfEnv["MyKv"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
+        export async function list(env: { MyKv: Env.MyKv, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithKv.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -1682,7 +1686,7 @@ export namespace ModelWithKv {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: CfEnv["MyKv"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { MyKv: Env.MyKv, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -1746,11 +1750,11 @@ export namespace ModelWithR2 {
             selectQuery: `SELECT "ModelWithR2"."id" AS "id" FROM "ModelWithR2"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: string): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithR2"."id" AS "id" FROM "ModelWithR2" WHERE "ModelWithR2"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: string, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithR2"."id" AS "id" FROM "ModelWithR2" WHERE "ModelWithR2"."id" > ?1 ORDER BY "ModelWithR2"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -1836,7 +1840,7 @@ export namespace ModelWithR2 {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyR2: Env.MyR2, db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -1847,7 +1851,7 @@ export namespace ModelWithR2 {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -1859,7 +1863,7 @@ export namespace ModelWithR2 {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithR2.Self[]>> {
+        export async function list(env: { MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithR2.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -1882,7 +1886,7 @@ export namespace ModelWithR2 {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -1942,11 +1946,11 @@ export namespace OneToManyModel {
             selectQuery: `SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "OneToManyModel"."id" AS "id", "BasicModel_1"."id" AS "oneToManyNav.id", "BasicModel_1"."fk_to_model" AS "oneToManyNav.fk_to_model" FROM "OneToManyModel" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "OneToManyModel"."id" = "BasicModel_1"."fk_to_model" WHERE "OneToManyModel"."id" > ?1 ORDER BY "OneToManyModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -2032,7 +2036,7 @@ export namespace OneToManyModel {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -2043,7 +2047,7 @@ export namespace OneToManyModel {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -2055,7 +2059,7 @@ export namespace OneToManyModel {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<OneToManyModel.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<OneToManyModel.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -2078,7 +2082,7 @@ export namespace OneToManyModel {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -2348,7 +2352,7 @@ export namespace RouteOwner {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { MyKv: CfEnv["MyKv"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyKv: Env.MyKv }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
         /**
@@ -2357,7 +2361,7 @@ export namespace RouteOwner {
          * @param env - Environment with the required binding(s).
          * @param args - Route key fields and an optional `include` tree override.
          */
-        export async function get(env: { MyKv: CfEnv["MyKv"] }, args: { ownerId: string, modelYear: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
+        export async function get(env: { MyKv: Env.MyKv }, args: { ownerId: string, modelYear: number, include?: IncludeTree<Self> }): Promise<CloesceResult<Self>> {
             const include = args.include ?? GeneratedSource.Default.tree;
             const base = { ownerId: args.ownerId, modelYear: args.modelYear,  } as DeepPartial<Self>;
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
@@ -2370,7 +2374,7 @@ export namespace RouteOwner {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: CfEnv["MyKv"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { MyKv: Env.MyKv }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -2437,11 +2441,11 @@ export namespace ToyotaPrius {
             selectQuery: `SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -2497,11 +2501,11 @@ export namespace ToyotaPrius {
             selectQuery: `SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -2557,11 +2561,11 @@ export namespace ToyotaPrius {
             selectQuery: `SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ToyotaPrius"."id" AS "id", "ToyotaPrius"."ownerId" AS "ownerId", "ToyotaPrius"."modelYear" AS "modelYear" FROM "ToyotaPrius" WHERE "ToyotaPrius"."id" > ?1 ORDER BY "ToyotaPrius"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -2647,7 +2651,7 @@ export namespace ToyotaPrius {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { MyKv: CfEnv["MyKv"], MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -2658,7 +2662,7 @@ export namespace ToyotaPrius {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { MyKv: CfEnv["MyKv"], MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -2670,7 +2674,7 @@ export namespace ToyotaPrius {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { MyKv: CfEnv["MyKv"], MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ToyotaPrius.Self[]>> {
+        export async function list(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ToyotaPrius.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -2693,7 +2697,7 @@ export namespace ToyotaPrius {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: CfEnv["MyKv"], MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -2753,11 +2757,11 @@ export namespace BasicModel {
             selectQuery: `SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "BasicModel"."id" AS "id", "BasicModel"."fk_to_model" AS "fk_to_model" FROM "BasicModel" WHERE "BasicModel"."id" > ?1 ORDER BY "BasicModel"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -2843,7 +2847,7 @@ export namespace BasicModel {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -2854,7 +2858,7 @@ export namespace BasicModel {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -2866,7 +2870,7 @@ export namespace BasicModel {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<BasicModel.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<BasicModel.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -2889,7 +2893,7 @@ export namespace BasicModel {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -2957,11 +2961,11 @@ export namespace ModelWithCustomDs {
             selectQuery: `SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number, externalParam: string): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number, externalParam: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id, externalParam);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -3001,11 +3005,11 @@ export namespace ModelWithCustomDs {
             selectQuery: `SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCustomDs"."id" AS "id", "ModelWithCustomDs"."name" AS "name", "ModelWithCustomDs"."oneToManyId" AS "oneToManyId", "OneToManyModel_1"."id" AS "oneToManyModel.id", "BasicModel_2"."id" AS "oneToManyModel.oneToManyNav.id", "BasicModel_2"."fk_to_model" AS "oneToManyModel.oneToManyNav.fk_to_model" FROM "ModelWithCustomDs" LEFT JOIN "OneToManyModel" AS "OneToManyModel_1" ON "ModelWithCustomDs"."oneToManyId" = "OneToManyModel_1"."id" LEFT JOIN "BasicModel" AS "BasicModel_2" ON "OneToManyModel_1"."id" = "BasicModel_2"."fk_to_model" WHERE "ModelWithCustomDs"."id" > ?1 ORDER BY "ModelWithCustomDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -3124,7 +3128,7 @@ export namespace ModelWithCustomDs {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { MyR2: Env.MyR2, db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -3135,7 +3139,7 @@ export namespace ModelWithCustomDs {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -3147,7 +3151,7 @@ export namespace ModelWithCustomDs {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
+        export async function list(env: { MyR2: Env.MyR2, db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCustomDs.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -3170,7 +3174,7 @@ export namespace ModelWithCustomDs {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyR2: CfEnv["MyR2"], db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -3231,11 +3235,11 @@ export namespace HasOneToOne {
             selectQuery: `SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "HasOneToOne"."id" AS "id", "HasOneToOne"."basicModelId" AS "basicModelId", "BasicModel_1"."id" AS "oneToOneNav.id", "BasicModel_1"."fk_to_model" AS "oneToOneNav.fk_to_model" FROM "HasOneToOne" LEFT JOIN "BasicModel" AS "BasicModel_1" ON "HasOneToOne"."basicModelId" = "BasicModel_1"."id" WHERE "HasOneToOne"."id" > ?1 ORDER BY "HasOneToOne"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -3321,7 +3325,7 @@ export namespace HasOneToOne {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -3332,7 +3336,7 @@ export namespace HasOneToOne {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -3344,7 +3348,7 @@ export namespace HasOneToOne {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HasOneToOne.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<HasOneToOne.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -3367,7 +3371,7 @@ export namespace HasOneToOne {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }
@@ -3429,11 +3433,11 @@ export namespace ModelWithCruds {
             selectQuery: `SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, name: string): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, name: string): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(name);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, name: string, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, name: string, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(name, limit);
             },
             /**
@@ -3460,11 +3464,11 @@ export namespace ModelWithCruds {
             selectQuery: `SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds"`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { db: CfEnv["db"] }, id: number): D1PreparedStatement {
+            getQuery(env: { db: Env.db }, id: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id);
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { db: CfEnv["db"] }, lastSeen_id: number, limit: number): D1PreparedStatement {
+            listQuery(env: { db: Env.db }, lastSeen_id: number, limit: number): D1PreparedStatement {
                 return env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit);
             },
             /**
@@ -3584,7 +3588,7 @@ export namespace ModelWithCruds {
          * @param include - Include tree controlling which relations to persist. Defaults to `Default.tree`.
          * @returns The saved row, or `null` if the target vanished.
          */
-        export async function save(env: { db: CfEnv["db"] }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+        export async function save(env: { db: Env.db }, newModel: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
             return await CloesceOrm.fromEnv(env).upsert<Self>(Meta, newModel, include);
         }
 
@@ -3595,7 +3599,7 @@ export namespace ModelWithCruds {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns The hydrated row, or `null` if no row matches.
          */
-        export async function get(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
+        export async function get(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<Self | null>> {
             args.include ??= GeneratedSource.Default.tree
             return await CloesceOrm.fromEnv(env).get<Self>(Meta, args.query, args.include);
         }
@@ -3607,7 +3611,7 @@ export namespace ModelWithCruds {
          * @param args - Optional `query` (defaults to this model's select) and `include` tree.
          * @returns All matching hydrated rows.
          */
-        export async function list(env: { db: CfEnv["db"] }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCruds.Self[]>> {
+        export async function list(env: { db: Env.db }, args: { query?: D1PreparedStatement, include?: IncludeTree<Self> }): Promise<CloesceResult<ModelWithCruds.Self[]>> {
             args.include ??= GeneratedSource.Default.tree;
             return await CloesceOrm.fromEnv(env).list<Self>(Meta, args.query, args.include);
         }
@@ -3630,7 +3634,7 @@ export namespace ModelWithCruds {
          * @param base - Partial row with at least the primary/route key fields populated.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: CfEnv["db"] }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
+        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self>> {
             return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, base, include);
         }
     }

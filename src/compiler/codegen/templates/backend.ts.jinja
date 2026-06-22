@@ -3,7 +3,7 @@ import { HttpResult, KValue, CloesceApp, Orm as CloesceOrm, IncludeTree, DeepPar
 import { DurableObject } from "cloudflare:workers";
 
 {%- macro env_type(bindings) -%}
-{ {% for (i, b) in bindings.iter().enumerate() %}{{ b }}: CfEnv["{{ b }}"]{% if i + 1 < bindings.len() %}, {% endif %}{% endfor %} }
+{ {% for (i, b) in bindings.iter().enumerate() %}{{ b }}: Env.{{ b }}{% if i + 1 < bindings.len() %}, {% endif %}{% endfor %} }
 {%- endmacro %}
 
 {%- macro inject_env(durable_target, injected) -%}
@@ -304,6 +304,14 @@ export namespace Env {
     /** Upgraded `{{ b.name }}` Durable Object binding with `stub<T>(...)`, `id(...)`, and `template(...)` helpers. */
     export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
 {%- endfor %}
+{%- for binding in &idl.wrangler_env.d1_bindings %}
+    /** The `{{ binding }}` D1 database binding. No Cloesce helpers; identical to the raw {@link CfEnv} field. */
+    export type {{ binding }} = CfEnv["{{ binding }}"];
+{%- endfor %}
+{%- for var in &idl.wrangler_env.vars %}
+    /** The `{{ var.name }}` environment variable. No Cloesce helpers; identical to the raw {@link CfEnv} field. */
+    export type {{ var.name }} = CfEnv["{{ var.name }}"];
+{%- endfor %}
 }
 
 /**
@@ -532,11 +540,11 @@ export namespace {{ model.name }} {
             selectQuery: `{{ ds.include_query }}`,
 
             /** Build the bound `D1PreparedStatement` for this data source's `get`. */
-            getQuery(env: { {{ db }}: CfEnv["{{ db }}"] }{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): D1PreparedStatement {
+            getQuery(env: { {{ db }}: Env.{{ db }} }{% for param in ds.get.parameters %}, {{ param.parameter.name }}: {{ map_type(&param.parameter.cidl_type) }}{% endfor %}): D1PreparedStatement {
                 return env.{{ db }}.prepare(`{{ ds.get_query }}`).bind({% for (i, param) in ds.get.parameters.iter().enumerate() %}{{ param.parameter.name }}{% if i + 1 < ds.get.parameters.len() %}, {% endif %}{% endfor %});
             },
             /** Build the bound `D1PreparedStatement` for this data source's `list`. */
-            listQuery(env: { {{ db }}: CfEnv["{{ db }}"] }{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): D1PreparedStatement {
+            listQuery(env: { {{ db }}: Env.{{ db }} }{% for param in ds.list.parameters %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}): D1PreparedStatement {
                 return env.{{ db }}.prepare(`{{ ds.list_query }}`).bind({% for (i, param) in ds.list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < ds.list.parameters.len() %}, {% endif %}{% endfor %});
             },
 {%- if !ds.get.is_stub %}
