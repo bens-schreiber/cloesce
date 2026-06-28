@@ -13,26 +13,30 @@
 
 ## Motivation
 
-Imagine the case where we are making a Reddit clone, where every `User`,  `SubReddit` and `Post` are different durable objects, and `Comment` is a SQLite table on the `Post` DO:
+Imagine the case where we are making a Reddit clone, where every `User`, `SubReddit` and `Post` are different durable objects, and `Comment` is a SQLite table on the `Post` DO:
 
 A `User` has
+
 - Many `SubReddit`s they are subscribed to
 - Many `Post`s they have made
 - Many `Comment`s they have made
 - Metadata (e.g. username, email, etc.)
 
 A `SubReddit` has
+
 - Many `User`s subscribed to it
 - Many `Post`s made in it
 - Metadata (e.g. name, description, etc.)
 
 A `Post` has
+
 - One `User` that made it
 - One `SubReddit` it was made in
 - Many `Comment`s made on it
 - Metadata (e.g. title, upvotes, etc.)
 
 A `Comment` has
+
 - One `User` that made it
 - One `Post` it was made on
 - Metadata (e.g. content, upvotes, etc.)
@@ -40,6 +44,7 @@ A `Comment` has
 Despite this being an intuitive data model, Cloesce in its current form cannot express the relationships between these Models because they are all separate durable objects.
 
 This proposal aims to break the barriers Cloesce has set up:
+
 - Any Model should be able to have a relationship with any other Model (be it either `1:1`, `1:N` or both).
 - Any Model can have `route` fields
 
@@ -100,7 +105,6 @@ To disambiguate relationships, we will remove the `nav` block and replace it wit
 
 Additionally, when faced with a relationship that cannot be resolved (such as a `1:N` relationship to a Worker backed model), Cloesce will simply populate the single result in an array.
 
-
 ### New Syntax
 
 The `nav` block will be replaced with a `one` or `many` block, which explicitly states the cardinality of the relationship.
@@ -124,10 +128,10 @@ one ModelB::{id(modelBId), doId(modelBDoId)} {
 }
 ```
 
-
 ### 1:1 Relationships
 
 #### D1 -> Worker
+
 ```cloesce
 model WorkerBacked {
     route {
@@ -250,7 +254,7 @@ model D1BackedA for DbA {
     primary {
         primaryId: int
     }
-    
+
     column {
         bId: int
     }
@@ -302,6 +306,7 @@ model Foo {
 This will resolve the value at `MyDurable::value` with the parameters `key1` and `key2` from the `Foo` model, and the `doId` from the `Foo` model to construct the DO id.
 
 If a user tried to simply pass:
+
 ```cloesce
 kv MyDurable::value(key1, key2) {
     myValue
@@ -309,7 +314,6 @@ kv MyDurable::value(key1, key2) {
 ```
 
 The compiler would raise an error, because the `doId` is required to construct the DO id, and it is not provided in the constructor.
-
 
 ### 1:N Relationships
 
@@ -455,6 +459,7 @@ model User for Do(tenantId) {
 Using the syntax described above, we can now express the relationships between our `User`, `SubReddit`, `Post` and `Comment` models in a Reddit clone.
 
 To demonstrate a small example, assume that:
+
 - `UserDo`, `SubRedditDo` and `PostDo` are all Durable Objects
 - `User`, `SubReddit`, `Post` and `Comment` are Models backed by each respective Durable Objects
 
@@ -486,16 +491,16 @@ model UserFollowedSubReddit for UserDo(userId) {
 }
 
 // ...same pattern for `UserComment` and `UserPost`:
-// have a `primary` field for the id of the associated DO, then a `one` nav 
+// have a `primary` field for the id of the associated DO, then a `one` nav
 // to the associated Model on that DO.
 ```
-
 
 ---
 
 ## Implementation
 
 See:
+
 - [D1](./prop-0/d1/d1.md)
 - [DO](./prop-0/do/do.md)
 - [KV-R2](./prop-0/kv-r2/kv-r2.md)

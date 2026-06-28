@@ -1,31 +1,30 @@
 use chumsky::prelude::*;
 
 use crate::{
-    AstBlockKind, ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, NavAdj, NavigationBlock,
-    R2FieldBlock, Spd, SqlBlockKind, Symbol,
+    AstBlockKind, Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock,
+    ModelBlockKind, NavigationBlock, NavigationKey, R2FieldBlock, Spd, SqlBlockKind, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
 };
 
 /// `foreign AdjModel::field [optional] { localField ... }`
-/// or `foreign (AdjModel::field1, ...) [optional] { localField ... }`
+/// or `foreign AdjModel::{ field1, field2 } [optional] { localField ... }`.
 fn foreign_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
-    let adj_ref = || {
+    // `::field` (single) or `::{ field1, field2 }` (spider)
+    let targets = just(Token::DoubleColon).ignore_then(choice((
         symbol()
-            .then_ignore(just(Token::DoubleColon))
-            .then(symbol())
-    };
-
-    let composite = adj_ref()
-        .separated_by(just(Token::Comma))
-        .at_least(1)
-        .collect::<Vec<_>>()
-        .delimited_by(just(Token::LParen), just(Token::RParen));
-    let single = adj_ref().map(|a| vec![a]);
+            .separated_by(just(Token::Comma))
+            .at_least(1)
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        symbol().map(|t| vec![t]),
+    )));
 
     kw!(Foreign)
-        .ignore_then(composite.or(single))
+        .ignore_then(symbol())
+        .then(targets)
         .then(kw!(Optional).or_not())
         .then(
             symbol()
@@ -33,62 +32,79 @@ fn foreign_block<'tokens, 'src: 'tokens>()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((adj, optional), fields)| ForeignBlock {
-            adj,
+        .map(|(((model, targets), optional), fields)| ForeignBlock {
+            model,
+            targets,
             is_optional: optional.is_some(),
             fields,
         })
 }
 
-/// `Binding::field(arg1, arg2, ...)` or `Binding::field`, optionally wrapped in
-/// a single pair of outer parens.
-fn binding_ref<'tokens, 'src: 'tokens>() -> impl Parser<
-    'tokens,
-    TokenInput<'tokens, 'src>,
-    (Symbol<'src>, Symbol<'src>, Vec<Symbol<'src>>),
-    Extra<'tokens, 'src>,
-> {
-    let inner = symbol()
-        .then_ignore(just(Token::DoubleColon))
-        .then(symbol())
-        .then(
-            symbol()
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen))
-                .or_not(),
-        )
-        .map(|((binding, template), args)| (binding, template, args.unwrap_or_default()))
-        .boxed();
-
-    inner
-        .clone()
-        .delimited_by(just(Token::LParen), just(Token::RParen))
-        .or(inner)
-}
-
-/// `kv Binding::field(arg1, arg2, ...) { localField }`
-/// or `kv Binding::field { localField }`
+/// `kv Binding::target(local1, ...) { localField }`
+/// | `kv Binding::target { localField }`
+/// | `kv Binding::{ template(args), shardField(local), ... } { localField }`.
 fn kv_field_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, KvFieldBlock<'src>, Extra<'tokens, 'src>> {
+    // `target(local1, local2, ...)` | `target`
+    let arg = || {
+        symbol()
+            .then(
+                symbol()
+                    .separated_by(just(Token::Comma))
+                    .allow_trailing()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LParen), just(Token::RParen))
+                    .or_not(),
+            )
+            .map(|(target, local)| KvFieldArgument {
+                target,
+                local: local.unwrap_or_default(),
+            })
+    };
+
+    // `::{ target(args), shardField(local), ... }`
+    // | `::target(args)`
+    let args = just(Token::DoubleColon).ignore_then(choice((
+        arg()
+            .separated_by(just(Token::Comma))
+            .at_least(1)
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        arg().map(|a| vec![a]),
+    )));
+
     kw!(Kv)
-        .ignore_then(binding_ref())
+        .ignore_then(symbol())
+        .then(args)
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map(|((binding, binding_template, args), field)| KvFieldBlock {
+        .map(|((binding, args), field)| KvFieldBlock {
             binding,
-            binding_template,
             args,
             field,
         })
 }
 
 /// `r2 Binding::field(arg1, arg2, ...) { localField }`
-/// or `r2 Binding::field { localField }`
+/// | `r2 Binding::field { localField }`
 fn r2_field_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, R2FieldBlock<'src>, Extra<'tokens, 'src>> {
+    let binding_call = symbol().then(
+        symbol()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LParen), just(Token::RParen))
+            .or_not(),
+    );
+
+    let binding_ref = symbol()
+        .then_ignore(just(Token::DoubleColon))
+        .then(binding_call)
+        .map(|(binding, (template, args))| (binding, template, args.unwrap_or_default()));
+
     kw!(R2)
-        .ignore_then(binding_ref())
+        .ignore_then(binding_ref)
         .then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
         .map(|((binding, binding_template, args), field)| R2FieldBlock {
             binding,
@@ -142,53 +158,57 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(ModelBlockKind::Unique),
     );
 
-    // `nav AdjModel::field { ident }`            (1:M single)
-    // `nav (Adj::f1, Adj::f2) { ident }`         (1:M composite)
-    // `nav AdjModel::field(localKey) { ident }`  (1:1 single)
-    // `nav (Adj::f1(l1), Adj::f2(l2)) { ident }` (1:1 composite)
-    // `nav Foo { ident }`                          (keyless singleton)
-    let nav_block = {
-        // `Model::field` or `Model::field(localKey)`
-        let nav_adj = || {
+    // `one|many Model { ident }`                          (discriminator-less)
+    // `one|many Model::target(local) { ident }`           (single direct)
+    // `one|many Model::target { ident }`                  (shard-only shorthand)
+    // `one|many Model::{ t1(l1), t2(l2) } { ident }`      (spider)
+    let navigation_block = {
+        // `target(local)` | `target`
+        let key = || {
             symbol()
-                .then_ignore(just(Token::DoubleColon))
-                .then(symbol())
                 .then(
                     symbol()
                         .delimited_by(just(Token::LParen), just(Token::RParen))
                         .or_not(),
                 )
-                .map(|((model, field), local_key)| NavAdj {
-                    model,
-                    field: Some(field),
-                    local_key,
-                })
+                .map(|(target, local)| NavigationKey { target, local })
         };
 
-        // bare `Model` with no `::field`
-        let bare_adj = || {
-            symbol().map(|model| NavAdj {
-                model,
-                field: None,
-                local_key: None,
-            })
-        };
+        // `::target(local)` / `::target` (single) or `::{ t1(l1), t2(l2) }` (spider)
+        let keys = just(Token::DoubleColon)
+            .ignore_then(choice((
+                key()
+                    .separated_by(just(Token::Comma))
+                    .at_least(1)
+                    .allow_trailing()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+                key().map(|k| vec![k]),
+            )))
+            .or_not()
+            .map(Option::unwrap_or_default);
 
-        let composite = nav_adj()
-            .separated_by(just(Token::Comma))
-            .at_least(1)
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LParen), just(Token::RParen));
-        let single = nav_adj().or(bare_adj()).map(|a| vec![a]);
+        let cardinality = choice((
+            kw!(One).to(Cardinality::One),
+            kw!(Many).to(Cardinality::Many),
+        ));
 
-        kw!(Nav)
-            .ignore_then(composite.or(single))
+        cardinality
+            .then(symbol())
+            .then(keys)
             .then(
                 symbol()
                     .map_spanned(|s| s)
                     .delimited_by(just(Token::LBrace), just(Token::RBrace)),
             )
-            .map(|(adj, nav)| ModelBlockKind::Navigation(NavigationBlock { adj, nav }))
+            .map(|(((cardinality, model), keys), field)| {
+                ModelBlockKind::Navigation(NavigationBlock {
+                    cardinality,
+                    model,
+                    keys,
+                    field,
+                })
+            })
     };
 
     let sub_blocks = choice((
@@ -196,7 +216,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         kv_field_block().map(ModelBlockKind::Kv),
         r2_field_block().map(ModelBlockKind::R2),
         column_block,
-        nav_block,
+        navigation_block,
         primary_block,
         route_block,
         unique_block,
@@ -204,7 +224,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     .boxed();
 
     // `for Binding`
-    // or `for Binding(shard1, shard2, ...)`
+    // | `for Binding(shard1, shard2, ...)`
     let backing = kw!(For).ignore_then(symbol()).then(
         symbol()
             .separated_by(just(Token::Comma))

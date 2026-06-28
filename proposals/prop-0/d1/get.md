@@ -28,21 +28,21 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -76,21 +76,21 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.id = ModelB.modelAId WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.id = ModelB.modelAId WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -122,21 +122,21 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id JOIN ModelC ON ModelA.id = ModelC.modelAId WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id JOIN ModelC ON ModelA.id = ModelC.modelAId WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -168,40 +168,40 @@ model ModelB for DbB {
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?",
-                "args": {
-                    "from_result": ["modelBId"]
-                },
-                "map": "one"
-            },
-            "result": "modelB"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?",
+        "args": {
+          "from_result": ["modelBId"]
+        },
+        "map": "one"
+      },
+      "result": "modelB"
+    }
+  ]
 ]
 ```
 
-This plan is executed by first querying `ModelA` in `DbA` with the provided `id` parameter. 
+This plan is executed by first querying `ModelA` in `DbA` with the provided `id` parameter.
 
 The result of that query is then used to query `ModelB` in `DbB` using the `modelBId` field from the result of the first query. The result of the second query is then mapped to the `modelB` field in the final result.
 
@@ -231,36 +231,36 @@ model ModelB for DbB {
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.modelAId = ?",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "modelBs"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.modelAId = ?",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "modelBs"
+    }
+  ]
 ]
 ```
 
@@ -290,49 +290,49 @@ model ModelA for DbA {
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?",
-                "args": {
-                    "from_result": ["bId"]
-                },
-                "map": "one"
-            },
-            "result": "modelB"
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?",
+        "args": {
+          "from_params": ["id"]
         },
-        {
-            "db": {
-                "name": "DbC"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelC WHERE ModelC.modelAId = ?",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "modelCs"
-        }
-    ]
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?",
+        "args": {
+          "from_result": ["bId"]
+        },
+        "map": "one"
+      },
+      "result": "modelB"
+    },
+    {
+      "db": {
+        "name": "DbC"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelC WHERE ModelC.modelAId = ?",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "modelCs"
+    }
+  ]
 ]
 ```
 
@@ -386,35 +386,35 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbAB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.bForeign = ModelB.bPrimary WHERE ModelA.aPrimary = ?",
-                "args": {
-                    "from_params": ["aPrimary"]
-                },
-                "map": "one"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbC"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelC WHERE ModelC.modelAId = ?",
-                "args": {
-                    "from_result": ["aPrimary"]
-                },
-                "map": "many"
-            },
-            "result": "modelCs"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbAB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.bForeign = ModelB.bPrimary WHERE ModelA.aPrimary = ?",
+        "args": {
+          "from_params": ["aPrimary"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbC"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelC WHERE ModelC.modelAId = ?",
+        "args": {
+          "from_result": ["aPrimary"]
+        },
+        "map": "many"
+      },
+      "result": "modelCs"
+    }
+  ]
 ]
 ```

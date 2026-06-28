@@ -28,22 +28,23 @@ It is clear that to `SELECT ModelA`, it must join `ModelB` on `ModelA.modelBId =
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
 The runtime will execute this query as so:
+
 1. Query the WASM ORM: `LIST ModelA`
 2. Receive the query plan from the Query Planner
 3. Execute `plan[0][0].query` on `plan[0][0].db` (in this case, `DbA`)
@@ -80,22 +81,23 @@ In this case, `ModelA` has many `ModelB`s, and we must join `ModelB` on `ModelA.
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.id = ModelB.modelAId",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.id = ModelB.modelAId",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
 The runtime will execute this query as so:
+
 1. Query the WASM ORM: `LIST ModelA`
 2. Receive the query plan from the Query Planner
 3. Execute `plan[0][0].query` on `plan[0][0].db` (in this case, `DbA`)
@@ -130,18 +132,18 @@ The query planner will generate a single query to fetch all `ModelA`s, `ModelB`s
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id JOIN ModelC ON ModelA.id = ModelC.modelAId",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.modelBId = ModelB.id JOIN ModelC ON ModelA.id = ModelC.modelAId",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -175,85 +177,89 @@ Note that `ModelA` does not have a foreign key to `ModelB` because they are in d
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE id IN (?)",
-                "args": {
-                    "from_result": ["modelBId"]
-                },
-                "map": "one"
-            },
-            "result": "modelB"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE id IN (?)",
+        "args": {
+          "from_result": ["modelBId"]
+        },
+        "map": "one"
+      },
+      "result": "modelB"
+    }
+  ]
 ]
 ```
 
 After querying `LIST ModelA`, the runtime will receive the above plan, composed of two transactions. The first transaction will:
+
 1. Execute `plan[0][0].query` on `plan[0][0].db` (in this case, `DbA`)
 2. Gather results, ask the WASM ORM to map the results to JSON
 3. Return all results as they are because `plan[0][0].map` is `many` and `plan[0][0].result` is empty (root)
 
-EX: Result after T0 => 
+EX: Result after T0 =>
+
 ```json
 [
-    {
-        "id": 1,
-        "modelBId": 1
-    },
-    {
-        "id": 2,
-        "modelBId": 2
-    }
+  {
+    "id": 1,
+    "modelBId": 1
+  },
+  {
+    "id": 2,
+    "modelBId": 2
+  }
 ]
 ```
 
 Another transaction exists and will be executed after the first transaction completes. The second transaction will:
+
 1. For each value in the current result, gather chunks of 999 (the maximum number of parameters allowed in a D1 query), grouped by `modelBId` (remove duplicates)
 2. For each batch, prepare the query `plan[1][0].query` on `plan[1][0].db` (in this case, `DbB`)
 3. Execute all batches in one transaction (using D1 batch statement)
 4. Gather results, ask the WASM ORM to map the results to JSON
 5. For each result, find the corresponding `ModelA` in the first transaction's result and attach the `ModelB` to it. Attach only the first result because `plan[1][0].map` is `one`.
 
-EX: Result after T1 => 
+EX: Result after T1 =>
+
 ```json
 [
-    {
-        "id": 1,
-        "modelBId": 1,
-        "modelB": {
-            "id": 1
-        }
-    },
-    {
-        "id": 2,
-        "modelBId": 2,
-        "modelB": {
-            "id": 2
-        }
+  {
+    "id": 1,
+    "modelBId": 1,
+    "modelB": {
+      "id": 1
     }
+  },
+  {
+    "id": 2,
+    "modelBId": 2,
+    "modelB": {
+      "id": 2
+    }
+  }
 ]
 ```
 
 No more transactions exist, and the runtime will return the final result to the caller.
 
-* In order to make this work, the runtime _must_ dedupe the cross-database query parameters, because we use `IN (?)` which is a set, making us lose the ability to map the results back to the original query positions.
+- In order to make this work, the runtime _must_ dedupe the cross-database query parameters, because we use `IN (?)` which is a set, making us lose the ability to map the results back to the original query positions.
 
 ## One-to-Many Relationship
 
@@ -283,71 +289,72 @@ The Query Planner will generate the following query plan for a `list` operation 
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE modelAId IN (?)",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "modelBs"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE modelAId IN (?)",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "modelBs"
+    }
+  ]
 ]
 ```
 
 The runtime will execute the first transaction as described in the previous section. After the first transaction completes, the second transaction will:
+
 1. For each value in the current result, gather chunks of 999 (the maximum number of parameters allowed in a D1 query), grouped by `id` (remove duplicates)
 2. For each batch, prepare the query `plan[1][0].query` on `plan[1][0].db` (in this case, `DbB`)
 3. Execute all batches in one transaction (using D1 batch statement)
 4. Gather results, ask the WASM ORM to map the results to JSON
 5. For each result, find the corresponding `ModelA` in the first transaction's result and attach the `ModelB`s to it. Attach all results because `plan[1][0].map` is `many`.
 
-EX T1 result => 
+EX T1 result =>
+
 ```json
 [
-    {
+  {
+    "id": 1,
+    "modelBs": [
+      {
         "id": 1,
-        "modelBs": [
-            {
-                "id": 1,
-                "modelAId": 1
-            },
-            {
-                "id": 2,
-                "modelAId": 1
-            }
-        ]
-    },
-    {
+        "modelAId": 1
+      },
+      {
         "id": 2,
-        "modelBs": [
-            {
-                "id": 3,
-                "modelAId": 2
-            }
-        ]
-    }
+        "modelAId": 1
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "modelBs": [
+      {
+        "id": 3,
+        "modelAId": 2
+      }
+    ]
+  }
 ]
 ```
-
 
 ## Several Relationships
 
@@ -375,86 +382,87 @@ model ModelA for DbA {
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE id IN (?)",
-                "args": {
-                    "from_result": ["bId"]
-                },
-                "map": "one"
-            },
-            "result": "modelB"
-        },
-        {
-            "db": {
-                "name": "DbC"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelC WHERE modelAId IN (?)",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "modelCs"
-        }
-    ]
-]
-```
-
-EX T1 result => 
-```json
-[
+  [
     {
-        "id": 1,
-        "bId": 1,
-        "modelB": {
-            "id": 1
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE id IN (?)",
+        "args": {
+          "from_result": ["bId"]
         },
-        "modelCs": [
-            {
-                "id": 1,
-                "modelAId": 1
-            },
-            {
-                "id": 2,
-                "modelAId": 1
-            }
-        ]
+        "map": "one"
+      },
+      "result": "modelB"
     },
     {
-        "id": 2,
-        "bId": 2,
-        "modelB": {
-            "id": 2
+      "db": {
+        "name": "DbC"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelC WHERE modelAId IN (?)",
+        "args": {
+          "from_result": ["id"]
         },
-        "modelCs": [
-            {
-                "id": 3,
-                "modelAId": 2
-            }
-        ]
+        "map": "many"
+      },
+      "result": "modelCs"
     }
+  ]
 ]
 ```
 
-# Hybrid 
+EX T1 result =>
+
+```json
+[
+  {
+    "id": 1,
+    "bId": 1,
+    "modelB": {
+      "id": 1
+    },
+    "modelCs": [
+      {
+        "id": 1,
+        "modelAId": 1
+      },
+      {
+        "id": 2,
+        "modelAId": 1
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "bId": 2,
+    "modelB": {
+      "id": 2
+    },
+    "modelCs": [
+      {
+        "id": 3,
+        "modelAId": 2
+      }
+    ]
+  }
+]
+```
+
+# Hybrid
 
 `ModelA` and `ModelB` are in `DbAB` but `ModelC` is in `DbC`:
 
@@ -500,33 +508,33 @@ model ModelC for DbC {
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbAB"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.bForeign = ModelB.bPrimary",
-                "map": "many"
-            },
-            "result": ""
-        }
-    ],
-    [
-        {
-            "db": {
-                "name": "DbC"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelC WHERE modelAId IN (?)",
-                "args": {
-                    "from_result": ["aPrimary"]
-                },
-                "map": "many"
-            },
-            "result": "modelCs"
-        }
-    ]
+  [
+    {
+      "db": {
+        "name": "DbAB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA JOIN ModelB ON ModelA.bForeign = ModelB.bPrimary",
+        "map": "many"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "DbC"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelC WHERE modelAId IN (?)",
+        "args": {
+          "from_result": ["aPrimary"]
+        },
+        "map": "many"
+      },
+      "result": "modelCs"
+    }
+  ]
 ]
 ```
 

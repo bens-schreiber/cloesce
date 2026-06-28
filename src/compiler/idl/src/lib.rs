@@ -179,25 +179,10 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-/// A relationship to another model
-#[derive(Deserialize, Serialize, Hash)]
-pub enum NavigationFieldKind<'src> {
-    OneToOne {
-        /// The fields on the current model that reference the other model's primary key.
-        ///
-        /// Multiple fields indicate a composite foreign key.
-        ///
-        /// No fields indicate a singleton.
-        #[serde(borrow)]
-        fields: Vec<&'src str>,
-    },
-    OneToMany {
-        /// The columns on the other model that reference the current model's primary key.
-        ///
-        /// Multiple columns indicate a composite foreign key.
-        #[serde(borrow)]
-        columns: Vec<&'src str>,
-    },
+#[derive(Deserialize, Serialize)]
+pub enum NavigationCardinality {
+    One,
+    Many,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -212,8 +197,12 @@ pub struct NavigationField<'src> {
     #[serde(borrow)]
     pub model_reference: &'src str,
 
+    /// The backing of the referenced model, when it has one.
     #[serde(borrow)]
-    pub kind: NavigationFieldKind<'src>,
+    pub target_backing: Option<ModelBacking<'src>>,
+
+    pub cardinality: NavigationCardinality,
+    // TODO: put fields on here
 }
 
 #[derive(Deserialize, Serialize, Hash)]
@@ -674,20 +663,6 @@ impl CloesceIdl<'_> {
 
                 col.hash = col_h;
                 model_h.write_u64(col_h);
-            }
-
-            for nav in model.navigation_fields.iter_mut() {
-                let nav_h = {
-                    let mut h = FxHasher::default();
-                    h.write(b"ModelNavigationProperty");
-                    nav.model_reference.hash(&mut h);
-                    nav.field.hash(&mut h);
-                    nav.kind.hash(&mut h);
-                    h.finish()
-                };
-
-                nav.hash = nav_h;
-                model_h.write_u64(nav_h);
             }
 
             let model_h_finished = model_h.finish();

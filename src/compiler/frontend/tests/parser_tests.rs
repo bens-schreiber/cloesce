@@ -1,26 +1,24 @@
 use compiler_test::lex_and_ast;
 use frontend::{
-    ArgumentLiteral, Ast, AstBlockKind, ForeignBlock, InjectEntry, Keyword, ModelBlock,
-    ModelBlockKind, NavAdj, Spd, SqlBlockKind, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, Cardinality, ForeignBlock, InjectEntry, Keyword,
+    ModelBlock, ModelBlockKind, NavigationKey, Spd, SqlBlockKind, Tag,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
-fn adj_matches(adj: &[(Symbol, Symbol)], expected: &[(&str, &str)]) -> bool {
-    adj.len() == expected.len()
-        && adj
-            .iter()
-            .zip(expected)
-            .all(|((m, f), (em, ef))| m.name == *em && f.name == *ef)
+/// Matches a foreign block against its referenced `model` and `targets`.
+fn foreign_matches(fb: &ForeignBlock, model: &str, targets: &[&str]) -> bool {
+    fb.model.name == model
+        && fb.targets.len() == targets.len()
+        && fb.targets.iter().zip(targets).all(|(t, et)| t.name == *et)
 }
 
-/// Matches a nav block's adjacency entries against `(model, field, local_key)` triples.
-fn nav_adj_matches(adj: &[NavAdj], expected: &[(&str, Option<&str>, Option<&str>)]) -> bool {
-    adj.len() == expected.len()
-        && adj.iter().zip(expected).all(|(a, (em, ef, ek))| {
-            a.model.name == *em
-                && a.field.as_ref().map(|s| s.name) == *ef
-                && a.local_key.as_ref().map(|s| s.name) == *ek
-        })
+/// Matches a navigation block's key pairs against `(target, local)` tuples.
+fn nav_keys_match(keys: &[NavigationKey], expected: &[(&str, Option<&str>)]) -> bool {
+    keys.len() == expected.len()
+        && keys
+            .iter()
+            .zip(expected)
+            .all(|(k, (et, el))| k.target.name == *et && k.local.as_ref().map(|s| s.name) == *el)
 }
 
 #[test]
@@ -263,22 +261,26 @@ fn model_durable_backing() {
         })
         .expect("Leaderboard to have a kv field");
     assert_eq!(top_entry_cache.binding.name, "LeaderboardDo");
-    assert_eq!(top_entry_cache.binding_template.name, "topEntryCache");
-    assert!(top_entry_cache.args.is_empty());
+    assert_eq!(top_entry_cache.args[0].target.name, "topEntryCache");
+    assert!(top_entry_cache.args[0].local.is_empty());
     assert_eq!(top_entry_cache.field.name, "top");
 
     let top_entry_cache_with_date = leaderboard
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Kv(kv) if kv.binding_template.name == "topEntryCacheWithDate" => {
+            ModelBlockKind::Kv(kv)
+                if kv.args.first().map(|a| a.target.name) == Some("topEntryCacheWithDate") =>
+            {
                 Some(kv)
             }
             _ => None,
         })
         .expect("Leaderboard to have a topEntryCacheWithDate kv field");
     assert_eq!(top_entry_cache_with_date.binding.name, "LeaderboardDo");
-    assert_eq!(top_entry_cache_with_date.args.len(), 1,);
+    // `topEntryCacheWithDate(date)` — one template local, no shard discriminators.
+    assert_eq!(top_entry_cache_with_date.args.len(), 1);
+    assert_eq!(top_entry_cache_with_date.args[0].local.len(), 1);
 
     let global = find_model(&ast, "Global");
     assert_eq!(
@@ -582,15 +584,15 @@ fn model_primary_unique_optional_foreign() {
 
             primary {
                 id: int
-                foreign(Company::id) { companyId }
-                foreign(Parent::orgId, Parent::userId) { orgId userId }
+                foreign Company::id { companyId }
+                foreign Parent::{ orgId, userId } { orgId userId }
             }
 
-            foreign(Tag::id) { tagId }
-            foreign(Org::id) { orgId2 }
-            foreign(Author::id) optional { authorId }
-            foreign(Dept::id) { deptId }
-            foreign(Draft::id) optional { draftId }
+            foreign Tag::id { tagId }
+            foreign Org::id { orgId2 }
+            foreign Author::id optional { authorId }
+            foreign Dept::id { deptId }
+            foreign Draft::id optional { draftId }
 
             unique (a, b)
             unique (orgId2)
@@ -640,7 +642,7 @@ fn model_primary_unique_optional_foreign() {
     assert_eq!(
         sql_foreigns(primary)
             .iter()
-            .find(|fb| adj_matches(&fb.adj, &[("Company", "id")]))
+            .find(|fb| foreign_matches(fb, "Company", &["id"]))
             .unwrap()
             .fields[0]
             .name,
@@ -649,7 +651,7 @@ fn model_primary_unique_optional_foreign() {
     assert_eq!(
         sql_foreigns(primary)
             .iter()
-            .find(|fb| adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")]))
+            .find(|fb| foreign_matches(fb, "Parent", &["orgId", "userId"]))
             .unwrap()
             .fields
             .iter()
@@ -662,7 +664,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Tag", "id")]) => Some(fb),
+            ModelBlockKind::Foreign(fb) if foreign_matches(fb, "Tag", &["id"]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -673,7 +675,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Author", "id")]) => Some(fb),
+            ModelBlockKind::Foreign(fb) if foreign_matches(fb, "Author", &["id"]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -683,7 +685,7 @@ fn model_primary_unique_optional_foreign() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Draft", "id")]) => Some(fb),
+            ModelBlockKind::Foreign(fb) if foreign_matches(fb, "Draft", &["id"]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -710,13 +712,13 @@ fn model_navigation() {
     let ast = lex_and_ast(
         r#"
         model M {
-            foreign(Location::id) {
+            foreign Location::id {
                 locationId
             }
-            foreign(Tag::id) { tagId }
-            nav Location::id(locationId) { location }
-            nav Weather::reportId { weathers }
-            nav (Alert::regionId, Alert::zoneId) { alerts }
+            foreign Tag::id { tagId }
+            one Location::id(locationId) { location }
+            many Weather::reportId { weathers }
+            many Alert::{ regionId(regionId), zoneId(zoneId) } { alerts }
         }
         "#,
     );
@@ -727,7 +729,7 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Location", "id")]) => Some(fb),
+            ModelBlockKind::Foreign(fb) if foreign_matches(fb, "Location", &["id"]) => Some(fb),
             _ => None,
         })
         .unwrap();
@@ -737,89 +739,42 @@ fn model_navigation() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Navigation(n) if n.nav.inner.name == "location" => Some(n),
+            ModelBlockKind::Navigation(n) if n.field.inner.name == "location" => Some(n),
             _ => None,
         })
         .unwrap();
-    assert!(location_nav.is_one_to_one());
-    assert!(nav_adj_matches(
-        &location_nav.adj,
-        &[("Location", Some("id"), Some("locationId"))]
+    assert_eq!(location_nav.cardinality, Cardinality::One);
+    assert_eq!(location_nav.model.name, "Location");
+    assert!(nav_keys_match(
+        &location_nav.keys,
+        &[("id", Some("locationId"))]
     ));
 
     let weathers_nav = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Navigation(n) if n.nav.inner.name == "weathers" => Some(n),
+            ModelBlockKind::Navigation(n) if n.field.inner.name == "weathers" => Some(n),
             _ => None,
         })
         .unwrap();
-    assert!(!weathers_nav.is_one_to_one());
-    assert!(nav_adj_matches(
-        &weathers_nav.adj,
-        &[("Weather", Some("reportId"), None)]
-    ));
+    assert_eq!(weathers_nav.cardinality, Cardinality::Many);
+    assert_eq!(weathers_nav.model.name, "Weather");
+    assert!(nav_keys_match(&weathers_nav.keys, &[("reportId", None)]));
 
     let alerts_nav = m
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Navigation(n) if n.nav.inner.name == "alerts" => Some(n),
+            ModelBlockKind::Navigation(n) if n.field.inner.name == "alerts" => Some(n),
             _ => None,
         })
         .unwrap();
-    assert!(nav_adj_matches(
-        &alerts_nav.adj,
-        &[
-            ("Alert", Some("regionId"), None),
-            ("Alert", Some("zoneId"), None)
-        ]
-    ));
-}
-
-#[test]
-fn model_route() {
-    let ast = lex_and_ast(
-        r#"
-        model Person {
-            route {
-                id: int
-                tenant: int
-            }
-
-            nav Dog::ownerId(id) { dog }
-        }
-        "#,
-    );
-
-    let m = find_model(&ast, "Person");
-
-    let route = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Route(syms) => Some(syms),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(route[0].name, "id");
-    assert_eq!(route[0].cidl_type, CidlType::Int);
-    assert_eq!(route[1].name, "tenant");
-    assert_eq!(route[1].cidl_type, CidlType::Int);
-
-    let dog_nav = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Navigation(n) if n.nav.inner.name == "dog" => Some(n),
-            _ => None,
-        })
-        .unwrap();
-    assert!(dog_nav.is_one_to_one());
-    assert!(nav_adj_matches(
-        &dog_nav.adj,
-        &[("Dog", Some("ownerId"), Some("id"))]
+    assert_eq!(alerts_nav.cardinality, Cardinality::Many);
+    assert_eq!(alerts_nav.model.name, "Alert");
+    assert!(nav_keys_match(
+        &alerts_nav.keys,
+        &[("regionId", Some("regionId")), ("zoneId", Some("zoneId"))]
     ));
 }
 
@@ -828,7 +783,7 @@ fn model_keyless_singleton_nav() {
     let ast = lex_and_ast(
         r#"
         model M {
-            nav Singleton { config }
+            one Singleton { config }
         }
         "#,
     );
@@ -838,16 +793,14 @@ fn model_keyless_singleton_nav() {
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Navigation(n) if n.nav.inner.name == "config" => Some(n),
+            ModelBlockKind::Navigation(n) if n.field.inner.name == "config" => Some(n),
             _ => None,
         })
         .unwrap();
 
-    assert!(!config_nav.is_one_to_one());
-    assert!(nav_adj_matches(
-        &config_nav.adj,
-        &[("Singleton", None, None)]
-    ));
+    assert_eq!(config_nav.cardinality, Cardinality::One);
+    assert_eq!(config_nav.model.name, "Singleton");
+    assert!(config_nav.keys.is_empty());
 }
 
 #[test]
@@ -907,9 +860,13 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(kv_value.binding.name, "NsA");
-    assert_eq!(kv_value.binding_template.name, "value");
+    assert_eq!(kv_value.args[0].target.name, "value");
     assert_eq!(
-        kv_value.args.iter().map(|s| s.name).collect::<Vec<_>>(),
+        kv_value.args[0]
+            .local
+            .iter()
+            .map(|s| s.name)
+            .collect::<Vec<_>>(),
         vec!["id"]
     );
 
@@ -922,7 +879,7 @@ fn kv_r2_bindings_fields() {
         })
         .unwrap();
     assert_eq!(kv_page.binding.name, "NsB");
-    assert_eq!(kv_page.binding_template.name, "page");
+    assert_eq!(kv_page.args[0].target.name, "page");
 
     let r2_photo = m
         .blocks
@@ -949,82 +906,6 @@ fn kv_r2_bindings_fields() {
         .unwrap();
     assert_eq!(r2_thumb.binding.name, "BucketB");
     assert_eq!(r2_thumb.binding_template.name, "thumb");
-}
-
-#[test]
-fn optional_outer_parens() {
-    let ast = lex_and_ast(
-        r#"
-        kv Ns {
-            data(id: int) -> json { "data/{id}" }
-            listing() -> json { "list" }
-        }
-
-        r2 Bucket {
-            file(id: int) { "files/{id}" }
-        }
-
-        model M {
-            primary {
-                id: int
-            }
-
-            foreign Company::id { companyId }
-            foreign (Parent::orgId, Parent::userId) { orgId userId }
-
-            kv Ns::data(id) { cachedData }
-            kv (Ns::listing) { pagedData }
-            r2 Bucket::file(id) { fileData }
-            r2 (Bucket::file(id)) { wrappedFileData }
-        }
-        "#,
-    );
-
-    let m = find_model(&ast, "M");
-
-    // Single foreign without parens parses identically to the parenthesized form.
-    let company_fb = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Company", "id")]) => Some(fb),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(company_fb.fields[0].name, "companyId");
-
-    assert!(m.blocks.iter().any(|spd| matches!(
-        &spd.inner,
-        ModelBlockKind::Foreign(fb) if adj_matches(&fb.adj, &[("Parent", "orgId"), ("Parent", "userId")])
-    )));
-
-    // kv wrapped in outer parens with no args, and r2 wrapped in outer parens.
-    let paged = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::Kv(kv) if kv.field.name == "pagedData" => Some(kv),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(paged.binding.name, "Ns");
-    assert_eq!(paged.binding_template.name, "listing");
-    assert!(paged.args.is_empty());
-
-    let wrapped = m
-        .blocks
-        .iter()
-        .find_map(|spd| match &spd.inner {
-            ModelBlockKind::R2(r2) if r2.field.name == "wrappedFileData" => Some(r2),
-            _ => None,
-        })
-        .unwrap();
-    assert_eq!(wrapped.binding.name, "Bucket");
-    assert_eq!(wrapped.binding_template.name, "file");
-    assert_eq!(
-        wrapped.args.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["id"]
-    );
 }
 
 #[test]
@@ -1098,6 +979,57 @@ fn sql_foreigns<'a>(blocks: &'a [Spd<SqlBlockKind<'a>>]) -> Vec<&'a ForeignBlock
             _ => None,
         })
         .collect()
+}
+
+#[test]
+fn kv_durable_spider_form() {
+    let ast = lex_and_ast(
+        r#"
+        durable MyDurable {
+            shard {
+                doId: string
+            }
+
+            value(key1: string, key2: string) -> string {
+                "value/{key1}/{key2}"
+            }
+        }
+
+        model Foo {
+            route {
+                key1: string
+                key2: string
+                doId: string
+            }
+
+            kv MyDurable::{ value(key1, key2), doId(doId) } { myValue }
+        }
+        "#,
+    );
+
+    let m = find_model(&ast, "Foo");
+    let kv = m
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            ModelBlockKind::Kv(kv) if kv.field.name == "myValue" => Some(kv),
+            _ => None,
+        })
+        .unwrap();
+
+    assert_eq!(kv.binding.name, "MyDurable");
+
+    assert_eq!(kv.args[0].target.name, "value");
+    assert_eq!(
+        kv.args[0].local.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["key1", "key2"]
+    );
+
+    assert_eq!(kv.args[1].target.name, "doId");
+    assert_eq!(
+        kv.args[1].local.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["doId"]
+    );
 }
 
 fn find_model<'a>(ast: &'a Ast<'a>, name: &str) -> &'a ModelBlock<'a> {

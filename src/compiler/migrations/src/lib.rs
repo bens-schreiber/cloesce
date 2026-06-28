@@ -16,7 +16,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
 };
 
-use idl::{CidlType, Column, ModelBacking, NavigationField};
+use idl::{CidlType, Column, ModelBacking};
 
 use indexmap::IndexMap;
 use sea_query::{
@@ -40,9 +40,6 @@ pub struct MigrationsModel<'src> {
 
     #[serde(borrow)]
     pub columns: Vec<Column<'src>>,
-
-    #[serde(borrow)]
-    pub navigation_fields: Vec<NavigationField<'src>>,
 }
 
 impl<'src> MigrationsModel<'src> {

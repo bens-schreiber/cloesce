@@ -1,4 +1,4 @@
-With the Cloesce Query Planner, Worker based relationships will be enabled with both `one` and `many` syntaxes. Because a Worker based Model cannot be truly "listed", the `many` syntax will simply map to an array with at most one element. 
+With the Cloesce Query Planner, Worker based relationships will be enabled with both `one` and `many` syntaxes. Because a Worker based Model cannot be truly "listed", the `many` syntax will simply map to an array with at most one element.
 
 Additionally, the `list` method for Worker based models will return a single element array containing the Worker based model, or an empty array if the Worker based model does not exist. This allows for consistent handling of Worker based relationships in queries, while still adhering to the limitations of Worker based models.
 
@@ -12,8 +12,8 @@ model User {
         id: int
     }
 
-    one Cat::id(id) { 
-        cat 
+    one Cat::id(id) {
+        cat
     }
 }
 
@@ -28,26 +28,26 @@ model Cat {
 
 ```json
 [
-    [
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
+  [
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
         },
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": "cat"
-        }
-    ]
+        "map": "one"
+      },
+      "result": ""
+    },
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": "cat"
+    }
+  ]
 ]
 ```
 
@@ -59,8 +59,8 @@ model User {
         id: int
     }
 
-    many Cat::userId(id) { 
-        cats 
+    many Cat::userId(id) {
+        cats
     }
 }
 
@@ -73,26 +73,26 @@ model Cat {
 
 ```json
 [
-    [
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": ""
+  [
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
         },
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "cats"
-        }
-    ]
+        "map": "one"
+      },
+      "result": ""
+    },
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "cats"
+    }
+  ]
 ]
 ```
 
@@ -108,8 +108,8 @@ model User {
         id: int
     }
 
-    one Cat::id(id) { 
-        cat 
+    one Cat::id(id) {
+        cat
     }
 }
 
@@ -122,26 +122,26 @@ model Cat {
 
 ```json
 [
-    [
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "many"
-            },
-            "result": ""
+  [
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
         },
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one"
-            },
-            "result": "cat"
-        }
-    ]
+        "map": "many"
+      },
+      "result": ""
+    },
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": "cat"
+    }
+  ]
 ]
 ```
 
@@ -155,8 +155,8 @@ model User {
         id: int
     }
 
-    many Cat::userId(id) { 
-        cats 
+    many Cat::userId(id) {
+        cats
     }
 }
 
@@ -169,26 +169,26 @@ model Cat {
 
 ```json
 [
-    [
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "many"
-            },
-            "result": ""
+  [
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
         },
-        {
-            "query": {
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "many"
-            },
-            "result": "cats"
-        }
-    ]
+        "map": "many"
+      },
+      "result": ""
+    },
+    {
+      "query": {
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "cats"
+    }
+  ]
 ]
 ```
 
@@ -198,12 +198,12 @@ A Worker based model does not require any route fields:
 
 ```cloesce
 model User {
-    one Cat { 
-        cat 
+    one Cat {
+        cat
     }
 
-    many Dog { 
-        dogs 
+    many Dog {
+        dogs
     }
 }
 
@@ -213,27 +213,28 @@ model Dog {}
 ```
 
 EX: `GET User`
+
 ```json
 [
-    [
-        {
-            "query": {
-                "map": "one"
-            },
-            "result": ""
-        },
-        {
-            "query": {
-                "map": "one"
-            },
-            "result": "cat"
-        },
-        {
-            "query": {
-                "map": "many"
-            },
-            "result": "dogs"
-        }
-    ]
+  [
+    {
+      "query": {
+        "map": "one"
+      },
+      "result": ""
+    },
+    {
+      "query": {
+        "map": "one"
+      },
+      "result": "cat"
+    },
+    {
+      "query": {
+        "map": "many"
+      },
+      "result": "dogs"
+    }
+  ]
 ]
 ```

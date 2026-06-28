@@ -40,24 +40,24 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["doId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelB ON ModelA.modelBId = ModelB.id",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one",
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["doId"]
         }
-    ]
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelB ON ModelA.modelBId = ModelB.id",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -85,24 +85,24 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["doId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelB ON ModelA.id = ModelB.modelAId",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one",
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["doId"]
         }
-    ]
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelB ON ModelA.id = ModelB.modelAId",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ]
 ]
 ```
 
@@ -139,42 +139,42 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["doId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one",
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["doId"]
         }
-    ],
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_result": ["modelBDoId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?1",
-                "args": {
-                    "from_result": ["modelBId"]
-                },
-                "map": "one",
-            },
-            "result": "modelB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_result": ["modelBDoId"]
         }
-    ]
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?1",
+        "args": {
+          "from_result": ["modelBId"]
+        },
+        "map": "one"
+      },
+      "result": "modelB"
+    }
+  ]
 ]
 ```
 
@@ -212,42 +212,42 @@ EX: `GET ModelA`
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["doId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one",
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["doId"]
         }
-    ],
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_result": ["modelBDoId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.modelAId = ?1",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": "many",
-            },
-            "result": "modelBs"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_result": ["modelBDoId"]
         }
-    ]
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.modelAId = ?1",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": "many"
+      },
+      "result": "modelBs"
+    }
+  ]
 ]
 ```
 
@@ -294,42 +294,41 @@ In this example, `ModelA` has a `one` relationship with `ModelB` through a varia
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["doId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelC ON ModelA.id = ModelC.modelAId",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": "one",
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["doId"]
         }
-    ],
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_result": ["modelBDoId"]
-                },
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?1",
-                "args": {
-                    "from_result": ["modelBId"]
-                },
-                "map": "one",
-            },
-            "result": "modelB"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.id = ?1 JOIN ModelC ON ModelA.id = ModelC.modelAId",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_result": ["modelBDoId"]
         }
-    ]
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelB WHERE ModelB.id = ?1",
+        "args": {
+          "from_result": ["modelBId"]
+        },
+        "map": "one"
+      },
+      "result": "modelB"
+    }
+  ]
 ]
 ```
-

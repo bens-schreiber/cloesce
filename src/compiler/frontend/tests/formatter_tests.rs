@@ -91,13 +91,13 @@ fn comments_retained() {
         } //9
 
         //14
-        foreign (OneToManyModel::id) { //E
+        foreign OneToManyModel::id { //E
             fk_to_model //15
             //16
         } //19
 
         //F
-        nav OneToManyModel::id(fk_to_model) { //G
+        one OneToManyModel::id(fk_to_model) { //G
             oneToOneNav //18
         }
         //H

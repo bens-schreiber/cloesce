@@ -52,71 +52,71 @@ Because the Model may not exist, the ORM will first execute the SQLite query to 
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "DbA"
-            },
-            "query": {
-                "sql": "SELECT * FROM ModelA WHERE ModelA.pk = ?1",
-                "args": {
-                    "from_params": ["pk"]
-                },
-                "map": "one"
-            },
-            "result": ""
+  [
+    {
+      "db": {
+        "name": "DbA"
+      },
+      "query": {
+        "sql": "SELECT * FROM ModelA WHERE ModelA.pk = ?1",
+        "args": {
+          "from_params": ["pk"]
+        },
+        "map": "one"
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "Bucket"
+      },
+      "query": {
+        "key": "image/{routeParam}",
+        "args": {
+          "from_result": ["routeParam"]
         }
-    ],
-    [
-        {
-            "db": {
-                "name": "Bucket"
-            },
-            "query": {
-                "key": "image/{routeParam}",
-                "args": {
-                    "from_result": ["routeParam"]
-                }
-            },
-            "result": "imageFromRoute"
-        },
-        {
-            "db": {
-                "name": "Namespace"
-            },
-            "query": {
-                "key": "value/{routeParam}",
-                "args": {
-                    "from_result": ["routeParam"]
-                }
-            },
-            "result": "settingsFromRoute"
-        },
-        {
-            "db": {
-                "name": "Bucket"
-            },
-            "query": {
-                "key": "image/{pk}",
-                "args": {
-                    "from_result": ["pk"]
-                }
-            },
-            "result": "imageFromPk"
-        },
-        {
-            "db": {
-                "name": "Namespace"
-            },
-            "query": {
-                "key": "value/{pk}",
-                "args": {
-                    "from_result": ["pk"]
-                }
-            },
-            "result": "settingsFromPk"
+      },
+      "result": "imageFromRoute"
+    },
+    {
+      "db": {
+        "name": "Namespace"
+      },
+      "query": {
+        "key": "value/{routeParam}",
+        "args": {
+          "from_result": ["routeParam"]
         }
-    ]
+      },
+      "result": "settingsFromRoute"
+    },
+    {
+      "db": {
+        "name": "Bucket"
+      },
+      "query": {
+        "key": "image/{pk}",
+        "args": {
+          "from_result": ["pk"]
+        }
+      },
+      "result": "imageFromPk"
+    },
+    {
+      "db": {
+        "name": "Namespace"
+      },
+      "query": {
+        "key": "value/{pk}",
+        "args": {
+          "from_result": ["pk"]
+        }
+      },
+      "result": "settingsFromPk"
+    }
+  ]
 ]
 ```
 
@@ -153,22 +153,22 @@ EX: `GET ModelA`:
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "ShardedDo",
-                "args": {
-                    "from_params": ["shard"]
-                }
-            },
-            "query": {
-                "key": "value/{key}",
-                "args": {
-                    "from_params": ["key"]
-                }
-            },
-            "result": "valueFromRoute"
+  [
+    {
+      "db": {
+        "name": "ShardedDo",
+        "args": {
+          "from_params": ["shard"]
         }
-    ]
+      },
+      "query": {
+        "key": "value/{key}",
+        "args": {
+          "from_params": ["key"]
+        }
+      },
+      "result": "valueFromRoute"
+    }
+  ]
 ]
 ```

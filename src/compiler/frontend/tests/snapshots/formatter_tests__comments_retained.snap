@@ -35,7 +35,7 @@ model BasicModel for db {
     } // 19
     
     // F
-    nav OneToManyModel::id(fk_to_model) {
+    one OneToManyModel::id(fk_to_model) {
         // G
         oneToOneNav // 18
     }
