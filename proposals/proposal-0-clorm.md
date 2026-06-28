@@ -13,7 +13,7 @@
 
 ## Motivation
 
-Imagine the case where we are making a Reddit clone, where every `User`,  `SubReddit`, `Post` and `Comment` are different durable objects.
+Imagine the case where we are making a Reddit clone, where every `User`,  `SubReddit` and `Post` are different durable objects, and `Comment` is a SQLite table on the `Post` DO:
 
 A `User` has
 - Many `SubReddit`s they are subscribed to
@@ -41,6 +41,7 @@ Despite this being an intuitive data model, Cloesce in its current form cannot e
 
 This proposal aims to break the barriers Cloesce has set up:
 - Any Model should be able to have a relationship with any other Model (be it either `1:1`, `1:N` or both).
+- Any Model can have `route` fields
 
 ---
 
@@ -96,6 +97,32 @@ Despite having similar syntax, none of these `User` models could express a relat
 But lets assume that the ORM could resolve these complex hydration queries, what would the syntax look like?
 
 To disambiguate relationships, we will remove the `nav` block and replace it with a `one` or `many` block that explicitly states the cardinality of the relationship.
+
+Additionally, when faced with a relationship that cannot be resolved (such as a `1:N` relationship to a Worker backed model), Cloesce will simply populate the single result in an array.
+
+
+### New Syntax
+
+The `nav` block will be replaced with a `one` or `many` block, which explicitly states the cardinality of the relationship.
+
+Additionally, a new "spider initializer" `::{}` will be introduced, which allows explicit specification of the fields that are used to resolve the relationship. This form can be used if one or more fields are required, where the old direct form can be used if one field is required:
+
+```cloesce
+// singular form
+one ModelB::id(modelBId) {
+    modelB
+}
+
+// singular form via spider initializer
+one ModelB::{id(modelBId)} {
+    modelB
+}
+
+// plural form via spider initializer
+one ModelB::{id(modelBId), doId(modelBDoId)} {
+    modelB
+}
+```
 
 
 ### 1:1 Relationships
@@ -244,10 +271,51 @@ model D1BackedB for DbB {
 
 This requires two separate queries to two separate databases, but is possible because all `primary` fields are supplied in the constructor.
 
+#### DO KV
+
+Any Model will be able to use a Durable Objects KV storage. The syntax will be as follows:
+
+```cloesce
+durable MyDurable {
+    shard {
+        doId: string
+    }
+
+    value(key1: string, key2: string) -> string {
+        "value/{key1}/{key2}"
+    }
+}
+
+model Foo {
+    route {
+        key1: string
+        key2: string
+        doId: string
+    }
+
+    kv MyDurable::{value(key1, key2), doId(doId)} {
+        myValue
+    }
+}
+```
+
+This will resolve the value at `MyDurable::value` with the parameters `key1` and `key2` from the `Foo` model, and the `doId` from the `Foo` model to construct the DO id.
+
+If a user tried to simply pass:
+```cloesce
+kv MyDurable::value(key1, key2) {
+    myValue
+}
+```
+
+The compiler would raise an error, because the `doId` is required to construct the DO id, and it is not provided in the constructor.
+
 
 ### 1:N Relationships
 
-Several relationships will always be impossible with `1:N`, because not all Models can be indexed. Any `Worker` backed model (be it with no backing or a `DO` that just uses `route` fields) will never be able to have a `1:N` relationship with any other model, because there is no way to index it.
+Previously, some relationships were impossible with `1:N`, because not all Models could be indexed. In this proposal, these relationships will be allowed, but the ORM will simply return an array with a single result (not all Models can be indexed, only one result can be returned).
+
+The syntax of the `many` block states "Many of Model X where X.Field equals Y.Field", where `X` is the Model being hydrated, and `Y` is the Model that is being hydrated from.
 
 #### Worker -> D1
 
@@ -320,7 +388,7 @@ model DoBackedB for DoB(tenantId) {
 
 In some cases, a Model may have no `primary` key or `route` fields, and therefore cannot be indexed by some key.
 
-The syntax for this Model (which would only be capable of `1:1` relationships) would look like this:
+The syntax for this Model would look like this:
 
 ```cloesce
 model UnindexedModel { }
@@ -338,7 +406,7 @@ model IndexedModel for Db {
 
 #### No Discriminator Provided
 
-It may be useful to have a `1:N` relationship where `N` is simply the entire collection of a Model. This would only be possible in a SQLite backed Model, and would look like this:
+It may be useful to have a `1:N` relationship where `N` is simply the entire collection of a Model:
 
 ```cloesce
 model Post for Db {
@@ -376,7 +444,7 @@ model User for Do(tenantId) {
     }
 
     // This fetches ALL posts for a given tenantId, no other discriminator provided.
-    many Post::{tenantId(tenantId)} {
+    many Post::tenantId(tenantId) {
         posts
     }
 }
@@ -387,7 +455,7 @@ model User for Do(tenantId) {
 Using the syntax described above, we can now express the relationships between our `User`, `SubReddit`, `Post` and `Comment` models in a Reddit clone.
 
 To demonstrate a small example, assume that:
-- `UserDo`, `SubRedditDo`, `PostDo`, and `CommentDo` are all Durable Objects
+- `UserDo`, `SubRedditDo` and `PostDo` are all Durable Objects
 - `User`, `SubReddit`, `Post` and `Comment` are Models backed by each respective Durable Objects
 
 ```cloesce
@@ -422,6 +490,13 @@ model UserFollowedSubReddit for UserDo(userId) {
 // to the associated Model on that DO.
 ```
 
-In this example, each `User` Model has the tables `UserFollowedSubReddit`, `UserComment` and `UserPost` stored in SQLite, and each one of them has a `1:1` relationship with their respective Model.
 
-Cloesce would be able to hydrate this entire relationship, allowing the backend to only focus on business logic and not have to worry about how to fetch related data across multiple DOs.
+---
+
+## Implementation
+
+See:
+- [D1](./prop-0/d1/d1.md)
+- [DO](./prop-0/do/do.md)
+- [KV-R2](./prop-0/kv-r2/kv-r2.md)
+- [Worker](./prop-0/worker/worker.md)
