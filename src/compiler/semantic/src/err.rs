@@ -1,6 +1,5 @@
 use ariadne::{Color, Config, IndexType, Label, Report, ReportKind};
 use frontend::{FileTable, Span, Spd, Tag, err::DisplayError};
-use idl::CrudKind;
 
 use crate::Symbol;
 
@@ -32,11 +31,6 @@ pub enum SemanticError<'src, 'p> {
 
     /// A model that specifies a database binding but does not specify a primary key.
     ModelMissingPrimaryKey {
-        model: &'p Symbol<'src>,
-    },
-
-    /// Route fields and SQL blocks are mutually exclusive
-    ModelMixesRoutesAndSql {
         model: &'p Symbol<'src>,
     },
 
@@ -75,35 +69,17 @@ pub enum SemanticError<'src, 'p> {
         field_count: usize,
     },
 
-    /// A foreign key or navigation adj list references more than one model name
-    InconsistentModelAdjacency {
-        first_model: &'p Symbol<'src>,
-        second_model: &'p Symbol<'src>,
+    /// A navigation or DO-KV reference to a Durable Object target is missing a shard
+    /// discriminator, so its DO id cannot be constructed.
+    RelationMissingDiscriminator {
+        field: &'p Symbol<'src>,
+        missing: &'src str,
     },
 
-    /// A navigation property references a model with a different backing: a different D1
-    /// database, or one side is a route model and the other is not.
-    NavigationReferencesDifferentBacking {
-        field: &'p Symbol<'src>,
-    },
-
-    /// A route model declares a navigation that is not a 1:1 to another route model.
-    RouteNavigationInvalid {
-        field: &'p Symbol<'src>,
-        reason: &'static str,
-    },
-
-    /// A navigation property could not be resolved to either a 1:1 or a 1:M
-    /// relationship because no matching foreign key exists.
-    NavigationMissingForeignKey {
-        field: &'p Symbol<'src>,
-        model_reference: &'src str,
-    },
-
-    /// A navigation property mixes 1:1 entries (with a local key) and 1:M
-    /// entries (without one) in the same adjacency list.
-    NavigationMixedAdjacency {
-        field: &'p Symbol<'src>,
+    /// A navigation discriminator key omits the local field that supplies it, i.e.
+    /// `Target::key` rather than `Target::key(local)`.
+    RelationMissingLocalKey {
+        target: &'p Symbol<'src>,
     },
 
     CyclicalRelationship {
@@ -121,6 +97,13 @@ pub enum SemanticError<'src, 'p> {
     ArgTypeMismatch {
         field: &'p Symbol<'src>,
         arg: &'p Symbol<'src>,
+    },
+
+    /// A KV reference must name exactly one of its binding's storage templates;
+    /// it named `count` (zero, or more than one).
+    KvTemplateCount {
+        field: &'p Symbol<'src>,
+        count: usize,
     },
 
     /// A template format string references a variable that is not in the
@@ -163,12 +146,6 @@ pub enum SemanticError<'src, 'p> {
     DataSourceInvalidMethodParam {
         source: &'p Symbol<'src>,
         param: &'p Symbol<'src>,
-    },
-
-    /// A model has a CRUD operation that is not supported for its backing store.
-    UnsupportedCrudOperation {
-        model: &'p Symbol<'src>,
-        crud: &'p Spd<CrudKind>,
     },
 
     /// An API block references a model that does not exist.
@@ -368,21 +345,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::ModelMixesRoutesAndSql { model } => {
-            let (path, range) = span_parts(&model.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "model '{}' mixes route fields with a SQLite table",
-                    model.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "a `route` block cannot coexist with SQL blocks or a D1 backing",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
         SemanticError::InvalidColumnType { column } => {
             let (path, range) = span_parts(&column.span, file_table);
             report!(path.clone(), range.clone())
@@ -469,29 +431,6 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::InconsistentModelAdjacency {
-            first_model,
-            second_model,
-        } => {
-            let (first_path, first_range) = span_parts(&first_model.span, file_table);
-            let (second_path, second_range) = span_parts(&second_model.span, file_table);
-
-            report!(second_path.clone(), second_range.clone())
-                .with_message("adjacency list references multiple models")
-                .with_label(
-                    Label::new((second_path, second_range))
-                        .with_message(format!("'{}' referenced here", second_model.name))
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((first_path, first_range))
-                        .with_message(format!(
-                            "'{}' referenced here — all entries must point to the same model",
-                            first_model.name
-                        ))
-                        .with_color(Color::Yellow),
-                )
-        }
         SemanticError::ForeignKeyInconsistentFieldAdj {
             span,
             adj_count,
@@ -508,66 +447,34 @@ fn display(
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationReferencesDifferentBacking { field: nav } => {
-            let (path, range) = span_parts(&nav.span, file_table);
+        SemanticError::RelationMissingDiscriminator { field, missing } => {
+            let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "navigation property '{}' references a model with a different backing",
-                    nav.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(
-                            "navigation properties must reference models with the same backing \
-                             (the same D1 database, or both route models)",
-                        )
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::RouteNavigationInvalid { field: nav, reason } => {
-            let (path, range) = span_parts(&nav.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "navigation property '{}' is not a valid route navigation",
-                    nav.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(*reason)
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::NavigationMissingForeignKey {
-            field: nav,
-            model_reference,
-        } => {
-            let (path, range) = span_parts(&nav.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "navigation property '{}' has no matching foreign key",
-                    nav.name
+                    "relation '{}' is missing the shard discriminator '{missing}'",
+                    field.name
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(format!(
-                            "a 1:1 nav needs a foreign key on this model referencing '{model_reference}', \
-                             and a 1:M nav needs a foreign key on '{model_reference}' referencing this model"
+                            "the target's Durable Object shard field '{missing}' must be supplied to construct its id"
                         ))
                         .with_color(Color::Red),
                 )
         }
-        SemanticError::NavigationMixedAdjacency { field: nav } => {
-            let (path, range) = span_parts(&nav.span, file_table);
+        SemanticError::RelationMissingLocalKey { target } => {
+            let (path, range) = span_parts(&target.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "navigation property '{}' mixes 1:1 and 1:M entries",
-                    nav.name
+                    "relation discriminator '{}' is missing a local field",
+                    target.name
                 ))
                 .with_label(
                     Label::new((path, range))
-                        .with_message(
-                            "all entries must either have a local key (1:1) or none (1:M)",
-                        )
+                        .with_message(format!(
+                            "supply the local field that resolves it, e.g. `{}(localField)`",
+                            target.name
+                        ))
                         .with_color(Color::Red),
                 )
         }
@@ -657,6 +564,24 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
+        SemanticError::KvTemplateCount { field, count } => {
+            let (path, range) = span_parts(&field.span, file_table);
+            let detail = if *count == 0 {
+                "no storage template is referenced".to_string()
+            } else {
+                format!("{count} storage templates are referenced")
+            };
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "'{}' must reference exactly one storage template, but {detail}",
+                    field.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("a kv field needs exactly one `template(args)` reference")
+                        .with_color(Color::Red),
+                )
+        }
         SemanticError::PlainOldObjectInvalidFieldType { field } => {
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
@@ -728,26 +653,6 @@ fn display(
                     Label::new((source_path, source_range))
                         .with_message(format!("data source '{}' declared here", source.name))
                         .with_color(Color::Yellow),
-                )
-        }
-        SemanticError::UnsupportedCrudOperation { model, crud } => {
-            let (path, range) = span_parts(&model.span, file_table);
-            let op = match crud.inner {
-                CrudKind::Get => "get",
-                CrudKind::List => "list",
-                CrudKind::Save => "save",
-            };
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "model '{}' does not support the `{}` CRUD operation",
-                    model.name, op
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(format!(
-                            "`{op}` is not supported for this model's backing store"
-                        ))
-                        .with_color(Color::Red),
                 )
         }
         SemanticError::ApiUnknownNamespaceReference { api } => {

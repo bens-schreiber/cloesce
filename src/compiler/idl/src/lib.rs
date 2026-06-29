@@ -179,10 +179,19 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
 pub enum NavigationCardinality {
     One,
     Many,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct NavigationKeyMapping<'src> {
+    #[serde(borrow)]
+    pub local: &'src str,
+
+    #[serde(borrow)]
+    pub target: &'src str,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -202,7 +211,10 @@ pub struct NavigationField<'src> {
     pub target_backing: Option<ModelBacking<'src>>,
 
     pub cardinality: NavigationCardinality,
-    // TODO: put fields on here
+
+    /// The resolved discriminator pairs used to join this model to its target.
+    #[serde(borrow, default)]
+    pub keys: Vec<NavigationKeyMapping<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Hash)]
@@ -342,6 +354,11 @@ pub struct KvField<'src> {
     pub binding: &'src str,
 
     pub key_format: String,
+
+    /// When [Self::binding] is a Durable Object, the model's local fields that supply the
+    /// DO's shard discriminators, in shard-declaration order.
+    #[serde(borrow, default)]
+    pub shard_fields: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -410,7 +427,7 @@ pub struct ApiMethod<'src> {
     pub durable_target: Option<DurableTarget<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
 pub enum BackingKind {
     DurableObject,
     D1,

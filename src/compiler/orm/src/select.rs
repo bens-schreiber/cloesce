@@ -1,4 +1,4 @@
-use idl::{CloesceIdl, IncludeTree, Model, NavigationFieldKind};
+use idl::{CloesceIdl, IncludeTree, Model};
 use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
@@ -107,34 +107,16 @@ impl<'a> SelectModel<'a> {
 
             let child_alias = self.id(child.name);
 
-            match &nav.kind {
-                NavigationFieldKind::OneToOne { fields } => {
-                    // Build join condition for all key columns
-                    let mut condition = sea_query::Condition::all();
-
-                    for (fk, pk) in fields.iter().zip(child.primary_columns.iter()) {
-                        condition = condition.add(
-                            Expr::col((alias(&model_alias), alias(*fk)))
-                                .equals((alias(&child_alias), alias(pk.field.name.as_ref()))),
-                        );
-                    }
-
-                    left_join_as(&mut self.query, child.name, &child_alias, condition);
-                }
-                NavigationFieldKind::OneToMany { columns } => {
-                    // Build join condition for all key columns
-                    let mut condition = sea_query::Condition::all();
-
-                    for (pk, fk) in model.primary_columns.iter().zip(columns.iter()) {
-                        condition = condition.add(
-                            Expr::col((alias(&model_alias), alias(pk.field.name.as_ref())))
-                                .equals((alias(&child_alias), alias(*fk))),
-                        );
-                    }
-
-                    left_join_as(&mut self.query, child.name, &child_alias, condition);
-                }
+            // Join on each resolved discriminator pair: `self.local = target.target`.
+            let mut condition = sea_query::Condition::all();
+            for key in &nav.keys {
+                condition = condition.add(
+                    Expr::col((alias(&model_alias), alias(key.local)))
+                        .equals((alias(&child_alias), alias(key.target))),
+                );
             }
+
+            left_join_as(&mut self.query, child.name, &child_alias, condition);
 
             self.path.push(nav.field.name.to_string());
             self.dfs(child, child_tree, child_alias);

@@ -34,7 +34,7 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
                 id: int
             }
 
-            foreign(User::id) {
+            foreign User::id {
                 userId
             }
         }
@@ -44,15 +44,15 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
                 id: int
             }
 
-            foreign(Profile::id) {
+            foreign Profile::id {
                 profileId
             }
 
-            nav Profile::id(profileId) {
+            one Profile::id(profileId) {
                 profile
             }
 
-            nav Order::userId {
+            many Order::userId(id) {
                 orders
             }
 
@@ -141,7 +141,7 @@ fn omitted_include_uses_default_tree() {
                 profileId
             }
 
-            nav Profile::id(profileId) {
+            one Profile::id(profileId) {
                 profile
             }
         }
@@ -229,7 +229,7 @@ async fn default_data_source_skips_nested_manys(db: SqlitePool) {
                 id: int
             }
 
-            foreign(Student::id) {
+            foreign Student::id {
                 studentId
             }
         }
@@ -239,7 +239,7 @@ async fn default_data_source_skips_nested_manys(db: SqlitePool) {
                 id: int
             }
 
-            nav(Student::teacherId) {
+            many Student::teacherId(id) {
                 students
             }
         }
@@ -249,11 +249,11 @@ async fn default_data_source_skips_nested_manys(db: SqlitePool) {
                 id: int
             }
 
-            foreign(Teacher::id) {
+            foreign Teacher::id {
                 teacherId
             }
 
-            nav(Grade::studentId) {
+            many Grade::studentId(id) {
                 grades
             }
         }
@@ -327,11 +327,11 @@ async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
                 breed: string
             }
 
-            foreign(Toy::id) {
+            foreign Toy::id {
                 toyId
             }
 
-            nav Toy::id(toyId) { toy }
+            one Toy::id(toyId) { toy }
         }
 
         model Owner for db {
@@ -342,11 +342,11 @@ async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
                 name: string
             }
 
-            foreign(Dog::id) {
+            foreign Dog::id {
                 dogId
             }
 
-            nav Dog::id(dogId) { dog }
+            one Dog::id(dogId) { dog }
         }
     "#,
     );
@@ -413,11 +413,11 @@ async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool
                 id: int
             }
 
-            foreign(Team::id) {
+            foreign Team::id {
                 teamId
             }
 
-            nav Team::id(teamId) { team }
+            one Team::id(teamId) { team }
         }
 
         model Company for db {
@@ -425,17 +425,17 @@ async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool
                 id: int
             }
 
-            foreign(Department::id) {
+            foreign Department::id {
                 departmentId
             }
 
-            nav Department::id(departmentId) { department }
+            one Department::id(departmentId) { department }
 
-            foreign(Team::id) {
+            foreign Team::id {
                 directTeamId
             }
 
-            nav Team::id(directTeamId) { team }
+            one Team::id(directTeamId) { team }
         }
     "#,
     );
@@ -705,7 +705,7 @@ fn default_data_source_durable_sqlite() {
                 score: int
             }
 
-            kv LeaderboardDo::topCache {
+            kv LeaderboardDo::{ topCache, tenantId(tenantId) } {
                 top
             }
         }

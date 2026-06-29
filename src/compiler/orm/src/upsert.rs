@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationFieldKind, ValidatedField};
+use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationCardinality, ValidatedField};
 
 use frontend::fmt_cidl_type;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder};
@@ -229,7 +229,7 @@ impl<'a> UpsertModel<'a> {
         let (one_to_ones, others): (Vec<_>, Vec<_>) = model
             .navigation_fields
             .iter()
-            .partition(|n| matches!(n.kind, NavigationFieldKind::OneToOne { .. }));
+            .partition(|n| matches!(n.cardinality, NavigationCardinality::One));
 
         // This table is dependent on it's 1:1 references, so they must be traversed before
         // table insertion (granted the include tree references them).
@@ -239,9 +239,6 @@ impl<'a> UpsertModel<'a> {
                 continue;
             };
             let Some(Value::Object(nav_model)) = new_model.remove(nav.field.name.as_ref()) else {
-                continue;
-            };
-            let NavigationFieldKind::OneToOne { fields } = &nav.kind else {
                 continue;
             };
 
@@ -254,24 +251,12 @@ impl<'a> UpsertModel<'a> {
                 format!("{path}.{}", nav.field.name),
             )?;
 
-            // Map each key column to the path in the context wheere its value can be found
-            let columns_by_name: HashMap<_, _> = model
-                .all_columns()
-                .map(|(c, _)| (c.field.name.as_ref(), c))
-                .collect();
-            for field in fields {
-                let col = columns_by_name
-                    .get(field)
-                    .expect("key column to exist in model");
-
-                let fk = col
-                    .foreign_key_reference
-                    .as_ref()
-                    .expect("foreign key to exist");
-
+            // Map each local key column to the path in the context where the target's
+            // value can be found: `{path}.{nav}.{target}`.
+            for key in &nav.keys {
                 nav_ref_to_path.insert(
-                    *field,
-                    format!("{path}.{}.{}", nav.field.name, fk.column_name),
+                    key.local,
+                    format!("{path}.{}.{}", nav.field.name, key.target),
                 );
             }
         }
@@ -376,8 +361,8 @@ impl<'a> UpsertModel<'a> {
                 continue;
             };
 
-            match (&nav.kind, new_model.remove(nav.field.name.as_ref())) {
-                (NavigationFieldKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
+            match (&nav.cardinality, new_model.remove(nav.field.name.as_ref())) {
+                (NavigationCardinality::Many, Some(Value::Array(nav_models))) => {
                     for nav_model in nav_models {
                         let Value::Object(obj) = nav_model else {
                             continue;

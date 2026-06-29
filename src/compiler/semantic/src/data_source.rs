@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use idl::{IncludeTree, Model, NavigationFieldKind};
+use idl::{IncludeTree, Model, NavigationCardinality};
 use indexmap::IndexMap;
 
 pub mod analysis {
@@ -600,8 +600,8 @@ pub fn include_dfs<'src>(
 
     let model = models.get(current_model).unwrap();
     for nav in &model.navigation_fields {
-        match nav.kind {
-            NavigationFieldKind::OneToOne { .. } => {
+        match nav.cardinality {
+            NavigationCardinality::One => {
                 if nav.model_reference == current_model {
                     // Self-referencing 1:1. Include but don't recurse.
                     current_node
@@ -617,7 +617,7 @@ pub fn include_dfs<'src>(
                 let new_node = include_dfs(models, nav.model_reference, visited);
                 current_node.0.insert(nav.field.name.clone(), new_node);
             }
-            NavigationFieldKind::OneToMany { .. } => {
+            NavigationCardinality::Many => {
                 // Include the related model as a leaf, but don't recurse.
                 current_node
                     .0
