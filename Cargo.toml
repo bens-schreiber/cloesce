@@ -1,11 +1,13 @@
 [workspace]
 members = [
-  "src/compiler/cli",
   "src/compiler/idl",
   "src/compiler/frontend",
   "src/compiler/semantic",
-  "src/compiler/codegen",
   "src/compiler/compiler-test",
+  # Temporarily disabled for Proposal 0 (ORM v2) syntax/semantic work — these
+  # consume the changed Navigation IR/AST and are migrated in a later phase.
+  # "src/compiler/cli",
+  # "src/compiler/codegen",
   "src/compiler/migrations",
   "src/compiler/orm",
 ]

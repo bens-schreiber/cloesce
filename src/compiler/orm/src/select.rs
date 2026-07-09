@@ -3,7 +3,7 @@ use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
 
-use crate::{OrmErrorKind, Result, alias, fail};
+use crate::alias;
 
 pub struct SelectModel<'a> {
     idl: &'a CloesceIdl<'a>,
@@ -13,22 +13,19 @@ pub struct SelectModel<'a> {
 }
 
 impl<'a> SelectModel<'a> {
-    /// Can return errors [OrmErrorKind::UnknownModel] and [OrmErrorKind::ModelMissingD1].
     pub fn query(
         model_name: &str,
         from: Option<String>,
         include_tree: Option<&IncludeTree>,
         idl: &'a CloesceIdl<'a>,
-    ) -> Result<String> {
+    ) -> String {
         let model = match idl.models.get(model_name) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel {
-                name: model_name.to_string(),
-            }),
+            None => return String::default(), // Fail silently if the model is not found
         };
         if !model.uses_sqlite() {
             // Fail silently.
-            return Ok(String::default());
+            return String::default();
         }
 
         const CUSTOM_FROM: &str = "__custom_from_placeholder__";
@@ -57,13 +54,13 @@ impl<'a> SelectModel<'a> {
 
         // Dumb hack to support custom FROM clauses
         if let Some(custom_from) = from {
-            return Ok(res.replace(
+            return res.replace(
                 &format!("\"{CUSTOM_FROM}\""),
                 &format!("({}) AS \"{}\"", custom_from, model.name),
-            ));
+            );
         }
 
-        Ok(res)
+        res
     }
 
     fn dfs(&mut self, model: &Model, tree: &IncludeTree, model_alias: String) {

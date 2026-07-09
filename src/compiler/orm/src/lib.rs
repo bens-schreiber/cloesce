@@ -2,6 +2,7 @@ use idl::Number;
 use serde_json::Value;
 
 pub mod map;
+pub mod query;
 pub mod select;
 pub mod upsert;
 pub mod validate;
@@ -13,9 +14,6 @@ pub fn alias(name: impl Into<String>) -> sea_query::Alias {
 #[derive(Debug)]
 pub enum OrmErrorKind {
     SerializeError { message: String },
-
-    UnknownModel { name: String },
-    UnknownDataSource { model: String, name: String },
     ModelKeyCannotAutoIncrement { model: String, field: String },
     MissingField { expected: String, missing: String },
     TypeMismatch { expected: String, got: Value },
@@ -36,10 +34,7 @@ impl std::fmt::Display for OrmErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OrmErrorKind::SerializeError { message } => write!(f, "Serialization error: {message}"),
-            OrmErrorKind::UnknownModel { name } => write!(f, "Unknown model: {name}"),
-            OrmErrorKind::UnknownDataSource { model, name } => {
-                write!(f, "Unknown data source '{name}' for model '{model}'")
-            }
+
             OrmErrorKind::ModelKeyCannotAutoIncrement { model, field } => write!(
                 f,
                 "Primary key field '{field}' on model '{model}' cannot be auto-incrementing"

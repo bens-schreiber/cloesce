@@ -6,8 +6,6 @@ use idl::NavigationCardinality;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::{OrmErrorKind, Result, fail};
-
 type D1Result = Vec<Map<String, Value>>;
 type IncludeTreeJson = Map<String, Value>;
 
@@ -19,16 +17,14 @@ pub fn map_sql(
     rows: D1Result,
     include_tree: Option<IncludeTreeJson>,
     idl: &CloesceIdl<'_>,
-) -> Result<Vec<Value>> {
+) -> Vec<Value> {
     let model = match idl.models.get(model_name) {
         Some(m) => m,
-        None => fail!(OrmErrorKind::UnknownModel {
-            name: model_name.to_string(),
-        }),
+        None => return vec![], // Fail silently if the model is not found),
     };
     if !model.uses_sqlite() {
         // Fail silently
-        return Ok(vec![]);
+        return vec![];
     }
 
     // Result must come back in the order that it was returned
@@ -96,11 +92,11 @@ pub fn map_sql(
         };
 
         if let Value::Object(model_json) = &mut results[idx] {
-            process_navigation_properties(model_json, model, "", tree, row, idl)?;
+            process_navigation_properties(model_json, model, "", tree, row, idl);
         }
     }
 
-    Ok(results)
+    results
 }
 
 fn process_navigation_properties(
@@ -110,7 +106,7 @@ fn process_navigation_properties(
     include_tree: &IncludeTreeJson,
     row: &Map<String, Value>,
     idl: &CloesceIdl<'_>,
-) -> Result<()> {
+) {
     for nav_prop in &model.navigation_fields {
         // Skip any property not in the tree.
         if !include_tree.contains_key(nav_prop.field.name.as_ref()) {
@@ -119,9 +115,7 @@ fn process_navigation_properties(
 
         let nested_model = match idl.models.get(&nav_prop.model_reference) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel {
-                name: nav_prop.model_reference.to_string(),
-            }),
+            None => return, // Fail silently if the model is not found
         };
 
         if !nested_model.uses_sqlite() {
@@ -205,7 +199,7 @@ fn process_navigation_properties(
                 nested_include_tree,
                 row,
                 idl,
-            )?;
+            );
         }
 
         if matches!(nav_prop.cardinality, NavigationCardinality::Many) {
@@ -228,6 +222,4 @@ fn process_navigation_properties(
             );
         }
     }
-
-    Ok(())
 }

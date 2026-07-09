@@ -77,7 +77,7 @@ fn no_records_returns_empty() {
     "#,
     );
     let rows: Vec<Map<String, Value>> = vec![];
-    let result = map_sql("Horse", rows, None, &idl).unwrap();
+    let result = map_sql("Horse", rows, None, &idl);
     assert_eq!(result.len(), 0);
 }
 
@@ -105,7 +105,7 @@ fn flat() {
     .into_iter()
     .collect::<Map<String, Value>>();
 
-    let result = map_sql("Horse", vec![row], None, &idl).unwrap();
+    let result = map_sql("Horse", vec![row], None, &idl);
     let horse = result.first().unwrap().as_object().unwrap();
     assert_eq!(horse.get("id"), Some(&json!("1")));
     assert_eq!(horse.get("name"), Some(&json!("Lightning")));
@@ -148,8 +148,7 @@ fn one_to_one_worker_model_is_skipped() {
     .collect::<Map<String, Value>>();
 
     // Act
-    let result = map_sql("Person", vec![row], include(json!({ "profile": {} })), &idl)
-        .expect("map_sql to succeed");
+    let result = map_sql("Person", vec![row], include(json!({ "profile": {} })), &idl);
 
     // Assert
     let person = result.first().unwrap().as_object().unwrap();
@@ -230,8 +229,7 @@ async fn one_to_one(db: SqlitePool) {
 
     let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
-    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl())
-        .expect("map_sql to succeed");
+    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl());
 
     assert_eq!(result, vec![new_model]);
 }
@@ -307,8 +305,7 @@ async fn one_to_many(db: SqlitePool) {
 
     let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
-    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl())
-        .expect("map_sql to succeed");
+    let result = map_sql("Horse", select_rows, include(include_tree_json), &idl());
 
     assert_eq!(result, vec![new_model]);
 }
@@ -349,7 +346,7 @@ fn composite_primary_key_deduplication() {
         .collect::<Map<String, Value>>(),
     ];
 
-    let result = map_sql("OrderItem", rows, None, &idl).unwrap();
+    let result = map_sql("OrderItem", rows, None, &idl);
     assert_eq!(result.len(), 1);
     let item = result.first().unwrap().as_object().unwrap();
     assert_eq!(item.get("orderId"), Some(&json!(1)));

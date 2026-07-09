@@ -45,8 +45,9 @@ Despite this being an intuitive data model, Cloesce in its current form cannot e
 
 This proposal aims to break the barriers Cloesce has set up:
 
-- Any Model should be able to have a relationship with any other Model (be it either `1:1`, `1:N` or both).
-- Any Model can have `route` fields
+- Every Model should be able to have a `one` or `many` relationship with _any_ other Model.
+- Every Model can have `route` fields
+- Every Model should be capable of having any CRUD operation
 
 ---
 
@@ -103,353 +104,137 @@ But lets assume that the ORM could resolve these complex hydration queries, what
 
 To disambiguate relationships, we will remove the `nav` block and replace it with a `one` or `many` block that explicitly states the cardinality of the relationship.
 
-Additionally, when faced with a relationship that cannot be resolved (such as a `1:N` relationship to a Worker backed model), Cloesce will simply populate the single result in an array.
+### Rules of Navigation
+
+1. Every Model can have a `one` or `many` relationship with every other Model
+2. Route fields and Durable Object shard fields _must always_ be supplied in the initializer of a navigation block
+3. Any other field can be used to resolve a relationship, but it must be supplied in the initializer of a navigation block
 
 ### New Syntax
 
 The `nav` block will be replaced with a `one` or `many` block, which explicitly states the cardinality of the relationship.
 
-Additionally, a new "spider initializer" `::{}` will be introduced, which allows explicit specification of the fields that are used to resolve the relationship. This form can be used if one or more fields are required, where the old direct form can be used if one field is required:
+A new "spider initializer" `::{}` will be introduced, which allows explicit specification of the fields that are used to resolve the relationship. This form can be used if one or more fields are required, where the old direct form can be used if one field is required.
+
+#### Empty Form
 
 ```cloesce
-// singular form
-one ModelB::id(modelBId) {
-    modelB
-}
+model Foo {
+    one ModelB {
+        modelB
+    }
 
-// singular form via spider initializer
-one ModelB::{id(modelBId)} {
-    modelB
-}
 
-// plural form via spider initializer
-one ModelB::{id(modelBId), doId(modelBDoId)} {
-    modelB
+    many ModelB {
+        modelBs
+    }
 }
 ```
 
-### 1:1 Relationships
+The most simple form of a navigation field is the empty form, where no fields are passed to resolve the relationship.
 
-#### D1 -> Worker
+If `ModelB` has no `route` or `shard` fields, then this is a valid form. 
+
+If `ModelB` is SQL based, then Cloesce will simply query for every single `ModelB` in the database, and return the first result for a `one` relationship, or an array of results for a `many` relationship.
+
+#### Singular Form
 
 ```cloesce
-model WorkerBacked {
+model Foo {
     route {
-        routeId: int
-    }
-}
-
-model D1Backed for Db {
-    primary {
-        primaryId: int
+        userId: int
+        modelBId: int
     }
 
-    one WorkerBacked::routeId(primaryId) {
-        workerBacked
+
+    one ModelB::id(modelBId) {
+        modelB
+    }
+
+    many ModelB::userId(userId) {
+        modelBs
     }
 }
 ```
 
-Here, `D1Backed` is capable of having a `1:1` relationship with `WorkerBacked`. In order to resolve the relationship, the ORM would have to first fetch `D1Backed` from D1, then use it's `primaryId` field to hydrate the `WorkerBacked` model.
+In the singular form, a single field is passed to resolve the relationship. This could be a `route`, `shard`, `primary`, or any other field on the Model. The ORM will use this field to query for the related Model.
 
-This relationship `1:1` relationship is possible because all `route` fields are supplied in the constructor.
+- Unlike the old syntax, the singular form requires a value to be passed to the initializer.
 
-#### Worker -> D1
+- If only a Durable Object shard field is supplied, then the ORM will query for every single Model on that DO, and return the first result for a `one` relationship, or an array of results for a `many` relationship.
+
+- If only one `route` field is supplied, then the ORM will query for every single Model on that route, and return the first result for a `one` relationship, or an array of results for a `many` relationship.
+
+#### Plural Form (Spider Initializer)
 
 ```cloesce
-model WorkerBacked {
+model Foo {
     route {
-        routeId: int
+        userId: int
+        modelBId: int
+        modelBDoId: string
     }
 
-    one D1Backed::primaryId(routeId) {
-        d1Backed
-    }
-}
-
-model D1Backed for Db {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-In the reverse case, `WorkerBacked` has a `1:1` relationship with `D1Backed`. To resolve the relationship, the ORM would first have to fetch `WorkerBacked`, then use its `routeId` field to construct a SQLite query to fetch the `D1Backed` model.
-
-This `1:1` relationship is possible because all `primary` fields are supplied in the constructor.
-
-#### D1 -> DO
-
-```cloesce
-model DoBacked for Do(tenantId) {
-    route {
-        routeId: int
-    }
-}
-
-model D1Backed for Db {
-    primary {
-        primaryId: int
-        tenantId: int
+    one ModelB::{id(modelBId), doId(modelBDoId)} {
+        modelB
     }
 
-    one DoBacked::{tenantId(tenantId), routeId(primaryId)} {
-        doBacked
+    many ModelB::{userId(userId), doId(modelBDoId)} {
+        modelBs
     }
 }
 ```
 
-`D1Backed` has a `1:1` relationship with `DoBacked`. To resolve the relationship, the ORM would first have to fetch `D1Backed`, then use its `tenantId` to construct the DO id, then use its `primaryId` to hydrate a `DoBacked` models `routeId` field.
+Sometimes, a relationship may require multiple fields to resolve. In this case, the "spider initializer" form can be used, which allows multiple fields to be passed to the initializer.
 
-This `1:1` relationship is possible because all shard fields (`tenantId`) and `route` fields (`routeId`) are supplied in the constructor.
+- The plural form can cover all scenarios of the singular form.
 
-#### DO -> D1
+- The plural form cannot represent the empty form (it expects at least one field to be passed to the initializer).
 
-```cloesce
-model DoBacked for Do(tenantId) {
-    route {
-        routeId: int
-    }
+#### Accessing Durable Object KV
 
-    one D1Backed::primaryId(routeId) {
-        d1Backed
-    }
-}
-
-model D1Backed for Db {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-This example is much like the `Worker -> D1` example, where the DO model has a `1:1` relationship with the D1 model. To resolve the relationship, the ORM would first have to fetch `DoBacked`, then use its `routeId` field to construct a SQLite query to fetch the `D1Backed` model.
-
-#### DO A -> DO B
+Any Model may now use a Durable Objects KV storage, but a shard field must be supplied to the initializer should it be required to resolve the storage:
 
 ```cloesce
-model DoBackedA for DoA(tenantId) {
-    route {
-        routeId: int
-    }
-
-    one DoBackedB::{tenantId(tenantId), routeId(routeId)} {
-        doBackedB
-    }
-}
-
-model DoBackedB for DoB(tenantId) {
-    route {
-        routeId: int
-    }
-}
-```
-
-Like the `D1 -> DO` example, `DoBackedA` has a `1:1` relationship with `DoBackedB`. To resolve the relationship, the ORM would first have to fetch `DoBackedA`, then use its `tenantId` to construct the DO id of `DoBackedB`, then use its `routeId` to hydrate the `DoBackedB` model.
-
-#### D1 A -> D1 B
-
-```cloesce
-model D1BackedA for DbA {
-    primary {
-        primaryId: int
-    }
-
-    column {
-        bId: int
-    }
-
-    one D1BackedB::primaryId(bId) {
-        d1BackedB
-    }
-}
-
-model D1BackedB for DbB {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-`D1BackedA` has a `1:1` relationship with `D1BackedB`. To resolve the relationship, the ORM would first have to fetch `D1BackedA`, then use its `bId` field to construct a SQLite query to fetch the `D1BackedB` model.
-
-This requires two separate queries to two separate databases, but is possible because all `primary` fields are supplied in the constructor.
-
-#### DO KV
-
-Any Model will be able to use a Durable Objects KV storage. The syntax will be as follows:
-
-```cloesce
-durable MyDurable {
+durable DurableObjectKV {
     shard {
-        doId: string
+        userId: int
     }
 
-    value(key1: string, key2: string) -> string {
-        "value/{key1}/{key2}"
+    value(userId: int, otherUserId: int) {
+        "value/{userId}/{otherUserId}"
     }
 }
 
 model Foo {
     route {
-        key1: string
-        key2: string
-        doId: string
+        userId: int
+        otherUserId: int
     }
 
-    kv MyDurable::{value(key1, key2), doId(doId)} {
-        myValue
+    kv DurableObjectKV::{value(userId, otherUserId), doId(userId)} {
+        value
     }
 }
 ```
 
-This will resolve the value at `MyDurable::value` with the parameters `key1` and `key2` from the `Foo` model, and the `doId` from the `Foo` model to construct the DO id.
-
-If a user tried to simply pass:
+A Durable Object without any shard fields, or a normal KV store can use the singular form to access the storage:
 
 ```cloesce
-kv MyDurable::value(key1, key2) {
-    myValue
+durable DurableObjectKV {
+    value(userId: int, otherUserId: int) {
+        "value/{userId}/{otherUserId}"
+    }
 }
-```
 
-The compiler would raise an error, because the `doId` is required to construct the DO id, and it is not provided in the constructor.
-
-### 1:N Relationships
-
-Previously, some relationships were impossible with `1:N`, because not all Models could be indexed. In this proposal, these relationships will be allowed, but the ORM will simply return an array with a single result (not all Models can be indexed, only one result can be returned).
-
-The syntax of the `many` block states "Many of Model X where X.Field equals Y.Field", where `X` is the Model being hydrated, and `Y` is the Model that is being hydrated from.
-
-#### Worker -> D1
-
-```cloesce
-model WorkerBacked {
+model Foo {
     route {
-        routeId: int
+        userId: int
+        otherUserId: int
     }
 
-    many D1Backed::primaryId(routeId) {
-        d1Backed
-    }
-}
-
-model D1Backed for Db {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-In this example, `WorkerBacked` has a `1:N` relationship with `D1Backed`. To resolve the relationship, the ORM would first have to fetch `WorkerBacked`, then use its `routeId` field to construct a SQLite query to fetch all `D1Backed` models that have a matching `primaryId`.
-
-#### D1 -> DO
-
-```cloesce
-model D1Backed for Db {
-    primary {
-        primaryId: int
-        tenantId: int
-    }
-
-    many DoBacked::{tenantId(tenantId), primaryId(primaryId)} {
-        doBacked
-    }
-}
-
-model DoBacked for Do(tenantId) {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-In this example, `D1Backed` has a `1:N` relationship with `DoBacked`. To resolve the relationship, the ORM would first have to fetch `D1Backed`, then use its `tenantId` to construct the DO id of `DoBacked`, then finally make a SQLite query to fetch all `DoBacked` models that have a matching `primaryId`.
-
-#### DO A -> DO B
-
-```cloesce
-model DoBackedA for DoA(tenantId) {
-    primary {
-        primaryId: int
-    }
-
-    many DoBackedB::{tenantId(tenantId), primaryId(primaryId)} {
-        doBackedB
-    }
-}
-
-model DoBackedB for DoB(tenantId) {
-    primary {
-        primaryId: int
-    }
-}
-```
-
-### Unindexed Relationships
-
-#### Missing Discriminators
-
-In some cases, a Model may have no `primary` key or `route` fields, and therefore cannot be indexed by some key.
-
-The syntax for this Model would look like this:
-
-```cloesce
-model UnindexedModel { }
-
-model IndexedModel for Db {
-    primary {
-        primaryId: int
-    }
-
-    one UnindexedModel {
-        unindexedModel
-    }
-}
-```
-
-#### No Discriminator Provided
-
-It may be useful to have a `1:N` relationship where `N` is simply the entire collection of a Model:
-
-```cloesce
-model Post for Db {
-    primary {
-        id: int
-    }
-}
-
-model User for Db {
-    primary {
-        id: int
-    }
-
-    many Post {
-        posts
-    }
-}
-```
-
-#### Only Durable Shard Discriminators Provided
-
-Like in the above case, it may be useful to have a `1:N` relationship where `N` is the entire collection of a Model, but this time for a DO backed Model. Since Cloesce still needs to know which DO to query, the shard fields would still need to be provided.
-
-```cloesce
-model Post for Do(tenantId) {
-    primary {
-        id: int
-    }
-}
-
-model User for Do(tenantId) {
-    primary {
-        id: int
-        tenantId: int
-    }
-
-    // This fetches ALL posts for a given tenantId, no other discriminator provided.
-    many Post::tenantId(tenantId) {
-        posts
+    kv DurableObjectKV::value(userId, otherUserId) {
+        value
     }
 }
 ```
@@ -499,9 +284,309 @@ model UserFollowedSubReddit for UserDo(userId) {
 
 ## Implementation
 
-See:
+### Query Planner
 
-- [D1](./prop-0/d1/d1.md)
-- [DO](./prop-0/do/do.md)
-- [KV-R2](./prop-0/kv-r2/kv-r2.md)
-- [Worker](./prop-0/worker/worker.md)
+When breaking all of the barriers between Models down, a weight is taken off of the shoulders of semantic analysis and placed on that of the ORM.
+
+Instead of the ORM consisting of several functions: `select`, `map`, and `upsert`, the ORM will now consist of a single function: `plan` (`validate_types` will still be a separate function available to the runtime).
+
+This new "query planner" will be responsible for consuming a query and producing a plan for how to execute it on the runtime, such that the runtime requires no knowledge of the relationships between Models or the underlying schema: simply execute the plan.
+
+Plans consist of a series of transactions, and each transaction consists of a series of steps. Within a transaction, all steps can be executed in parallel, but transactions must be executed sequentially.
+
+Each transaction can depend on the results of the previous transaction. Each step can store a result in the output of its own transaction, which can be used as input to the next transaction.
+
+If a step fails, the entire transaction does not fail: any steps that depend on the failed steps output will be skipped. Errors will be propogated via a sink; any number of errors can occur when a query plan is executed, no single error will halt the execution of the plan.
+
+To support this approach, two changes will be made:
+
+1. `map` will be removed from the ORM completely.
+2. Models will _no longer_ be `JOIN`ed together in SQL, and instead resolved in separate queries, regardless of whether they are in the same database or not.
+
+### GET, LIST Plans
+
+The Query Planner will accept a command `GET Model` or `LIST Model` with Include Tree provided, and will produce a plan for how to execute the query on the runtime.
+
+These plans will accept arguments for the primary keys, route fields, shard fields, and filters like `limit` for `LIST` queries.
+
+For example, to hydrate the Model:
+
+```cloesce
+model User for UserDo(userId) {
+    primary {
+        id: int
+    }
+
+    foreign Dog::id {
+        dogId
+    }
+
+    one Dog::id(dogId) {
+        dog
+    }
+
+    many Cat::userId(id) {
+        cats
+    }
+}
+
+// ...cat model, dog model, both on a D1 Database `AnimalDb`
+```
+
+NOTE: The JSON structure of the below plans are not final and are subject to change.
+
+#### `GET User`
+
+A plan for `GET User` with `IncludeTree` `{ dog, cats }` would look like this in JSON:
+
+```json
+[
+    [
+        {
+            "db": {
+                "name": "UserDo",
+                "args": {
+                    "from_params": ["userId"]
+                }
+            },
+            "sql": {
+                "query": "SELECT * FROM User WHERE id = ?1 ORDER BY id ASC",
+                "args": {
+                    "from_params": ["id"]
+                },
+                "map": {
+                    "cardinality": "one",
+                }
+            },
+            "result": ""
+        },
+    ],
+    [
+        {
+            "db": {
+                "name": "AnimalDb",
+                "args": []
+            },
+            "sql": {
+                "query": "SELECT * FROM Dog WHERE id = ?1 ORDER BY id ASC",
+                "args": {
+                    "from_result": ["dogId"]
+                },
+                "map": {
+                    "cardinality": "one",
+                }
+            },
+            "result": "dog"
+        },
+        {
+            "db": {
+                "name": "AnimalDb",
+                "args": []
+            },
+            "sql": {
+                "query": "SELECT * FROM Cat WHERE userId = ?1 ORDER BY id ASC",
+                "args": {
+                    "from_result": ["id"]
+                },
+                "map": {
+                    "cardinality": "many",
+                    "parent_key": "id",
+                    "child_key": "userId"
+                }
+            },
+            "result": "cats"
+        }
+    ]
+]
+```
+
+The plan consists of two transactions. Before any transaction is executed, it is assumed that these parameters are supplied to the query: `userId` and `id`.
+
+1. Query the `User` table on the `UserDo` Durable Object to get the `dogId` and `id` fields. Store all results in the root of the output:
+
+EX Output:
+
+```json
+{
+    "id": 1,
+    "dogId": 2
+}
+```
+
+2. Query the `Dog` and `Cat` tables on the `AnimalDb` D1 database to get the associated `Dog` and `Cat` Models. Store the results in the output under the keys `dog` and `cats`, respectively.
+
+EX Output:
+
+```json
+{
+    "dog": {
+        "id": 2,
+        "name": "Fido"
+    },
+    "cats": [
+        {
+            "id": 1,
+            "name": "Whiskers"
+        },
+        {
+            "id": 2,
+            "name": "Fluffy"
+        }
+    ]
+}
+```
+
+Any `SELECT` statement will always be ordered by the primary key of the Model being queried.
+
+Results and arguments will follow an accessor format string like `"path.to.field"`, where the first element is always in the root(s) of the output, and each subsequent element is a key in the output object.
+
+#### `LIST User`
+
+LIST will follow a similar plan to GET, but will not require an argument for the primary key of the base model, and will accept a `limit` argument to limit the number of base models returned.
+
+In order to avoid the `N+1` problem, the runtime will always batch queries for related models, and will return an array of results for each related model.
+
+For example, a plan for `LIST User` with `IncludeTree` `{ dog, cats }` would look like this in JSON:
+
+```json
+[
+    [
+        {
+            "db": {
+                "name": "UserDo",
+                "args": {
+                    "from_params": ["userId"]
+                }
+            },
+            "sql": {
+                "query": "SELECT * FROM User LIMIT ?1 ORDER BY id ASC",
+                "args": {
+                    "from_params": ["limit"]
+                },
+                "map": {
+                    "cardinality": "many",
+                    "parent_key": null,
+                    "child_key": null
+                }
+            },
+            "result": ""
+        },
+    ],
+    [
+        {
+            "db": {
+                "name": "AnimalDb",
+                "args": []
+            },
+            "sql": {
+                "query": "SELECT * FROM Dog WHERE id IN (?1) ORDER BY id ASC",
+                "args": {
+                    "from_result": ["dogId"]
+                },
+                "map": {
+                    "cardinality": "many",
+                    "parent_key": "dogId",
+                    "child_key": "id"
+                }
+            },
+            "result": "dogs"
+        },
+        {
+            "db": {
+                "name": "AnimalDb",
+                "args": []
+            },
+            "sql": {
+                "query": "SELECT * FROM Cat WHERE userId IN (?1) ORDER BY id ASC",
+                "args": {
+                    "from_result": ["id"]
+                },
+                "map": {
+                    "cardinality": "many",
+                    "parent_key": "id",
+                    "child_key": "userId"
+                }
+            },
+            "result": "cats"
+        }
+    ]
+]
+```
+
+This plan consists of two transactions. Before any transaction is executed, it is assumed that these parameters are supplied to the query: `userId` and `limit`.
+
+1. Query the `User` table on the `UserDo` Durable Object to get the `dogId` and `id` fields. Store all results in the root of the output:
+
+```json
+[
+    {
+        "id": 1,
+        "dogId": 2
+    },
+    {
+        "id": 2,
+        "dogId": 3
+    }
+]
+```
+
+2. Query the `Dog` and `Cat` tables on the `AnimalDb` D1 database
+
+Instead of looping through each `User` in the result list and mapping to individual `SELECT` queries, the runtime will batch the queries for `Dog` and `Cat` by 1000 at a time, and return an array of results for each related model. For example, the first batch of `Dog` queries would look like this:
+
+```sql
+SELECT * FROM Dog WHERE id IN (2, 3) ORDER BY id ASC
+```
+
+If there are more than 1000 `Dog` ids, the runtime will execute another query for the next batch of 1000, and so on until all `Dog` ids have been queried.
+
+EX Output:
+
+```json
+[
+    {
+        "id": 2,
+        "dogId": 2,
+        "dog": {
+            "id": 2,
+            "name": "Fido"
+        },
+        "cats": [
+            {
+                "id": 1,
+                "name": "Whiskers"
+            },
+            {
+                "id": 2,
+                "name": "Fluffy"
+            }
+        ]
+    }
+]
+```
+
+#### R2 and KV
+
+An R2 or KV store can be hydrated in any step along with SQL queries, and will be executed in parallel with any other queries in the same transaction. The results of the R2 or KV query will be stored in the output under the key specified in the plan.
+
+For example, a step to query an R2 bucket would look like this in JSON:
+
+```json
+{
+    "db": {
+        "name": "MyR2Bucket",
+        "kind": "r2",
+    },
+    "query": {
+        "key": "my-key/{id}",
+        "args": {
+            "from_result": ["id"]
+        },
+    },
+    "result": "myR2Object"
+}
+```
+
+### SAVE Plans
+
+<todo>

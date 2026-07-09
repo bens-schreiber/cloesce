@@ -460,8 +460,7 @@ pub mod expansion {
         let injected = model_bindings(idl, model, Some(&ds.tree));
 
         if model.uses_sqlite() {
-            let include_query =
-                SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
+            let include_query = SelectModel::query(model.name, None, Some(&ds.tree), idl);
 
             let get_params = shard_fields
                 .iter()

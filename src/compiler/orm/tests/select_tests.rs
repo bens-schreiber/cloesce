@@ -42,8 +42,7 @@ async fn scalar_model(db: SqlitePool) {
     .to_string();
 
     // Act
-    let select_stmt =
-        SelectModel::query("Person", None, None, &idl).expect("SelectModel::query to work");
+    let select_stmt = SelectModel::query("Person", None, None, &idl);
 
     // Assert
     expected_str!(
@@ -97,8 +96,7 @@ async fn one_to_one(db: SqlitePool) {
 
     // Act
     let select_stmt =
-        SelectModel::query("Person", None, include(json!({"dog": {}})).as_ref(), &idl)
-            .expect("SelectModel::query to work");
+        SelectModel::query("Person", None, include(json!({"dog": {}})).as_ref(), &idl);
 
     // Assert
     expected_str!(
@@ -155,8 +153,7 @@ async fn one_to_one_worker_model_is_not_joined(db: SqlitePool) {
         None,
         include(json!({"profile": {}})).as_ref(),
         &idl,
-    )
-    .expect("SelectModel::query to work");
+    );
 
     // Assert
     expected_str!(
@@ -249,8 +246,7 @@ async fn one_to_many(db: SqlitePool) {
         }))
         .as_ref(),
         &idl,
-    )
-    .expect("list models to work");
+    );
 
     // Assert
     expected_str!(
@@ -336,8 +332,7 @@ async fn composite_one_to_one(db: SqlitePool) {
         None,
         include(json!({"student": {}})).as_ref(),
         &idl,
-    )
-    .expect("SelectModel::query to work");
+    );
 
     // Assert
     expected_str!(
@@ -409,8 +404,7 @@ async fn composite_one_to_many(db: SqlitePool) {
 
     // Act
     let select_stmt =
-        SelectModel::query("Order", None, include(json!({"items": {}})).as_ref(), &idl)
-            .expect("SelectModel::query to work");
+        SelectModel::query("Order", None, include(json!({"items": {}})).as_ref(), &idl);
 
     // Assert
     expected_str!(
@@ -501,8 +495,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
         "#.to_string();
 
     // Act
-    let sql = SelectModel::query("Horse", None, include(include_tree).as_ref(), &idl)
-        .expect("list models to work");
+    let sql = SelectModel::query("Horse", None, include(include_tree).as_ref(), &idl);
 
     // Assert
     expected_str!(
@@ -546,8 +539,7 @@ async fn custom_from(db: SqlitePool) {
 
     // Act
     let custom_from = "SELECT * FROM Person WHERE name = 'Alice'".to_string();
-    let select_stmt = SelectModel::query("Person", Some(custom_from), None, &idl)
-        .expect("SelectModel::query to work");
+    let select_stmt = SelectModel::query("Person", Some(custom_from), None, &idl);
 
     // Assert
     expected_str!(

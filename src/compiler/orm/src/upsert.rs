@@ -96,7 +96,7 @@ impl<'a> UpsertModel<'a> {
                 let include_tree_typed: IncludeTree =
                     IncludeTree::deserialize(&include_tree_value).unwrap_or_default();
 
-                SelectModel::query(model_name, None, Some(&include_tree_typed), idl)?
+                SelectModel::query(model_name, None, Some(&include_tree_typed), idl)
                     .trim_start_matches("SELECT ")
                     .to_string()
             };
@@ -142,9 +142,7 @@ impl<'a> UpsertModel<'a> {
     ) -> Result<()> {
         let model = match self.idl.models.get(model_name) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel {
-                name: model_name.to_string(),
-            }),
+            None => return Ok(()), // Fail silently if the model is not found
         };
 
         // KV Fields

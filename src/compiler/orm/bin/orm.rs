@@ -208,17 +208,10 @@ pub unsafe extern "C" fn select_model(
 
     let res =
         IDL.with(|idl| SelectModel::query(model_name, from, include_tree.as_ref(), &idl.borrow()));
-    match res {
-        Ok(res) => {
-            let bytes = res.into_bytes();
-            yield_result(bytes);
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
+
+    let bytes = res.into_bytes();
+    yield_result(bytes);
+    0
 }
 
 /// Maps D1 results to a Cloesce model structure.
@@ -272,17 +265,9 @@ pub unsafe extern "C" fn map(
     };
 
     let res = IDL.with(|idl| map_sql(model_name, d1_results, include_tree, &idl.borrow()));
-    match res {
-        Ok(res) => {
-            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
-            yield_result(bytes);
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
+    let bytes = serde_json::to_string(&res).unwrap().into_bytes();
+    yield_result(bytes);
+    0
 }
 
 /// Validates a value against a ValidatedField

@@ -1,3 +1,6 @@
+pub mod executor;
+pub mod setup;
+
 use idl::CloesceIdl;
 use migrations::{MigrationsIdl, MigrationsModel};
 
