@@ -21,7 +21,6 @@ pub async fn test_sql(
                         backing: None, // Not used in test
                         primary_columns: model.primary_columns,
                         columns: model.columns,
-                        navigation_fields: model.navigation_fields,
                     },
                 )
             })

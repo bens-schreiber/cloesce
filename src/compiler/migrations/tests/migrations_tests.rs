@@ -47,7 +47,6 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
                 }),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
-                navigation_fields: model.navigation_fields,
             };
             (name.to_string(), m)
         })

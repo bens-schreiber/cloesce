@@ -12,7 +12,7 @@
 //! Additionally, after semantic analysis, the IDL is expanded with synthetic APIs and data sources based on the presence of models
 //! and the configuration of existing data sources.
 //!
-//! ## Error Sink
+//! # Error Sink
 //!
 //! No single error halts the entire analysis process. Instead, errors are collected in an [ErrorSink] and reported together at the end.
 //! Some errors may cause a certain structure to be escaped or treated as if it were not present, but will be reported in the final error list.
