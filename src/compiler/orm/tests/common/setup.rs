@@ -69,8 +69,8 @@ pub struct MockStorage {
     /// `R2ObjectBody`: reads return the raw stored value.
     pub r2: HashMap<String, HashMap<String, Value>>,
 
-    /// Workers KV binding name -> (key -> (value, metadata)).
-    pub kv: HashMap<String, HashMap<String, (Value, Option<Value>)>>,
+    /// Workers KV binding name -> (key -> value).
+    pub kv: HashMap<String, HashMap<String, Value>>,
 
     /// DO-KV: binding name -> (shard value tuple -> (key -> value)). DO storage exists
     /// implicitly, so a shard with no seeded entries is a valid, empty store.
@@ -145,11 +145,11 @@ impl MockStorage {
             .insert(key.to_string(), value);
     }
 
-    pub fn seed_kv(&mut self, binding: &str, key: &str, value: Value, metadata: Option<Value>) {
+    pub fn seed_kv(&mut self, binding: &str, key: &str, value: Value) {
         self.kv
             .entry(binding.to_string())
             .or_default()
-            .insert(key.to_string(), (value, metadata));
+            .insert(key.to_string(), value);
     }
 
     pub fn seed_durable_kv(&mut self, binding: &str, shard: Vec<Value>, key: &str, value: Value) {

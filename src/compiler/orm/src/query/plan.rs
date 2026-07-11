@@ -85,23 +85,22 @@ pub enum Query<'src> {
         shard: Vec<(&'src str, ValueArg<'src>)>,
     },
 
-    /// Build an object at [Step::result] out of runtime params or parent field values,
-    /// without querying an external database.
+    /// Set `fields` on the object(s) at [Step::result] from runtime params or parent
+    /// field values, without querying an external database.
+    ///
+    /// - When `create` is true, the object is built fresh and attached: a backing-less
+    ///   model's whole state, or a backing-less nav target built from its parent.
+    ///
+    /// - When `create` is false, the fields are merged onto whatever an earlier step
+    ///   already attached here, and a slot with no such object is left untouched.
     Synthesize {
         fields: Vec<(&'src str, ValueArg<'src>)>,
 
         /// Whether each parent object receives the object bare or as a singleton array.
         cardinality: MapCardinality,
-    },
 
-    /// Merge `fields` into every object already present at [Step::result].
-    ///
-    /// Unlike [Query::Synthesize], this never creates an object: if an earlier step
-    /// attached nothing there (e.g. a GET that matched no row), the step is a noop.
-    ///
-    /// Used to place a SQL-backed model's non-shard route fields onto its rows.
-    Tag {
-        fields: Vec<(&'src str, ValueArg<'src>)>,
+        /// Whether to build the object fresh (true) or merge onto an existing one (false).
+        create: bool,
     },
 }
 

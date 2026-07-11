@@ -11,7 +11,8 @@ use std::collections::HashMap;
 use idl::{BackingKind, CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField};
 
 use crate::query::plan::{
-    Database, DatabaseKind, JoinKeys, KeySegment, Mapping, Query, QueryPlan, SqlArg, Step, ValueArg,
+    Database, DatabaseKind, JoinKeys, KeySegment, MapCardinality, Mapping, Query, QueryPlan,
+    SqlArg, Step, ValueArg,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,18 +111,22 @@ pub fn plan<'src>(
             result: vec![],
         });
 
-        // Non-shard route fields aren't columns and aren't merged by the SQL shard, so a
-        // [Query::Tag] (all `Param` at the root) sets them onto every row in-stage.
-        let route_tags = model
+        // Non-shard route fields need to be explicitly synthesized
+        // onto the root result
+        let ns_route_fields = model
             .route_fields
             .iter()
             .map(|f| f.name.as_ref())
             .filter(|f| !backing.fields.contains(f))
             .map(|f| (f, ValueArg::Param(f)))
             .collect::<Vec<_>>();
-        if !route_tags.is_empty() {
+        if !ns_route_fields.is_empty() {
             plan.stage_at(0).steps.push(Step {
-                query: Query::Tag { fields: route_tags },
+                query: Query::Synthesize {
+                    fields: ns_route_fields,
+                    cardinality: MapCardinality::One,
+                    create: false,
+                },
                 result: vec![],
             });
         }
@@ -141,6 +146,7 @@ pub fn plan<'src>(
             query: Query::Synthesize {
                 fields,
                 cardinality: mapping.cardinality,
+                create: true,
             },
             result: vec![],
         });
@@ -201,7 +207,7 @@ fn select_keys<'src>(
                 .collect::<Vec<_>>();
             let shards_covered = shard
                 .iter()
-                .all(|(_, arg)| matches!(arg, ValueArg::Param(_)));
+                .all(|(_, arg)| matches!(arg, ValueArg::Param(_) | ValueArg::ParentField(_)));
 
             let step_stage = if segments_covered && shards_covered {
                 stage
@@ -326,13 +332,14 @@ fn select_navs<'src>(
             query: Query::Synthesize {
                 fields,
                 cardinality: nav.cardinality.clone().into(),
+                create: true,
             },
             result: path.to_vec(),
         });
     }
 
     /// Emit a single SQL step for `nav` targeting SQLite-backed `target` at `stage`,
-    /// plus a [Query::Tag] for any non-shard route fields the target carries.
+    /// plus a merge [Query::Synthesize] for any non-shard route fields the target carries.
     fn select_nav<'src>(
         nav: &'src NavigationField<'src>,
         target: &'src Model<'src>,
@@ -390,15 +397,19 @@ fn select_navs<'src>(
         });
 
         // Non-shard route fields ride onto the rows the SQL step just produced.
-        let route_tags = nav
+        let ns_route_fields = nav
             .keys
             .iter()
             .filter(|k| is_route(k.target))
             .map(|k| (k.target, params.value_arg(k.local)))
             .collect::<Vec<_>>();
-        if !route_tags.is_empty() {
+        if !ns_route_fields.is_empty() {
             plan.stage_at(stage).steps.push(Step {
-                query: Query::Tag { fields: route_tags },
+                query: Query::Synthesize {
+                    fields: ns_route_fields,
+                    cardinality: MapCardinality::One,
+                    create: false,
+                },
                 result: path.to_vec(),
             });
         }

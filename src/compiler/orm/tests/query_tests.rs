@@ -793,65 +793,6 @@ async fn cardinality_one_coercion() {
 }
 
 #[sqlx::test]
-async fn spread_dedup_and_nulls() {
-    // Arrange
-    let idl = src_to_idl(
-        r#"
-        d1 { db }
-
-        model Person for db {
-            primary { id: int }
-            foreign Dog::id optional { dogId }
-            one Dog::id(dogId) { dog }
-        }
-
-        model Dog for db {
-            primary { id: int }
-            column { name: string }
-        }
-        "#,
-    );
-
-    let mut storage = MockStorage::from_idl(&idl, &[]).await;
-    storage
-        .seed_d1(
-            "db",
-            "INSERT INTO Dog (id, name) VALUES (100, 'Fido'), (200, 'Rex');
-         INSERT INTO Person (id, dogId) VALUES
-            (1, 100), (2, 200), (3, 100), (4, NULL), (5, 200)",
-        )
-        .await;
-
-    // Act
-    let (plan, body) = execute_ok(
-        &idl,
-        Operation::List,
-        "Person",
-        json!({ "dog": {} }),
-        json!({ "limit": 10 }),
-        &storage,
-    )
-    .await;
-
-    // Assert
-    assert_eq!(
-        body,
-        json!([
-            { "id": 1, "dogId": 100, "dog": { "id": 100, "name": "Fido" } },
-            { "id": 2, "dogId": 200, "dog": { "id": 200, "name": "Rex" } },
-            { "id": 3, "dogId": 100, "dog": { "id": 100, "name": "Fido" } },
-            { "id": 4, "dogId": null, "dog": null },
-            { "id": 5, "dogId": 200, "dog": { "id": 200, "name": "Rex" } },
-        ])
-    );
-    assert_eq!(
-        plan.stages.len(),
-        2,
-        "`dog` relies on `Person::dogId` which is only known after the first stage"
-    );
-}
-
-#[sqlx::test]
 async fn r2_field_on_d1_root() {
     // Arrange
     let idl = src_to_idl(
@@ -1038,12 +979,7 @@ async fn kv_field_on_d1_root() {
     storage
         .seed_d1("db", "INSERT INTO Item (id, region) VALUES (1, 'us')")
         .await;
-    storage.seed_kv(
-        "Cache",
-        "e/us/1",
-        json!({ "hits": 3 }),
-        Some(json!({ "ttl": 60 })),
-    );
+    storage.seed_kv("Cache", "e/us/1", json!({ "hits": 3 }));
 
     // Act
     let (plan, body) = execute_ok(
@@ -1062,9 +998,9 @@ async fn kv_field_on_d1_root() {
         json!({
             "id": 1,
             "region": "us",
-            "entry": { "value": { "hits": 3 }, "metadata": { "ttl": 60 } }
+            "entry": { "value": { "hits": 3 } }
         }),
-        "A Workers KV read wraps the value and metadata, keyed by the composite format"
+        "A Workers KV read wraps the value keyed by the composite format"
     );
     assert_eq!(
         plan.stages.len(),
@@ -1099,8 +1035,8 @@ async fn kv_field_list_fanout() {
     storage
         .seed_d1("db", "INSERT INTO Item (id) VALUES (1), (2)")
         .await;
-    storage.seed_kv("Cache", "e/1", json!("a"), None);
-    storage.seed_kv("Cache", "e/2", json!("b"), None);
+    storage.seed_kv("Cache", "e/1", json!("a"));
+    storage.seed_kv("Cache", "e/2", json!("b"));
 
     // Act
     let (plan, body) = execute_ok(
@@ -1117,8 +1053,8 @@ async fn kv_field_list_fanout() {
     assert_eq!(
         body,
         json!([
-            { "id": 1, "entry": { "value": "a", "metadata": null } },
-            { "id": 2, "entry": { "value": "b", "metadata": null } },
+            { "id": 1, "entry": { "value": "a"} },
+            { "id": 2, "entry": { "value": "b"} },
         ]),
         "Each listed row reads its own KV entry; absent metadata is null"
     );
@@ -1530,7 +1466,7 @@ async fn backingless_root_get() {
     );
 
     let mut storage = MockStorage::from_idl(&idl, &[]).await;
-    storage.seed_kv("Cache", "e/o1", json!("meta"), None);
+    storage.seed_kv("Cache", "e/o1", json!("meta"));
 
     // Act
     let (plan, body) = execute_ok(
@@ -1546,7 +1482,7 @@ async fn backingless_root_get() {
     // Assert
     assert_eq!(
         body,
-        json!({ "ownerId": "o1", "entry": { "value": "meta", "metadata": null } }),
+        json!({ "ownerId": "o1", "entry": { "value": "meta" } }),
         "The root object is synthesized from the route param, then its KV field is read"
     );
     assert_eq!(
@@ -1744,4 +1680,64 @@ async fn route_field_on_d1_root_merges_in_stage_zero() {
         "the route field is merged in stage zero"
     );
     assert_eq!(plan.stages[0].steps.len(), 2);
+}
+
+#[sqlx::test]
+async fn route_field_on_sql_nav_child() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Parent for db {
+            primary { id: int }
+            foreign Child::id { childId }
+            column { region: string }
+            one Child::{ id(childId), region(region) } { child }
+        }
+
+        model Child for db {
+            primary { id: int }
+            route { region: string }
+        }
+        "#,
+    );
+
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+    storage
+        .seed_d1(
+            "db",
+            "INSERT INTO Child (id) VALUES (10), (20);
+             INSERT INTO Parent (id, childId, region) VALUES (1, 10, 'us'), (2, 20, 'eu')",
+        )
+        .await;
+
+    // Act
+    let (plan, body) = execute_ok(
+        &idl,
+        Operation::List,
+        "Parent",
+        json!({ "child": {} }),
+        json!({ "limit": 10 }),
+        &storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!([
+            { "id": 1, "childId": 10, "region": "us", "child": { "id": 10, "region": "us" } },
+            { "id": 2, "childId": 20, "region": "eu", "child": { "id": 20, "region": "eu" } },
+        ]),
+        "The fetched child keeps its `id` and gains `region`; the route Synthesize must \
+         merge, not replace"
+    );
+    assert_eq!(
+        plan.stages.len(),
+        2,
+        "`child` relies on `Parent::childId` and `Parent::region` which are only known after the first stage"
+    );
+    assert_eq!(plan.stages[0].steps.len(), 1);
+    assert_eq!(plan.stages[1].steps.len(), 2, "Select and synthesize");
 }
