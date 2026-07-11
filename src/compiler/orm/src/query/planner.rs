@@ -1,29 +1,17 @@
-//! Cloesce Query Planner
+//! # Cloesce Query Planner
 //!
 //! Converts an [Operation] into a [QueryPlan], detailing how the runtime should execute
 //! the operation against the underlying data sources.
 //!
-//! [plan] will try its best to create as few [Stage]s as possible to hydrate
+//! [plan] will create as few [crate::query::plan::Stage] as possible to hydrate
 //! the requested [IncludeTree].
-//!
-//! # SQLite (D1, Durable Objects)
-//!
-//! A relationship between two SQLite backed Models falls under two categories:
-//! - Both Models are backed by the same database
-//! - Model databases are disjoint
-//!
-//! Both cases are handled the exact same way, and never with a SQL JOIN: select the
-//! base model first, then in a later stage select the related model(s) using the
-//! hydrated result of the base model as bindings to the related query.
-//!
-//! NOTE: Even if the parameters to hydrate a Model and its related Model are known at
-//! runtime, the planner still places the child in a later [Stage] than its parent,
-//! because the parent rows **must** exist to supply the child's bindings.
+
+use std::collections::HashMap;
 
 use idl::{BackingKind, CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField};
 
 use crate::query::plan::{
-    Argument, Database, DatabaseKind, JoinKeys, Mapping, ObjectPath, Query, QueryPlan, Step,
+    Database, DatabaseKind, JoinKeys, KeySegment, Mapping, Query, QueryPlan, SqlArg, Step, ValueArg,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,12 +25,6 @@ pub enum Operation {
 const LIMIT_PARAM: &str = "limit";
 
 /// Convert an [Operation] into a [QueryPlan] for the given model.
-///
-/// # Parameters
-/// - `operation`: The kind operation to plan.
-/// - `model`: The model on which to execute the operation.
-/// - `idl`: The Cloesce IDL containing the schema information.
-/// - `tree`: The include tree specifying which fields and relations to hydrate.
 pub fn plan<'src>(
     operation: Operation,
     model: &str,
@@ -52,149 +34,341 @@ pub fn plan<'src>(
     let mut plan = QueryPlan::default();
 
     let Some(model) = idl.models.get(model) else {
-        return plan; // Fail silently if the model is not found
+        // Fail silently if the model is not found
+        return plan;
     };
 
-    // Every shard field value comes from runtime parameters
-    let shard = model
-        .backing
-        .as_ref()
-        .map(|b| {
-            b.fields
-                .iter()
-                .map(|f| Argument::Param(f))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    // TODO: models dont always have a database
-    let database = database(model.backing.as_ref().unwrap(), shard);
-
-    match operation {
+    let mapping = match operation {
+        Operation::Get => Mapping::one(),
+        Operation::List => Mapping::many(),
         Operation::Save => todo!("Not yet implemented"),
-        Operation::Get => {
-            // GET is always a fetch-by-pk. Gather all WHERE predicates, e.g.
-            // "id = ?1", ... "name = ?N"
-            let predicates = model
-                .primary_columns
-                .iter()
-                .enumerate()
-                .map(|(i, c)| format!("\"{}\" = ?{}", c.field.name, i + 1))
-                .collect::<Vec<_>>();
+    };
 
-            // Every primary key columns value comes from runtime parameters
-            let arguments = model
-                .primary_columns
-                .iter()
-                .map(|c| Argument::Param(c.field.name.as_ref()))
-                .collect::<Vec<_>>();
-
-            plan.stage_at(0).steps.push(Step {
-                database,
-                query: Query::Sql {
-                    sql: select_sql(model, &predicates, false),
-                },
-                arguments,
-                result: ObjectPath::Root,
-                mapping: Mapping::one(),
-            });
-
-            select_navs(model, idl, tree, &mut plan, &[], 0);
-        }
-        Operation::List => {
-            // LIST takes only the database and `limit` arguments
-            plan.stage_at(0).steps.push(Step {
-                database,
-                query: Query::Sql {
-                    sql: select_sql(model, &[], true),
-                },
-                arguments: vec![Argument::Param(LIMIT_PARAM)],
-                result: ObjectPath::Root,
-                mapping: Mapping::many(),
-            });
-
-            select_navs(model, idl, tree, &mut plan, &[], 0);
+    let mut params = Params::default();
+    for f in &model.route_fields {
+        // Every route field is required to be supplied by the runtime
+        // This includes Durabe Object shard fields, which are always route fields.
+        params.map.insert(f.name.as_ref(), f.name.as_ref());
+    }
+    if operation == Operation::Get {
+        for c in &model.primary_columns {
+            // In Get operations, every primary key column is required to be supplied
+            // by the runtime
+            params
+                .map
+                .insert(c.field.name.as_ref(), c.field.name.as_ref());
         }
     }
+
+    if let Some(backing) = model.backing.as_ref().filter(|_| model.uses_sqlite()) {
+        // Every root shard field value comes from runtime parameters
+        let shard = backing
+            .fields
+            .iter()
+            .map(|f| (*f, SqlArg::Param(f)))
+            .collect::<Vec<_>>();
+
+        let query = match operation {
+            Operation::Get => {
+                // GET is always a fetch-by-pk. Gather all WHERE predicates, e.g.
+                // "id = ?1", ... "name = ?N"
+                let predicates = model
+                    .primary_columns
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| format!("\"{}\" = ?{}", c.field.name, i + 1))
+                    .collect::<Vec<_>>();
+
+                // Every primary key column's value comes from runtime parameters
+                let arguments = model
+                    .primary_columns
+                    .iter()
+                    .map(|c| SqlArg::Param(c.field.name.as_ref()))
+                    .collect::<Vec<_>>();
+
+                Query::Sql {
+                    database: database(backing),
+                    sql: select_sql(model, &predicates, false),
+                    arguments,
+                    shard,
+                    mapping,
+                }
+            }
+            // LIST takes only the `limit` argument
+            Operation::List => Query::Sql {
+                database: database(backing),
+                sql: select_sql(model, &[], true),
+                arguments: vec![SqlArg::Param(LIMIT_PARAM)],
+                shard,
+                mapping,
+            },
+            _ => todo!("Not yet implemented"),
+        };
+
+        plan.stage_at(0).steps.push(Step {
+            query,
+            result: vec![],
+        });
+
+        // Non-shard route fields aren't columns and aren't merged by the SQL shard, so a
+        // [Query::Tag] (all `Param` at the root) sets them onto every row in-stage.
+        let route_tags = model
+            .route_fields
+            .iter()
+            .map(|f| f.name.as_ref())
+            .filter(|f| !backing.fields.contains(f))
+            .map(|f| (f, ValueArg::Param(f)))
+            .collect::<Vec<_>>();
+        if !route_tags.is_empty() {
+            plan.stage_at(0).steps.push(Step {
+                query: Query::Tag { fields: route_tags },
+                result: vec![],
+            });
+        }
+    } else {
+        // A non-sqlite-backed model has no database to select from, just a state
+        // synthesized from its route fields, which must be supplied by the runtime.
+        //
+        // Without a SQLite backing, a [MapCardinality::Many] model is coerced into
+        // a singleton list.
+        let fields = model
+            .route_fields
+            .iter()
+            .map(|f| (f.name.as_ref(), ValueArg::Param(f.name.as_ref())))
+            .collect();
+
+        plan.stage_at(0).steps.push(Step {
+            query: Query::Synthesize {
+                fields,
+                cardinality: mapping.cardinality,
+            },
+            result: vec![],
+        });
+    }
+
+    hydrate_model(model, idl, tree, &mut plan, &params, &[], 0);
 
     plan
 }
 
-/// Recurse the include tree, emitting one nav step per included [NavigationField]
-/// whose target uses sqlite.
+fn hydrate_model<'src>(
+    model: &'src Model<'src>,
+    idl: &'src CloesceIdl<'src>,
+    tree: &IncludeTree<'src>,
+    plan: &mut QueryPlan<'src>,
+    params: &Params<'src>,
+    path: &[&'src str],
+    stage: usize,
+) {
+    select_keys(model, idl, tree, plan, params, path, stage);
+    select_navs(model, idl, tree, plan, params, path, stage);
+}
+
+/// Emit one [Query::Key] [Step] per included R2 and KV field of `model`.
 ///
-/// A nav at include-tree stage `s` is placed in stage `s + 1`, meaning
-/// parents are resolved in a stage before their children, who can be resolved in parallel
-/// in the next stage.
+/// - If all placeholders on the key-template are in the set of [Params],
+///   the step runs in `stage`.
+///
+/// - If any placeholder is not in the set of [Params], the step must run in
+///   `stage + 1`.
+fn select_keys<'src>(
+    model: &'src Model<'src>,
+    idl: &'src CloesceIdl<'src>,
+    tree: &IncludeTree<'src>,
+    plan: &mut QueryPlan<'src>,
+    params: &Params<'src>,
+    path: &[&'src str],
+    stage: usize,
+) {
+    let mut push =
+        |field: &'src str, database: Database<'src>, key: &'src str, shard_fields: &[&'src str]| {
+            if !tree.0.contains_key(field) {
+                // Include tree does not request this field, skip.
+                return;
+            }
+
+            let segments = key_segments(key, params);
+            let segments_covered = segments.iter().all(|s| {
+                matches!(
+                    s,
+                    KeySegment::Literal(_) | KeySegment::Value(ValueArg::Param(_))
+                )
+            });
+
+            let shard = shard_fields
+                .iter()
+                .map(|f| (*f, params.value_arg(f)))
+                .collect::<Vec<_>>();
+            let shards_covered = shard
+                .iter()
+                .all(|(_, arg)| matches!(arg, ValueArg::Param(_)));
+
+            let step_stage = if segments_covered && shards_covered {
+                stage
+            } else {
+                stage + 1
+            };
+
+            let mut result = path.to_vec();
+            result.push(field);
+
+            plan.stage_at(step_stage).steps.push(Step {
+                query: Query::Key {
+                    database,
+                    segments,
+                    shard,
+                },
+                result,
+            });
+        };
+
+    for r2 in &model.r2_fields {
+        let database = Database {
+            name: r2.binding,
+            kind: DatabaseKind::R2,
+        };
+
+        push(r2.field.name.as_ref(), database, &r2.key_format, &[]);
+    }
+
+    for kv in &model.kv_fields {
+        let is_do_kv = idl
+            .wrangler_env
+            .durable_bindings
+            .iter()
+            .any(|b| b.name == kv.binding);
+
+        let (kind, shard) = if is_do_kv {
+            (DatabaseKind::DurableObject, kv.shard_fields.as_slice())
+        } else {
+            (DatabaseKind::Kv, [].as_slice())
+        };
+
+        let database = Database {
+            name: kv.binding,
+            kind,
+        };
+
+        push(kv.field.name.as_ref(), database, &kv.key_format, shard);
+    }
+}
+
+/// Recurse the include tree, emitting one nav step per included [NavigationField].
+///
+/// A nav whose key locals are all param-covered runs in `depth` (sourcing them from
+/// params); otherwise it waits for `depth + 1`, spreading the parent's hydrated values.
 fn select_navs<'src>(
     model: &'src Model<'src>,
     idl: &'src CloesceIdl<'src>,
     tree: &IncludeTree<'src>,
     plan: &mut QueryPlan<'src>,
+    params: &Params<'src>,
     parent_path: &[&'src str],
     depth: usize,
 ) {
     for nav in &model.navigation_fields {
         let Some(subtree) = tree.0.get(nav.field.name.as_ref()) else {
+            // Include tree does not request this nav, skip.
             continue;
         };
         let Some(target) = idl.models.get(nav.model_reference) else {
+            // Fail silently (this should be unreachable)
             continue;
         };
-        let Some(backing) = nav.target_backing.as_ref() else {
-            continue;
-        };
-        if !target.uses_sqlite() {
-            continue;
-        }
 
         let mut path = parent_path.to_vec();
         path.push(nav.field.name.as_ref());
 
-        select_nav(nav, target, backing, parent_path, &path, plan, depth + 1);
-        select_navs(target, idl, subtree, plan, &path, depth + 1);
+        let child_params = {
+            // Child inherits a param for each nav key whose local is covered
+            let map = nav
+                .keys
+                .iter()
+                .filter_map(|k| params.map.get(k.local).map(|p| (k.target, *p)))
+                .collect::<HashMap<_, _>>();
+
+            Params { map }
+        };
+
+        let covered = nav.keys.iter().all(|k| params.map.contains_key(k.local));
+        let stage = if covered {
+            // All inputs are covered, run in parallel
+            depth
+        } else {
+            // Some input is not covered, wait for the parent to finish
+            depth + 1
+        };
+
+        if let Some(backing) = target.backing.as_ref().filter(|_| target.uses_sqlite()) {
+            select_nav(nav, target, backing, params, &path, plan, stage);
+        } else {
+            synthesize_nav(nav, params, &path, plan, stage);
+        }
+
+        hydrate_model(target, idl, subtree, plan, &child_params, &path, stage);
     }
 
-    /// Emit a single nav step for `nav` targeting `target` at stage `stage`.
-    fn select_nav<'src>(
+    /// Emit a [Query::Synthesize] nav step
+    fn synthesize_nav<'src>(
         nav: &'src NavigationField<'src>,
-        target: &'src Model<'src>,
-        backing: &'src ModelBacking<'src>,
-        parent_path: &[&'src str],
+        params: &Params<'src>,
         path: &[&'src str],
         plan: &mut QueryPlan<'src>,
         stage: usize,
     ) {
-        let spread = |local: &'src str| {
-            Argument::Spread(ObjectPath::Field(
-                parent_path.iter().copied().chain([local]).collect(),
-            ))
-        };
-
-        // A key whose `target` names a field of the target's backing (a DO shard/route
-        // field, not a column) is a shard key; every other key is a SQL predicate.
-        let (shard_keys, sql_keys): (Vec<_>, Vec<_>) = nav
+        let fields = nav
             .keys
             .iter()
-            .partition(|k| backing.fields.contains(&k.target));
+            .map(|k| (k.target, params.value_arg(k.local)))
+            .collect();
 
-        // DO shard keys are supplied by spreading the parent's values; each distinct value
-        // fans the step out to its own stub, and rows come back tagged with the shard value
-        // under the shard field name so stitching stays uniform.
-        let shard = shard_keys.iter().map(|k| spread(k.local)).collect();
+        plan.stage_at(stage).steps.push(Step {
+            query: Query::Synthesize {
+                fields,
+                cardinality: nav.cardinality.clone().into(),
+            },
+            result: path.to_vec(),
+        });
+    }
 
-        // Remaining keys become `target IN (?N)` predicates fed by the parent's values,
-        // one placeholder per key.
+    /// Emit a single SQL step for `nav` targeting SQLite-backed `target` at `stage`,
+    /// plus a [Query::Tag] for any non-shard route fields the target carries.
+    fn select_nav<'src>(
+        nav: &'src NavigationField<'src>,
+        target: &'src Model<'src>,
+        backing: &'src ModelBacking<'src>,
+        params: &Params<'src>,
+        path: &[&'src str],
+        plan: &mut QueryPlan<'src>,
+        stage: usize,
+    ) {
+        let is_shard = |t: &str| backing.fields.contains(&t);
+        let is_route = |t: &str| target.route_fields.iter().any(|f| f.name == t) && !is_shard(t);
+
+        let shard = nav
+            .keys
+            .iter()
+            .filter(|k| is_shard(k.target))
+            .map(|k| (k.target, params.sql_arg(k.local)))
+            .collect();
+
+        // Remaining (non-shard, non-route) keys become `target IN (?N)` predicates.
+        let sql_keys = nav
+            .keys
+            .iter()
+            .filter(|k| !is_shard(k.target) && !is_route(k.target))
+            .collect::<Vec<_>>();
         let predicates = sql_keys
             .iter()
             .enumerate()
             .map(|(i, k)| format!("\"{}\" IN (?{})", k.target, i + 1))
             .collect::<Vec<_>>();
-        let bindings = sql_keys.iter().map(|k| spread(k.local)).collect();
+        let bindings = sql_keys.iter().map(|k| params.sql_arg(k.local)).collect();
 
-        let join = shard_keys
+        let join = nav
+            .keys
             .iter()
-            .chain(&sql_keys)
+            .filter(|k| !is_route(k.target))
             .map(|k| JoinKeys {
                 parent_key: k.local,
                 child_key: k.target,
@@ -202,23 +376,37 @@ fn select_navs<'src>(
             .collect();
 
         plan.stage_at(stage).steps.push(Step {
-            database: database(backing, shard),
             query: Query::Sql {
+                database: database(backing),
                 sql: select_sql(target, &predicates, false),
+                arguments: bindings,
+                shard,
+                mapping: Mapping {
+                    cardinality: nav.cardinality.clone().into(),
+                    join,
+                },
             },
-            arguments: bindings,
-            result: ObjectPath::Field(path.to_vec()),
-            mapping: Mapping {
-                cardinality: nav.cardinality.clone().into(),
-                join,
-            },
+            result: path.to_vec(),
         });
+
+        // Non-shard route fields ride onto the rows the SQL step just produced.
+        let route_tags = nav
+            .keys
+            .iter()
+            .filter(|k| is_route(k.target))
+            .map(|k| (k.target, params.value_arg(k.local)))
+            .collect::<Vec<_>>();
+        if !route_tags.is_empty() {
+            plan.stage_at(stage).steps.push(Step {
+                query: Query::Tag { fields: route_tags },
+                result: path.to_vec(),
+            });
+        }
     }
 }
 
-/// Build an ordered `SELECT` over the model's explicit columns (never `SELECT *`).
-///
-/// Every select is ordered by all primary key columns.
+/// Build an ordered `SELECT` over the model's columns. Every select is ordered by
+/// primary key column(s).
 fn select_sql(model: &Model, preds: &[String], limit: bool) -> String {
     let columns = model
         .primary_columns
@@ -253,12 +441,58 @@ fn select_sql(model: &Model, preds: &[String], limit: bool) -> String {
     sql
 }
 
-fn database<'src>(backing: &'src ModelBacking, shard: Vec<Argument<'src>>) -> Database<'src> {
+/// Maps a field on the current model to the runtime parameter that fixes its value.
+///
+/// A field present in the map is "param-covered" if its value is known without querying a
+/// database, so a [Step] consuming it may run in its parent stage rather than `parent stage + 1`.
+#[derive(Default)]
+struct Params<'src> {
+    map: HashMap<&'src str, &'src str>,
+}
+
+impl<'src> Params<'src> {
+    fn value_arg(&self, field: &'src str) -> ValueArg<'src> {
+        match self.map.get(field) {
+            Some(param) => ValueArg::Param(param),
+            None => ValueArg::ParentField(field),
+        }
+    }
+
+    fn sql_arg(&self, field: &'src str) -> SqlArg<'src> {
+        match self.map.get(field) {
+            Some(param) => SqlArg::Param(param),
+            None => SqlArg::Spread(field),
+        }
+    }
+}
+
+/// Parse a key template into ordered [KeySegment]
+fn key_segments<'src>(key: &'src str, params: &Params<'src>) -> Vec<KeySegment<'src>> {
+    fn push_literal<'src>(segments: &mut Vec<KeySegment<'src>>, text: &'src str) {
+        if !text.is_empty() {
+            segments.push(KeySegment::Literal(text));
+        }
+    }
+
+    let mut segments = Vec::new();
+    let mut rest = key;
+    while let Some(open) = rest.find('{') {
+        push_literal(&mut segments, &rest[..open]);
+        let close = rest[open..].find('}').expect("validated key template") + open;
+        segments.push(KeySegment::Value(params.value_arg(&rest[open + 1..close])));
+        rest = &rest[close + 1..];
+    }
+
+    push_literal(&mut segments, rest);
+    segments
+}
+
+fn database<'src>(backing: &'src ModelBacking) -> Database<'src> {
     Database {
         name: backing.binding,
         kind: match backing.kind {
             BackingKind::D1 => DatabaseKind::D1,
-            BackingKind::DurableObject => DatabaseKind::DurableObject { shard },
+            BackingKind::DurableObject => DatabaseKind::DurableObject,
         },
     }
 }

@@ -133,7 +133,7 @@ model Foo {
 
 The most simple form of a navigation field is the empty form, where no fields are passed to resolve the relationship.
 
-If `ModelB` has no `route` or `shard` fields, then this is a valid form. 
+If `ModelB` has no `route` or `shard` fields, then this is a valid form.
 
 If `ModelB` is SQL based, then Cloesce will simply query for every single `ModelB` in the database, and return the first result for a `one` relationship, or an array of results for a `many` relationship.
 
@@ -341,62 +341,62 @@ A plan for `GET User` with `IncludeTree` `{ dog, cats }` would look like this in
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "UserDo",
-                "args": {
-                    "from_params": ["userId"]
-                }
-            },
-            "sql": {
-                "query": "SELECT * FROM User WHERE id = ?1 ORDER BY id ASC",
-                "args": {
-                    "from_params": ["id"]
-                },
-                "map": {
-                    "cardinality": "one",
-                }
-            },
-            "result": ""
-        },
-    ],
-    [
-        {
-            "db": {
-                "name": "AnimalDb",
-                "args": []
-            },
-            "sql": {
-                "query": "SELECT * FROM Dog WHERE id = ?1 ORDER BY id ASC",
-                "args": {
-                    "from_result": ["dogId"]
-                },
-                "map": {
-                    "cardinality": "one",
-                }
-            },
-            "result": "dog"
-        },
-        {
-            "db": {
-                "name": "AnimalDb",
-                "args": []
-            },
-            "sql": {
-                "query": "SELECT * FROM Cat WHERE userId = ?1 ORDER BY id ASC",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": {
-                    "cardinality": "many",
-                    "parent_key": "id",
-                    "child_key": "userId"
-                }
-            },
-            "result": "cats"
+  [
+    {
+      "db": {
+        "name": "UserDo",
+        "args": {
+          "from_params": ["userId"]
         }
-    ]
+      },
+      "sql": {
+        "query": "SELECT * FROM User WHERE id = ?1 ORDER BY id ASC",
+        "args": {
+          "from_params": ["id"]
+        },
+        "map": {
+          "cardinality": "one"
+        }
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "AnimalDb",
+        "args": []
+      },
+      "sql": {
+        "query": "SELECT * FROM Dog WHERE id = ?1 ORDER BY id ASC",
+        "args": {
+          "from_result": ["dogId"]
+        },
+        "map": {
+          "cardinality": "one"
+        }
+      },
+      "result": "dog"
+    },
+    {
+      "db": {
+        "name": "AnimalDb",
+        "args": []
+      },
+      "sql": {
+        "query": "SELECT * FROM Cat WHERE userId = ?1 ORDER BY id ASC",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": {
+          "cardinality": "many",
+          "parent_key": "id",
+          "child_key": "userId"
+        }
+      },
+      "result": "cats"
+    }
+  ]
 ]
 ```
 
@@ -408,8 +408,8 @@ EX Output:
 
 ```json
 {
-    "id": 1,
-    "dogId": 2
+  "id": 1,
+  "dogId": 2
 }
 ```
 
@@ -419,20 +419,20 @@ EX Output:
 
 ```json
 {
-    "dog": {
-        "id": 2,
-        "name": "Fido"
+  "dog": {
+    "id": 2,
+    "name": "Fido"
+  },
+  "cats": [
+    {
+      "id": 1,
+      "name": "Whiskers"
     },
-    "cats": [
-        {
-            "id": 1,
-            "name": "Whiskers"
-        },
-        {
-            "id": 2,
-            "name": "Fluffy"
-        }
-    ]
+    {
+      "id": 2,
+      "name": "Fluffy"
+    }
+  ]
 }
 ```
 
@@ -450,66 +450,66 @@ For example, a plan for `LIST User` with `IncludeTree` `{ dog, cats }` would loo
 
 ```json
 [
-    [
-        {
-            "db": {
-                "name": "UserDo",
-                "args": {
-                    "from_params": ["userId"]
-                }
-            },
-            "sql": {
-                "query": "SELECT * FROM User LIMIT ?1 ORDER BY id ASC",
-                "args": {
-                    "from_params": ["limit"]
-                },
-                "map": {
-                    "cardinality": "many",
-                    "parent_key": null,
-                    "child_key": null
-                }
-            },
-            "result": ""
-        },
-    ],
-    [
-        {
-            "db": {
-                "name": "AnimalDb",
-                "args": []
-            },
-            "sql": {
-                "query": "SELECT * FROM Dog WHERE id IN (?1) ORDER BY id ASC",
-                "args": {
-                    "from_result": ["dogId"]
-                },
-                "map": {
-                    "cardinality": "many",
-                    "parent_key": "dogId",
-                    "child_key": "id"
-                }
-            },
-            "result": "dogs"
-        },
-        {
-            "db": {
-                "name": "AnimalDb",
-                "args": []
-            },
-            "sql": {
-                "query": "SELECT * FROM Cat WHERE userId IN (?1) ORDER BY id ASC",
-                "args": {
-                    "from_result": ["id"]
-                },
-                "map": {
-                    "cardinality": "many",
-                    "parent_key": "id",
-                    "child_key": "userId"
-                }
-            },
-            "result": "cats"
+  [
+    {
+      "db": {
+        "name": "UserDo",
+        "args": {
+          "from_params": ["userId"]
         }
-    ]
+      },
+      "sql": {
+        "query": "SELECT * FROM User LIMIT ?1 ORDER BY id ASC",
+        "args": {
+          "from_params": ["limit"]
+        },
+        "map": {
+          "cardinality": "many",
+          "parent_key": null,
+          "child_key": null
+        }
+      },
+      "result": ""
+    }
+  ],
+  [
+    {
+      "db": {
+        "name": "AnimalDb",
+        "args": []
+      },
+      "sql": {
+        "query": "SELECT * FROM Dog WHERE id IN (?1) ORDER BY id ASC",
+        "args": {
+          "from_result": ["dogId"]
+        },
+        "map": {
+          "cardinality": "many",
+          "parent_key": "dogId",
+          "child_key": "id"
+        }
+      },
+      "result": "dogs"
+    },
+    {
+      "db": {
+        "name": "AnimalDb",
+        "args": []
+      },
+      "sql": {
+        "query": "SELECT * FROM Cat WHERE userId IN (?1) ORDER BY id ASC",
+        "args": {
+          "from_result": ["id"]
+        },
+        "map": {
+          "cardinality": "many",
+          "parent_key": "id",
+          "child_key": "userId"
+        }
+      },
+      "result": "cats"
+    }
+  ]
 ]
 ```
 
@@ -519,14 +519,14 @@ This plan consists of two transactions. Before any transaction is executed, it i
 
 ```json
 [
-    {
-        "id": 1,
-        "dogId": 2
-    },
-    {
-        "id": 2,
-        "dogId": 3
-    }
+  {
+    "id": 1,
+    "dogId": 2
+  },
+  {
+    "id": 2,
+    "dogId": 3
+  }
 ]
 ```
 
@@ -544,24 +544,24 @@ EX Output:
 
 ```json
 [
-    {
+  {
+    "id": 2,
+    "dogId": 2,
+    "dog": {
+      "id": 2,
+      "name": "Fido"
+    },
+    "cats": [
+      {
+        "id": 1,
+        "name": "Whiskers"
+      },
+      {
         "id": 2,
-        "dogId": 2,
-        "dog": {
-            "id": 2,
-            "name": "Fido"
-        },
-        "cats": [
-            {
-                "id": 1,
-                "name": "Whiskers"
-            },
-            {
-                "id": 2,
-                "name": "Fluffy"
-            }
-        ]
-    }
+        "name": "Fluffy"
+      }
+    ]
+  }
 ]
 ```
 
@@ -573,17 +573,17 @@ For example, a step to query an R2 bucket would look like this in JSON:
 
 ```json
 {
-    "db": {
-        "name": "MyR2Bucket",
-        "kind": "r2",
-    },
-    "query": {
-        "key": "my-key/{id}",
-        "args": {
-            "from_result": ["id"]
-        },
-    },
-    "result": "myR2Object"
+  "db": {
+    "name": "MyR2Bucket",
+    "kind": "r2"
+  },
+  "query": {
+    "key": "my-key/{id}",
+    "args": {
+      "from_result": ["id"]
+    }
+  },
+  "result": "myR2Object"
 }
 ```
 

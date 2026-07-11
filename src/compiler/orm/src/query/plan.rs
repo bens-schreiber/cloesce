@@ -1,15 +1,13 @@
 //! The query plan IR.
 //!
+//! Consists of a sequence of [Stage]s, each of which contains a set of [Step]s that may run in parallel.
+//! Each stage is intended to run after the previous stage has completed, and may read values from the hydrated
+//! result produced by earlier stages.
+//!
 //! TODO: Does not yet support `save` operations.
 
 use serde::Serialize;
 
-/// A complete description of how the runtime should execute a single operation:
-/// an ordered pipeline of [Stage]s.
-///
-/// Stages execute sequentially; each stage may read values from the hydrated
-/// result produced by earlier stages. A plan is pure data: serializable, and
-/// executable with no knowledge of the schema or the relationships between Models.
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct QueryPlan<'src> {
     pub stages: Vec<Stage<'src>>,
@@ -26,136 +24,143 @@ impl<'src> QueryPlan<'src> {
     }
 }
 
-/// A set of [Step] that may run in parallel.
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct Stage<'src> {
     pub steps: Vec<Step<'src>>,
 }
 
-/// A single action in a [Stage] that stores its result in the hydrated result
-/// of the [QueryPlan] at the location specified by [Step::result].
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Step<'src> {
-    pub database: Database<'src>,
-
     pub query: Query<'src>,
 
-    /// Positional values bound into [Step::query]: placeholder `?N` resolves
-    /// to `arguments[N - 1]`.
-    pub arguments: Vec<Argument<'src>>,
-
     /// The location in the hydrated result where this step's result is attached.
-    pub result: ObjectPath<'src>,
-
-    /// How this step's rows are shaped and attached at [Step::result].
-    pub mapping: Mapping<'src>,
+    ///
+    /// An empty path means the result is to be attached at the root of the hydrated result.
+    pub result: Vec<&'src str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Database<'src> {
     pub name: &'src str,
-    pub kind: DatabaseKind<'src>,
+    pub kind: DatabaseKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum DatabaseKind<'src> {
+pub enum DatabaseKind {
     Kv,
     R2,
     D1,
-    DurableObject {
-        /// Arguments supplying the shard values needed to construct a specific
-        /// Durable Object stub.
-        ///
-        /// A [Argument::Spread] shard value fans the step out: one stub per
-        /// distinct value, the same query executed against each, and each
-        /// stub's rows tagged with its shard value for joining
-        shard: Vec<Argument<'src>>,
-    },
+    DurableObject,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Query<'src> {
-    /// A SQL query to execute against a Durable Object or D1 database,
-    /// composed of positional `?N` placeholders referencing [Step::arguments].
+    /// A SQL query to execute against a Durable Object or D1 database, composed of
+    /// positional `?N` placeholders referencing `arguments` (1-based).
     ///
     /// For example:
     /// - sql => `SELECT * FROM users WHERE id = ?1 AND name = ?2`
-    /// - arguments => `vec![Argument::Param("id"), Argument::Param("name")]`
-    Sql { sql: String },
+    /// - arguments => `vec![SqlArg::Param("id"), SqlArg::Param("name")]`
+    Sql {
+        database: Database<'src>,
+        sql: String,
+        arguments: Vec<SqlArg<'src>>,
+        mapping: Mapping<'src>,
 
-    /// An operation executed against a KV or R2 storage.
-    ///
-    /// Always has a [Cardinality::One] result, which is the value read from the storage
-    /// (regardless of the stored values type).
+        /// For a [DatabaseKind::DurableObject] step, the `(field, value)` pairs
+        /// routing to specific stubs. Empty otherwise.
+        ///
+        /// - A [SqlArg::Spread] value fans the step out: one stub per distinct
+        ///   value, the same query executed against each.
+        ///
+        /// - A [SqlArg::Param] value (a root step) addresses the single stub fixed
+        ///   by the request.
+        shard: Vec<(&'src str, SqlArg<'src>)>,
+    },
+
+    /// An operation executed against a KV, R2, or Durable Object KV storage.
     Key {
-        /// The key to read from the storage, composed of `{{param}}` placeholders
-        /// referencing [Step::arguments].
-        key: &'src str,
+        database: Database<'src>,
+        segments: Vec<KeySegment<'src>>,
+        shard: Vec<(&'src str, ValueArg<'src>)>,
+    },
+
+    /// Build an object at [Step::result] out of runtime params or parent field values,
+    /// without querying an external database.
+    Synthesize {
+        fields: Vec<(&'src str, ValueArg<'src>)>,
+
+        /// Whether each parent object receives the object bare or as a singleton array.
+        cardinality: MapCardinality,
+    },
+
+    /// Merge `fields` into every object already present at [Step::result].
+    ///
+    /// Unlike [Query::Synthesize], this never creates an object: if an earlier step
+    /// attached nothing there (e.g. a GET that matched no row), the step is a noop.
+    ///
+    /// Used to place a SQL-backed model's non-shard route fields onto its rows.
+    Tag {
+        fields: Vec<(&'src str, ValueArg<'src>)>,
     },
 }
 
-/// A single positional value bound into a [Query].
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum Argument<'src> {
-    /// A scalar parameter from the runtime that must exist in order to execute
-    /// this [Step], and could be referenced in a SQL query or Durable Object shard key.
+pub enum SqlArg<'src> {
+    /// A scalar runtime parameter that must be provided to execute the [Step].
     Param(&'src str),
 
-    /// A scalar from the hydrated result of a previous [Stage] that must exist
-    /// in order to execute this [Step].
-    Scalar(ObjectPath<'src>),
-
-    /// Every value at the path across the hydrated result of a previous [Stage],
-    /// deduplicated, with nulls dropped.
-    ///
-    /// The runtime expands the placeholder into a value list (e.g. `id IN (?1)`),
-    /// chunked by the backend's bind-parameter limit.
-    Spread(ObjectPath<'src>),
+    /// Every value of the named field across the parents of the step's own
+    /// [Step::result] path
+    Spread(&'src str),
 }
 
-/// A chain of field names that navigates to a value in the hydrated result
-/// of a previous [Stage].
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum ObjectPath<'src> {
-    /// Value exists in the root(s) of the hydrated result,
-    /// e.g. `id` in the object `{ "id": 1 }`
-    Root,
+pub enum ValueArg<'src> {
+    /// A scalar runtime parameter that must be provided to execute the [Step].
+    Param(&'src str),
 
-    /// Value is nested in the hydrated result,
-    /// e.g. `dog.id` in the object `{ "dog": { "id": 1 } }`.
-    ///
-    /// Provides a path of field names to navigate to the value, e.g. `["dog", "id"]`.
-    Field(Vec<&'src str>),
+    /// A field read from the parent object (the object at the parent path of
+    /// [Step::result]).
+    ParentField(&'src str),
 }
 
-/// How a [Step]'s raw rows become values in the hydrated result.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum KeySegment<'src> {
+    /// Text between placeholders
+    Literal(&'src str),
+
+    /// A placeholder resolved from a runtime param or a parent object
+    /// field
+    Value(ValueArg<'src>),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Mapping<'src> {
     /// Whether each parent object receives a single object or an array of objects.
     ///
     /// - If a query returns more than one row but the cardinality is [Cardinality::One],
     ///   the runtime will take the first row only.
-    pub cardinality: Cardinality,
+    pub cardinality: MapCardinality,
 
     /// How rows are distributed among parent objects: a row is attached to every
     /// parent where all pairs satisfy `parent[parent_key] == row[child_key]`.
     ///
-    /// Empty on root steps (there is no parent to join into) and on
-    /// discriminator-less navigations, where every parent receives the same value(s).
+    /// If empty, every parent receives the same result.
     pub join: Vec<JoinKeys<'src>>,
 }
 
 impl Mapping<'_> {
     pub fn one() -> Self {
         Self {
-            cardinality: Cardinality::One,
+            cardinality: MapCardinality::One,
             join: vec![],
         }
     }
 
     pub fn many() -> Self {
         Self {
-            cardinality: Cardinality::Many,
+            cardinality: MapCardinality::Many,
             join: vec![],
         }
     }
@@ -167,21 +172,17 @@ pub struct JoinKeys<'src> {
     pub child_key: &'src str,
 }
 
-/// Whether a step's SQLite result should be mapped to a single object
-/// or an array of objects in the hydrated result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum Cardinality {
-    /// Take the first row only.
+pub enum MapCardinality {
     One,
-    /// Take all rows.
     Many,
 }
 
-impl From<idl::NavigationCardinality> for Cardinality {
+impl From<idl::NavigationCardinality> for MapCardinality {
     fn from(c: idl::NavigationCardinality) -> Self {
         match c {
-            idl::NavigationCardinality::One => Cardinality::One,
-            idl::NavigationCardinality::Many => Cardinality::Many,
+            idl::NavigationCardinality::One => MapCardinality::One,
+            idl::NavigationCardinality::Many => MapCardinality::Many,
         }
     }
 }
