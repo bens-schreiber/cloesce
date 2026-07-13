@@ -5,6 +5,8 @@
 //! Each stage is intended to run after the previous stage has completed, and may read values from the hydrated
 //! result produced by earlier stages.
 
+use std::borrow::Cow;
+
 use serde::Serialize;
 
 use crate::query::{Database, TemplateSegment};
@@ -97,7 +99,7 @@ pub enum Select<'src> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum SqlArg<'src> {
     /// A scalar runtime parameter that must be provided to execute the [Step].
-    Param(&'src str),
+    Param(Cow<'src, str>),
 
     /// Every value of the named field across the parents of the step's own
     /// [Step::result] path

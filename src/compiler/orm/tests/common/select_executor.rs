@@ -16,9 +16,9 @@ use crate::common::setup::MockStorage;
 ///
 /// - KV metadata is not supported
 /// - Does not chunk large spreads
-/// - Does not support partial failures. If any part of the plan fails, the whole
-///   plan fails. In the actual runtime, dependent steps will not execute, with the plan
-///   continuing where it can.
+/// - Does not support partial failures. If any step fails, the whole plan fails. In the
+///   real runtime a failed step still lets later steps in its stage attach their results
+///   (with a blank body where needed)
 /// - Any missing value is a hard failure
 pub async fn execute(
     plan: &SelectPlan<'_>,
@@ -26,15 +26,19 @@ pub async fn execute(
     storage: &MockStorage,
 ) -> Value {
     let mut ctx = Context {
-        plan,
         params,
         storage,
         body: Value::Null,
     };
 
     for stage in &plan.stages {
-        for step in &stage.steps {
-            ctx.step(step).await;
+        // Run all steps in parallel
+        let fetched =
+            futures::future::join_all(stage.steps.iter().map(|step| ctx.fetch(step))).await;
+
+        // Attach each step's result into the body in step order.
+        for (step, fetched) in stage.steps.iter().zip(fetched) {
+            ctx.sink(step, fetched);
         }
     }
 
@@ -42,25 +46,35 @@ pub async fn execute(
 }
 
 struct Context<'a> {
-    plan: &'a SelectPlan<'a>,
     params: Map<String, Value>,
     storage: &'a MockStorage,
     body: Value,
 }
 
 impl<'a> Context<'a> {
-    async fn step(&mut self, step: &SelectStep<'_>) {
-        let result = &step.result;
+    /// Resolve a SQL step's rows against the frozen body, without mutating it.
+    async fn fetch(&self, step: &SelectStep<'_>) -> Option<Vec<Value>> {
         match &step.query {
             Select::Sql {
                 database,
                 sql,
                 arguments,
                 shard,
-                mapping,
-            } => {
-                self.sql_step(database, sql, arguments, shard, mapping, result)
-                    .await;
+                ..
+            } => Some(
+                self.fetch_sql(database, sql, arguments, shard, &step.result)
+                    .await,
+            ),
+            Select::Key { .. } | Select::Synthesize { .. } => None,
+        }
+    }
+
+    /// Attach a step's result into the body.
+    fn sink(&mut self, step: &SelectStep<'_>, rows: Option<Vec<Value>>) {
+        let result = &step.result;
+        match &step.query {
+            Select::Sql { mapping, .. } => {
+                self.sink_sql(result, rows.expect("SQL steps fetch rows"), mapping)
             }
             Select::Key {
                 database,
@@ -75,15 +89,14 @@ impl<'a> Context<'a> {
         }
     }
 
-    async fn sql_step(
-        &mut self,
+    async fn fetch_sql(
+        &self,
         database: &Database<'_>,
         sql: &str,
         arguments: &[SqlArg<'_>],
         shard: &[(&str, SqlArg<'_>)],
-        mapping: &Mapping<'_>,
         result: &[&str],
-    ) {
+    ) -> Vec<Value> {
         let name = database.name;
         let Self {
             params,
@@ -99,7 +112,7 @@ impl<'a> Context<'a> {
             None => &[],
         };
 
-        let rows = match &database.kind {
+        match &database.kind {
             DatabaseKind::D1 => {
                 let pool = storage.d1.get(name).expect("D1 binding to exist in tests");
 
@@ -130,7 +143,11 @@ impl<'a> Context<'a> {
                 rows
             }
             other => panic!("unsupported database {other:?}"),
-        };
+        }
+    }
+
+    fn sink_sql(&mut self, result: &[&str], rows: Vec<Value>, mapping: &Mapping<'_>) {
+        let body = &mut self.body;
 
         // Attach the rows to the parent objects at `result` (or the root if `result` is empty),
         match result.split_last() {
@@ -387,7 +404,7 @@ fn resolve(
 ) -> Vec<Value> {
     match binding {
         SqlArg::Param(name) => params
-            .get(*name)
+            .get(name.as_ref())
             .cloned()
             .map(|v| vec![v])
             .expect("Value to exist in tests"),

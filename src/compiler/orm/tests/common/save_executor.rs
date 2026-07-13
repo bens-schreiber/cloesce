@@ -11,10 +11,10 @@ use crate::common::setup::MockStorage;
 ///
 /// A save receives no runtime params — every value is carried in the payload the plan was
 /// built from — so the executor takes none.
-///
 /// - Any missing value is a hard failure
 /// - KV metadata is ignored for storage
-/// - No partial save failures.
+/// - No partial save failures. If any step fails, the whole plan fails. In the real runtime
+///   a failed step still lets later steps in its stage attach their results.
 pub async fn execute(plan: &SavePlan<'_>, storage: &mut MockStorage) -> Value {
     let mut ctx = Context {
         storage,
@@ -22,12 +22,101 @@ pub async fn execute(plan: &SavePlan<'_>, storage: &mut MockStorage) -> Value {
     };
 
     for stage in &plan.stages {
+        // Resolve values from the frozen body
+        let mut prepped = Vec::with_capacity(stage.steps.len());
         for step in &stage.steps {
-            ctx.step(step).await;
+            prepped.push(ctx.prep(step).await);
+        }
+
+        // Run all steps in parallel
+        let fetched = futures::future::join_all(prepped.into_iter().map(Prepped::fetch)).await;
+
+        // Attach each steps result in step order.
+        for (step, fetched) in stage.steps.iter().zip(fetched) {
+            ctx.sink(step, fetched);
         }
     }
 
     ctx.body
+}
+
+/// `(result path, value)` pairs a step attaches in the sink, in statement order.
+type Attachments<'src> = Vec<(&'src [PathSegment<'src>], Value)>;
+
+/// A single prepared statement carried from prep into the parallel fetch.
+struct PreppedStatement<'src> {
+    sql: &'src str,
+
+    /// Bind values pre-resolved from the frozen body, in `?N` order.
+    binds: Vec<Value>,
+
+    /// `Some(result)` for a Hydrate readback, `None` for a plain write.
+    hydrate: Option<&'src [PathSegment<'src>]>,
+}
+
+/// A step after prep: everything needing `&mut storage` or a body read is done, leaving
+/// only work that can run in parallel (SqlBatch transactions) or at sink time.
+enum Prepped<'src> {
+    /// A SqlBatch ready to run its transaction in the parallel fetch.
+    Batch {
+        pool: sqlx::SqlitePool,
+        shard_tags: Vec<(String, Value)>,
+        statements: Vec<PreppedStatement<'src>>,
+    },
+
+    /// Attachments already resolved in prep.
+    ///
+    /// Empty for a [SaveQuery::Synthesize] step with `create = false`
+    /// (merge onto an existing object).
+    Ready(Attachments<'src>),
+}
+
+impl<'src> Prepped<'src> {
+    /// Run the parallel part of a prepped step: a SqlBatch's transaction, yielding its
+    /// hydrated rows
+    async fn fetch(self) -> Attachments<'src> {
+        let (pool, shard_tags, statements) = match self {
+            Prepped::Ready(attachments) => return attachments,
+            Prepped::Batch {
+                pool,
+                shard_tags,
+                statements,
+            } => (pool, shard_tags, statements),
+        };
+
+        let mut rows = Vec::new();
+        let mut tx = pool.begin().await.expect("begin");
+        for stmt in statements {
+            let query = stmt
+                .binds
+                .iter()
+                .fold(sqlx::query(stmt.sql), |q, v| bind_value(q, v));
+            match stmt.hydrate {
+                None => {
+                    query
+                        .execute(&mut *tx)
+                        .await
+                        .expect("write to succeed in tests");
+                }
+                Some(result) => {
+                    let mut row = row_to_json(
+                        &query
+                            .fetch_one(&mut *tx)
+                            .await
+                            .expect("hydrate to return a row in tests"),
+                    );
+                    if let Value::Object(map) = &mut row {
+                        for (field, value) in &shard_tags {
+                            map.insert(field.clone(), value.clone());
+                        }
+                    }
+                    rows.push((result, row));
+                }
+            }
+        }
+        tx.commit().await.expect("commit");
+        rows
+    }
 }
 
 struct Context<'a> {
@@ -36,13 +125,15 @@ struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    async fn step(&mut self, step: &SaveStep<'_>) {
+    /// Prepare a step: resolve everything that needs `&mut storage` or reads the frozen
+    /// body, so the fetch phase can run in parallel.
+    async fn prep<'src>(&mut self, step: &'src SaveStep<'src>) -> Prepped<'src> {
         match &step.query {
             SaveQuery::SqlBatch {
                 database,
                 statements,
                 shard,
-            } => self.sql_batch(database, statements, shard).await,
+            } => self.prep_sql_batch(database, statements, shard).await,
             SaveQuery::KeyWrite {
                 database,
                 key: segments,
@@ -57,20 +148,27 @@ impl<'a> Context<'a> {
                 metadata.as_deref(),
                 shard,
             ),
-            SaveQuery::Synthesize { fields, create } => {
-                self.synthesize(&step.result, fields, *create)
-            }
+            SaveQuery::Synthesize { .. } => Prepped::Ready(vec![]),
         }
     }
 
-    async fn sql_batch(
+    /// Attach a step's fetched result into the body. Runs in step order.
+    fn sink(&mut self, step: &SaveStep<'_>, attachments: Attachments<'_>) {
+        for (result, value) in attachments {
+            self.attach(result, value);
+        }
+        if let SaveQuery::Synthesize { fields, create } = &step.query {
+            self.synthesize(&step.result, fields, *create);
+        }
+    }
+
+    async fn prep_sql_batch<'src>(
         &mut self,
         database: &Database<'_>,
-        statements: &[SqlStatement<'_>],
+        statements: &'src [SqlStatement<'src>],
         shard: &[(&str, SaveArg<'_>)],
-    ) {
-        // Resolve the pool up front (cloned handle so we don't hold a borrow of storage
-        // while mutating the body). A DO batch also tags each hydrated row with its shard
+    ) -> Prepped<'src> {
+        // Resolve the pool up front. A DO batch also tags each hydrated row with its shard
         // values, since the shard fields are route fields not returned by the SELECT.
         let (pool, shard_tags) = match &database.kind {
             DatabaseKind::D1 => (
@@ -98,48 +196,44 @@ impl<'a> Context<'a> {
             other => panic!("unsupported save database {other:?}"),
         };
 
-        let mut tx = pool.begin().await.expect("begin");
-        for statement in statements {
-            match statement {
-                SqlStatement::Write { sql, arguments } => {
-                    self.bind(sql, arguments)
-                        .execute(&mut *tx)
-                        .await
-                        .expect("write to succeed in tests");
-                }
+        // Pre-resolve every statement's bind values from the frozen body so the fetch
+        // future borrows nothing of `self`.
+        let statements = statements
+            .iter()
+            .map(|statement| match statement {
+                SqlStatement::Write { sql, arguments } => PreppedStatement {
+                    sql,
+                    binds: arguments.iter().map(|a| self.resolve(a)).collect(),
+                    hydrate: None,
+                },
                 SqlStatement::Hydrate {
                     sql,
                     arguments,
                     result,
-                } => {
-                    let mut row = row_to_json(
-                        &self
-                            .bind(sql, arguments)
-                            .fetch_one(&mut *tx)
-                            .await
-                            .expect("hydrate to return a row in tests"),
-                    );
-                    if let Value::Object(map) = &mut row {
-                        for (field, value) in &shard_tags {
-                            map.insert(field.clone(), value.clone());
-                        }
-                    }
-                    self.attach(result, row);
-                }
-            }
+                } => PreppedStatement {
+                    sql,
+                    binds: arguments.iter().map(|a| self.resolve(a)).collect(),
+                    hydrate: Some(result),
+                },
+            })
+            .collect();
+
+        Prepped::Batch {
+            pool,
+            shard_tags,
+            statements,
         }
-        tx.commit().await.expect("commit");
     }
 
-    fn key_write(
+    fn key_write<'src>(
         &mut self,
-        result: &[PathSegment<'_>],
+        result: &'src [PathSegment<'src>],
         database: &Database<'_>,
         segments: &[TemplateSegment<'_, SaveArg<'_>>],
         value: &Value,
         _metadata: Option<&Value>,
         shard: &[(&str, SaveArg<'_>)],
-    ) {
+    ) -> Prepped<'src> {
         let key = resolve_key(segments, &self.body);
         let written = value.clone();
 
@@ -174,7 +268,7 @@ impl<'a> Context<'a> {
             other => unreachable!("key write routed at non-storage kind {other:?}"),
         }
 
-        self.attach(result, written);
+        Prepped::Ready(vec![(result, written)])
     }
 
     fn synthesize(
@@ -218,25 +312,6 @@ impl<'a> Context<'a> {
                 .cloned()
                 .expect("Body value to exist in tests"),
         }
-    }
-
-    /// Bind a statement's `?N` slots from its [SaveArg]s. `Value::Null` binds a typed
-    /// `None`, bools bind as `i64`, matching the runtime's typed-null handling.
-    fn bind<'q>(
-        &self,
-        sql: &'q str,
-        arguments: &[SaveArg<'_>],
-    ) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
-        arguments
-            .iter()
-            .fold(sqlx::query(sql), |q, arg| match self.resolve(arg) {
-                Value::Null => q.bind(None::<String>),
-                Value::Bool(b) => q.bind(b as i64),
-                Value::Number(n) if n.is_i64() => q.bind(n.as_i64().unwrap()),
-                Value::Number(n) => q.bind(n.as_f64().unwrap()),
-                Value::String(s) => q.bind(s),
-                other => q.bind(other.to_string()),
-            })
     }
 
     /// The value at an exact [PathSeg] path of the hydrated body.
@@ -319,6 +394,22 @@ fn place(cur: &mut Value, seg: &PathSegment<'_>, value: Value) {
             }
             arr[*i] = value;
         }
+    }
+}
+
+/// Bind one pre-resolved `?N` slot. `Value::Null` binds a typed `None`, bools bind as
+/// `i64`, matching the runtime's typed-null handling.
+fn bind_value<'q>(
+    q: sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>>,
+    value: &Value,
+) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
+    match value {
+        Value::Null => q.bind(None::<String>),
+        Value::Bool(b) => q.bind(*b as i64),
+        Value::Number(n) if n.is_i64() => q.bind(n.as_i64().unwrap()),
+        Value::Number(n) => q.bind(n.as_f64().unwrap()),
+        Value::String(s) => q.bind(s.clone()),
+        other => q.bind(other.to_string()),
     }
 }
 

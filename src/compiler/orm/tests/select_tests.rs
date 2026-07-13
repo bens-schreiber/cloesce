@@ -96,7 +96,7 @@ async fn scalar_d1_get_and_list() {
             SelectOperation::List,
             "Person",
             json!({}),
-            json!({ "limit": 2 }),
+            json!({ "lastSeen_id": 0, "limit": 2 }),
             &storage,
         )
         .await;
@@ -113,6 +113,82 @@ async fn scalar_d1_get_and_list() {
         assert_eq!(plan.stages.len(), 1);
         assert_eq!(plan.stages[0].steps.len(), 1);
     }
+
+    // LIST
+    {
+        // Act
+        let (_, body) = execute_ok(
+            &idl,
+            SelectOperation::List,
+            "Person",
+            json!({}),
+            // seek past the last id seen on page 1, returning the remainder.
+            json!({ "lastSeen_id": 2, "limit": 2 }),
+            &storage,
+        )
+        .await;
+
+        // Assert
+        assert_eq!(
+            body,
+            json!([{ "id": 3, "name": "Cara" }]),
+            "Seeking past id `2` returns only the records after it"
+        );
+    }
+}
+
+#[sqlx::test]
+async fn composite_pk_list_seek() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Order for db {
+            primary {
+                region: int
+                num: int
+            }
+            column { total: int }
+        }
+        "#,
+    );
+
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+    for (region, num, total) in [(1, 10, 100), (1, 20, 200), (2, 5, 50)] {
+        seed(
+            &idl,
+            "Order",
+            json!({}),
+            json!({ "region": region, "num": num, "total": total }),
+            &mut storage,
+        )
+        .await;
+    }
+
+    // Act
+    let (plan, body) = execute_ok(
+        &idl,
+        SelectOperation::List,
+        "Order",
+        json!({}),
+        json!({ "lastSeen_region": 1, "lastSeen_num": 10, "limit": 10 }),
+        &storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!([
+            { "region": 1, "num": 20, "total": 200 },
+            { "region": 2, "num": 5, "total": 50 },
+        ]),
+        "The row-value cursor advances lexicographically: `(1,20)` and `(2,5)` sort after \
+         `(1,10)`, but `(2,5)` is not excluded despite its smaller `num`"
+    );
+    assert_eq!(plan.stages.len(), 1);
+    assert_eq!(plan.stages[0].steps.len(), 1);
 }
 
 #[sqlx::test]
@@ -179,7 +255,7 @@ async fn one_nav_same_db() {
             SelectOperation::List,
             "Person",
             json!({ "dog": {} }),
-            json!({ "limit": 10 }),
+            json!({ "lastSeen_id": 0, "limit": 10 }),
             &storage,
         )
         .await;
@@ -281,7 +357,7 @@ async fn many_nav_same_db() {
             SelectOperation::List,
             "User",
             json!({ "posts": {} }),
-            json!({ "limit": 10 }),
+            json!({ "lastSeen_id": 0, "limit": 10 }),
             &storage,
         )
         .await;
@@ -350,7 +426,7 @@ async fn cross_database_nav() {
         SelectOperation::List,
         "Person",
         json!({ "dog": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -417,7 +493,7 @@ async fn nested_depth_two() {
         SelectOperation::List,
         "User",
         json!({ "dog": { "toy": {} } }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -541,7 +617,7 @@ async fn d1_root_do_child_fanout() {
         SelectOperation::List,
         "Company",
         json!({ "tenant": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -676,7 +752,7 @@ async fn empty_form_nav() {
         SelectOperation::List,
         "Page",
         json!({ "banners": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -923,7 +999,7 @@ async fn r2_field_list_fanout() {
         SelectOperation::List,
         "User",
         json!({ "avatar": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -1104,7 +1180,7 @@ async fn kv_field_list_fanout() {
         SelectOperation::List,
         "Item",
         json!({ "entry": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -1296,7 +1372,7 @@ async fn do_kv_fanout_from_d1_list() {
         SelectOperation::List,
         "Org",
         json!({ "board": { "top": {} } }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;
@@ -1811,7 +1887,7 @@ async fn route_field_on_sql_nav_child() {
         SelectOperation::List,
         "Parent",
         json!({ "child": {} }),
-        json!({ "limit": 10 }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
         &storage,
     )
     .await;

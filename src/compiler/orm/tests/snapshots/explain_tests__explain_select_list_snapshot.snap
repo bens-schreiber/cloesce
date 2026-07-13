@@ -10,7 +10,7 @@ INCLUDE
    └─ `top`
 
 STAGE 0
-└─ SCAN `Org` ON d1 `db` LIMIT `$limit` MANY
+└─ SEARCH `Org` ON d1 `db` LIMIT `$limit` MANY
 
 STAGE 1
 ├─ SCAN `Board` ON durable `BoardDo` INTO `board` ONE

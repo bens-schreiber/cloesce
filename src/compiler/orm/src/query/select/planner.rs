@@ -60,7 +60,7 @@ pub fn plan<'src>(
         let shard = backing
             .fields
             .iter()
-            .map(|f| (*f, SqlArg::Param(f)))
+            .map(|f| (*f, SqlArg::Param((*f).into())))
             .collect::<Vec<_>>();
 
         let query = match operation {
@@ -78,25 +78,51 @@ pub fn plan<'src>(
                 let arguments = model
                     .primary_columns
                     .iter()
-                    .map(|c| SqlArg::Param(c.field.name.as_ref()))
+                    .map(|c| SqlArg::Param(c.field.name.as_ref().into()))
                     .collect::<Vec<_>>();
 
                 Select::Sql {
                     database: backing.into(),
-                    sql: select_sql(model, &predicates, false),
+                    sql: select_sql(model, &predicates, None),
                     arguments,
                     shard,
                     mapping,
                 }
             }
-            // LIST takes only the `limit` argument
-            SelectOperation::List => Select::Sql {
-                database: backing.into(),
-                sql: select_sql(model, &[], true),
-                arguments: vec![SqlArg::Param(LIMIT_PARAM)],
-                shard,
-                mapping,
-            },
+            SelectOperation::List => {
+                let pks = &model.primary_columns;
+
+                // ex: `"id" > ?1` or `("region", "num") > (?1, ?2)`
+                let placeholders = (1..=pks.len()).map(|i| format!("?{i}")).collect::<Vec<_>>();
+                let predicate = if pks.len() == 1 {
+                    format!("\"{}\" > {}", pks[0].field.name, placeholders[0])
+                } else {
+                    let cols = pks
+                        .iter()
+                        .map(|c| format!("\"{}\"", c.field.name))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("({}) > ({})", cols, placeholders.join(", "))
+                };
+
+                // One `lastSeen_<pk>` cursor value per pk column, then `limit`.
+                //
+                // Cursor values are not added to `Params::map`
+                // (they cannot fix any field value for child steps).
+                let arguments = pks
+                    .iter()
+                    .map(|c| SqlArg::Param(format!("lastSeen_{}", c.field.name).into()))
+                    .chain(std::iter::once(SqlArg::Param(LIMIT_PARAM.into())))
+                    .collect::<Vec<_>>();
+
+                Select::Sql {
+                    database: backing.into(),
+                    sql: select_sql(model, &[predicate], Some(pks.len() + 1)),
+                    arguments,
+                    shard,
+                    mapping,
+                }
+            }
         };
 
         plan.stage_at(0).steps.push(SelectStep {
@@ -378,7 +404,7 @@ fn select_navs<'src>(
         plan.stage_at(stage).steps.push(SelectStep {
             query: Select::Sql {
                 database: backing.into(),
-                sql: select_sql(target, &predicates, false),
+                sql: select_sql(target, &predicates, None),
                 arguments: bindings,
                 shard,
                 mapping: Mapping {
@@ -411,7 +437,7 @@ fn select_navs<'src>(
 
 /// Build an ordered SQL `SELECT` over the model's columns. Ordered by
 /// primary key column(s).
-fn select_sql(model: &Model, preds: &[String], limit: bool) -> String {
+fn select_sql(model: &Model, preds: &[String], limit_placeholder: Option<usize>) -> String {
     let columns = model
         .primary_columns
         .iter()
@@ -437,9 +463,9 @@ fn select_sql(model: &Model, preds: &[String], limit: bool) -> String {
         .join(", ");
     sql.push_str(&format!(" ORDER BY {order}"));
 
-    if limit {
+    if let Some(n) = limit_placeholder {
         // ... LIMIT ?N
-        sql.push_str(&format!(" LIMIT ?{}", preds.len() + 1));
+        sql.push_str(&format!(" LIMIT ?{n}"));
     }
 
     sql
@@ -464,7 +490,7 @@ impl<'src> Params<'src> {
 
     fn sql_arg(&self, field: &'src str) -> SqlArg<'src> {
         match self.map.get(field) {
-            Some(param) => SqlArg::Param(param),
+            Some(param) => SqlArg::Param((*param).into()),
             None => SqlArg::Spread(field),
         }
     }
