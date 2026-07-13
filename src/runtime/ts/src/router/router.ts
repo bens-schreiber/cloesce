@@ -447,8 +447,6 @@ async function validateRequest(
       idl: idl,
       includeTree: null,
       env,
-      durable: null,
-      promises: [],
     });
     params[p.name] = hydrated ?? validatedRaw;
   }

@@ -1,7 +1,7 @@
 use askama::Template;
 use idl::{
     ApiMethod, CidlType, CloesceIdl, DataSourceGetMethodParam, HttpVerb, MediaType, Model,
-    NavigationField, NavigationFieldKind,
+    NavigationCardinality, NavigationField,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -47,11 +47,11 @@ impl ClientTemplate<'_> {
     }
 
     fn nav_type(&self, nav: &NavigationField<'_>) -> String {
-        let cidl_type = match &nav.kind {
-            NavigationFieldKind::OneToOne { .. } => CidlType::Object {
+        let cidl_type = match nav.cardinality {
+            NavigationCardinality::One => CidlType::Object {
                 name: nav.model_reference,
             },
-            NavigationFieldKind::OneToMany { .. } => CidlType::array(CidlType::Object {
+            NavigationCardinality::Many => CidlType::array(CidlType::Object {
                 name: nav.model_reference,
             }),
         };
@@ -116,7 +116,7 @@ impl ClientTemplate<'_> {
     }
 
     fn is_one_to_one(&self, nav: &NavigationField<'_>) -> bool {
-        matches!(nav.kind, NavigationFieldKind::OneToOne { .. })
+        matches!(nav.cardinality, NavigationCardinality::One)
     }
 
     fn ds_get<'t>(

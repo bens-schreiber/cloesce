@@ -319,16 +319,6 @@ pub struct DataSource<'src> {
     #[serde(borrow)]
     pub save: DataSourceMethod<'src>,
 
-    /// A raw SQL query generated from the WASM `select` method.
-    /// Empty if the data source is not backed by a SQL db
-    pub include_query: String,
-
-    /// Fetch by primary key based on [Self::include_query]
-    pub get_query: String,
-
-    /// Seek pagination query based on [Self::include_query]
-    pub list_query: String,
-
     /// True if the data source should not be exposed to the client
     pub is_internal: bool,
 }

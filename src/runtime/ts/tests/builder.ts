@@ -5,7 +5,7 @@ import {
   Field,
   HttpVerb,
   CidlType,
-  NavigationFieldKind,
+  NavigationCardinality,
   Column,
   DataSource,
   NavigationField,
@@ -24,9 +24,6 @@ export function createIdl(args?: { models?: Model[] }): Cidl {
     model.data_sources["Default"] ??= {
       name: "Default",
       tree: {},
-      include_query: "",
-      get_query: "",
-      list_query: "",
       get: { parameters: [], injected: [], is_stub: false },
       list: { parameters: [], injected: [], is_stub: false },
       save: { parameters: [], injected: [], is_stub: false },
@@ -129,11 +126,23 @@ export class ModelBuilder {
     return this;
   }
 
-  navP(name: string, model_reference: string, kind: NavigationFieldKind): this {
+  navP(
+    name: string,
+    model_reference: string,
+    cardinality: NavigationCardinality,
+    keys: { local: string; target: string }[] = [],
+  ): this {
     this.navigation_fields.push({
-      field: { name, cidl_type: { Object: { name: model_reference } } },
+      field: {
+        name,
+        cidl_type:
+          cardinality === "One"
+            ? { Object: { name: model_reference } }
+            : { Array: { Object: { name: model_reference } } },
+      },
       model_reference,
-      kind,
+      cardinality,
+      keys,
     });
     return this;
   }
@@ -198,9 +207,6 @@ export class ModelBuilder {
     this.data_sources[name] = {
       name,
       tree,
-      include_query: "",
-      get_query: "",
-      list_query: "",
       get: {
         parameters:
           get?.map((f) => ({

@@ -1,12 +1,7 @@
 use compiler_test::src_to_idl;
-use sqlx::{Row, SqlitePool};
 
-async fn exec_batch(db: &SqlitePool, sql: &str) {
-    sqlx::raw_sql(sql).execute(db).await.unwrap();
-}
-
-#[sqlx::test]
-async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
+#[test]
+fn default_data_source_tree_includes_all_relationships() {
     let idl = src_to_idl(
         r#"
         d1 { db }
@@ -86,38 +81,6 @@ async fn default_data_source_tree_includes_all_relationships(db: SqlitePool) {
     assert!(!default_ds.get.is_stub);
     assert!(!default_ds.list.is_stub);
     assert!(!default_ds.save.is_stub);
-    assert!(default_ds.include_query.to_uppercase().contains("SELECT"));
-
-    exec_batch(
-        &db,
-        r#"CREATE TABLE Profile (id INTEGER PRIMARY KEY);
-           CREATE TABLE Role (id INTEGER PRIMARY KEY);
-           CREATE TABLE "Order" (id INTEGER PRIMARY KEY, userId INTEGER NOT NULL);
-           CREATE TABLE User (id INTEGER PRIMARY KEY, profileId INTEGER NOT NULL);
-
-           INSERT INTO Profile (id) VALUES (1);
-           INSERT INTO Role (id) VALUES (10);
-           INSERT INTO User (id, profileId) VALUES (1, 1), (2, 1);
-           INSERT INTO "Order" (id, userId) VALUES (100, 1), (200, 1);"#,
-    )
-    .await;
-
-    let rows = sqlx::query(&default_ds.get_query)
-        .bind(1)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert!(!rows.is_empty(), "GET query should return rows");
-    assert_eq!(rows[0].get::<u32, _>("id"), 1);
-    assert_eq!(rows[0].get::<u32, _>("profile.id"), 1);
-
-    let rows = sqlx::query(&default_ds.list_query)
-        .bind(0) // lastSeen_id
-        .bind(10) // limit
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert!(rows.len() >= 2, "LIST query should return multiple rows");
 }
 
 #[test]
@@ -218,8 +181,8 @@ fn default_data_source_present_on_every_d1_model() {
     assert!(!default_ds.save.is_stub);
 }
 
-#[sqlx::test]
-async fn default_data_source_skips_nested_manys(db: SqlitePool) {
+#[test]
+fn default_data_source_skips_nested_manys() {
     let idl = src_to_idl(
         r#"
         d1 { db }
@@ -272,40 +235,10 @@ async fn default_data_source_skips_nested_manys(db: SqlitePool) {
         !students_node.0.contains_key("grades"),
         "Default data source should NOT recurse past 1:N"
     );
-
-    exec_batch(
-        &db,
-        "CREATE TABLE Grade (id INTEGER PRIMARY KEY, studentId INTEGER NOT NULL);
-         CREATE TABLE Teacher (id INTEGER PRIMARY KEY);
-         CREATE TABLE Student (id INTEGER PRIMARY KEY, teacherId INTEGER NOT NULL);
-
-         INSERT INTO Teacher (id) VALUES (1);
-         INSERT INTO Student (id, teacherId) VALUES (10, 1), (20, 1);
-         INSERT INTO Grade (id, studentId) VALUES (100, 10);",
-    )
-    .await;
-
-    let rows = sqlx::query(&default_ds.get_query)
-        .bind(1)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert_eq!(rows.len(), 2, "GET should return 2 rows (1 per student)");
-    assert_eq!(rows[0].get::<u32, _>("id"), 1);
-    assert_eq!(rows[0].get::<u32, _>("students.id"), 10);
-    assert_eq!(rows[1].get::<u32, _>("students.id"), 20);
-
-    let rows = sqlx::query(&default_ds.list_query)
-        .bind(0)
-        .bind(10)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert!(!rows.is_empty(), "LIST query should return rows");
 }
 
-#[sqlx::test]
-async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
+#[test]
+fn default_data_source_includes_multiple_one_to_ones() {
     let idl = src_to_idl(
         r#"
         d1 { db }
@@ -361,40 +294,10 @@ async fn default_data_source_includes_multiple_one_to_ones(db: SqlitePool) {
         toy_node.0.is_empty(),
         "Default include should not recurse past leaf 1:1"
     );
-
-    exec_batch(
-        &db,
-        "CREATE TABLE Toy (id INTEGER PRIMARY KEY, color TEXT NOT NULL);
-         CREATE TABLE Dog (id INTEGER PRIMARY KEY, breed TEXT NOT NULL, toyId INTEGER NOT NULL REFERENCES Toy(id));
-         CREATE TABLE Owner (id INTEGER PRIMARY KEY, name TEXT NOT NULL, dogId INTEGER NOT NULL REFERENCES Dog(id));
-
-         INSERT INTO Toy (id, color) VALUES (1, 'red');
-         INSERT INTO Dog (id, breed, toyId) VALUES (1, 'poodle', 1);
-         INSERT INTO Owner (id, name, dogId) VALUES (1, 'Alice', 1);",
-    )
-    .await;
-
-    let row = sqlx::query(&default_ds.get_query)
-        .bind(1)
-        .fetch_one(&db)
-        .await
-        .unwrap();
-    assert_eq!(row.get::<String, _>("name"), "Alice");
-    assert_eq!(row.get::<String, _>("dog.breed"), "poodle");
-    assert_eq!(row.get::<String, _>("dog.toy.color"), "red");
-
-    let rows = sqlx::query(&default_ds.list_query)
-        .bind(0)
-        .bind(10)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].get::<String, _>("name"), "Alice");
 }
 
-#[sqlx::test]
-async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool) {
+#[test]
+fn default_data_source_diamond_does_not_duplicate_traversal() {
     let idl = src_to_idl(
         r#"
         d1 { db }
@@ -448,39 +351,10 @@ async fn default_data_source_diamond_does_not_duplicate_traversal(db: SqlitePool
     assert!(tree.0.contains_key("team"));
     let department_node = tree.0.get("department").unwrap();
     assert!(department_node.0.contains_key("team"));
-
-    exec_batch(
-        &db,
-        "CREATE TABLE Team (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
-         CREATE TABLE Department (id INTEGER PRIMARY KEY, teamId INTEGER NOT NULL REFERENCES Team(id));
-         CREATE TABLE Company (id INTEGER PRIMARY KEY, departmentId INTEGER NOT NULL REFERENCES Department(id), directTeamId INTEGER NOT NULL REFERENCES Team(id));
-
-         INSERT INTO Team (id, name) VALUES (1, 'Alpha'), (2, 'Beta');
-         INSERT INTO Department (id, teamId) VALUES (1, 1);
-         INSERT INTO Company (id, departmentId, directTeamId) VALUES (1, 1, 2);",
-    )
-    .await;
-
-    let row = sqlx::query(&default_ds.get_query)
-        .bind(1)
-        .fetch_one(&db)
-        .await
-        .unwrap();
-    assert_eq!(row.get::<u32, _>("id"), 1);
-    assert_eq!(row.get::<String, _>("team.name"), "Beta");
-    assert_eq!(row.get::<String, _>("department.team.name"), "Alpha");
-
-    let rows = sqlx::query(&default_ds.list_query)
-        .bind(0)
-        .bind(10)
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert_eq!(rows.len(), 1);
 }
 
-#[sqlx::test]
-async fn default_data_source_composite_pk(db: SqlitePool) {
+#[test]
+fn default_data_source_composite_pk() {
     let idl = src_to_idl(
         r#"
         d1 { db }
@@ -497,13 +371,6 @@ async fn default_data_source_composite_pk(db: SqlitePool) {
     "#,
     );
 
-    exec_batch(
-        &db,
-        "CREATE TABLE OrderItem (orderId INTEGER NOT NULL, productId INTEGER NOT NULL, qty INTEGER NOT NULL, PRIMARY KEY (orderId, productId));
-         INSERT INTO OrderItem (orderId, productId, qty) VALUES (1, 1, 5), (1, 2, 3), (2, 1, 7);",
-    )
-    .await;
-
     let ds = idl
         .models
         .get("OrderItem")
@@ -511,26 +378,18 @@ async fn default_data_source_composite_pk(db: SqlitePool) {
         .default_data_source()
         .unwrap();
 
-    // GET by composite PK
-    let row = sqlx::query(&ds.get_query)
-        .bind(1)
-        .bind(2)
-        .fetch_one(&db)
-        .await
-        .unwrap();
-    assert_eq!(row.get::<u32, _>("orderId"), 1);
-    assert_eq!(row.get::<u32, _>("productId"), 2);
-    assert_eq!(row.get::<u32, _>("qty"), 3);
+    // GET takes every composite PK column.
+    let get_params: Vec<&str> = ds
+        .get
+        .parameters
+        .iter()
+        .map(|p| p.parameter.name.as_ref())
+        .collect();
+    assert_eq!(get_params, vec!["orderId", "productId"]);
 
     // LIST with seek pagination
-    let rows = sqlx::query(&ds.list_query)
-        .bind(0) // lastSeen_orderId
-        .bind(0) // lastSeen_productId
-        .bind(10) // limit
-        .fetch_all(&db)
-        .await
-        .unwrap();
-    assert_eq!(rows.len(), 3);
+    let list_params: Vec<&str> = ds.list.parameters.iter().map(|p| p.name.as_ref()).collect();
+    assert_eq!(list_params, vec!["lastSeen_orderId", "lastSeen_productId", "limit"]);
 }
 
 #[test]
@@ -714,11 +573,6 @@ fn default_data_source_durable_sqlite() {
 
     let entry = idl.models.get("LeaderboardEntry").unwrap();
     let ds = entry.default_data_source().expect("default data source");
-
-    // SQL queries are generated like a D1 model's, keyed on the primary key.
-    assert!(!ds.include_query.is_empty());
-    assert!(ds.get_query.contains(r#""LeaderboardEntry"."id" = ?1"#));
-    assert!(ds.list_query.contains("ORDER BY"));
 
     // Every method takes the shard fields first to locate the DO instance.
     let get_params: Vec<&str> = ds

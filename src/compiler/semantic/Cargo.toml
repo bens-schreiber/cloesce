@@ -8,7 +8,6 @@ idl = { path = "../idl" }
 frontend = { path = "../frontend" }
 indexmap = { workspace = true }
 regex-lite = { workspace = true }
-orm = { path = "../orm" }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }

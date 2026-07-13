@@ -1,15 +1,8 @@
 use idl::Number;
 use serde_json::Value;
 
-pub mod map;
 pub mod query;
-pub mod select;
-pub mod upsert;
 pub mod validate;
-
-pub fn alias(name: impl Into<String>) -> sea_query::Alias {
-    sea_query::Alias::new(name)
-}
 
 #[derive(Debug)]
 pub enum OrmErrorKind {

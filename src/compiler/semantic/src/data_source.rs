@@ -252,9 +252,6 @@ pub mod analysis {
                     list,
                     get,
                     save,
-                    include_query: String::new(),
-                    get_query: String::new(),
-                    list_query: String::new(),
                     is_internal,
                 },
             ));
@@ -319,15 +316,11 @@ pub mod expansion {
         DataSourceGetMethodParam, DataSourceMethod, DurableTarget, ModelBacking, Number,
         ValidatedField, Validator, model_bindings,
     };
-    use orm::select::SelectModel;
 
     use super::{HashSet, Model, include_dfs};
 
     #[derive(Default)]
     struct GeneratedDataSource<'src> {
-        include_query: String,
-        get_query: String,
-        list_query: String,
         get: Option<DataSourceGetMethod<'src>>,
         list: Option<DataSourceMethod<'src>>,
         save: Option<DataSourceMethod<'src>>,
@@ -355,9 +348,6 @@ pub mod expansion {
                     list: DataSourceMethod::default(),
                     get: DataSourceGetMethod::default(),
                     save: DataSourceMethod::default(),
-                    include_query: String::new(),
-                    get_query: String::new(),
-                    list_query: String::new(),
                     is_internal: false,
                 },
             );
@@ -381,10 +371,6 @@ pub mod expansion {
             else {
                 continue;
             };
-
-            ds.include_query = generated.include_query;
-            ds.get_query = generated.get_query;
-            ds.list_query = generated.list_query;
 
             // Only replace a verb the user did not declare as a stub.
             if let Some(get) = generated.get.filter(|_| !ds.get.is_stub) {
@@ -460,8 +446,6 @@ pub mod expansion {
         let injected = model_bindings(idl, model, Some(&ds.tree));
 
         if model.uses_sqlite() {
-            let include_query = SelectModel::query(model.name, None, Some(&ds.tree), idl);
-
             let get_params = shard_fields
                 .iter()
                 .cloned()
@@ -473,9 +457,6 @@ pub mod expansion {
                 .collect::<Vec<_>>();
 
             return GeneratedDataSource {
-                get_query: build_get_query(model, &include_query),
-                list_query: build_list_query(model, &include_query),
-                include_query,
                 get: Some(DataSourceGetMethod {
                     parameters: get_params,
                     injected: injected.clone(),
@@ -534,55 +515,6 @@ pub mod expansion {
             }),
             ..GeneratedDataSource::default()
         }
-    }
-
-    /// Basic primary key fetch SELECT, e.g. `{include_query} WHERE "Model"."pk" = ?1`.
-    fn build_get_query(model: &Model, include_query: &str) -> String {
-        let cols = model
-            .primary_columns
-            .iter()
-            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-            .collect::<Vec<_>>();
-        let placeholders = (1..=cols.len())
-            .map(|i| format!("?{i}"))
-            .collect::<Vec<_>>();
-
-        if cols.len() == 1 {
-            format!("{include_query} WHERE {} = {}", cols[0], placeholders[0])
-        } else {
-            format!(
-                "{include_query} WHERE ({}) = ({})",
-                cols.join(", "),
-                placeholders.join(", ")
-            )
-        }
-    }
-
-    /// Seek-pagination SELECT keyed off the primary key:
-    /// `{include_query} WHERE pk > ?1 ORDER BY pk ASC LIMIT ?N`.
-    fn build_list_query(model: &Model, include_query: &str) -> String {
-        let cols = model
-            .primary_columns
-            .iter()
-            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-            .collect::<Vec<_>>();
-        let placeholders = (1..=cols.len())
-            .map(|i| format!("?{i}"))
-            .collect::<Vec<_>>();
-        let limit = format!("?{}", cols.len() + 1);
-        let order = cols
-            .iter()
-            .map(|c| format!("{c} ASC"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let where_clause = if cols.len() == 1 {
-            format!("{} > {}", cols[0], placeholders[0])
-        } else {
-            format!("({}) > ({})", cols.join(", "), placeholders.join(", "))
-        };
-
-        format!("{include_query} WHERE {where_clause} ORDER BY {order} LIMIT {limit}")
     }
 }
 

@@ -426,9 +426,8 @@ fn route_model_valid() {
     let keys: Vec<(&str, &str)> = dog_nav.keys.iter().map(|k| (k.local, k.target)).collect();
     assert_eq!(keys, vec![("org", "tenant"), ("id", "ownerId")]);
 
-    // The default data source has no SQL and is keyed on the route fields.
+    // The default data source is keyed on the route fields.
     let ds = person.default_data_source().unwrap();
-    assert!(ds.include_query.is_empty());
     let params: Vec<&str> = ds
         .get
         .parameters

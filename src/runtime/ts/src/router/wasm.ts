@@ -16,31 +16,22 @@ export interface OrmWasmExports {
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
 
-  upsert_model(
+  plan_select(
     model_name_ptr: number,
     model_name_len: number,
-    new_model_ptr: number,
-    new_model_len: number,
+    operation_ptr: number,
+    operation_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
   ): boolean;
 
-  select_model(
+  plan_save(
     model_name_ptr: number,
     model_name_len: number,
-    from_ptr: number,
-    from_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
-  ): boolean;
-
-  map(
-    model_name_ptr: number,
-    model_name_len: number,
-    d1_result_ptr: number,
-    d1_result_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number,
+    payload_ptr: number,
+    payload_len: number,
   ): boolean;
 
   validate_type(
