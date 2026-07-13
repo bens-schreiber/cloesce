@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 
-use idl::{BackingKind, CloesceIdl, Model};
+use idl::{BackingKind, CloesceIdl, IncludeTree, Model};
 use migrations::{MigrationsGenerator, MigrationsIdl, MigrationsModel};
 use serde_json::Value;
 use sqlx::SqlitePool;
+
+pub fn tree(value: Value) -> IncludeTree<'static> {
+    let s = serde_json::to_string(&value).unwrap();
+    serde_json::from_str(Box::leak(s.into_boxed_str())).unwrap()
+}
 
 struct MockIntent;
 impl migrations::MigrationsIntent for MockIntent {
@@ -75,6 +80,27 @@ pub struct MockStorage {
     /// DO-KV: binding name -> (shard value tuple -> (key -> value)). DO storage exists
     /// implicitly, so a shard with no seeded entries is a valid, empty store.
     pub durable_kv: HashMap<String, HashMap<Vec<Value>, HashMap<String, Value>>>,
+
+    /// DO binding name -> its schema migration, so a save to a brand-new shard can create
+    /// that stub's pool lazily.
+    pub durable_migrations: HashMap<String, String>,
+}
+
+impl MockStorage {
+    /// Return the pool for a DO stub, creating it (and running its migration) if a test
+    /// saves to a shard that was not pre-declared.
+    pub async fn durable_pool(&mut self, binding: &str, shard: &[Value]) -> &SqlitePool {
+        let migration = self
+            .durable_migrations
+            .get(binding)
+            .cloned()
+            .unwrap_or_default();
+        let instances = self.durable.entry(binding.to_string()).or_default();
+        if !instances.contains_key(shard) {
+            instances.insert(shard.to_vec(), new_pool(&migration).await);
+        }
+        instances.get(shard).unwrap()
+    }
 }
 
 impl MockStorage {
@@ -99,6 +125,7 @@ impl MockStorage {
 
         let mut d1 = HashMap::new();
         let mut durable = HashMap::new();
+        let mut durable_migrations = HashMap::new();
         let shards = shard_inits.iter().cloned().collect::<HashMap<_, _>>();
 
         for (binding, (kind, models)) in by_binding {
@@ -117,6 +144,7 @@ impl MockStorage {
                         instances.insert(tuple.clone(), new_pool(&migration).await);
                     }
                     durable.insert(binding.to_string(), instances);
+                    durable_migrations.insert(binding.to_string(), migration);
                 }
             }
         }
@@ -124,40 +152,8 @@ impl MockStorage {
         MockStorage {
             d1,
             durable,
+            durable_migrations,
             ..Default::default()
         }
-    }
-
-    pub async fn seed_d1(&mut self, binding: &str, sql: &str) {
-        let pool = self.d1.get(binding).unwrap();
-        sqlx::query(sql).execute(pool).await.unwrap();
-    }
-
-    pub async fn seed_do(&mut self, binding: &str, shard: Vec<Value>, sql: &str) {
-        let pool = self.durable.get(binding).unwrap().get(&shard).unwrap();
-        sqlx::query(sql).execute(pool).await.unwrap();
-    }
-
-    pub fn seed_r2(&mut self, binding: &str, key: &str, value: Value) {
-        self.r2
-            .entry(binding.to_string())
-            .or_default()
-            .insert(key.to_string(), value);
-    }
-
-    pub fn seed_kv(&mut self, binding: &str, key: &str, value: Value) {
-        self.kv
-            .entry(binding.to_string())
-            .or_default()
-            .insert(key.to_string(), value);
-    }
-
-    pub fn seed_durable_kv(&mut self, binding: &str, shard: Vec<Value>, key: &str, value: Value) {
-        self.durable_kv
-            .entry(binding.to_string())
-            .or_default()
-            .entry(shard)
-            .or_default()
-            .insert(key.to_string(), value);
     }
 }

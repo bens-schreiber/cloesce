@@ -1,37 +1,38 @@
-//! The query plan IR.
+//! The select (read) query plan IR.
 //!
-//! Consists of a sequence of [Stage]s, each of which contains a set of [Step]s that may run in parallel.
+//! Consists of a sequence of stages, each containing a set of steps that may execute in parallel.
+//!
 //! Each stage is intended to run after the previous stage has completed, and may read values from the hydrated
 //! result produced by earlier stages.
-//!
-//! TODO: Does not yet support `save` operations.
 
 use serde::Serialize;
 
+use crate::query::{Database, TemplateSegment};
+
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
-pub struct QueryPlan<'src> {
-    pub stages: Vec<Stage<'src>>,
+pub struct SelectPlan<'src> {
+    pub stages: Vec<SelectStage<'src>>,
 }
 
-impl<'src> QueryPlan<'src> {
+impl<'src> SelectPlan<'src> {
     /// Return the stage at `index`, creating it (and any stages before it)
     /// if it does not yet exist.
-    pub fn stage_at(&mut self, index: usize) -> &mut Stage<'src> {
+    pub fn stage_at(&mut self, index: usize) -> &mut SelectStage<'src> {
         if self.stages.len() <= index {
-            self.stages.resize_with(index + 1, Stage::default);
+            self.stages.resize_with(index + 1, SelectStage::default);
         }
         &mut self.stages[index]
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
-pub struct Stage<'src> {
-    pub steps: Vec<Step<'src>>,
+pub struct SelectStage<'src> {
+    pub steps: Vec<SelectStep<'src>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Step<'src> {
-    pub query: Query<'src>,
+pub struct SelectStep<'src> {
+    pub query: Select<'src>,
 
     /// The location in the hydrated result where this step's result is attached.
     ///
@@ -40,21 +41,7 @@ pub struct Step<'src> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct Database<'src> {
-    pub name: &'src str,
-    pub kind: DatabaseKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum DatabaseKind {
-    Kv,
-    R2,
-    D1,
-    DurableObject,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum Query<'src> {
+pub enum Select<'src> {
     /// A SQL query to execute against a Durable Object or D1 database, composed of
     /// positional `?N` placeholders referencing `arguments` (1-based).
     ///
@@ -81,8 +68,11 @@ pub enum Query<'src> {
     /// An operation executed against a KV, R2, or Durable Object KV storage.
     Key {
         database: Database<'src>,
-        segments: Vec<KeySegment<'src>>,
-        shard: Vec<(&'src str, ValueArg<'src>)>,
+        key: Vec<TemplateSegment<'src, SelectArg<'src>>>,
+
+        /// For a Durable Object, the `(field, value)` pairs
+        /// routing to specific stubs. Empty otherwis
+        shard: Vec<(&'src str, SelectArg<'src>)>,
     },
 
     /// Set `fields` on the object(s) at [Step::result] from runtime params or parent
@@ -94,7 +84,7 @@ pub enum Query<'src> {
     /// - When `create` is false, the fields are merged onto whatever an earlier step
     ///   already attached here, and a slot with no such object is left untouched.
     Synthesize {
-        fields: Vec<(&'src str, ValueArg<'src>)>,
+        fields: Vec<(&'src str, SelectArg<'src>)>,
 
         /// Whether each parent object receives the object bare or as a singleton array.
         cardinality: MapCardinality,
@@ -115,30 +105,10 @@ pub enum SqlArg<'src> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum ValueArg<'src> {
-    /// A scalar runtime parameter that must be provided to execute the [Step].
-    Param(&'src str),
-
-    /// A field read from the parent object (the object at the parent path of
-    /// [Step::result]).
-    ParentField(&'src str),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum KeySegment<'src> {
-    /// Text between placeholders
-    Literal(&'src str),
-
-    /// A placeholder resolved from a runtime param or a parent object
-    /// field
-    Value(ValueArg<'src>),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Mapping<'src> {
     /// Whether each parent object receives a single object or an array of objects.
     ///
-    /// - If a query returns more than one row but the cardinality is [Cardinality::One],
+    /// - If a query returns more than one row but the cardinality is [MapCardinality::One],
     ///   the runtime will take the first row only.
     pub cardinality: MapCardinality,
 
@@ -165,12 +135,6 @@ impl Mapping<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct JoinKeys<'src> {
-    pub parent_key: &'src str,
-    pub child_key: &'src str,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum MapCardinality {
     One,
@@ -184,4 +148,20 @@ impl From<idl::NavigationCardinality> for MapCardinality {
             idl::NavigationCardinality::Many => MapCardinality::Many,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct JoinKeys<'src> {
+    pub parent_key: &'src str,
+    pub child_key: &'src str,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum SelectArg<'src> {
+    /// A scalar runtime parameter that must be provided to execute the step.
+    Param(&'src str),
+
+    /// A field read from the parent object (the object at the parent path of
+    /// the step's result).
+    ParentField(&'src str),
 }
