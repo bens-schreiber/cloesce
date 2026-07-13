@@ -959,6 +959,7 @@ dependencies = [
  "compiler-test",
  "frontend",
  "idl",
+ "insta",
  "migrations",
  "regex-lite",
  "sea-query",

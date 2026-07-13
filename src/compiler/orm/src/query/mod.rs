@@ -2,6 +2,7 @@
 //! - [select] gets or lists
 //! - [save] upserts
 
+pub mod explain;
 pub mod save;
 pub mod select;
 

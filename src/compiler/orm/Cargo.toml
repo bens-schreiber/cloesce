@@ -13,6 +13,7 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
+insta = { workspace = true }
 migrations = { path = "../migrations" }
 sqlx = { workspace = true }
 

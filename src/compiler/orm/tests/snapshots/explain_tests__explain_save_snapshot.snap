@@ -1,0 +1,26 @@
+---
+source: src/compiler/orm/tests/explain_tests.rs
+expression: "explain_save(\"Org\", &tree(include()), &plan)"
+---
+SAVE PLAN `Org` · 2 stages · 4 steps
+INCLUDE
+└─ `board`
+   ├─ `banner`
+   ├─ `entries`
+   └─ `top`
+
+STAGE 0
+├─ BATCH ON durable `BoardDo` SHARD `tenantId` = 7
+│  ├─ INSERT `Board` DEFAULT VALUES
+│  ├─ INSERT `Entry` (`score` = 42, `boardId` = `saved.board.pid`)
+│  ├─ READBACK `Board` INTO `board`
+│  └─ READBACK `Entry` INTO `board.entries[0]`
+├─ BATCH ON d1 `db`
+│  ├─ INSERT `Org` (`tenantId` = 7)
+│  └─ READBACK `Org` INTO `result`
+└─ WRITE durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = 7
+   └─ VALUE {"cached":true}
+
+STAGE 1
+└─ WRITE r2 `Bucket` KEY "banners/{saved.board.pid}" INTO `board.banner`
+   └─ VALUE {"url":"b.png"}

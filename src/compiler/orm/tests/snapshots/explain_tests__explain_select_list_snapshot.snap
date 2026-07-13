@@ -1,0 +1,25 @@
+---
+source: src/compiler/orm/tests/explain_tests.rs
+expression: "explain_select(SelectOperation::List, \"Org\", &inc, &plan)"
+---
+SELECT PLAN (LIST) `Org` · 3 stages · 5 steps
+INCLUDE
+└─ `board`
+   ├─ `banner`
+   ├─ `entries`
+   └─ `top`
+
+STAGE 0
+└─ SCAN `Org` ON d1 `db` LIMIT `$limit` MANY
+
+STAGE 1
+├─ SCAN `Board` ON durable `BoardDo` INTO `board` ONE
+│     JOIN `parent.tenantId` = `row.tenantId`
+│     SHARD `tenantId` = EACH `parent.tenantId`
+└─ READ durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = `parent.tenantId`
+
+STAGE 2
+├─ READ r2 `Bucket` KEY "banners/{parent.pid}" INTO `board.banner`
+└─ SEARCH `Entry` ON durable `BoardDo` INTO `board.entries` MANY
+      JOIN `parent.tenantId` = `row.tenantId` AND `parent.pid` = `row.boardId`
+      SHARD `tenantId` = EACH `parent.tenantId`
