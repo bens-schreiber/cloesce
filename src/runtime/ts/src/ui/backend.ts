@@ -6,8 +6,8 @@ import { u8ToB64 } from "../common.js";
  */
 export { CloesceApp } from "../router/router.js";
 export type { CrudKind } from "../cidl.js";
-export { Orm } from "../router/orm.js";
-export type { SqlStatement } from "../router/orm.js";
+export { Orm, durableSqlBatch } from "../router/orm.js";
+export type { SelectPlan } from "../router/plan.js";
 export type { R2ObjectBody } from "@cloudflare/workers-types";
 
 /**

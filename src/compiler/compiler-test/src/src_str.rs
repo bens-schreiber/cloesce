@@ -107,7 +107,7 @@ model OneToManyModel for db {
         id: int
     }
 
-    many BasicModel::fk_to_model {
+    many BasicModel::fk_to_model(id) {
         oneToManyNav
     }
 }

@@ -14,7 +14,7 @@ model Student for db {
     }
     
     // Composite 1:M navigation to StudentCourse join table
-    nav (StudentCourse::studentId, StudentCourse::studentName) {
+    many StudentCourse::{studentId(id), studentName(name)} {
         studentCourses
     }
 }
@@ -29,7 +29,7 @@ model Course for db {
         title: string
     }
     
-    nav StudentCourse::courseId {
+    many StudentCourse::courseId(id) {
         studentCourses
     }
 }
@@ -40,7 +40,7 @@ model Course for db {
 model StudentCourse for db{
     primary {
         // Composite foreign key to Student
-        foreign (Student::id, Student::name) {
+        foreign Student::{id, name} {
             studentId
             studentName
         }
@@ -51,11 +51,11 @@ model StudentCourse for db{
     }
 
     // Navigations to Student and Course using the foreign keys
-    nav (Student::id(studentId), Student::name(studentName)) {
+    one Student::{id(studentId), name(studentName)} {
         student
     }
 
-    nav Course::id(courseId) {
+    one Course::id(courseId) {
         course
     }
 }

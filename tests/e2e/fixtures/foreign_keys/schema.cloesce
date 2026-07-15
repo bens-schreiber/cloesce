@@ -9,7 +9,7 @@ model B for db {
         id: int
     }
     
-    nav A::bId {
+    one A::bId(id) {
         a
     }
 }
@@ -28,7 +28,7 @@ model A for db{
         bId
     }
 
-    nav B::id(bId) {
+    one B::id(bId) {
         b
     }
 }
@@ -56,7 +56,7 @@ model Person for db {
         id: int
     }
     
-    nav Dog::personId {
+    many Dog::personId(id) {
         dogs
     }
 }
@@ -87,7 +87,7 @@ model Dog for db {
         personId
     }
 
-    nav Person::id(personId) {
+    one Person::id(personId) {
         person
     }
 }
@@ -103,7 +103,7 @@ model Student for db {
         id: int
     }
     
-    nav CourseStudent::studentId {
+    many CourseStudent::studentId(id) {
         courses
     }
 }
@@ -138,7 +138,7 @@ model Course for db {
         id: int
     }
     
-    nav CourseStudent::courseId {
+    many CourseStudent::courseId(id) {
         students
     }
 }
@@ -154,11 +154,11 @@ model CourseStudent for db {
         }
     }
 
-    nav Course::id(courseId) {
+    one Course::id(courseId) {
         course
     }
 
-    nav Student::id(studentId) {
+    one Student::id(studentId) {
         student
     }
 }

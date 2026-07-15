@@ -1,353 +1,317 @@
 //! A mock runtime executor for [SavePlan].
 
 use orm::query::save::plan::{PathSegment, SaveArg, SavePlan, SaveQuery, SaveStep, SqlStatement};
-use orm::query::{Database, DatabaseKind, TemplateSegment};
+use orm::query::select::plan::MapCardinality;
+use orm::query::{DatabaseKind, TemplateSegment};
 use serde_json::{Value, json};
 
-use crate::common::row_to_json;
 use crate::common::setup::MockStorage;
+use crate::common::{bind_value, merge, row_to_json};
 
 /// Executes a save plan against a mutable [MockStorage].
 ///
-/// A save receives no runtime params — every value is carried in the payload the plan was
-/// built from — so the executor takes none.
+/// Some differences from the real runtime:
 /// - Any missing value is a hard failure
 /// - KV metadata is ignored for storage
 /// - No partial save failures. If any step fails, the whole plan fails. In the real runtime
 ///   a failed step still lets later steps in its stage attach their results.
 pub async fn execute(plan: &SavePlan<'_>, storage: &mut MockStorage) -> Value {
-    let mut ctx = Context {
-        storage,
-        body: Value::Null,
-    };
+    let mut body = Value::Null;
 
     for stage in &plan.stages {
-        // Resolve values from the frozen body
-        let mut prepped = Vec::with_capacity(stage.steps.len());
+        let mut handles = Vec::with_capacity(stage.steps.len());
         for step in &stage.steps {
-            prepped.push(ctx.prep(step).await);
+            handles.push(resolve_handle(step, &body, storage).await);
         }
 
-        // Run all steps in parallel
-        let fetched = futures::future::join_all(prepped.into_iter().map(Prepped::fetch)).await;
+        // The runtime would run each step in parallel, then order the output
+        // in step order. This mock just runs them sequentially.
+        let mut outs = Vec::with_capacity(stage.steps.len());
+        for (step, handle) in stage.steps.iter().zip(handles) {
+            outs.push(run_step(step, handle, &body).await);
+        }
 
-        // Attach each steps result in step order.
-        for (step, fetched) in stage.steps.iter().zip(fetched) {
-            ctx.sink(step, fetched);
+        // Sequential sink: apply deferred storage writes and attach results, in step order.
+        for (step, out) in stage.steps.iter().zip(outs) {
+            sink(step, out, &mut body, storage);
         }
     }
 
-    ctx.body
+    body
 }
 
-/// `(result path, value)` pairs a step attaches in the sink, in statement order.
-type Attachments<'src> = Vec<(&'src [PathSegment<'src>], Value)>;
-
-/// A single prepared statement carried from prep into the parallel fetch.
-struct PreppedStatement<'src> {
-    sql: &'src str,
-
-    /// Bind values pre-resolved from the frozen body, in `?N` order.
-    binds: Vec<Value>,
-
-    /// `Some(result)` for a Hydrate readback, `None` for a plain write.
-    hydrate: Option<&'src [PathSegment<'src>]>,
-}
-
-/// A step after prep: everything needing `&mut storage` or a body read is done, leaving
-/// only work that can run in parallel (SqlBatch transactions) or at sink time.
-enum Prepped<'src> {
-    /// A SqlBatch ready to run its transaction in the parallel fetch.
-    Batch {
+enum Handle<'src> {
+    Sql {
         pool: sqlx::SqlitePool,
-        shard_tags: Vec<(String, Value)>,
-        statements: Vec<PreppedStatement<'src>>,
-    },
 
-    /// Attachments already resolved in prep.
-    ///
-    /// Empty for a [SaveQuery::Synthesize] step with `create = false`
-    /// (merge onto an existing object).
-    Ready(Attachments<'src>),
+        /// For a DO batch, the `(field, value)` shard tags to stamp onto hydrated rows.
+        shard_tags: Vec<(String, Value)>,
+        statements: &'src [SqlStatement<'src>],
+    },
+    None,
 }
 
-impl<'src> Prepped<'src> {
-    /// Run the parallel part of a prepped step: a SqlBatch's transaction, yielding its
-    /// hydrated rows
-    async fn fetch(self) -> Attachments<'src> {
-        let (pool, shard_tags, statements) = match self {
-            Prepped::Ready(attachments) => return attachments,
-            Prepped::Batch {
+async fn resolve_handle<'src>(
+    step: &'src SaveStep<'src>,
+    body: &Value,
+    storage: &mut MockStorage,
+) -> Handle<'src> {
+    let SaveQuery::SqlBatch {
+        database,
+        statements,
+        shard,
+    } = &step.query
+    else {
+        return Handle::None;
+    };
+
+    let (pool, shard_tags) = match &database.kind {
+        DatabaseKind::D1 => (
+            storage
+                .d1
+                .get(database.name)
+                .expect("D1 binding to exist in tests")
+                .clone(),
+            Vec::new(),
+        ),
+        DatabaseKind::DurableObject => {
+            let tags = shard
+                .iter()
+                .map(|(f, arg)| (f.to_string(), resolve(arg, body)))
+                .collect::<Vec<_>>();
+            let tuple = tags.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();
+            (
+                storage.durable_pool(database.name, &tuple).await.clone(),
+                tags,
+            )
+        }
+        other => panic!("unsupported save database {other:?}"),
+    };
+
+    Handle::Sql {
+        pool,
+        shard_tags,
+        statements,
+    }
+}
+
+/// A deferred storage write applied in the sink, once its containing step is due.
+struct Write {
+    kind: DatabaseKind,
+    binding: String,
+    key: String,
+    value: Value,
+
+    /// The DO shard tuple this write routes to; empty for R2/KV.
+    shard: Vec<Value>,
+}
+
+enum StepResult<'src> {
+    Attach(Vec<(&'src [PathSegment<'src>], Value)>),
+    Write(Write, &'src [PathSegment<'src>]),
+
+    /// A [SaveQuery::Synthesize], deferred to the sink to merge onto the existing
+    /// hydrated body.
+    Synthesize,
+}
+
+async fn run_step<'src>(
+    step: &'src SaveStep<'src>,
+    handle: Handle<'src>,
+    body: &Value,
+) -> StepResult<'src> {
+    match &step.query {
+        SaveQuery::SqlBatch { .. } => {
+            let Handle::Sql {
                 pool,
                 shard_tags,
                 statements,
-            } => (pool, shard_tags, statements),
-        };
-
-        let mut rows = Vec::new();
-        let mut tx = pool.begin().await.expect("begin");
-        for stmt in statements {
-            let query = stmt
-                .binds
-                .iter()
-                .fold(sqlx::query(stmt.sql), |q, v| bind_value(q, v));
-            match stmt.hydrate {
-                None => {
-                    query
-                        .execute(&mut *tx)
-                        .await
-                        .expect("write to succeed in tests");
-                }
-                Some(result) => {
-                    let mut row = row_to_json(
-                        &query
-                            .fetch_one(&mut *tx)
-                            .await
-                            .expect("hydrate to return a row in tests"),
-                    );
-                    if let Value::Object(map) = &mut row {
-                        for (field, value) in &shard_tags {
-                            map.insert(field.clone(), value.clone());
-                        }
-                    }
-                    rows.push((result, row));
-                }
-            }
+            } = handle
+            else {
+                unreachable!("SqlBatch step always resolves a Sql handle")
+            };
+            StepResult::Attach(run_sql_batch(&pool, &shard_tags, statements, body).await)
         }
-        tx.commit().await.expect("commit");
-        rows
+        SaveQuery::KeyWrite {
+            database,
+            segments,
+            value,
+            shard,
+            ..
+        } => StepResult::Write(
+            Write {
+                kind: database.kind.clone(),
+                binding: database.name.to_string(),
+                shard: shard.iter().map(|(_, arg)| resolve(arg, body)).collect(),
+                key: resolve_key(segments, body),
+                value: (*value).clone(),
+            },
+            &step.result,
+        ),
+        SaveQuery::Synthesize { .. } => StepResult::Synthesize,
     }
 }
 
-struct Context<'a> {
-    storage: &'a mut MockStorage,
-    body: Value,
-}
-
-impl<'a> Context<'a> {
-    /// Prepare a step: resolve everything that needs `&mut storage` or reads the frozen
-    /// body, so the fetch phase can run in parallel.
-    async fn prep<'src>(&mut self, step: &'src SaveStep<'src>) -> Prepped<'src> {
-        match &step.query {
-            SaveQuery::SqlBatch {
-                database,
-                statements,
-                shard,
-            } => self.prep_sql_batch(database, statements, shard).await,
-            SaveQuery::KeyWrite {
-                database,
-                key: segments,
-                value,
-                metadata,
-                shard,
-            } => self.key_write(
-                &step.result,
-                database,
-                segments,
-                value,
-                metadata.as_deref(),
-                shard,
-            ),
-            SaveQuery::Synthesize { .. } => Prepped::Ready(vec![]),
-        }
-    }
-
-    /// Attach a step's fetched result into the body. Runs in step order.
-    fn sink(&mut self, step: &SaveStep<'_>, attachments: Attachments<'_>) {
-        for (result, value) in attachments {
-            self.attach(result, value);
-        }
-        if let SaveQuery::Synthesize { fields, create } = &step.query {
-            self.synthesize(&step.result, fields, *create);
-        }
-    }
-
-    async fn prep_sql_batch<'src>(
-        &mut self,
-        database: &Database<'_>,
-        statements: &'src [SqlStatement<'src>],
-        shard: &[(&str, SaveArg<'_>)],
-    ) -> Prepped<'src> {
-        // Resolve the pool up front. A DO batch also tags each hydrated row with its shard
-        // values, since the shard fields are route fields not returned by the SELECT.
-        let (pool, shard_tags) = match &database.kind {
-            DatabaseKind::D1 => (
-                self.storage
-                    .d1
-                    .get(database.name)
-                    .expect("D1 binding to exist in tests")
-                    .clone(),
-                Vec::new(),
-            ),
-            DatabaseKind::DurableObject => {
-                let tags = shard
-                    .iter()
-                    .map(|(f, arg)| (f.to_string(), self.resolve(arg)))
-                    .collect::<Vec<_>>();
-                let tuple = tags.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>();
-                (
-                    self.storage
-                        .durable_pool(database.name, &tuple)
-                        .await
-                        .clone(),
-                    tags,
-                )
-            }
-            other => panic!("unsupported save database {other:?}"),
+/// Run one batch's statements as a single transaction, in a fold over binds resolved from
+/// the frozen `body`.
+async fn run_sql_batch<'src>(
+    pool: &sqlx::SqlitePool,
+    shard_tags: &[(String, Value)],
+    statements: &'src [SqlStatement<'src>],
+    body: &Value,
+) -> Vec<(&'src [PathSegment<'src>], Value)> {
+    let mut rows = Vec::new();
+    let mut tx = pool.begin().await.expect("begin");
+    for statement in statements {
+        let (sql, arguments) = match statement {
+            SqlStatement::Write { sql, arguments } => (sql, arguments),
+            SqlStatement::Hydrate { sql, arguments, .. } => (sql, arguments),
         };
-
-        // Pre-resolve every statement's bind values from the frozen body so the fetch
-        // future borrows nothing of `self`.
-        let statements = statements
+        let query = arguments
             .iter()
-            .map(|statement| match statement {
-                SqlStatement::Write { sql, arguments } => PreppedStatement {
-                    sql,
-                    binds: arguments.iter().map(|a| self.resolve(a)).collect(),
-                    hydrate: None,
-                },
-                SqlStatement::Hydrate {
-                    sql,
-                    arguments,
-                    result,
-                } => PreppedStatement {
-                    sql,
-                    binds: arguments.iter().map(|a| self.resolve(a)).collect(),
-                    hydrate: Some(result),
-                },
-            })
-            .collect();
+            .map(|a| resolve(a, body))
+            .fold(sqlx::query(sql), |q, v| bind_value(q, &v));
 
-        Prepped::Batch {
-            pool,
-            shard_tags,
-            statements,
+        match statement {
+            SqlStatement::Write { .. } => {
+                query
+                    .execute(&mut *tx)
+                    .await
+                    .expect("write to succeed in tests");
+            }
+            SqlStatement::Hydrate { result, .. } => {
+                let mut row = row_to_json(
+                    &query
+                        .fetch_one(&mut *tx)
+                        .await
+                        .expect("hydrate to return a row in tests"),
+                );
+                if let Value::Object(map) = &mut row {
+                    for (field, value) in shard_tags {
+                        map.insert(field.clone(), value.clone());
+                    }
+                }
+                rows.push((result.as_slice(), row));
+            }
         }
     }
+    tx.commit().await.expect("commit");
+    rows
+}
 
-    fn key_write<'src>(
-        &mut self,
-        result: &'src [PathSegment<'src>],
-        database: &Database<'_>,
-        segments: &[TemplateSegment<'_, SaveArg<'_>>],
-        value: &Value,
-        _metadata: Option<&Value>,
-        shard: &[(&str, SaveArg<'_>)],
-    ) -> Prepped<'src> {
-        let key = resolve_key(segments, &self.body);
-        let written = value.clone();
-
-        match &database.kind {
-            DatabaseKind::R2 => {
-                self.storage
-                    .r2
-                    .entry(database.name.to_string())
-                    .or_default()
-                    .insert(key, written.clone());
+/// Apply a [StepResult], mutating `body` and `storage`. Runs in step order.
+fn sink(step: &SaveStep, out: StepResult, body: &mut Value, storage: &mut MockStorage) {
+    match out {
+        StepResult::Attach(attachments) => {
+            for (path, value) in attachments {
+                attach(body, path, value);
             }
-            DatabaseKind::Kv => {
-                self.storage
-                    .kv
-                    .entry(database.name.to_string())
-                    .or_default()
-                    .insert(key, written.clone());
-            }
-            DatabaseKind::DurableObject => {
-                let tuple = shard
-                    .iter()
-                    .map(|(_, arg)| resolve_arg(arg, &self.body))
-                    .collect::<Vec<_>>();
-                self.storage
+        }
+        StepResult::Write(write, result) => {
+            let map = match write.kind {
+                DatabaseKind::R2 => storage.r2.entry(write.binding).or_default(),
+                DatabaseKind::Kv => storage.kv.entry(write.binding).or_default(),
+                DatabaseKind::DurableObject => storage
                     .durable_kv
-                    .entry(database.name.to_string())
+                    .entry(write.binding)
                     .or_default()
-                    .entry(tuple)
-                    .or_default()
-                    .insert(key, written.clone());
-            }
-            other => unreachable!("key write routed at non-storage kind {other:?}"),
+                    .entry(write.shard)
+                    .or_default(),
+                other => unreachable!("key write routed at non-storage kind {other:?}"),
+            };
+            map.insert(write.key, write.value.clone());
+            attach(body, result, write.value);
         }
-
-        Prepped::Ready(vec![(result, written)])
-    }
-
-    fn synthesize(
-        &mut self,
-        result: &[PathSegment<'_>],
-        fields: &[(&str, SaveArg<'_>)],
-        create: bool,
-    ) {
-        if create {
-            let object = self.build_fields(fields);
-            self.attach(result, object);
-            return;
-        }
-
-        // Merge onto the existing object at `result`.
-        if self.body_at(result).is_none() {
-            return;
-        }
-        let additions = self.build_fields(fields);
-        if let (Some(Value::Object(map)), Value::Object(add)) =
-            (self.body_at_mut(result), additions)
-        {
-            map.extend(add);
+        StepResult::Synthesize => {
+            let SaveQuery::Synthesize {
+                fields,
+                create,
+                cardinality,
+            } = &step.query
+            else {
+                unreachable!("StepOut::Synthesize only produced for a Synthesize step")
+            };
+            synthesize(body, &step.result, fields, *create, *cardinality);
         }
     }
+}
 
-    fn build_fields(&self, fields: &[(&str, SaveArg<'_>)]) -> Value {
-        Value::Object(
-            fields
-                .iter()
-                .map(|(field, arg)| (field.to_string(), self.resolve(arg)))
-                .collect(),
-        )
-    }
-
-    fn resolve(&self, arg: &SaveArg<'_>) -> Value {
-        match arg {
-            SaveArg::Payload(v) => (*v).clone(),
-            SaveArg::Result(path) => self
-                .body_at(path)
-                .cloned()
-                .expect("Body value to exist in tests"),
-        }
-    }
-
-    /// The value at an exact [PathSeg] path of the hydrated body.
-    fn body_at(&self, path: &[PathSegment<'_>]) -> Option<&Value> {
-        path.iter().try_fold(&self.body, |cur, seg| match seg {
-            PathSegment::Field(f) => cur.get(*f),
-            PathSegment::Index(i) => cur.get(*i),
-        })
-    }
-
-    fn body_at_mut(&mut self, path: &[PathSegment<'_>]) -> Option<&mut Value> {
-        path.iter().try_fold(&mut self.body, |cur, seg| match seg {
-            PathSegment::Field(f) => cur.get_mut(*f),
-            PathSegment::Index(i) => cur.get_mut(*i),
-        })
-    }
-
-    /// Attach `value` at an exact [PathSeg] path, creating intermediate objects/arrays
-    /// on demand. An empty path replaces the whole body.
-    fn attach(&mut self, path: &[PathSegment<'_>], value: Value) {
-        let Some((last, parents)) = path.split_last() else {
-            // Root attach: merge onto an existing root object (a child hydrated earlier may
-            // already sit there) rather than replacing it.
-            match (&mut self.body, value) {
-                (Value::Object(existing), Value::Object(add)) => existing.extend(add),
-                (body, value) => *body = value,
-            }
-            return;
+fn synthesize(
+    body: &mut Value,
+    result: &[PathSegment<'_>],
+    fields: &[(&str, SaveArg<'_>)],
+    create: bool,
+    cardinality: MapCardinality,
+) {
+    if create {
+        let value = match cardinality {
+            MapCardinality::One => build_fields(fields, body),
+            MapCardinality::Many if fields.is_empty() => json!([]),
+            MapCardinality::Many => json!([build_fields(fields, body)]),
         };
-
-        let mut cur = &mut self.body;
-        for (seg, next) in parents.iter().zip(path.iter().skip(1)) {
-            cur = descend(cur, seg, matches!(next, PathSegment::Index(_)));
-        }
-        place(cur, last, value);
+        attach(body, result, value);
+        return;
     }
+
+    // Merge onto the existing object at `result`; a slot with nothing there is untouched.
+    if body_at(body, result).is_none() {
+        return;
+    }
+    let additions = build_fields(fields, body);
+    if let (Some(Value::Object(map)), Value::Object(add)) = (body_at_mut(body, result), additions) {
+        map.extend(add);
+    }
+}
+
+fn build_fields(fields: &[(&str, SaveArg<'_>)], body: &Value) -> Value {
+    Value::Object(
+        fields
+            .iter()
+            .map(|(field, arg)| (field.to_string(), resolve(arg, body)))
+            .collect(),
+    )
+}
+
+/// Resolve a [SaveArg]: a payload literal, or a value read from `body` at an exact path
+/// (a generated PK hydrated by an earlier stage's read-back). Any missing value is a hard
+/// failure in tests.
+fn resolve(arg: &SaveArg<'_>, body: &Value) -> Value {
+    match arg {
+        SaveArg::Payload(v) => (*v).clone(),
+        SaveArg::Result(path) => body_at(body, path)
+            .cloned()
+            .expect("Body value to exist in tests"),
+    }
+}
+
+fn body_at<'b>(body: &'b Value, path: &[PathSegment<'_>]) -> Option<&'b Value> {
+    path.iter().try_fold(body, |cur, seg| match seg {
+        PathSegment::Field(f) => cur.get(*f),
+        PathSegment::Index(i) => cur.get(*i),
+    })
+}
+
+fn body_at_mut<'b>(body: &'b mut Value, path: &[PathSegment<'_>]) -> Option<&'b mut Value> {
+    path.iter().try_fold(body, |cur, seg| match seg {
+        PathSegment::Field(f) => cur.get_mut(*f),
+        PathSegment::Index(i) => cur.get_mut(*i),
+    })
+}
+
+/// Attach `value` at an exact [PathSegment] path, creating intermediate objects/arrays on
+/// demand. An empty path attaches at the root, merging onto an existing root object (a
+/// child hydrated earlier may already sit there) rather than replacing it.
+fn attach(body: &mut Value, path: &[PathSegment<'_>], value: Value) {
+    let Some((last, parents)) = path.split_last() else {
+        merge(body, value);
+        return;
+    };
+
+    let mut cur = body;
+    for (seg, next) in parents.iter().zip(path.iter().skip(1)) {
+        cur = descend(cur, seg, matches!(next, PathSegment::Index(_)));
+    }
+    place(cur, last, value);
 }
 
 /// Step into (creating if needed) the child at `seg`. `next_is_index` decides whether a
@@ -359,8 +323,10 @@ fn descend<'b>(cur: &'b mut Value, seg: &PathSegment<'_>, next_is_index: bool) -
             if !cur.is_object() {
                 *cur = json!({});
             }
-            let map = cur.as_object_mut().unwrap();
-            map.entry(f.to_string()).or_insert_with(empty)
+            cur.as_object_mut()
+                .unwrap()
+                .entry(f.to_string())
+                .or_insert_with(empty)
         }
         PathSegment::Index(i) => {
             if !cur.is_array() {
@@ -397,46 +363,15 @@ fn place(cur: &mut Value, seg: &PathSegment<'_>, value: Value) {
     }
 }
 
-/// Bind one pre-resolved `?N` slot. `Value::Null` binds a typed `None`, bools bind as
-/// `i64`, matching the runtime's typed-null handling.
-fn bind_value<'q>(
-    q: sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>>,
-    value: &Value,
-) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
-    match value {
-        Value::Null => q.bind(None::<String>),
-        Value::Bool(b) => q.bind(*b as i64),
-        Value::Number(n) if n.is_i64() => q.bind(n.as_i64().unwrap()),
-        Value::Number(n) => q.bind(n.as_f64().unwrap()),
-        Value::String(s) => q.bind(s.clone()),
-        other => q.bind(other.to_string()),
-    }
-}
-
 fn resolve_key(segments: &[TemplateSegment<'_, SaveArg<'_>>], body: &Value) -> String {
-    let mut out = String::new();
-    for segment in segments {
-        match segment {
-            TemplateSegment::Literal(text) => out.push_str(text),
-            TemplateSegment::Value(arg) => match resolve_arg(arg, body) {
-                Value::String(s) => out.push_str(&s),
-                other => out.push_str(&other.to_string()),
+    segments
+        .iter()
+        .map(|segment| match segment {
+            TemplateSegment::Literal(text) => (*text).to_string(),
+            TemplateSegment::Value(arg) => match resolve(arg, body) {
+                Value::String(s) => s,
+                other => other.to_string(),
             },
-        }
-    }
-    out
-}
-
-fn resolve_arg(arg: &SaveArg<'_>, body: &Value) -> Value {
-    match arg {
-        SaveArg::Payload(value) => (*value).clone(),
-        SaveArg::Result(path) => path
-            .iter()
-            .try_fold(body, |cur, seg| match seg {
-                PathSegment::Field(f) => cur.get(*f),
-                PathSegment::Index(i) => cur.get(*i),
-            })
-            .cloned()
-            .expect("Value to exist in tests"),
-    }
+        })
+        .collect()
 }

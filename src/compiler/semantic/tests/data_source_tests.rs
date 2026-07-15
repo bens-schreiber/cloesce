@@ -84,6 +84,72 @@ fn default_data_source_tree_includes_all_relationships() {
 }
 
 #[test]
+fn default_data_source_get_list_plans_are_precompiled() {
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Profile for db {
+            primary {
+                id: int
+            }
+        }
+
+        model User for db {
+            primary {
+                id: int
+            }
+
+            foreign Profile::id {
+                profileId
+            }
+
+            one Profile::id(profileId) {
+                profile
+            }
+        }
+    "#,
+    );
+
+    let user = idl.models.get("User").unwrap();
+    let default_ds = user.default_data_source().unwrap();
+
+    let get_plan = default_ds
+        .get_plan
+        .as_ref()
+        .expect("get_plan should be precompiled");
+    let list_plan = default_ds
+        .list_plan
+        .as_ref()
+        .expect("list_plan should be precompiled");
+
+    // `SelectPlan` only implements `Serialize` (it borrows from the IDL), so assert on the
+    // serialized JSON's structural shape rather than round-tripping through `Deserialize`.
+    let get_stages = get_plan
+        .get("stages")
+        .and_then(|s| s.as_array())
+        .expect("get_plan should be a SelectPlan with a `stages` array");
+    let list_stages = list_plan
+        .get("stages")
+        .and_then(|s| s.as_array())
+        .expect("list_plan should be a SelectPlan with a `stages` array");
+
+    assert!(!get_stages.is_empty());
+    assert!(!list_stages.is_empty());
+
+    assert!(
+        default_ds.get_explain.contains("GET"),
+        "get_explain should render an EXPLAIN header: {}",
+        default_ds.get_explain
+    );
+    assert!(
+        default_ds.list_explain.contains("LIST"),
+        "list_explain should render an EXPLAIN header: {}",
+        default_ds.list_explain
+    );
+}
+
+#[test]
 fn omitted_include_uses_default_tree() {
     let idl = src_to_idl(
         r#"
@@ -389,7 +455,10 @@ fn default_data_source_composite_pk() {
 
     // LIST with seek pagination
     let list_params: Vec<&str> = ds.list.parameters.iter().map(|p| p.name.as_ref()).collect();
-    assert_eq!(list_params, vec!["lastSeen_orderId", "lastSeen_productId", "limit"]);
+    assert_eq!(
+        list_params,
+        vec!["lastSeen_orderId", "lastSeen_productId", "limit"]
+    );
 }
 
 #[test]

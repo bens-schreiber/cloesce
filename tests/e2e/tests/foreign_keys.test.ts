@@ -70,11 +70,10 @@ describe("POST and refresh Student", () => {
     expectHttpResult(res, "Expected POST to work");
     expect(res.data!.courses.length).toBe(1);
 
-    // student -> courses (junction) -> course -> students (junction) -> student -> courses (junction)
     const joinRow = res.data!.courses[0];
     expect(joinRow.course!.id).toBe(500);
-    expect(joinRow.course!.students.length).toBe(1);
-    expect(joinRow.course!.students[0].student!.courses.length).toBe(1);
+    // Save responses are payload-shaped: `students` was sent empty, so it echoes [].
+    expect(joinRow.course!.students).toEqual([]);
   });
 
   it("none returns Student without Courses", async () => {

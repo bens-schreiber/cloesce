@@ -542,10 +542,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         };
 
         let target_backing = self.resolve_target_backing(table, target_block);
-        let is_durable = matches!(
-            target_backing.as_ref().map(|b| &b.kind),
-            Some(BackingKind::DurableObject)
-        );
 
         // Each key maps a discriminator on the target to a local field on this model.
         let mut keys = Vec::with_capacity(nav.keys.len());
@@ -594,23 +590,21 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             });
         }
 
-        // A Durable Object target must have every shard field supplied so the ORM can
-        // construct the DO id.
-        if is_durable {
-            let shard_fields = table
-                .durable_bindings
-                .get(target_block.database_binding.as_ref().unwrap().name)
-                .map(|b| b.shard_blocks.inners().flat_map(|s| &s.fields))
-                .into_iter()
-                .flatten();
+        // Every route field of the target must be supplied as a key so the target's
+        // state can be constructed. Durable Object shard fields are coerced into route fields,
+        // so they are also required to be supplied as keys.
+        let shard_fields = target_block.shard_args.as_deref().unwrap_or_default();
+        let route_fields = target_block.blocks.inners().flat_map(|b| match b {
+            ModelBlockKind::Route(symbols) => symbols.as_slice(),
+            _ => &[],
+        });
 
-            for shard in shard_fields {
-                if !nav.keys.iter().any(|k| k.target.name == shard.name) {
-                    ma.sink.push(SemanticError::RelationMissingDiscriminator {
-                        field,
-                        missing: shard.name,
-                    });
-                }
+        for route in shard_fields.iter().chain(route_fields) {
+            if !nav.keys.iter().any(|k| k.target.name == route.name) {
+                ma.sink.push(SemanticError::RelationMissingDiscriminator {
+                    field,
+                    missing: route.name,
+                });
             }
         }
 

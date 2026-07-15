@@ -38,7 +38,7 @@ durable SubRedditDo {
 
 [crud get, save]
 model SubReddit for SubRedditDo(subId) {
-    kv SubRedditDo::metadata() {
+    kv SubRedditDo::{ metadata, id(subId) } {
         metadata
     }
 
@@ -64,7 +64,7 @@ model Post for SubRedditDo(subId) {
         content: string
     }
 
-    nav Comment::postId {
+    many Comment::{postId(id), subId(subId)} {
         comments
     }
 }

@@ -1,86 +1,42 @@
-import type {
-  R2Bucket,
-  R2ObjectBody,
-  D1Database,
-  KVNamespace,
-  D1Result,
-  D1PreparedStatement,
-} from "@cloudflare/workers-types";
+import type { R2Bucket, R2ObjectBody, D1Database, KVNamespace } from "@cloudflare/workers-types";
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import {
-  Model,
-  CidlType,
-  Cidl,
-  getNavigationCidlType,
-  KvField,
-  isD1Backed,
-  isDurableBacked,
-  ENV_DURABLE_TARGET_KEY,
-} from "../cidl.js";
-import { CloesceError, CloesceResult, InternalError, u8ToB64 } from "../common.js";
+import { Model, CidlType, Cidl, getNavigationCidlType, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
+import { CloesceError, CloesceResult, Either, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue } from "../ui/backend.js";
-
-/**
- * A SQL query plus its positional bindings, not bound to any database.
- */
-export type SqlStatement = { query: string; values?: unknown[] };
+import {
+  executeSave,
+  executeSelect,
+  type KeyStore,
+  type KeyValueWrapper,
+  type SqlStore,
+  type StorageResolver,
+} from "./executor.js";
+import type { Database, SavePlan, SelectPlan } from "./plan.js";
 
 type HydrateArgs = {
   idl: Cidl;
   includeTree: IncludeTree<any> | null;
   env: any;
-  durable: DurableContext | null;
-  promises: Promise<CloesceResult<void>>[];
 };
 
 type DurableContext = {
   state: {
-    storage: {
-      sql: DurableSql;
-      kv: {
-        get(key: string): any;
-        put(key: string, value: any): void;
-        list(options?: { prefix?: string }): Iterable<[string, any]>;
-      };
-      transactionSync?<T>(closure: () => T): T;
-    };
+    storage: DurableStorage;
   };
 };
 
-type DurableSql = {
-  exec(query: string, ...bindings: any[]): { toArray(): Record<string, unknown>[] };
-};
-
-interface KvRepository {
-  /** Reads the value stored at `key`. */
-  hydrate(kv: KvField, key: string): Promise<KValue<unknown> | unknown>;
-
-  put(key: string, value: any, metadata?: unknown): Promise<void> | void;
-}
-
-interface R2Repository {
-  /** Reads the object stored at `key`. */
-  hydrate(key: string): Promise<R2ObjectBody | null>;
-}
-
-interface SqlRepository {
-  prepare(query: string): D1PreparedStatement;
-  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
-}
-
-type KvUpload = {
-  namespace_binding: string;
-  key: string;
-  value: any;
-  metadata: unknown;
-};
-
-type UpsertResult = {
-  sql: { query: string; values: any[] }[];
-  kv_uploads: KvUpload[];
-  kv_delayed_uploads: ({ path: string[] } & KvUpload)[];
+type DurableStorage = {
+  sql: {
+    exec(query: string, ...bindings: any[]): { toArray(): Record<string, unknown>[] };
+  };
+  kv: {
+    get(key: string): any;
+    put(key: string, value: any): void;
+    list(options?: { prefix?: string }): Iterable<[string, any]>;
+  };
+  transactionSync?<T>(closure: () => T): T;
 };
 
 export class Orm {
@@ -95,370 +51,393 @@ export class Orm {
   }
 
   /**
-   * Maps a D1Result to a Cloesce Model based on the provided metadata and include tree.
+   * Load a single `{@link Model}` (and its included relations) by its key params.
    *
-   * Fails silently if a mapping cannot be performed for some row, skipping it in results.
+   * `params` supplies every primary/route key the select plan requires.
    *
-   * Capable of mapping only queries returned from `Orm.select`, which are aliased in an Object Oriented fashion.
+   * A precompiled `plan` (from `cidl.json`) skips the WASM planning call when supplied.
    */
-  static map<T extends object>(meta: Model, d1Results: D1Result, includeTree: IncludeTree<T>): T[] {
-    const { wasm } = RuntimeContainer.get();
-    const d1ResultsRes = WasmResource.fromString(JSON.stringify(d1Results.results), wasm);
-    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
-    const mapQueryRes = invokeOrmWasm(
-      wasm.map,
-      [WasmResource.fromString(meta.name, wasm), d1ResultsRes, includeTreeRes],
-      wasm,
-    );
-
-    if (mapQueryRes.isLeft()) {
-      throw new InternalError(`Mapping failed: ${mapQueryRes.value}`);
-    }
-
-    return JSON.parse(mapQueryRes.unwrap()) as T[];
-  }
-
-  /**
-   * A SQL `SELECT` query generator based on the provided metadata and include tree.
-   *
-   * All navigation fields are `LEFT JOIN`ed to the result.
-   * Aliases all fields of a Model in an Object Oriented fashion s.t. they can be referenced like:
-   * `[navigation.name]`, `[navigation.nestedNavigation.name]`, etc. in the mapping function.
-   *
-   * All top level columns of a Model are aliased by name:
-   * `[columnName]`.
-   *
-   * Utilizes the provided `includeTree` to determine which navigation fields to `LEFT JOIN` and include in the result.
-   *
-   * @returns a SQL `SELECT` string that can be executed to retrieve the Model(s).
-   */
-  static select<T extends object>(
+  async get<T extends object>(
     meta: Model,
-    from: string | null,
+    params: Record<string, unknown>,
     includeTree: IncludeTree<T>,
-  ): string {
-    const { wasm } = RuntimeContainer.get();
-    const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
-    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
-    const selectQueryRes = invokeOrmWasm(
-      wasm.select_model,
-      [WasmResource.fromString(meta.name, wasm), fromRes, includeTreeRes],
-      wasm,
-    );
-
-    if (selectQueryRes.isLeft()) {
-      throw new InternalError(`Select generation failed: ${selectQueryRes.value}`);
-    }
-
-    return selectQueryRes.unwrap();
+    plan?: SelectPlan,
+  ): Promise<CloesceResult<T | null>> {
+    includeTree ??= {} as IncludeTree<T>;
+    return CloesceError.catchGeneric(async () => {
+      const selectPlan = plan ?? this.planSelect(meta, "get", includeTree);
+      const storage = this.storageResolver();
+      const body = await executeSelect(
+        selectPlan,
+        params,
+        storage,
+        this.keyWrapper(meta, includeTree),
+      );
+      return this.coerce(meta, body, includeTree) as T | null;
+    }).then((res) => res);
   }
 
   /**
-   * Given some base object (be it empty or the result of an `Orm.map`), hydrates all of the fields recursively
-   * using the `includeTree` to determine which navigation properties to hydrate.
+   * Load all matching `{@link Model}` rows (and included relations).
    *
-   * For KV and R2 fields, performs the necessary queries to Workers KV and R2 to retrieve the data, which is then attached to the base object.
+   * - `params` carries the `limit` (and any shard/route keys) the list plan requires.
+   * - A precompiled `plan` (from `cidl.json`) skips the WASM planning call when supplied.
    */
-  async hydrate<T extends object>(
+  async list<T extends object>(
     meta: Model,
-    base: any,
+    params: Record<string, unknown>,
     includeTree: IncludeTree<T>,
-  ): Promise<CloesceResult<T>> {
-    base ??= {};
-    const { idl } = RuntimeContainer.get();
-    const modelCidlType: CidlType = {
-      Object: { name: meta.name },
-    };
-    const env: any = this.env;
-    const promises: Promise<CloesceResult<void>>[] = [];
-
-    const hydrated = hydrateType(base, modelCidlType, {
-      idl,
-      includeTree,
-      env,
-      durable: this.durable,
-      promises,
-    });
-
-    const errors = CloesceError.drain(await Promise.all(promises));
-    if (errors) {
-      return errors;
-    }
-
-    return { value: hydrated, errors: [] };
-  }
-
-  private kvRepositoryFor(meta: Model, binding: string): KvRepository {
-    return kvRepositoryFor(meta, binding, { env: this.env, durable: this.durable });
+    plan?: SelectPlan,
+  ): Promise<CloesceResult<T[]>> {
+    includeTree ??= {} as IncludeTree<T>;
+    return CloesceError.catchGeneric(async () => {
+      const selectPlan = plan ?? this.planSelect(meta, "list", includeTree);
+      const storage = this.storageResolver();
+      const body = await executeSelect(
+        selectPlan,
+        params,
+        storage,
+        this.keyWrapper(meta, includeTree),
+      );
+      const rows = Array.isArray(body) ? body : [];
+      return rows.map((row) => this.coerce(meta, row, includeTree) as T);
+    }).then((res) => res);
   }
 
   /**
-   * Performs a SQL + KV upsert based on the provided metadata and include tree, returning the upserted model.
-   * Recursively performs upserts for all nested navigation properties included in the `includeTree`.
-   *
-   * The `newModel` parameter is a partial model object that specifies the new values to upsert, and serves as the basis for generating the upsert SQL query.
-   *
-   * The SQL query will execute as an insert if:
-   * - The primary key fields are missing from `newModel`
-   *
-   * The SQL query will execute as an insert OR update if:
-   * - All fields are provided with values in `newModel`
-   *
-   * The SQL query will execute as an update if:
-   * - At least one field is missing from `newModel`, but all primary key fields are provided with values.
+   * Insert or update a `{@link Model}` and its included relations, returning the saved row
+   * as the database's truth (in payload order).
    */
-  async upsert<T extends object>(
+  async save<T extends object>(
     meta: Model,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T>,
   ): Promise<CloesceResult<T | null>> {
     includeTree ??= {} as IncludeTree<T>;
-    const { wasm, idl } = RuntimeContainer.get();
+    const planRes = this.planSave(meta, includeTree, newModel);
+    if (planRes.isLeft()) {
+      return CloesceError.cloesce(planRes.value);
+    }
+    return CloesceError.catchGeneric(async () => {
+      const storage = this.storageResolver();
+      const body = await executeSave(planRes.unwrap(), storage);
+      if (body === null || body === undefined) return null;
+      return this.coerce(meta, body, includeTree) as T;
+    }).then((res) => res);
+  }
 
-    // Invoke the ORM upsert function
-    const upsertQueryRes = invokeOrmWasm(
-      wasm.upsert_model,
+  // --- Plan generation (WASM) ---
+  private planSelect(meta: Model, op: string, includeTree: IncludeTree<any>): SelectPlan {
+    const { wasm } = RuntimeContainer.get();
+    const res = invokeOrmWasm(
+      wasm.plan_select,
       [
         WasmResource.fromString(meta.name, wasm),
-        WasmResource.fromString(
-          // TODO: Stringify only objects in the include tree?
-          // Could try to track `this` in the reviver function
-          JSON.stringify(newModel, (_, v) =>
-            // To serialize a Uint8Array s.t. WASM can read it, we convert it to a base64 string.
-            v instanceof Uint8Array ? u8ToB64(v) : v,
-          ),
-          wasm,
-        ),
+        WasmResource.fromString(op, wasm),
         WasmResource.fromString(JSON.stringify(includeTree), wasm),
       ],
       wasm,
     );
-    if (upsertQueryRes.isLeft()) {
-      return CloesceError.cloesce(upsertQueryRes.value);
+    if (res.isLeft()) {
+      throw new InternalError(`Select planning failed: ${res.value}`);
     }
-    const upsertRes = JSON.parse(upsertQueryRes.unwrap()) as UpsertResult;
+    return JSON.parse(res.unwrap()) as SelectPlan;
+  }
 
-    // Collect all KV uploads that can be performed concurrently with the SQL upsert.
-    // Each upload is routed to its destination (a Worker KV namespace, or this model's
-    // own Durable Object storage) by its binding.
-    const kvUploadPromises = upsertRes.kv_uploads.map((upload) =>
-      CloesceError.catchGeneric(async () => {
-        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
-        await repo.put(upload.key, upload.value, upload.metadata);
-      }),
+  private planSave(
+    meta: Model,
+    includeTree: IncludeTree<any>,
+    payload: unknown,
+  ): Either<string, SavePlan> {
+    const { wasm } = RuntimeContainer.get();
+    const res = invokeOrmWasm(
+      wasm.plan_save,
+      [
+        WasmResource.fromString(meta.name, wasm),
+        WasmResource.fromString(JSON.stringify(includeTree), wasm),
+        WasmResource.fromString(
+          // Serialize a Uint8Array so WASM can read it, as a base64 string.
+          JSON.stringify(payload, (_, v) => (v instanceof Uint8Array ? u8ToB64(v) : v)),
+          wasm,
+        ),
+      ],
+      wasm,
     );
+    return res.map((json) => JSON.parse(json) as SavePlan);
+  }
 
-    const sqlRepo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
-    const queries = sqlRepo
-      ? upsertRes.sql.map((s) => sqlRepo.prepare(s.query).bind(...s.values))
-      : [];
-
-    // Concurrently execute SQL with KV uploads.
-    const [batchRes] = await Promise.all([
-      queries.length > 0 ? sqlRepo!.batch(queries) : Promise.resolve([]),
-      ...kvUploadPromises,
-    ]);
-
-    let base: any = newModel;
-
-    // Ensure all queries succeeded, then map the result of the final SELECT statement to the Model
-    if (queries.length > 0) {
-      const failed = batchRes.find((r) => !r.success);
-      if (failed) {
-        return CloesceError.d1(failed);
-      }
-
-      let selectIndex = -1;
-      for (let i = upsertRes.sql.length - 1; i >= 0; i--) {
-        if (/^SELECT/i.test(upsertRes.sql[i].query)) {
-          selectIndex = i;
-          break;
+  // --- Storage wiring ---
+  private storageResolver(): StorageResolver {
+    const env = this.env;
+    const durable = this.durable;
+    return {
+      sql(database: Database, shard: unknown[]): SqlStore {
+        if (database.kind === "DurableObject") {
+          return durableSqlStore(env, durable, database, shard);
         }
-      }
-      base = Orm.map(meta, batchRes[selectIndex], includeTree)[0];
-
-      // Route fields are not SQL columns, so the mapped row lacks them. Restore them
-      // from the supplied model.
-      if (base) {
-        for (const field of meta.route_fields) {
-          if (base[field.name] === undefined && (newModel as any)[field.name] !== undefined) {
-            base[field.name] = (newModel as any)[field.name];
-          }
+        return new D1SqlStore(env[database.name]);
+      },
+      key(database: Database, shard: unknown[]): KeyStore {
+        switch (database.kind) {
+          case "DurableObject":
+            return durableKeyStore(env, durable, database, shard);
+          case "R2":
+            return new R2KeyStore(env, database.name);
+          default:
+            return new WorkerKvStore(env, database.name);
         }
-      }
-    }
-
-    // Base needs to include all of the key fields from newModel and its includes.
-    const q: Array<{ model: any; meta: Model; tree: IncludeTree<any> }> = [
-      { model: base, meta, tree: includeTree },
-    ];
-    while (q.length > 0) {
-      const { model: currentModel, meta: currentMeta, tree: currentTree } = q.shift()!;
-
-      // Navigation properties
-      for (const navProp of currentMeta.navigation_fields) {
-        const nestedTree = currentTree[navProp.field.name];
-        if (!nestedTree) continue;
-
-        const nestedMeta = idl.models[navProp.model_reference];
-        const value = currentModel[navProp.field.name];
-
-        if (Array.isArray(value)) {
-          for (let i = 0; i < value.length; i++) {
-            q.push({
-              model: value[i],
-              meta: nestedMeta,
-              tree: nestedTree,
-            });
-          }
-        } else if (value) {
-          q.push({
-            model: value,
-            meta: nestedMeta,
-            tree: nestedTree,
-          });
-        }
-      }
-    }
-
-    // Execute all delayed KV uploads that depended on SQL results
-    const delayedUploadResults = await Promise.all(
-      upsertRes.kv_delayed_uploads.map((upload): Promise<CloesceResult<void>> => {
-        let current: any = base;
-        for (const pathPart of upload.path) {
-          current = current[pathPart];
-          if (current === undefined) {
-            throw new InternalError(
-              `Failed to resolve path ${upload.path.join(".")} for delayed KV upload.`,
-            );
-          }
-        }
-
-        const key = resolveKey(upload.key, current);
-        if (!key) {
-          throw new InternalError(
-            `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
-          );
-        }
-
-        const repo = this.kvRepositoryFor(meta, upload.namespace_binding);
-        return CloesceError.catchGeneric(async () => {
-          await repo.put(key, upload.value, upload.metadata);
-        });
-      }),
-    );
-
-    const delayedUploadErrors = CloesceError.drain(delayedUploadResults);
-    if (delayedUploadErrors) {
-      return delayedUploadErrors;
-    }
-
-    return await this.hydrate(meta, base, includeTree);
+      },
+    };
   }
 
   /**
-   * Resolves a query argument to a runnable prepared statement. A raw `SqlStatement`
-   * descriptor is bound against the model's backing SQL store (D1, or the Durable
-   * Object's SQLite storage when running inside the DO).
+   * A read from a `Key` step is wrapped to match the field's declared type: Workers KV
+   * fields become a {@link KValue}, DO-KV and R2 fields pass through raw (R2 already
+   * returns an `R2ObjectBody`).
    */
-  private resolveStatement(
-    meta: Model,
-    query: D1PreparedStatement | SqlStatement | null | undefined,
-  ): D1PreparedStatement | null {
-    if (!query) {
-      return null;
-    }
-    if (typeof (query as D1PreparedStatement).run === "function") {
-      return query as D1PreparedStatement;
-    }
-
-    const { query: sql, values = [] } = query as SqlStatement;
-    const repo = sqlRepositoryFor(meta, { env: this.env, durable: this.durable });
-    if (!repo) {
-      throw new InternalError(
-        `Model "${meta.name}" has no reachable SQL store to execute a query against.`,
-      );
-    }
-    return repo.prepare(sql).bind(...values);
+  private keyWrapper(_meta: Model, _tree: IncludeTree<any>): KeyValueWrapper {
+    return (database, _resultPath, raw, metadata) => {
+      if (database.kind === "Kv") {
+        // A Workers KV store returns `{ value, metadata }`; unwrap into a KValue.
+        const inner = (raw ?? {}) as { value?: unknown; metadata?: unknown };
+        return new KValue(inner.value ?? null, inner.metadata ?? metadata ?? null);
+      }
+      return raw ?? null;
+    };
   }
 
-  async get<T extends object>(
-    meta: Model,
-    query: D1PreparedStatement | SqlStatement | null | undefined,
-    includeTree: IncludeTree<T>,
-    seed?: DeepPartial<T>,
-  ): Promise<CloesceResult<T | null>> {
-    const stmt = this.resolveStatement(meta, query);
-    if (!stmt) {
-      // No query provided, hydrate any non-SQL fields
-      return await this.hydrate(meta, { ...seed }, includeTree);
-    }
+  // --- Post-plan scalar coercion ---
+  /**
+   * Coerce a plan-produced body's scalar fields into their JS runtime types (Date, Uint8Array,
+   * boolean) recursively.
+   */
+  private coerce(meta: Model, body: any, includeTree: IncludeTree<any>): any {
+    const { idl } = RuntimeContainer.get();
+    const modelCidlType: CidlType = { Object: { name: meta.name } };
+    const hydrated = hydrateType(body, modelCidlType, {
+      idl,
+      includeTree,
+      env: this.env,
+    });
+    return hydrated ?? body;
+  }
+}
 
-    const res = await stmt.run();
+// ----------------------------------------------------------------------------
+// SQL stores
+// ----------------------------------------------------------------------------
+class D1SqlStore implements SqlStore {
+  constructor(private db: D1Database) {
+    if (!db) {
+      throw new InternalError("D1 database binding not found for a query plan.");
+    }
+  }
+
+  async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
+    const res = await this.db
+      .prepare(sql)
+      .bind(...bindings.map(toSqlBind))
+      .all();
     if (!res.success) {
-      return CloesceError.d1(res);
+      throw new InternalError(`D1 query failed: ${JSON.stringify(res)}`);
     }
-
-    const mapped = Orm.map(meta, res, includeTree)[0];
-    if (!mapped) {
-      return { value: null, errors: [] };
-    }
-    // Seed values (e.g. a DO-backed model's route fields, which are not SQL columns)
-    // must be present before hydration so KV key formats can resolve.
-    return await this.hydrate(meta, Object.assign(mapped, seed), includeTree);
+    return res.results as Record<string, unknown>[];
   }
 
-  async list<T extends object>(
-    meta: Model,
-    query: D1PreparedStatement | SqlStatement | null | undefined,
-    includeTree: IncludeTree<T>,
-    seed?: DeepPartial<T>,
-  ): Promise<CloesceResult<T[]>> {
-    const stmt = this.resolveStatement(meta, query);
-    if (!stmt) {
-      return { value: [], errors: [] };
-    }
-
-    const rows = await stmt.run();
-    if (!rows.success) {
-      return CloesceError.d1(rows);
-    }
-
-    const results = Orm.map(meta, rows, includeTree);
-    const hydratedResults = await Promise.all(
-      results.map((modelJson) =>
-        this.hydrate<T>(meta, Object.assign(modelJson, seed), includeTree),
-      ),
+  async batch(
+    statements: { sql: string; bindings: unknown[] }[],
+  ): Promise<Record<string, unknown>[][]> {
+    const prepared = statements.map((s) =>
+      this.db.prepare(s.sql).bind(...s.bindings.map(toSqlBind)),
     );
-
-    const errors = hydratedResults.flatMap((r) => r.errors);
-    if (errors.length > 0) {
-      return { value: null, errors };
+    const results = await this.db.batch(prepared);
+    const failed = results.find((r) => !r.success);
+    if (failed) {
+      throw new InternalError(`D1 batch failed: ${JSON.stringify(failed)}`);
     }
-
-    return { value: hydratedResults.map((r) => r.value as T), errors: [] };
+    return results.map((r) => (r.results ?? []) as Record<string, unknown>[]);
   }
+}
+
+/**
+ * A DO's SQLite storage reached over RPC (from the Worker) or directly (inside the DO).
+ * The Worker path routes to the stub identified by the shard tuple.
+ */
+function durableSqlStore(
+  env: any,
+  durable: DurableContext | null,
+  database: Database,
+  shard: unknown[],
+): SqlStore {
+  if (durable) {
+    return new LocalDurableSqlStore(durable);
+  }
+  const stub = durableStub(env, database.name, shard);
+  return new RemoteDurableSqlStore(stub);
+}
+
+/** Runs SQL directly against the DO context we are executing inside. */
+class LocalDurableSqlStore implements SqlStore {
+  constructor(private ctx: DurableContext) {}
+
+  async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
+    return durableSqlBatch(this.ctx.state.storage, [{ sql, bindings }])[0];
+  }
+
+  async batch(
+    statements: { sql: string; bindings: unknown[] }[],
+  ): Promise<Record<string, unknown>[][]> {
+    return durableSqlBatch(this.ctx.state.storage, statements);
+  }
+}
+
+/** Runs SQL against a remote DO stub via the generated `__cloesceSqlBatch` RPC. */
+class RemoteDurableSqlStore implements SqlStore {
+  constructor(private stub: any) {}
+
+  async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
+    const res = await this.stub.__cloesceSqlBatch([{ sql, bindings }]);
+    return res[0];
+  }
+
+  async batch(
+    statements: { sql: string; bindings: unknown[] }[],
+  ): Promise<Record<string, unknown>[][]> {
+    return await this.stub.__cloesceSqlBatch(statements);
+  }
+}
+
+/**
+ * @internal Runs an ordered SQL batch against a Durable Object's SQLite storage as a single
+ * transaction, rolling back on the first failure. Returns each statement's rows.
+ *
+ * Exported for the generated DO subclass to expose as an RPC to the plan executor.
+ */
+export function durableSqlBatch(
+  storage: DurableStorage,
+  statements: { sql: string; bindings: unknown[] }[],
+): Record<string, unknown>[][] {
+  const runAll = () =>
+    statements.map((s) => storage.sql.exec(s.sql, ...s.bindings.map(toSqlBind)).toArray());
+  return storage.transactionSync ? storage.transactionSync(runAll) : runAll();
+}
+
+// ----------------------------------------------------------------------------
+// Key stores
+// ----------------------------------------------------------------------------
+class WorkerKvStore implements KeyStore {
+  private namespace: KVNamespace;
+
+  constructor(env: any, binding: string) {
+    this.namespace = env?.[binding];
+    if (!this.namespace) {
+      throw new InternalError(`KV Namespace binding "${binding}" not found.`);
+    }
+  }
+
+  async get(key: string): Promise<unknown> {
+    // Read value + metadata so a KValue can carry both.
+    const { value, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
+    return { value, metadata };
+  }
+
+  put(key: string, value: unknown, metadata?: unknown): Promise<void> {
+    return this.namespace.put(key, JSON.stringify(value), { metadata: metadata as any });
+  }
+}
+
+class R2KeyStore implements KeyStore {
+  private bucket: R2Bucket;
+
+  constructor(env: any, binding: string) {
+    this.bucket = env?.[binding];
+    if (!this.bucket) {
+      throw new InternalError(`R2 Bucket binding "${binding}" not found.`);
+    }
+  }
+
+  get(key: string): Promise<R2ObjectBody | null> {
+    return this.bucket.get(key);
+  }
+
+  async put(key: string, value: unknown): Promise<void> {
+    await this.bucket.put(key, value as any);
+  }
+}
+
+function durableKeyStore(
+  env: any,
+  durable: DurableContext | null,
+  database: Database,
+  shard: unknown[],
+): KeyStore {
+  if (durable) {
+    return new LocalDurableKeyStore(durable);
+  }
+  return new RemoteDurableKeyStore(durableStub(env, database.name, shard));
+}
+
+class LocalDurableKeyStore implements KeyStore {
+  constructor(private ctx: DurableContext) {}
+
+  get(key: string): unknown {
+    return this.ctx.state.storage.kv.get(key) ?? null;
+  }
+
+  put(key: string, value: unknown): void {
+    this.ctx.state.storage.kv.put(key, value);
+  }
+}
+
+class RemoteDurableKeyStore implements KeyStore {
+  constructor(private stub: any) {}
+
+  async get(key: string): Promise<unknown> {
+    return (await this.stub.__cloesceKvGet(key)) ?? null;
+  }
+
+  async put(key: string, value: unknown): Promise<void> {
+    await this.stub.__cloesceKvPut(key, value);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
+/** Resolve the stub for a DO shard from the raw shard values, mirroring the router's naming. */
+function durableStub(env: any, binding: string, shard: unknown[]): any {
+  const namespace = env[binding];
+  if (!namespace) {
+    throw new InternalError(`Durable Object binding "${binding}" not found.`);
+  }
+  const name = [binding, ...shard.map((v) => String(v))].join("/");
+  return namespace.get(namespace.idFromName(name));
+}
+
+/** Coerce a JS value into a form the SQL drivers bind cleanly (booleans -> 0/1, blobs -> bytes). */
+function toSqlBind(value: unknown): unknown {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value instanceof Uint8Array) return value;
+  return value;
 }
 
 /**
  * @internal
  *
- * Hydrates a pure JSON value to a JS object based on it's CIDL type.
+ * Coerces a plan-produced JSON value into its JS runtime type based on its CIDL type.
+ * Recurses through columns, POO fields, and included navigations, but does **not** touch
+ * KV/R2 fields (the plan already read and shaped them).
  *
- * @param value The value to hydrate.
- * @param cidlType The CIDL type of the value.
- * @param includeTree The include tree specifying which navigation properties to include.
- *  If null, includes all navigation properties, but does not hydrate KV and R2 properties.
- *
- * @returns The hydrated value if a transformation was necessary, or undefined if the value was mutated in place.
+ * @returns The coerced value if a replacement was necessary, or `undefined` if the value
+ *   was mutated in place.
  */
 export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): any | undefined {
   if (value === null || value === undefined) {
     return value;
   }
 
-  // Unwrap nullable types
   if (typeof cidlType === "object" && "Nullable" in cidlType) {
+    // Unwrap nullable types
     cidlType = cidlType.Nullable;
   }
 
@@ -468,7 +447,7 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
         return new Date(value);
       }
       case "Blob": {
-        const arr: number[] = value;
+        const arr = value as number[];
         return new Uint8Array(arr);
       }
       case "Boolean": {
@@ -484,7 +463,6 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     if (!Array.isArray(value)) {
       return [];
     }
-
     for (let i = 0; i < value.length; i++) {
       value[i] = hydrateType(value[i], cidlType.Array, args);
     }
@@ -509,33 +487,21 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
   const pooMeta = args.idl.poos[objectName];
 
   if (modelMeta) {
-    for (const col of modelMeta.columns) {
+    for (const col of [...modelMeta.primary_columns, ...modelMeta.columns]) {
       if (value[col.field.name] === undefined) continue;
       const res = hydrateType(value[col.field.name], col.field.cidl_type, args);
-      if (res) value[col.field.name] = res;
+      if (res !== undefined) value[col.field.name] = res;
     }
 
     for (const nav of modelMeta.navigation_fields) {
-      const tree = args.includeTree ? args.includeTree[nav.field.name] : null;
-      if (tree === undefined) continue;
+      if (nav.cardinality === "Many" && value[nav.field.name] === undefined) {
+        // Default to an empty array for absent many navs.
+        value[nav.field.name] = [];
+      }
 
-      // A route model nav target has no unique fields: it is assembled entirely from
-      // this model's route values, mapped onto the target's route fields in order.
-      const target = args.idl.models[nav.model_reference];
-      if (
-        value[nav.field.name] === undefined &&
-        !target.backing &&
-        typeof nav.kind === "object" &&
-        "OneToOne" in nav.kind
-      ) {
-        const columns = nav.kind.OneToOne.fields;
-        const assembled: any = {};
-        if (target.route_fields.length > 0) {
-          target.route_fields.forEach((field, i) => {
-            assembled[field.name] = value[columns[i]];
-          });
-        }
-        value[nav.field.name] = assembled;
+      const tree = args.includeTree ? args.includeTree[nav.field.name] : null;
+      if (tree === undefined || value[nav.field.name] === undefined) {
+        continue;
       }
 
       const res = hydrateType(value[nav.field.name], getNavigationCidlType(nav), {
@@ -545,33 +511,6 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
       if (res) value[nav.field.name] = res;
     }
 
-    for (const kv of modelMeta.kv_fields) {
-      const key = resolveKey(kv.key_format, value);
-      if ((args.includeTree && args.includeTree[kv.field.name] === undefined) || !key) {
-        continue;
-      }
-
-      const repo = kvRepositoryFor(modelMeta, kv.binding, args);
-      args.promises.push(
-        CloesceError.catchGeneric(async () => {
-          value[kv.field.name] = await repo.hydrate(kv, key);
-        }),
-      );
-    }
-
-    for (const r2 of modelMeta.r2_fields) {
-      const key = resolveKey(r2.key_format, value);
-      if ((args.includeTree && args.includeTree[r2.field.name] === undefined) || !key) {
-        continue;
-      }
-      const repo = r2RepositoryFor(r2.binding, args.env);
-      args.promises.push(
-        CloesceError.catchGeneric(async () => {
-          value[r2.field.name] = await repo.hydrate(key);
-        }),
-      );
-    }
-
     return value;
   }
 
@@ -579,202 +518,8 @@ export function hydrateType(value: any, cidlType: CidlType, args: HydrateArgs): 
     for (const field of pooMeta.fields) {
       if (value[field.name] === undefined) continue;
       const res = hydrateType(value[field.name], field.cidl_type, args);
-      if (res) value[field.name] = res;
+      if (res !== undefined) value[field.name] = res;
     }
     return value;
   }
-}
-
-class D1SqlRepository implements SqlRepository {
-  constructor(private db: D1Database) {}
-
-  prepare(query: string): D1PreparedStatement {
-    return this.db.prepare(query);
-  }
-
-  batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
-    return this.db.batch(statements);
-  }
-}
-
-class DurableSqlPreparedStatement {
-  constructor(
-    private sql: DurableSql,
-    private query: string,
-    private values: any[] = [],
-  ) {}
-
-  bind(...values: any[]): DurableSqlPreparedStatement {
-    return new DurableSqlPreparedStatement(this.sql, this.query, values);
-  }
-
-  runSync(): D1Result {
-    try {
-      const results = this.sql.exec(this.query, ...this.values).toArray();
-      return { success: true, results, meta: {} } as unknown as D1Result;
-    } catch (e) {
-      return {
-        success: false,
-        results: [],
-        error: e instanceof Error ? e.message : String(e),
-        meta: {},
-      } as unknown as D1Result;
-    }
-  }
-
-  async run(): Promise<D1Result> {
-    return this.runSync();
-  }
-}
-
-/** @internal Carries partial batch results out of a rolled-back transaction. */
-class DurableBatchFailure extends Error {
-  constructor(public results: D1Result[]) {
-    super("Durable Object SQL batch failed");
-  }
-}
-
-/**
- * `batch` runs inside a synchronous storage transaction when available, rolling back
- * on the first failed statement to mirror D1's transactional batch.
- */
-class DurableSqlRepository implements SqlRepository {
-  constructor(private ctx: DurableContext) {}
-
-  prepare(query: string): D1PreparedStatement {
-    return new DurableSqlPreparedStatement(
-      this.ctx.state.storage.sql,
-      query,
-    ) as unknown as D1PreparedStatement;
-  }
-
-  async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
-    const storage = this.ctx.state.storage;
-    const runAll = () => {
-      const results = (statements as unknown as DurableSqlPreparedStatement[]).map((stmt) =>
-        stmt.runSync(),
-      );
-      if (results.some((r) => !r.success)) {
-        throw new DurableBatchFailure(results);
-      }
-      return results;
-    };
-
-    try {
-      return storage.transactionSync ? storage.transactionSync(runAll) : runAll();
-    } catch (e) {
-      if (e instanceof DurableBatchFailure) {
-        return e.results;
-      }
-      throw e;
-    }
-  }
-}
-
-/**
- * @returns the `SqlRepository` backing this model, or undefined when the model has no
- * reachable SQL store (no backing, or a DO-backed model outside its DO's context).
- */
-function sqlRepositoryFor(
-  meta: Model,
-  ctx: { env: any; durable: DurableContext | null },
-): SqlRepository | undefined {
-  if (isD1Backed(meta)) {
-    return new D1SqlRepository(ctx.env[meta.backing!.binding]);
-  }
-  if (isDurableBacked(meta) && ctx.durable) {
-    return new DurableSqlRepository(ctx.durable);
-  }
-  return undefined;
-}
-
-class WorkerKvRepository implements KvRepository {
-  constructor(private namespace: KVNamespace) {}
-
-  async hydrate(kv: KvField, key: string): Promise<KValue<unknown>> {
-    // KV Fields are capable of holding a `Stream` of data, which must be retrieved
-    // with the `type: "stream"` option and cannot be JSON-parsed.
-    const inner =
-      typeof kv.field.cidl_type === "object" && "KvObject" in kv.field.cidl_type
-        ? kv.field.cidl_type.KvObject
-        : kv.field.cidl_type;
-
-    if (inner === "Stream") {
-      return new KValue(await this.namespace.get(key, { type: "stream" }), null);
-    }
-
-    const { value: raw, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
-    return new KValue(raw, metadata);
-  }
-
-  put(key: string, value: any, metadata: unknown): Promise<void> {
-    return this.namespace.put(key, JSON.stringify(value), { metadata });
-  }
-}
-
-class DurableKvRepository implements KvRepository {
-  constructor(private ctx: DurableContext) {}
-
-  async hydrate(_kv: KvField, key: string): Promise<unknown> {
-    return this.ctx.state.storage.kv.get(key) ?? null;
-  }
-
-  put(key: string, value: any): void {
-    this.ctx.state.storage.kv.put(key, value);
-  }
-}
-
-class WorkerR2Repository implements R2Repository {
-  constructor(private bucket: R2Bucket) {}
-
-  hydrate(key: string): Promise<R2ObjectBody | null> {
-    return this.bucket.get(key);
-  }
-}
-
-/**
- * @returns null if any parameter could not be resolved
- */
-function resolveKey(format: string, current: any): string | null {
-  try {
-    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-      const paramValue = current[paramName];
-      if (paramValue === undefined) throw null;
-      return String(paramValue);
-    });
-  } catch {
-    return null;
-  }
-}
-
-/**
- * @returns a `KvRepository` instance based on the provided model metadata and binding,
- * routing to either a Worker KV namespace or Durable Object storage as appropriate.
- */
-function kvRepositoryFor(
-  meta: Model,
-  binding: string,
-  ctx: { env: any; durable: DurableContext | null },
-): KvRepository {
-  if (ctx.durable && isDurableBacked(meta) && binding === meta.backing!.binding) {
-    return new DurableKvRepository(ctx.durable);
-  }
-
-  const namespace: KVNamespace | undefined = ctx.env?.[binding];
-  if (!namespace) {
-    throw new InternalError(`KV Namespace binding "${binding}" not found.`);
-  }
-
-  return new WorkerKvRepository(namespace);
-}
-
-/**
- * @returns an `R2Repository` instance based on the provided binding, routing to a Worker R2 bucket.
- */
-function r2RepositoryFor(binding: string, env: any): R2Repository {
-  const bucket: R2Bucket | undefined = env?.[binding];
-  if (!bucket) {
-    throw new InternalError(`R2 Bucket binding "${binding}" not found.`);
-  }
-  return new WorkerR2Repository(bucket);
 }

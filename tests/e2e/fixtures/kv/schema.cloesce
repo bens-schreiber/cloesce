@@ -52,7 +52,7 @@ model KVOnly {
         someData
     }
 
-    nav KVSibling::siblingId(id) {
+    one KVSibling::siblingId(id) {
         sibling
     }
 }
@@ -83,5 +83,5 @@ model KVOnlyWithSingleton {
         someData
     }
 
-    nav AppConfig { appConfig }
+    one AppConfig { appConfig }
 }

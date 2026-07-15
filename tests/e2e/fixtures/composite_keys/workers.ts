@@ -3,20 +3,22 @@ import { HttpResult } from "cloesce";
 
 const CoursesOrderedDescending = Student.CoursesOrderedDescending.impl({
   async list(env, lastId, lastName, limit) {
-    const stmt = env.db
-      .prepare(
-        `WITH students AS (${this.selectQuery})
-           SELECT * FROM students
-           WHERE id > ?1 AND name > ?2
-           ORDER BY id DESC, name DESC
-           LIMIT ?3`,
-      )
-      .bind(lastId, lastName, limit);
-    const res = await Student.Orm.list(env, { query: stmt, include: this.tree });
-    if (res.errors.length > 0) {
-      return HttpResult.fail(400, JSON.stringify(res.errors));
+    // No raw SQL: fetch the seek-filtered (id > lastId AND name > lastName)
+    // ascending page via the generated Default data source, then reorder
+    // descending and cap to `limit` in JS.
+    const res = await Student.GeneratedSource.Default.list(
+      env,
+      lastId,
+      lastName,
+      Number.MAX_SAFE_INTEGER,
+    );
+    if (!res.ok) {
+      return res;
     }
-    return HttpResult.ok(200, res.value!);
+    const students = [...res.data!]
+      .sort((a, b) => (a.id !== b.id ? b.id - a.id : b.name.localeCompare(a.name)))
+      .slice(0, limit);
+    return HttpResult.ok(200, students);
   },
 });
 

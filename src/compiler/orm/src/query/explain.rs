@@ -122,6 +122,7 @@ mod save {
     use crate::query::save::plan::{
         PathSegment, SaveArg, SaveQuery, SaveStep, SqlStatement, TMP_TABLE,
     };
+    use crate::query::select::plan::MapCardinality;
 
     /// Converts a [SaveStep] into a [Node]
     pub fn step(step: &SaveStep) -> Node {
@@ -165,7 +166,7 @@ mod save {
             }
             SaveQuery::KeyWrite {
                 database: db,
-                key,
+                segments,
                 value,
                 shard,
                 ..
@@ -173,7 +174,7 @@ mod save {
                 text: format!(
                     "WRITE {} KEY {} INTO `{}`{}",
                     fmt::database(db),
-                    fmt::key_template(key, |a| match a {
+                    fmt::key_template(segments, |a| match a {
                         SaveArg::Payload(v) => fmt::truncate(&v.to_string()),
                         SaveArg::Result(p) => format!("saved.{}", path(p)),
                     }),
@@ -185,11 +186,19 @@ mod save {
                     fmt::truncate(&value.to_string())
                 ))],
             },
-            SaveQuery::Synthesize { fields, create } => Node {
+            SaveQuery::Synthesize {
+                fields,
+                create,
+                cardinality,
+            } => Node {
                 text: format!(
-                    "SYNTHESIZE {} INTO `{}`",
+                    "SYNTHESIZE {} INTO `{}`{}",
                     if *create { "CREATE" } else { "MERGE" },
-                    path(&step.result)
+                    path(&step.result),
+                    match cardinality {
+                        MapCardinality::One => " ONE",
+                        MapCardinality::Many => " MANY",
+                    }
                 ),
                 children: fmt::synth_fields(fields, arg),
             },
@@ -314,9 +323,7 @@ mod select {
 
     use super::render::Node;
     use super::{fmt, sql};
-    use crate::query::select::plan::{
-        JoinKeys, MapCardinality, Select, SelectArg, SelectStep, SqlArg,
-    };
+    use crate::query::select::plan::{JoinKeys, MapCardinality, Select, SelectArg, SelectStep};
 
     pub fn step(step: &SelectStep) -> Node {
         match &step.query {
@@ -325,6 +332,7 @@ mod select {
                 sql: query,
                 mapping,
                 shard,
+                route_fields,
                 ..
             } => {
                 // SEARCH when there is a predicate, SCAN for an unfiltered read
@@ -351,35 +359,26 @@ mod select {
                     let _ = write!(head, "\n{}", join_clause(&mapping.join));
                 }
                 if !shard.is_empty() {
-                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, sql_arg).trim_start());
+                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, arg).trim_start());
+                }
+                if !route_fields.is_empty() {
+                    let _ = write!(head, "\n{}", attach_clause(route_fields));
                 }
                 Node::leaf(head)
             }
             Select::Key {
                 database: db,
-                key,
+                segments: key,
                 shard,
             } => Node::leaf(format!(
                 "READ {} KEY {} INTO `{}`{}",
                 fmt::database(db),
-                fmt::key_template(key, |a| match a {
-                    SelectArg::Param(p) => format!("${p}"),
-                    SelectArg::ParentField(f) => format!("parent.{f}"),
-                }),
+                fmt::key_template(key, arg),
                 str_path(&step.result),
                 fmt::shard_clause(shard, arg)
             )),
-            Select::Synthesize {
-                fields,
-                cardinality: card,
-                create,
-            } => Node {
-                text: format!(
-                    "SYNTHESIZE {} INTO `{}`{}",
-                    if *create { "CREATE" } else { "MERGE" },
-                    str_path(&step.result),
-                    cardinality(*card)
-                ),
+            Select::Synthesize { fields, .. } => Node {
+                text: format!("SYNTHESIZE INTO `{}`", str_path(&step.result),),
                 children: fmt::synth_fields(fields, arg),
             },
         }
@@ -388,14 +387,7 @@ mod select {
     fn arg(arg: &SelectArg) -> String {
         match arg {
             SelectArg::Param(p) => format!("`${p}`"),
-            SelectArg::ParentField(f) => format!("`parent.{f}`"),
-        }
-    }
-
-    fn sql_arg(arg: &SqlArg) -> String {
-        match arg {
-            SqlArg::Param(p) => format!("`${p}`"),
-            SqlArg::Spread(f) => format!("EACH `parent.{f}`"),
+            SelectArg::Result(path) => path.join("."),
         }
     }
 
@@ -412,6 +404,16 @@ mod select {
             MapCardinality::One => " ONE",
             MapCardinality::Many => " MANY",
         }
+    }
+
+    /// `ATTACH `<field>` = <arg>, ...` for each route field riding onto the rows.
+    fn attach_clause(fields: &[(&str, SelectArg)]) -> String {
+        let body = fields
+            .iter()
+            .map(|(f, a)| format!("`{f}` = {}", arg(a)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("ATTACH {body}")
     }
 
     fn join_clause(keys: &[JoinKeys]) -> String {

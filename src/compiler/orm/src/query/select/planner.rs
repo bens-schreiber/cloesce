@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use idl::{CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField};
 
-use crate::query::select::plan::{
-    JoinKeys, MapCardinality, Mapping, Select, SelectArg, SelectPlan, SelectStep, SqlArg,
-};
+use crate::query::select::plan::{JoinKeys, Mapping, Select, SelectArg, SelectPlan, SelectStep};
 use crate::query::{Database, DatabaseKind, TemplateSegment};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,15 +41,15 @@ pub fn plan<'src>(
     for f in &model.route_fields {
         // Every route field is required to be supplied by the runtime
         // This includes Durabe Object shard fields, which are always route fields.
-        params.map.insert(f.name.as_ref(), f.name.as_ref());
+        let name = f.name.as_ref();
+        params.map.insert(name, (SelectArg::Param(name.into()), 0));
     }
     if operation == SelectOperation::Get {
         for c in &model.primary_columns {
             // In Get operations, every primary key column is required to be supplied
             // by the runtime
-            params
-                .map
-                .insert(c.field.name.as_ref(), c.field.name.as_ref());
+            let name = c.field.name.as_ref();
+            params.map.insert(name, (SelectArg::Param(name.into()), 0));
         }
     }
 
@@ -60,7 +58,15 @@ pub fn plan<'src>(
         let shard = backing
             .fields
             .iter()
-            .map(|f| (*f, SqlArg::Param((*f).into())))
+            .map(|f| (*f, SelectArg::Param((*f).into())))
+            .collect::<Vec<_>>();
+
+        // Every route field (shard fields included) rides onto each result row,
+        // sourced from runtime parameters.
+        let route_fields = model
+            .route_fields
+            .iter()
+            .map(|f| (f.name.as_ref(), SelectArg::Param(f.name.clone())))
             .collect::<Vec<_>>();
 
         let query = match operation {
@@ -78,7 +84,7 @@ pub fn plan<'src>(
                 let arguments = model
                     .primary_columns
                     .iter()
-                    .map(|c| SqlArg::Param(c.field.name.as_ref().into()))
+                    .map(|c| SelectArg::Param(c.field.name.as_ref().into()))
                     .collect::<Vec<_>>();
 
                 Select::Sql {
@@ -87,6 +93,7 @@ pub fn plan<'src>(
                     arguments,
                     shard,
                     mapping,
+                    route_fields,
                 }
             }
             SelectOperation::List => {
@@ -106,13 +113,10 @@ pub fn plan<'src>(
                 };
 
                 // One `lastSeen_<pk>` cursor value per pk column, then `limit`.
-                //
-                // Cursor values are not added to `Params::map`
-                // (they cannot fix any field value for child steps).
                 let arguments = pks
                     .iter()
-                    .map(|c| SqlArg::Param(format!("lastSeen_{}", c.field.name).into()))
-                    .chain(std::iter::once(SqlArg::Param(LIMIT_PARAM.into())))
+                    .map(|c| SelectArg::Param(format!("lastSeen_{}", c.field.name).into()))
+                    .chain(std::iter::once(SelectArg::Param(LIMIT_PARAM.into())))
                     .collect::<Vec<_>>();
 
                 Select::Sql {
@@ -121,6 +125,7 @@ pub fn plan<'src>(
                     arguments,
                     shard,
                     mapping,
+                    route_fields,
                 }
             }
         };
@@ -129,26 +134,6 @@ pub fn plan<'src>(
             query,
             result: vec![],
         });
-
-        // Non-shard route fields need to be explicitly synthesized
-        // onto the root result
-        let ns_route_fields = model
-            .route_fields
-            .iter()
-            .map(|f| f.name.as_ref())
-            .filter(|f| !backing.fields.contains(f))
-            .map(|f| (f, SelectArg::Param(f)))
-            .collect::<Vec<_>>();
-        if !ns_route_fields.is_empty() {
-            plan.stage_at(0).steps.push(SelectStep {
-                query: Select::Synthesize {
-                    fields: ns_route_fields,
-                    cardinality: MapCardinality::One,
-                    create: false,
-                },
-                result: vec![],
-            });
-        }
     } else {
         // A non-sqlite-backed model has no database to select from, just a state
         // synthesized from its route fields, which must be supplied by the runtime.
@@ -158,14 +143,13 @@ pub fn plan<'src>(
         let fields = model
             .route_fields
             .iter()
-            .map(|f| (f.name.as_ref(), SelectArg::Param(f.name.as_ref())))
+            .map(|f| (f.name.as_ref(), SelectArg::Param(f.name.clone())))
             .collect();
 
         plan.stage_at(0).steps.push(SelectStep {
             query: Select::Synthesize {
                 fields,
                 cardinality: mapping.cardinality,
-                create: true,
             },
             result: vec![],
         });
@@ -191,11 +175,9 @@ fn hydrate_model<'src>(
 
 /// Emit one [Select::Key] [SelectStep] per included R2 and KV field of `model`.
 ///
-/// - If all placeholders on the key-template are in the set of [Params],
-///   the step runs in `stage`.
-///
-/// - If any placeholder is not in the set of [Params], the step must run in
-///   `stage + 1`.
+/// The step runs in the latest stage at which any of its key-template or shard inputs becomes
+/// readable: `stage` for inputs sourced from params, `owner stage + 1` for inputs sourced from a
+/// hydrated result.
 fn select_keys<'src>(
     model: &'src Model<'src>,
     idl: &'src CloesceIdl<'src>,
@@ -212,27 +194,22 @@ fn select_keys<'src>(
                 return;
             }
 
-            let segments = TemplateSegment::parse(key, |arg| params.value_arg(arg));
-            let segments_covered = segments.iter().all(|s| {
-                matches!(
-                    s,
-                    TemplateSegment::Literal(_) | TemplateSegment::Value(SelectArg::Param(_))
-                )
+            // The key template and shard fields are owned by `model` at `path`, hydrated at `stage`.
+            let mut inputs = shard_fields.to_vec();
+            let segments = TemplateSegment::parse(key, |arg| {
+                inputs.push(arg);
+                params.arg(path, arg)
             });
-
             let shard = shard_fields
                 .iter()
-                .map(|f| (*f, params.value_arg(f)))
-                .collect::<Vec<_>>();
-            let shards_covered = shard
-                .iter()
-                .all(|(_, arg)| matches!(arg, SelectArg::Param(_) | SelectArg::ParentField(_)));
+                .map(|f| (*f, params.arg(path, f)))
+                .collect();
 
-            let step_stage = if segments_covered && shards_covered {
-                stage
-            } else {
-                stage + 1
-            };
+            // The step runs no earlier than the latest stage any of its inputs becomes readable.
+            let step_stage = inputs
+                .iter()
+                .map(|f| params.min_stage(stage, f))
+                .fold(stage, usize::max);
 
             let mut result = path.to_vec();
             result.push(field);
@@ -240,7 +217,7 @@ fn select_keys<'src>(
             plan.stage_at(step_stage).steps.push(SelectStep {
                 query: Select::Key {
                     database,
-                    key: segments,
+                    segments,
                     shard,
                 },
                 result,
@@ -280,8 +257,10 @@ fn select_keys<'src>(
 
 /// Recurse the include tree, emitting one nav step per included [NavigationField].
 ///
-/// A nav whose key locals are all param-covered runs in `depth` (sourcing them from
-/// params); otherwise it waits for `depth + 1`, spreading the parent's hydrated values.
+/// Each nav key local is owned by the parent model at `parent_path` (hydrated at `depth`); its
+/// source is either a runtime param (readable from stage 0) or the parent's hydrated result
+/// (readable at `depth + 1`). The nav runs in the latest stage any of its key locals becomes
+/// readable, and the child inherits every key's source (keyed by its target field).
 fn select_navs<'src>(
     model: &'src Model<'src>,
     idl: &'src CloesceIdl<'src>,
@@ -304,30 +283,44 @@ fn select_navs<'src>(
         let mut path = parent_path.to_vec();
         path.push(nav.field.name.as_ref());
 
-        let child_params = {
-            // Child inherits a param for each nav key whose local is covered
-            let map = nav
+        // The nav runs no earlier than the latest stage any of its key locals (owned by the
+        // parent model at `parent_path`, hydrated at `depth`) becomes readable.
+        let stage = nav
+            .keys
+            .iter()
+            .map(|k| params.min_stage(depth, k.local))
+            .fold(depth, usize::max);
+
+        // The child inherits every nav key: its target field is fixed by the local's source.
+        let child_params = Params {
+            map: nav
                 .keys
                 .iter()
-                .filter_map(|k| params.map.get(k.local).map(|p| (k.target, *p)))
-                .collect::<HashMap<_, _>>();
-
-            Params { map }
-        };
-
-        let covered = nav.keys.iter().all(|k| params.map.contains_key(k.local));
-        let stage = if covered {
-            // All inputs are covered, run in parallel
-            depth
-        } else {
-            // Some input is not covered, wait for the parent to finish
-            depth + 1
+                .map(|k| {
+                    (
+                        k.target,
+                        (
+                            params.arg(parent_path, k.local),
+                            params.min_stage(depth, k.local),
+                        ),
+                    )
+                })
+                .collect(),
         };
 
         if let Some(backing) = target.backing.as_ref().filter(|_| target.uses_sqlite()) {
-            select_nav(nav, target, backing, params, &path, plan, stage);
+            select_nav(
+                nav,
+                target,
+                backing,
+                params,
+                parent_path,
+                &path,
+                plan,
+                stage,
+            );
         } else {
-            synthesize_nav(nav, params, &path, plan, stage);
+            synthesize_nav(nav, params, parent_path, &path, plan, stage);
         }
 
         hydrate_model(target, idl, subtree, plan, &child_params, &path, stage);
@@ -337,6 +330,7 @@ fn select_navs<'src>(
     fn synthesize_nav<'src>(
         nav: &'src NavigationField<'src>,
         params: &Params<'src>,
+        parent_path: &[&'src str],
         path: &[&'src str],
         plan: &mut SelectPlan<'src>,
         stage: usize,
@@ -344,26 +338,26 @@ fn select_navs<'src>(
         let fields = nav
             .keys
             .iter()
-            .map(|k| (k.target, params.value_arg(k.local)))
+            .map(|k| (k.target, params.arg(parent_path, k.local)))
             .collect();
 
         plan.stage_at(stage).steps.push(SelectStep {
             query: Select::Synthesize {
                 fields,
                 cardinality: nav.cardinality.clone().into(),
-                create: true,
             },
             result: path.to_vec(),
         });
     }
 
     /// Emit a single SQL step for `nav` targeting SQLite-backed `target` at `stage`,
-    /// plus a merge [Select::Synthesize] for any non-shard route fields the target carries.
+    /// attaching any route fields the target carries (shard fields included) onto its rows.
     fn select_nav<'src>(
         nav: &'src NavigationField<'src>,
         target: &'src Model<'src>,
         backing: &'src ModelBacking<'src>,
         params: &Params<'src>,
+        parent_path: &[&'src str],
         path: &[&'src str],
         plan: &mut SelectPlan<'src>,
         stage: usize,
@@ -375,7 +369,7 @@ fn select_navs<'src>(
             .keys
             .iter()
             .filter(|k| is_shard(k.target))
-            .map(|k| (k.target, params.sql_arg(k.local)))
+            .map(|k| (k.target, params.arg(parent_path, k.local)))
             .collect();
 
         // Remaining (non-shard, non-route) keys become `target IN (?N)` predicates.
@@ -389,7 +383,10 @@ fn select_navs<'src>(
             .enumerate()
             .map(|(i, k)| format!("\"{}\" IN (?{})", k.target, i + 1))
             .collect::<Vec<_>>();
-        let bindings = sql_keys.iter().map(|k| params.sql_arg(k.local)).collect();
+        let bindings = sql_keys
+            .iter()
+            .map(|k| params.arg(parent_path, k.local))
+            .collect();
 
         let join = nav
             .keys
@@ -399,6 +396,14 @@ fn select_navs<'src>(
                 parent_key: k.local,
                 child_key: k.target,
             })
+            .collect();
+
+        // Route fields (shard fields included) ride onto the rows the SQL step produces.
+        let route_fields = nav
+            .keys
+            .iter()
+            .filter(|k| is_shard(k.target) || is_route(k.target))
+            .map(|k| (k.target, params.arg(parent_path, k.local)))
             .collect();
 
         plan.stage_at(stage).steps.push(SelectStep {
@@ -411,27 +416,10 @@ fn select_navs<'src>(
                     cardinality: nav.cardinality.clone().into(),
                     join,
                 },
+                route_fields,
             },
             result: path.to_vec(),
         });
-
-        // Non-shard route fields ride onto the rows the SQL step just produced.
-        let ns_route_fields = nav
-            .keys
-            .iter()
-            .filter(|k| is_route(k.target))
-            .map(|k| (k.target, params.value_arg(k.local)))
-            .collect::<Vec<_>>();
-        if !ns_route_fields.is_empty() {
-            plan.stage_at(stage).steps.push(SelectStep {
-                query: Select::Synthesize {
-                    fields: ns_route_fields,
-                    cardinality: MapCardinality::One,
-                    create: false,
-                },
-                result: path.to_vec(),
-            });
-        }
     }
 }
 
@@ -471,27 +459,30 @@ fn select_sql(model: &Model, preds: &[String], limit_placeholder: Option<usize>)
     sql
 }
 
-/// Maps a field on the current model to the runtime parameter that fixes its value.
-///
-/// A field present in the map is "param-covered" if its value is known without querying a
-/// database, so a [SelectStep] consuming it may run in its parent stage rather than `parent stage + 1`.
+/// Maps a field on the current model to the [SelectArg] that fixes its value,
+/// paired with the first stage at which that value is readable.
 #[derive(Default)]
 struct Params<'src> {
-    map: HashMap<&'src str, &'src str>,
+    map: HashMap<&'src str, (SelectArg<'src>, usize)>,
 }
 
 impl<'src> Params<'src> {
-    fn value_arg(&self, field: &'src str) -> SelectArg<'src> {
-        match self.map.get(field) {
-            Some(param) => SelectArg::Param(param),
-            None => SelectArg::ParentField(field),
-        }
+    /// Resolve `field`, owned by the model at `parent_path`, to its source.
+    fn arg(&self, parent_path: &[&'src str], field: &'src str) -> SelectArg<'src> {
+        self.map
+            .get(field)
+            .map(|(arg, _)| arg.clone())
+            .unwrap_or_else(|| {
+                let mut path = parent_path.to_vec();
+                path.push(field);
+                SelectArg::Result(path)
+            })
     }
 
-    fn sql_arg(&self, field: &'src str) -> SqlArg<'src> {
-        match self.map.get(field) {
-            Some(param) => SqlArg::Param((*param).into()),
-            None => SqlArg::Spread(field),
-        }
+    /// The first stage at which `field`'s value is readable.
+    fn min_stage(&self, parent_stage: usize, field: &'src str) -> usize {
+        self.map
+            .get(field)
+            .map_or(parent_stage + 1, |(_, stage)| *stage)
     }
 }

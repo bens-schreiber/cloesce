@@ -53,24 +53,22 @@ pub enum Select<'src> {
     Sql {
         database: Database<'src>,
         sql: String,
-        arguments: Vec<SqlArg<'src>>,
+        arguments: Vec<SelectArg<'src>>,
         mapping: Mapping<'src>,
 
-        /// For a [DatabaseKind::DurableObject] step, the `(field, value)` pairs
+        /// For a [Database::DurableObject] step, the `(field, value)` pairs
         /// routing to specific stubs. Empty otherwise.
-        ///
-        /// - A [SqlArg::Spread] value fans the step out: one stub per distinct
-        ///   value, the same query executed against each.
-        ///
-        /// - A [SqlArg::Param] value (a root step) addresses the single stub fixed
-        ///   by the request.
-        shard: Vec<(&'src str, SqlArg<'src>)>,
+        shard: Vec<(&'src str, SelectArg<'src>)>,
+
+        /// Route fields to attach to every row of the result, including
+        /// shard fields.
+        route_fields: Vec<(&'src str, SelectArg<'src>)>,
     },
 
     /// An operation executed against a KV, R2, or Durable Object KV storage.
     Key {
         database: Database<'src>,
-        key: Vec<TemplateSegment<'src, SelectArg<'src>>>,
+        segments: Vec<TemplateSegment<'src, SelectArg<'src>>>,
 
         /// For a Durable Object, the `(field, value)` pairs
         /// routing to specific stubs. Empty otherwis
@@ -80,30 +78,12 @@ pub enum Select<'src> {
     /// Set `fields` on the object(s) at [Step::result] from runtime params or parent
     /// field values, without querying an external database.
     ///
-    /// - When `create` is true, the object is built fresh and attached: a backing-less
-    ///   model's whole state, or a backing-less nav target built from its parent.
-    ///
-    /// - When `create` is false, the fields are merged onto whatever an earlier step
-    ///   already attached here, and a slot with no such object is left untouched.
+    /// Will never synthesize onto the result(s) of a [Select::Sql] call, only
+    /// on some non-sql backed parent object.
     Synthesize {
         fields: Vec<(&'src str, SelectArg<'src>)>,
-
-        /// Whether each parent object receives the object bare or as a singleton array.
         cardinality: MapCardinality,
-
-        /// Whether to build the object fresh (true) or merge onto an existing one (false).
-        create: bool,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub enum SqlArg<'src> {
-    /// A scalar runtime parameter that must be provided to execute the [Step].
-    Param(Cow<'src, str>),
-
-    /// Every value of the named field across the parents of the step's own
-    /// [Step::result] path
-    Spread(&'src str),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -161,9 +141,9 @@ pub struct JoinKeys<'src> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum SelectArg<'src> {
     /// A scalar runtime parameter that must be provided to execute the step.
-    Param(&'src str),
+    Param(Cow<'src, str>),
 
-    /// A field read from the parent object (the object at the parent path of
-    /// the step's result).
-    ParentField(&'src str),
+    /// A path to a value in the hydrated result produced by an earlier step
+    /// (same semantics as [SelectStep::result]).
+    Result(Vec<&'src str>),
 }

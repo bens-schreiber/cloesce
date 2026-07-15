@@ -352,6 +352,201 @@ async fn save_junction_table_composite_fk_pk() {
 }
 
 #[sqlx::test]
+async fn save_many_join_rows_nested_one_nav_hydrates() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Student for db {
+            primary { id: int }
+            many CourseStudent::studentId(id) { courses }
+        }
+
+        model CourseStudent for db {
+            primary {
+                foreign Student::id { studentId }
+                foreign Course::id { courseId }
+            }
+            one Course::id(courseId) { course }
+        }
+
+        model Course for db {
+            primary { id: int }
+            column { name: string }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (_, body) = save_ok(
+        &idl,
+        "Student",
+        json!({ "courses": { "course": {} } }),
+        json!({
+            "id": 2,
+            "courses": [ { "course": { "id": 500, "name": "Algebra" } } ]
+        }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!({
+            "id": 2,
+            "courses": [
+                {
+                    "studentId": 2,
+                    "courseId": 500,
+                    "course": { "id": 500, "name": "Algebra" },
+                }
+            ]
+        }),
+        "the nested `course` nav present in the payload must be hydrated at its path"
+    );
+}
+
+#[sqlx::test]
+async fn save_empty_many_nav_hydrates_as_empty_array() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Student for db {
+            primary { id: int }
+            many CourseStudent::studentId(id) { courses }
+        }
+
+        model CourseStudent for db {
+            primary {
+                foreign Student::id { studentId }
+                foreign Course::id { courseId }
+            }
+            one Course::id(courseId) { course }
+        }
+
+        model Course for db {
+            primary { id: int }
+            column { name: string }
+            many CourseStudent::courseId(id) { students }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (_, body) = save_ok(
+        &idl,
+        "Student",
+        json!({ "courses": { "course": { "students": {} } } }),
+        json!({
+            "id": 2,
+            "courses": [ { "course": { "id": 500, "name": "Algebra", "students": [] } } ]
+        }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!({
+            "id": 2,
+            "courses": [
+                {
+                    "studentId": 2,
+                    "courseId": 500,
+                    "course": { "id": 500, "name": "Algebra", "students": [] },
+                }
+            ]
+        }),
+        "a present-but-empty Many nav hydrates as `[]`, not a missing key"
+    );
+}
+
+#[sqlx::test]
+async fn save_deep_nested_navs_all_hydrate() {
+    // Arrangee
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Student for db {
+            primary { id: int }
+            many CourseStudent::studentId(id) { courses }
+        }
+
+        model CourseStudent for db {
+            primary {
+                foreign Student::id { studentId }
+                foreign Course::id { courseId }
+            }
+            one Course::id(courseId) { course }
+        }
+
+        model Course for db {
+            primary { id: int }
+            column { name: string }
+            many Lesson::courseId(id) { lessons }
+        }
+
+        model Lesson for db {
+            primary { id: int }
+            foreign Course::id { courseId }
+            column { title: string }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (_, body) = save_ok(
+        &idl,
+        "Student",
+        json!({ "courses": { "course": { "lessons": {} } } }),
+        json!({
+            "id": 2,
+            "courses": [ {
+                "course": {
+                    "id": 500,
+                    "name": "Algebra",
+                    "lessons": [ { "title": "Intro" }, { "title": "Deep" } ]
+                }
+            } ]
+        }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!({
+            "id": 2,
+            "courses": [
+                {
+                    "studentId": 2,
+                    "courseId": 500,
+                    "course": {
+                        "id": 500,
+                        "name": "Algebra",
+                        "lessons": [
+                            { "id": 1, "courseId": 500, "title": "Intro" },
+                            { "id": 2, "courseId": 500, "title": "Deep" },
+                        ]
+                    },
+                }
+            ]
+        }),
+        "every payload-present nav hydrates at its path, at any depth"
+    );
+}
+
+#[sqlx::test]
 async fn save_partial_update() {
     // Arrange
     let idl = src_to_idl(

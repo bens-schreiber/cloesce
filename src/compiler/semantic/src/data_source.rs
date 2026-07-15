@@ -253,6 +253,10 @@ pub mod analysis {
                     get,
                     save,
                     is_internal,
+                    get_plan: None,
+                    list_plan: None,
+                    get_explain: String::new(),
+                    list_explain: String::new(),
                 },
             ));
         }
@@ -317,6 +321,9 @@ pub mod expansion {
         ValidatedField, Validator, model_bindings,
     };
 
+    use orm::query::explain::explain_select;
+    use orm::query::select::planner::{SelectOperation, plan};
+
     use super::{HashSet, Model, include_dfs};
 
     #[derive(Default)]
@@ -324,6 +331,35 @@ pub mod expansion {
         get: Option<DataSourceGetMethod<'src>>,
         list: Option<DataSourceMethod<'src>>,
         save: Option<DataSourceMethod<'src>>,
+    }
+
+    /// Precompiled `get`/`list` [orm] select plans for a data source, and their
+    /// rendered `EXPLAIN`-style text.
+    ///
+    /// The plans borrow from the IDL, so they cannot be stored directly
+    /// (hence serialization to JSON); this also means the immutable borrow used to
+    /// build them must be dropped before the IDL can be mutated to store the results.
+    struct PrecompiledPlans {
+        get_plan: serde_json::Value,
+        list_plan: serde_json::Value,
+        get_explain: String,
+        list_explain: String,
+    }
+
+    fn precompile<'src>(
+        idl: &CloesceIdl<'src>,
+        model: &Model<'src>,
+        ds: &DataSource<'src>,
+    ) -> PrecompiledPlans {
+        let get = plan(SelectOperation::Get, model.name, idl, &ds.tree);
+        let list = plan(SelectOperation::List, model.name, idl, &ds.tree);
+
+        PrecompiledPlans {
+            get_explain: explain_select(SelectOperation::Get, model.name, &ds.tree, &get),
+            list_explain: explain_select(SelectOperation::List, model.name, &ds.tree, &list),
+            get_plan: serde_json::to_value(&get).expect("SelectPlan serializes"),
+            list_plan: serde_json::to_value(&list).expect("SelectPlan serializes"),
+        }
     }
 
     /// Adds a `Default` [DataSource] to every model that doesn't have one.
@@ -349,21 +385,30 @@ pub mod expansion {
                     get: DataSourceGetMethod::default(),
                     save: DataSourceMethod::default(),
                     is_internal: false,
+                    get_plan: None,
+                    list_plan: None,
+                    get_explain: String::new(),
+                    list_explain: String::new(),
                 },
             );
         }
 
-        let generated =
-            idl.models
-                .values()
-                .flat_map(|model| {
-                    model.data_sources.iter().map(|(ds_name, ds)| {
-                        (model.name, *ds_name, generate_source(idl, model, ds))
-                    })
+        let generated = idl
+            .models
+            .values()
+            .flat_map(|model| {
+                model.data_sources.iter().map(|(ds_name, ds)| {
+                    (
+                        model.name,
+                        *ds_name,
+                        generate_source(idl, model, ds),
+                        precompile(idl, model, ds),
+                    )
                 })
-                .collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
-        for (model_name, ds_name, generated) in generated {
+        for (model_name, ds_name, generated, plans) in generated {
             let Some(ds) = idl
                 .models
                 .get_mut(model_name)
@@ -382,6 +427,11 @@ pub mod expansion {
             if let Some(save) = generated.save.filter(|_| !ds.save.is_stub) {
                 ds.save = save;
             }
+
+            ds.get_plan = Some(plans.get_plan);
+            ds.list_plan = Some(plans.list_plan);
+            ds.get_explain = plans.get_explain;
+            ds.list_explain = plans.list_explain;
         }
     }
 

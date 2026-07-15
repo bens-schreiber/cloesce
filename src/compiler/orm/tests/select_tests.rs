@@ -1845,7 +1845,7 @@ async fn route_field_on_d1_root_merges_in_stage_zero() {
         1,
         "the route field is merged in stage zero"
     );
-    assert_eq!(plan.stages[0].steps.len(), 2);
+    assert_eq!(plan.stages[0].steps.len(), 1,);
 }
 
 #[sqlx::test]
@@ -1899,8 +1899,8 @@ async fn route_field_on_sql_nav_child() {
             { "id": 1, "childId": 10, "region": "us", "child": { "id": 10, "region": "us" } },
             { "id": 2, "childId": 20, "region": "eu", "child": { "id": 20, "region": "eu" } },
         ]),
-        "The fetched child keeps its `id` and gains `region`; the route Synthesize must \
-         merge, not replace"
+        "The fetched child keeps its `id` and gains `region`; the route field must \
+         ride onto the selected rows"
     );
     assert_eq!(
         plan.stages.len(),
@@ -1908,5 +1908,94 @@ async fn route_field_on_sql_nav_child() {
         "`child` relies on `Parent::childId` and `Parent::region` which are only known after the first stage"
     );
     assert_eq!(plan.stages[0].steps.len(), 1);
-    assert_eq!(plan.stages[1].steps.len(), 2, "Select and synthesize");
+    assert_eq!(plan.stages[1].steps.len(), 1);
+}
+
+#[sqlx::test]
+async fn kv_key_straddles_nav_inherited_and_local_fields() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        durable BoardDo {
+            shard { tenantId: int }
+        }
+
+        kv Cache {
+            entry(tenantId: int, itemId: int) -> json {
+                "e/{tenantId}/{itemId}"
+            }
+        }
+
+        model Org for db {
+            primary { id: int }
+            column { tenantId: int }
+            one Board::tenantId(tenantId) { board }
+        }
+
+        model Board for BoardDo(tenantId) {
+            primary { pid: int }
+            column { itemId: int }
+            kv Cache::entry(tenantId, itemId) { entry }
+        }
+        "#,
+    );
+
+    let mut storage = MockStorage::from_idl(
+        &idl,
+        &[("BoardDo", vec![vec![json!(100)], vec![json!(200)]])],
+    )
+    .await;
+    for (oid, tid, item, entry) in [(1, 100, 1, "a"), (2, 200, 2, "b")] {
+        seed(
+            &idl,
+            "Org",
+            json!({ "board": { "entry": {} } }),
+            json!({
+                "id": oid,
+                "tenantId": tid,
+                "board": { "pid": 1, "itemId": item, "entry": { "raw": entry, "metadata": null } }
+            }),
+            &mut storage,
+        )
+        .await;
+    }
+
+    // Act
+    let (plan, body) = execute_ok(
+        &idl,
+        SelectOperation::List,
+        "Org",
+        json!({ "board": { "entry": {} } }),
+        json!({ "lastSeen_id": 0, "limit": 10 }),
+        &storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!([
+            {
+                "id": 1, "tenantId": 100,
+                "board": { "pid": 1, "itemId": 1, "tenantId": 100, "entry": { "value": "a" } }
+            },
+            {
+                "id": 2, "tenantId": 200,
+                "board": { "pid": 1, "itemId": 2, "tenantId": 200, "entry": { "value": "b" } }
+            },
+        ]),
+        "`entry`'s key pairs each board's own `itemId` with the `tenantId` it inherited \
+         from its owning org, without a cross product between mismatched boards/orgs \
+         (only `e/100/1` and `e/200/2` are seeded; a cross product would request the \
+         unseeded `e/100/2` / `e/200/1` and panic)"
+    );
+    assert_eq!(
+        plan.stages.len(),
+        3,
+        "Org at stage 0; `board` at stage 1 (needs Org's tenantId); `entry` at stage 2 \
+         (needs Board's own itemId — its inherited tenantId is already known from stage 0, \
+         so straddling tables costs no extra staging)"
+    );
 }

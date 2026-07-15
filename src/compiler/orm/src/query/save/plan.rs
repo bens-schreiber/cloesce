@@ -10,6 +10,7 @@
 
 use serde::Serialize;
 
+use crate::query::select::plan::MapCardinality;
 use crate::query::{Database, TemplateSegment};
 
 /// The name of a "temporary table" used to capture the primary key of a just-inserted row for a later
@@ -80,7 +81,7 @@ pub enum SaveQuery<'src> {
     /// then attach the written value at [SaveStep::result].
     KeyWrite {
         database: Database<'src>,
-        key: Vec<TemplateSegment<'src, SaveArg<'src>>>,
+        segments: Vec<TemplateSegment<'src, SaveArg<'src>>>,
         value: &'src serde_json::Value,
 
         /// Workers-KV metadata,
@@ -102,6 +103,9 @@ pub enum SaveQuery<'src> {
     Synthesize {
         fields: Vec<(&'src str, SaveArg<'src>)>,
         create: bool,
+
+        /// Whether the created value attaches bare or shaped as an array
+        cardinality: MapCardinality,
     },
 }
 

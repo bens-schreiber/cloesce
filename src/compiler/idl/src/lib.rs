@@ -321,6 +321,11 @@ pub struct DataSource<'src> {
 
     /// True if the data source should not be exposed to the client
     pub is_internal: bool,
+
+    pub get_plan: Option<serde_json::Value>,
+    pub list_plan: Option<serde_json::Value>,
+    pub get_explain: String,
+    pub list_explain: String,
 }
 
 impl DataSource<'_> {

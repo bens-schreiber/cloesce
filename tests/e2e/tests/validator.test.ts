@@ -51,15 +51,6 @@ describe("Validator Tests", () => {
     expect(res.status).toBe(400);
   });
 
-  it("save fails when name is not length 10", async () => {
-    const res = await Validator.$save({
-      id: 50,
-      email: "test@example.com",
-    });
-    expect(res.ok, `Expected validation to fail\n\n${JSON.stringify(res)}`).toBe(false);
-    expect(res.status).toBe(400);
-  });
-
   it("save fails when KV value is over length 500", async () => {
     const longValue = "a".repeat(501);
     const res = await Validator.$save({

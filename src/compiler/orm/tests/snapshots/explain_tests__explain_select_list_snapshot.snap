@@ -15,11 +15,13 @@ STAGE 0
 STAGE 1
 ├─ SCAN `Board` ON durable `BoardDo` INTO `board` ONE
 │     JOIN `parent.tenantId` = `row.tenantId`
-│     SHARD `tenantId` = EACH `parent.tenantId`
-└─ READ durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = `parent.tenantId`
+│     SHARD `tenantId` = tenantId
+│     ATTACH `tenantId` = tenantId
+└─ READ durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = tenantId
 
 STAGE 2
-├─ READ r2 `Bucket` KEY "banners/{parent.pid}" INTO `board.banner`
+├─ READ r2 `Bucket` KEY "banners/{board.pid}" INTO `board.banner`
 └─ SEARCH `Entry` ON durable `BoardDo` INTO `board.entries` MANY
       JOIN `parent.tenantId` = `row.tenantId` AND `parent.pid` = `row.boardId`
-      SHARD `tenantId` = EACH `parent.tenantId`
+      SHARD `tenantId` = tenantId
+      ATTACH `tenantId` = tenantId

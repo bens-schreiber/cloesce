@@ -69,8 +69,8 @@ pub enum SemanticError<'src, 'p> {
         field_count: usize,
     },
 
-    /// A navigation or DO-KV reference to a Durable Object target is missing a shard
-    /// discriminator, so its DO id cannot be constructed.
+    /// A navigation is missing one of its target's route fields, or a DO-KV reference
+    /// is missing a shard discriminator.
     RelationMissingDiscriminator {
         field: &'p Symbol<'src>,
         missing: &'src str,
@@ -451,13 +451,13 @@ fn display(
             let (path, range) = span_parts(&field.span, file_table);
             report!(path.clone(), range.clone())
                 .with_message(format!(
-                    "relation '{}' is missing the shard discriminator '{missing}'",
+                    "relation '{}' is missing the discriminator '{missing}'",
                     field.name
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(format!(
-                            "the target's Durable Object shard field '{missing}' must be supplied to construct its id"
+                            "the target's '{missing}' must be supplied to construct its state"
                         ))
                         .with_color(Color::Red),
                 )

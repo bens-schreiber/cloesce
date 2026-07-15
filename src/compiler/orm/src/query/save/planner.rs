@@ -6,6 +6,7 @@ use frontend::fmt_cidl_type;
 use crate::query::save::plan::{
     PathSegment, SaveArg, SavePlan, SaveQuery, SaveStep, SqlStatement, TMP_TABLE,
 };
+use crate::query::select::plan::MapCardinality;
 use crate::query::{Database, DatabaseKind, TemplateSegment};
 use crate::validate::validate_cidl_type;
 use crate::{OrmErrorKind, Result, fail};
@@ -161,6 +162,7 @@ impl<'src> Planner<'src> {
                     SaveQuery::Synthesize {
                         fields,
                         create: true,
+                        cardinality: MapCardinality::One,
                     },
                 );
             }
@@ -407,6 +409,7 @@ impl<'src> Planner<'src> {
                 SaveQuery::Synthesize {
                     fields: ns_route_fields,
                     create: false,
+                    cardinality: MapCardinality::One,
                 },
             );
         }
@@ -452,6 +455,19 @@ impl<'src> Planner<'src> {
                     // A non-array payload for a Many nav is silently ignored.
                     continue;
                 };
+                if items.is_empty() {
+                    // A present-but-empty Many nav still hydrates, as `[]`.
+                    self.push_step(
+                        instance.stage,
+                        nav_path,
+                        SaveQuery::Synthesize {
+                            fields: vec![],
+                            create: true,
+                            cardinality: MapCardinality::Many,
+                        },
+                    );
+                    continue;
+                }
                 for (i, item) in items.iter().enumerate() {
                     let mut child_path = nav_path.clone();
                     child_path.push(PathSegment::Index(i));
@@ -507,7 +523,7 @@ impl<'src> Planner<'src> {
                         name: r2.binding,
                         kind: DatabaseKind::R2,
                     },
-                    key: segments,
+                    segments,
                     value,
                     metadata: None,
                     shard: vec![],
@@ -564,7 +580,7 @@ impl<'src> Planner<'src> {
                         name: kv.binding,
                         kind,
                     },
-                    key: segments,
+                    segments,
                     value,
                     metadata,
                     shard,
@@ -702,7 +718,17 @@ impl<'src> Planner<'src> {
 
         for batch in batches {
             let mut statements = batch.writes;
-            statements.extend(batch.hydrates);
+
+            // Read-backs attach by placing a whole row object at their result path, so a
+            // parent placed after a nested child would clobber that child. Post-order
+            // recursion queues children first; order the hydrates shallow-to-deep so every
+            // instance attaches before its descendants merge onto it.
+            let mut hydrates = batch.hydrates;
+            hydrates.sort_by_key(|s| match s {
+                SqlStatement::Hydrate { result, .. } => result.len(),
+                SqlStatement::Write { .. } => 0,
+            });
+            statements.extend(hydrates);
             if batch.uses_tmp {
                 // Every single batch must clear the tmp table s.t. it is
                 // empty for the next batch.

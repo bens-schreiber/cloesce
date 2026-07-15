@@ -639,7 +639,7 @@ fn d1_model_nullability_prevents_cycle() {
 
 #[test]
 fn kv_r2_errors() {
-    // Arrange: every KV/R2 reference error in one schema.
+    // Arrange
     let src = &with_env(
         r#"
         durable MyDurable {
@@ -694,7 +694,7 @@ fn kv_r2_errors() {
     // Act
     let (_, errors) = analyze(&parse);
 
-    // Assert: invalid bindings and stray args resolve to unresolved symbols.
+    // Assert
     let unresolved: Vec<&str> = errors
         .iter()
         .filter_map(|e| match e {
@@ -709,13 +709,11 @@ fn kv_r2_errors() {
         );
     }
 
-    // A Durable Object KV reference must supply every shard discriminator.
     let missing = expect_err!(errors,
         SemanticError::RelationMissingDiscriminator { field, missing } => (field.name, *missing)
     );
     assert_eq!(missing, ("missingShard", "doId"));
 
-    // A kv field must reference exactly one storage template: not zero, not several.
     let counts: Vec<(&str, usize)> = errors
         .iter()
         .filter_map(|e| match e {
@@ -725,6 +723,73 @@ fn kv_r2_errors() {
         .collect();
     assert!(counts.contains(&("noTemplate", 0)), "got: {counts:?}");
     assert!(counts.contains(&("twoTemplates", 2)), "got: {counts:?}");
+}
+
+#[test]
+fn nav_requires_every_target_route_field() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        durable SubRedditDo {
+            shard {
+                id: int
+            }
+        }
+
+        model Post for SubRedditDo(subId) {
+            primary { id: int }
+            column { title: string }
+
+            // `subId(subId)` supplies the shard route field: valid.
+            many Comment::{ postId(id), subId(subId) } { comments }
+
+            // No shard key at all.
+            many Comment::postId(id) { noShard }
+
+            // Both of the target's plain route fields supplied: valid.
+            one Ledger::{ region(title), owner(title) } { ledger }
+
+            // `owner` is not supplied.
+            one Ledger::region(title) { partialLedger }
+        }
+
+        model Comment for SubRedditDo(subId) {
+            primary { id: int }
+            foreign Post::id { postId }
+        }
+
+        model Ledger for my_d1 {
+            primary { lid: int }
+            route {
+                region: string
+                owner: string
+            }
+        }
+        "#,
+    );
+
+    let src = src.as_str();
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    let missing: Vec<(&str, &str)> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::RelationMissingDiscriminator { field, missing } => {
+                Some((field.name, *missing))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        missing,
+        vec![("noShard", "subId"), ("partialLedger", "owner"),],
+        "got errors: {errors:#?}"
+    );
+    assert_eq!(errors.len(), 2, "unexpected errors: {errors:#?}");
 }
 
 #[test]
@@ -2001,7 +2066,7 @@ fn proposal_relationship_matrix() {
             }
 
             // D1 -> Worker (1:1)
-            one Worker::routeId(primaryId) { worker }
+            one Worker::{ routeId(primaryId), tenantId(tenantId) } { worker }
 
             // D1 -> DO (1:1)
             one DoBacked::{ tenantId(tenantId), routeId(primaryId) } { doBacked }
@@ -2151,7 +2216,7 @@ fn proposal_relationship_matrix() {
         One,
         "Worker",
         None,
-        &[("primaryId", "routeId")],
+        &[("primaryId", "routeId"), ("tenantId", "tenantId")],
     );
     check(
         "D1Primary",

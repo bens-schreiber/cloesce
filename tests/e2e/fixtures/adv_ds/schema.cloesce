@@ -14,7 +14,7 @@ model Hamburger for db {
     }
 
     // Uses the HamburgerTopping join table to get the toppings for a hamburger
-    nav HamburgerTopping::hamburgerId {
+    many HamburgerTopping::hamburgerId(id) {
         toppings
     }
 }
@@ -35,7 +35,7 @@ model Topping for db {
     }
 
     // Uses the HamburgerTopping join table to get the hamburgers for a topping
-    nav HamburgerTopping::toppingId {
+    many HamburgerTopping::toppingId(id) {
         hamburgers
     }
 }
@@ -52,11 +52,11 @@ model HamburgerTopping for db {
         }
     }
 
-    nav Hamburger::id(hamburgerId) {
+    one Hamburger::id(hamburgerId) {
         hamburger
     }
 
-    nav Topping::id(toppingId) {
+    one Topping::id(toppingId) {
         topping
     }
 }
