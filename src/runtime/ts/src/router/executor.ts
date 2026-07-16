@@ -59,14 +59,22 @@ export type KeyValueWrapper = (
   metadata?: unknown,
 ) => unknown;
 
-/** Execute a select plan; the value is the hydrated body (object, array, or null). */
+/**
+ * Execute a select plan; the value is the hydrated body (object, array, or null).
+ *
+ * When `seed` is supplied its rows become the root table and every plan step whose
+ * result path the seed covers is skipped (see {@link select.Execution.plantSeeds}): the
+ * caller pre-sources part of the result and the executor hydrates only the rest. Seeds
+ * are consumed, their objects stamped and attached to in place rather than cloned.
+ */
 export async function executeSelect(
   plan: SelectPlan,
   params: Record<string, unknown>,
   storage: StorageResolver,
   wrap: KeyValueWrapper,
+  seed?: Record<string, unknown>[],
 ): Promise<CloesceResult<any>> {
-  return new select.Execution(params, storage, wrap).run(plan);
+  return new select.Execution(params, storage, wrap, seed).run(plan);
 }
 
 /** Execute a save plan; the value is the saved body as the database's truth. */
@@ -154,18 +162,32 @@ namespace select {
     /** Hydrated tables of completed steps, keyed by JSON-encoded result path. */
     private tables = new Map<string, Table>();
 
+    /** Result paths whose table a seed pre-supplied; their steps are not fetched. */
+    private seeded = new Set<string>();
+
     constructor(
       private params: Record<string, unknown>,
       private storage: StorageResolver,
       private wrap: KeyValueWrapper,
+      private seed?: Record<string, unknown>[],
     ) {}
 
     async run(plan: SelectPlan): Promise<CloesceResult<any>> {
       const errors: CloesceErrorKind[] = [];
+      if (this.seed) {
+        try {
+          this.plantSeeds(plan);
+        } catch (e) {
+          // A malformed seed (non-array Many field) aborts hydration; surface
+          // it as a collected error rather than an uncaught throw.
+          return sinkResult(null, [stepError(null, e)]);
+        }
+      }
       for (const stage of plan.stages) {
-        const settled = await Promise.allSettled(stage.steps.map((s) => this.fetch(s)));
+        const pending = stage.steps.filter((s) => !this.seeded.has(JSON.stringify(s.result)));
+        const settled = await Promise.allSettled(pending.map((s) => this.fetch(s)));
         settled.forEach((res, i) => {
-          const step = stage.steps[i];
+          const step = pending[i];
           try {
             if (res.status === "fulfilled") this.attach(step, res.value);
             else throw res.reason;
@@ -176,6 +198,109 @@ namespace select {
         });
       }
       return sinkResult(this.assemble(), errors);
+    }
+
+    /**
+     * Pre-populate tables from caller-supplied seed rows so {@link run} skips the
+     * steps they cover. The root rows are planted directly, then every step is walked
+     * in plan order:
+     *
+     * - A step is seeded when its parent path is already seeded and its field is
+     *   present (`!== undefined`) on at least one parent attachment.
+     * - Parents lacking the field contribute no attachments, so they degrade to
+     *   empty. Missing data is never an error.
+     * - Each seeded step also gets its derived (shard, route, synthesized) fields
+     *   stamped, mirroring a live fetch so unseeded descendants still route and join.
+     *
+     * Seeds are consumed in place: their objects are stamped and attached to, never cloned.
+     */
+    private plantSeeds(plan: SelectPlan): void {
+      this.tables.set(JSON.stringify([]), {
+        attachments: this.seed!.map((value) => ({ parent: 0, value })),
+        many: true,
+      });
+      this.seeded.add(JSON.stringify([]));
+
+      for (const stage of plan.stages) {
+        for (const step of stage.steps) {
+          const path = step.result;
+          const parentSeeded = this.seeded.has(JSON.stringify(path.slice(0, -1)));
+          const seededHere = this.seeded.has(JSON.stringify(path));
+          if (path.length === 0) {
+            this.stampDerived(step);
+          } else if (parentSeeded && !seededHere && this.seedChild(step)) {
+            this.stampDerived(step);
+          }
+        }
+      }
+    }
+
+    /**
+     * Build a child step's table from the field the seed supplied on its parent.
+     *
+     * - Returns `false` (leaving the step to be fetched) when the field is absent on
+     *   every parent.
+     * - `Many` fields flatten their array elements into attachments (`[]` seeds empty);
+     *   `One`/`Key` fields attach one non-null value. A `null`, or an absent parent,
+     *   contributes nothing.
+     */
+    private seedChild(step: SelectStep): boolean {
+      const path = step.result;
+      const field = path[path.length - 1];
+      const parent = this.table(path.slice(0, -1))!;
+      if (parent.attachments.every((a) => a.value[field] === undefined)) return false;
+
+      const q = step.query;
+      const many =
+        "Sql" in q
+          ? q.Sql.mapping.cardinality === "Many"
+          : "Synthesize" in q
+            ? q.Synthesize.cardinality === "Many"
+            : false;
+      const attachments: Attachment[] = [];
+      parent.attachments.forEach((a, idx) => {
+        const value = a.value[field];
+        if (value === undefined || value === null) return;
+        if (many) {
+          if (!Array.isArray(value)) {
+            throw new Error(
+              `seed at ${JSON.stringify(path)}: Many field "${field}" must be an array`,
+            );
+          }
+          for (const el of value) attachments.push({ parent: idx, value: el });
+        } else {
+          attachments.push({ parent: idx, value });
+        }
+      });
+      this.tables.set(JSON.stringify(path), { attachments, many });
+      this.seeded.add(JSON.stringify(path));
+      return true;
+    }
+
+    /**
+     * Fill a seeded step's derived fields where the seed left them undefined, so the
+     * seed matches what a live fetch would have produced. Covers an `Sql` step's shard
+     * and route fields and a `Synthesize` step's fields. `Param` args resolve from
+     * params, `Result` args off the parent attachment chain. Seed values always win.
+     */
+    private stampDerived(step: SelectStep): void {
+      const q = step.query;
+      const fields =
+        "Sql" in q
+          ? [...(q.Sql.shard ?? []), ...(q.Sql.route_fields ?? [])]
+          : "Synthesize" in q
+            ? q.Synthesize.fields
+            : [];
+      if (fields.length === 0) return;
+
+      const table = this.table(step.result)!;
+      table.attachments.forEach((att, idx) => {
+        for (const [field, raw] of fields) {
+          if (att.value[field] !== undefined) continue;
+          const value = this.resolveFrom(step.result, idx, arg(raw));
+          if (value !== undefined) att.value[field] = value;
+        }
+      });
     }
 
     private async fetch(step: SelectStep): Promise<Fetched> {
@@ -373,7 +498,12 @@ namespace select {
       const index = new Map<string, number[]>();
       parent.attachments.forEach((a, i) => {
         const k = joinKey(a.value, (j) => j.parent_key);
-        index.get(k)?.push(i) ?? index.set(k, [i]);
+        const bucket = index.get(k);
+        if (bucket) {
+          bucket.push(i);
+        } else {
+          index.set(k, [i]);
+        }
       });
 
       const routeFields = (q.route_fields ?? [])

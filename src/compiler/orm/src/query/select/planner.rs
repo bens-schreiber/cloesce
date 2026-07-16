@@ -352,6 +352,7 @@ fn select_navs<'src>(
 
     /// Emit a single SQL step for `nav` targeting SQLite-backed `target` at `stage`,
     /// attaching any route fields the target carries (shard fields included) onto its rows.
+    #[allow(clippy::too_many_arguments)]
     fn select_nav<'src>(
         nav: &'src NavigationField<'src>,
         target: &'src Model<'src>,

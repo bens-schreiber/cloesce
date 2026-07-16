@@ -89,8 +89,59 @@ export class Orm {
   }
 
   /**
+   * Hydrate caller-supplied partial rows (and their included relations) into full
+   * `{@link Model}` rows against the list plan.
+   *
+   * - The seeded rows, and any seeded sub-paths, replace their plan steps instead of
+   *   being re-fetched; the plan still sources every step the seed omits.
+   * - Each result is shaped from the assembled body, not the raw `rows`, so stamps
+   *   and later-stage children are coerced.
+   * - `params` carries any shard/route keys the skipped root step would have bound; a
+   *   plain D1 model needs none.
+   * - A precompiled `plan` (from `cidl.json`) skips the WASM planning call.
+   * - Seeds are consumed (stamped and attached to in place); do not reuse a `rows` array.
+   */
+  async hydrateAll<T extends object>(
+    meta: Model,
+    rows: DeepPartial<T>[],
+    includeTree: IncludeTree<T>,
+    plan?: SelectPlan,
+    params: Record<string, unknown> = {},
+  ): Promise<CloesceResult<T[]>> {
+    includeTree ??= {} as IncludeTree<T>;
+    return this.runSelect(
+      meta,
+      "list",
+      params,
+      includeTree,
+      plan,
+      (body) => {
+        const assembled = Array.isArray(body) ? body : [];
+        return assembled.map((row) => this.coerce(meta, row, includeTree) as T);
+      },
+      rows as Record<string, unknown>[],
+    );
+  }
+
+  /**
+   * Hydrate a single caller-supplied partial row. A thin wrapper over {@link hydrateAll}
+   * that returns the full `{@link Model}`, or `null` when the seed hydrates to nothing.
+   */
+  async hydrate<T extends object>(
+    meta: Model,
+    row: DeepPartial<T>,
+    includeTree: IncludeTree<T>,
+    plan?: SelectPlan,
+    params: Record<string, unknown> = {},
+  ): Promise<CloesceResult<T | null>> {
+    const res = await this.hydrateAll(meta, [row], includeTree, plan, params);
+    return { value: res.value?.[0] ?? null, errors: res.errors };
+  }
+
+  /**
    * Plan (unless precompiled) and execute a select, shaping the hydrated body — which
    * may be partial when the executor sunk step errors. Anything thrown here is generic.
+   * A `seed` pre-supplies the root (and optionally sub-paths), skipping those plan steps.
    */
   private async runSelect<R>(
     meta: Model,
@@ -99,6 +150,7 @@ export class Orm {
     includeTree: IncludeTree<any>,
     plan: SelectPlan | undefined,
     shape: (body: unknown) => R,
+    seed?: Record<string, unknown>[],
   ): Promise<CloesceResult<R>> {
     try {
       const selectPlan = plan ?? this.planSelect(meta, op, includeTree);
@@ -107,6 +159,7 @@ export class Orm {
         params,
         this.storageResolver(),
         this.keyWrapper(meta, includeTree),
+        seed,
       );
       return { value: shape(res.value), errors: res.errors };
     } catch (e) {

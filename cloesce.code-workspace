@@ -15,10 +15,6 @@
       "path": "tests/e2e",
     },
     {
-      "name": "regression",
-      "path": "tests/regression",
-    },
-    {
       "name": "examples",
       "path": "examples",
     },

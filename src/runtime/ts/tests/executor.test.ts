@@ -67,7 +67,7 @@ class MockKeyStore implements KeyStore {
 }
 
 /**
- * A fake {@link StorageResolver}. `sql`/`key` are resolved by a `(database, shard) -> store`
+ * A mock {@link StorageResolver}. `sql`/`key` are resolved by a `(database, shard) -> store`
  * lookup; every distinct `(name, shard)` gets its own recorded store so shard fan-out and
  * routing are observable.
  */
@@ -755,7 +755,7 @@ describe("executeSelect seek pagination", () => {
 });
 
 describe("executeSelect stage/step parallelism", () => {
-  /** A promise plus its resolve, so a test can control exactly when a fake call settles. */
+  /** A promise plus its resolve, so a test can control exactly when a mock call settles. */
   function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
     let resolve!: (v: T) => void;
     const promise = new Promise<T>((r) => (resolve = r));
@@ -943,6 +943,239 @@ describe("executeSelect error semantics", () => {
   });
 });
 
+describe("seeded select", () => {
+  test("root-only seed skips the root fetch, needing no seek params", async () => {
+    // A list plan whose root binds seek params; seeding the root must skip it entirely,
+    // so those params are never demanded and the root store is never queried.
+    const rootStore = new MockSqlStore(() => [{ id: 999 }]);
+    const resolver = new MockResolver(() => rootStore);
+    const plan = selectPlan([
+      sqlStep([], 'SELECT * FROM M WHERE "id" > ?1 ORDER BY "id" LIMIT ?2', {
+        args: [param("lastSeen_id"), param("limit")],
+        mapping: many,
+      }),
+    ]);
+
+    const body = await executeSelectOk(
+      plan,
+      {}, // no lastSeen_id / limit supplied
+      resolver,
+      passthroughWrap,
+      [
+        { id: 1, name: "a" },
+        { id: 2, name: "b" },
+      ],
+    );
+
+    expect(body).toEqual([
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+    ]);
+    expect(rootStore.queries).toEqual([]);
+  });
+
+  test("root+child seed with a grandchild fetched off the seeded child values", async () => {
+    // Root and its `children` are seeded; the grandchild `notes` is absent, so it is
+    // fetched, spreading the seeded children's ids into the IN (...) query.
+    const grandStore = new MockSqlStore(() => [
+      { id: 100, childId: 10 },
+      { id: 101, childId: 11 },
+    ]);
+    const rootStore = new MockSqlStore(() => {
+      throw new Error("root must not be fetched");
+    });
+    const childStore = new MockSqlStore(() => {
+      throw new Error("child must not be fetched");
+    });
+    const resolver = new MockResolver((database) => {
+      if (database.name === "root") return rootStore;
+      if (database.name === "children") return childStore;
+      return grandStore;
+    });
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" IN (?1)', {
+          db: d1("children"),
+          args: [spread("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "parentId" }]),
+        }),
+      ],
+      [
+        sqlStep(["children", "notes"], 'SELECT * FROM notes WHERE "childId" IN (?1)', {
+          db: d1("notes"),
+          args: [spread("children", "id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "childId" }]),
+        }),
+      ],
+    );
+
+    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
+      {
+        id: 1,
+        children: [
+          { id: 10, parentId: 1 },
+          { id: 11, parentId: 1 },
+        ],
+      },
+    ]);
+
+    expect(grandStore.queries).toEqual([
+      { sql: 'SELECT * FROM notes WHERE "childId" IN (?, ?)', bindings: [10, 11] },
+    ]);
+    expect(body).toEqual([
+      {
+        id: 1,
+        children: [
+          { id: 10, parentId: 1, notes: [{ id: 100, childId: 10 }] },
+          { id: 11, parentId: 1, notes: [{ id: 101, childId: 11 }] },
+        ],
+      },
+    ]);
+  });
+
+  test("a seeded [] child skips its step and every downstream step", async () => {
+    const childStore = new MockSqlStore(() => [{ id: 10, parentId: 1 }]);
+    const grandStore = new MockSqlStore(() => [{ id: 100, childId: 10 }]);
+    const resolver = new MockResolver((database) =>
+      database.name === "children" ? childStore : grandStore,
+    );
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" IN (?1)', {
+          db: d1("children"),
+          args: [spread("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "parentId" }]),
+        }),
+      ],
+      [
+        sqlStep(["children", "notes"], 'SELECT * FROM notes WHERE "childId" IN (?1)', {
+          db: d1("notes"),
+          args: [spread("children", "id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "childId" }]),
+        }),
+      ],
+    );
+
+    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
+      { id: 1, children: [] },
+    ]);
+
+    expect(childStore.queries).toEqual([]);
+    expect(grandStore.queries).toEqual([]);
+    expect(body).toEqual([{ id: 1, children: [] }]);
+  });
+
+  test("mixed presence of a seeded field degrades absent parents to empty", async () => {
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" IN (?1)', {
+          db: d1("children"),
+          args: [spread("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "parentId" }]),
+        }),
+      ],
+    );
+
+    const res = await executeSelect(plan, {}, new MockResolver(), passthroughWrap, [
+      { id: 1, children: [{ id: 10, parentId: 1 }] },
+      { id: 2 }, // children absent here
+    ]);
+
+    expect(res.errors).toEqual([]);
+    expect(res.value).toEqual([
+      { id: 1, children: [{ id: 10, parentId: 1 }] },
+      { id: 2, children: [] },
+    ]);
+  });
+
+  test("a One-cardinality null seed leaves the slot null and skips the fetch", async () => {
+    const ownerStore = new MockSqlStore(() => [{ id: 7, name: "owner" }]);
+    const resolver = new MockResolver((database) =>
+      database.name === "owners" ? ownerStore : new MockSqlStore(() => []),
+    );
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["owner"], 'SELECT * FROM owners WHERE "id" IN (?1)', {
+          db: d1("owners"),
+          args: [spread("ownerId")],
+          mapping: mapping("One", [{ parent_key: "ownerId", child_key: "id" }]),
+        }),
+      ],
+    );
+
+    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
+      { id: 1, ownerId: 7, owner: null },
+    ]);
+
+    expect(ownerStore.queries).toEqual([]);
+    expect(body).toEqual([{ id: 1, ownerId: 7, owner: null }]);
+  });
+
+  test("a DO-sharded root seed stamps Param shard fields, routing a same-stage child fetch", async () => {
+    // Root and its same-stage `notes` child share stage 0: the child's shard reads the root
+    // row's `tenant`, which the seed omits, so plantSeeds stamps it from the tenantId param
+    // and the child fetch routes to the right shard.
+    const resolver = new MockResolver((database, shard) => {
+      if (database.name === "notes") return new MockSqlStore(() => [{ note: `n-${shard[0]}` }]);
+      return new MockSqlStore(() => {
+        throw new Error("root must not be fetched");
+      });
+    });
+    const plan = selectPlan([
+      sqlStep([], "SELECT * FROM root", {
+        db: d1("root"),
+        mapping: many,
+        shard: [["tenant", param("tenantId")]],
+      }),
+      sqlStep(["notes"], "SELECT * FROM notes", {
+        db: doDb("notes"),
+        mapping: mapping("Many", [{ parent_key: "tenant", child_key: "tenant" }]),
+        shard: [["tenant", spread("tenant")]],
+      }),
+    ]);
+
+    const body = await executeSelectOk(plan, { tenantId: "A" }, resolver, passthroughWrap, [
+      { id: 1 },
+      { id: 2 },
+    ]);
+
+    expect(resolver.sqlStores.has('notes|["A"]')).toBe(true);
+    // Root rows carry the stamped shard field; the child routed to shard A and tagged rows.
+    expect(body).toEqual([
+      { id: 1, tenant: "A", notes: [{ note: "n-A", tenant: "A" }] },
+      { id: 2, tenant: "A", notes: [{ note: "n-A", tenant: "A" }] },
+    ]);
+  });
+
+  test("a missing join key on seeded rows yields empty children (documented footgun)", async () => {
+    // The child spreads `id`, but the seeded root row omits it, so the spread is empty and
+    // the child fetch short-circuits to no rows.
+    const childStore = new MockSqlStore(() => [{ id: 10, parentId: 1 }]);
+    const resolver = new MockResolver((database) =>
+      database.name === "children" ? childStore : new MockSqlStore(() => []),
+    );
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" IN (?1)', {
+          db: d1("children"),
+          args: [spread("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "parentId" }]),
+        }),
+      ],
+    );
+
+    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [{ name: "no-id" }]);
+
+    expect(childStore.queries).toEqual([]);
+    expect(body).toEqual([{ name: "no-id", children: [] }]);
+  });
+});
+
 function write(sql: string, args: SaveArg[] = []): SqlStatement {
   return {
     Write: { sql, arguments: args },
@@ -1037,7 +1270,7 @@ describe("executeSave SqlBatch", () => {
 
   test("$cloesce_tmp autoincrement capture: hydrate reads back the generated id", async () => {
     // The $cloesce_tmp mechanism lives entirely in the SQL strings; the executor just runs
-    // the batch in order. The fake store models a store that captured last_insert_rowid()=42
+    // the batch in order. The mock store models a store that captured last_insert_rowid()=42
     // in the tmp table and the hydrate select reads it back.
     let captured: number | null = null;
     const store = new MockSqlStore(undefined, (call) => {

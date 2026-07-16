@@ -785,14 +785,45 @@ export namespace GlobalSettings {
         }
 
         /**
-         * Hydrate a partial `GlobalSettings` into a full row from the backing Durable Object.
+         * Hydrate a single pre-supplied ("seeded") `GlobalSettings` row through the backing
+         * Durable Object, filling only the relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param ctx - The Durable Object context (e.g. `env.ctx`).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(ctx: GlobalDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv({ ctx: ctx }).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(ctx: GlobalDo, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `GlobalSettings` rows through the backing
+         * Durable Object. See {@link hydrate} for seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(ctx: GlobalDo, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -884,7 +915,7 @@ export namespace HasSqlColumnTypes {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"str\", \"integer\", \"dub\", \"boo\", \"dat\", \"strNull\", \"integerNull\", \"dubNull\", \"booNull\", \"dateNull\" FROM \"HasSqlColumnTypes\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
 
             /**
@@ -906,6 +937,57 @@ export namespace HasSqlColumnTypes {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `HasSqlColumnTypes` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `HasSqlColumnTypes` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -983,14 +1065,45 @@ export namespace HasSqlColumnTypes {
         }
 
         /**
-         * Hydrate a partial `HasSqlColumnTypes` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `HasSqlColumnTypes` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `HasSqlColumnTypes` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -1153,14 +1266,47 @@ export namespace Leaderboard {
         }
 
         /**
-         * Hydrate a partial `Leaderboard` into a full row from the backing Durable Object.
+         * Hydrate a single pre-supplied ("seeded") `Leaderboard` row through the backing
+         * Durable Object, filling only the relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param ctx - The Durable Object context (e.g. `env.ctx`).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
+         * @param tenantId - Route/shard key used to route unseeded child fetches.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv({ ctx: ctx }).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(ctx: LeaderboardDo, row: DeepPartial<Self>, tenantId: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, row, include, undefined, { tenantId });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `Leaderboard` rows through the backing
+         * Durable Object. See {@link hydrate} for seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param tenantId - Route/shard key used to route unseeded child fetches.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(ctx: LeaderboardDo, rows: DeepPartial<Self>[], tenantId: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrateAll<Self>(Meta, rows, include, undefined, { tenantId });
         }
     }
 }
@@ -1251,7 +1397,7 @@ export namespace LeaderboardEntry {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"DurableObject","name":"LeaderboardDo"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[["tenantId",{"Param":"tenantId"}]],"shard":[["tenantId",{"Param":"tenantId"}]],"sql":"SELECT \"id\", \"playerName\", \"score\" FROM \"LeaderboardEntry\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"result":["topEntries"]}]}]} as SelectPlan,
 
             /**
@@ -1278,6 +1424,57 @@ export namespace LeaderboardEntry {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `LeaderboardEntry` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { ctx: LeaderboardDo }, rows: DeepPartial<Self>[], tenantId: number): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, { tenantId });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `LeaderboardEntry` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { ctx: LeaderboardDo }, row: DeepPartial<Self>, tenantId: number): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, { tenantId });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -1356,14 +1553,47 @@ export namespace LeaderboardEntry {
         }
 
         /**
-         * Hydrate a partial `LeaderboardEntry` into a full row from the backing Durable Object.
+         * Hydrate a single pre-supplied ("seeded") `LeaderboardEntry` row through the backing
+         * Durable Object, filling only the relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param ctx - The Durable Object context (e.g. `env.ctx`).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
+         * @param tenantId - Route/shard key used to route unseeded child fetches.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(ctx: LeaderboardDo, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv({ ctx: ctx }).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(ctx: LeaderboardDo, row: DeepPartial<Self>, tenantId: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrate<Self>(Meta, row, include, undefined, { tenantId });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `LeaderboardEntry` rows through the backing
+         * Durable Object. See {@link hydrate} for seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param ctx - The Durable Object context (e.g. `env.ctx`).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param tenantId - Route/shard key used to route unseeded child fetches.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(ctx: LeaderboardDo, rows: DeepPartial<Self>[], tenantId: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv({ ctx: ctx }).hydrateAll<Self>(Meta, rows, include, undefined, { tenantId });
         }
     }
 }
@@ -1454,7 +1684,7 @@ export namespace ModelWithCompositePk {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_tenantId"},{"Param":"lastSeen_rowId"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"tenantId\", \"rowId\", \"name\" FROM \"ModelWithCompositePk\" WHERE (\"tenantId\", \"rowId\") > (?1, ?2) ORDER BY \"tenantId\" ASC, \"rowId\" ASC LIMIT ?3"}},"result":[]}]}]} as SelectPlan,
 
             /**
@@ -1476,6 +1706,57 @@ export namespace ModelWithCompositePk {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithCompositePk` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithCompositePk` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -1553,14 +1834,45 @@ export namespace ModelWithCompositePk {
         }
 
         /**
-         * Hydrate a partial `ModelWithCompositePk` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ModelWithCompositePk` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ModelWithCompositePk` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -1664,7 +1976,7 @@ export namespace ModelWithKv {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id1"},{"Param":"lastSeen_id2"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id1\", \"id2\" FROM \"ModelWithKv\" WHERE (\"id1\", \"id2\") > (?1, ?2) ORDER BY \"id1\" ASC, \"id2\" ASC LIMIT ?3"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["id1"]}},{"Literal":"/"},{"Value":{"Result":["id2"]}}],"shard":[]}},"result":["someValue"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"stream/"},{"Value":{"Result":["id1"]}},{"Literal":"/"},{"Value":{"Result":["id2"]}}],"shard":[]}},"result":["streamValue"]}]}]} as SelectPlan,
 
             /**
@@ -1693,6 +2005,57 @@ export namespace ModelWithKv {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithKv` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyKv: Env.MyKv, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithKv` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyKv: Env.MyKv, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -1770,14 +2133,45 @@ export namespace ModelWithKv {
         }
 
         /**
-         * Hydrate a partial `ModelWithKv` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ModelWithKv` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: Env.MyKv, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { MyKv: Env.MyKv, db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ModelWithKv` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { MyKv: Env.MyKv, db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -1867,7 +2261,7 @@ export namespace ModelWithR2 {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"ModelWithR2\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"files/"},{"Value":{"Result":["id"]}}],"shard":[]}},"result":["fileData"]}]}]} as SelectPlan,
 
             /**
@@ -1894,6 +2288,57 @@ export namespace ModelWithR2 {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithR2` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithR2` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -1971,14 +2416,45 @@ export namespace ModelWithR2 {
         }
 
         /**
-         * Hydrate a partial `ModelWithR2` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ModelWithR2` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ModelWithR2` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -2065,7 +2541,7 @@ export namespace OneToManyModel {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["id"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyNav"]}]}]} as SelectPlan,
 
             /**
@@ -2093,6 +2569,57 @@ export namespace OneToManyModel {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `OneToManyModel` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `OneToManyModel` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -2170,14 +2697,45 @@ export namespace OneToManyModel {
         }
 
         /**
-         * Hydrate a partial `OneToManyModel` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `OneToManyModel` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `OneToManyModel` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -2333,13 +2891,45 @@ export namespace RouteCar {
         }
 
         /**
-         * Hydrate a partial `RouteCar` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `RouteCar` row, filling only the
+         * relations not already present on `row`.
          *
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param row - Partial row, authoritative as given.
+         * @param ownerId - Route/shard key used to route unseeded child fetches.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv({}).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(row: DeepPartial<Self>, ownerId: string, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv({}).hydrate<Self>(Meta, row, include, undefined, { ownerId });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `RouteCar` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param ownerId - Route/shard key used to route unseeded child fetches.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(rows: DeepPartial<Self>[], ownerId: string, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv({}).hydrateAll<Self>(Meta, rows, include, undefined, { ownerId });
         }
     }
 }
@@ -2511,14 +3101,49 @@ export namespace RouteOwner {
         }
 
         /**
-         * Hydrate a partial `RouteOwner` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `RouteOwner` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
+         * @param ownerId - Route/shard key used to route unseeded child fetches.
+         * @param modelYear - Route/shard key used to route unseeded child fetches.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: Env.MyKv }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { MyKv: Env.MyKv }, row: DeepPartial<Self>, ownerId: string, modelYear: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, { ownerId, modelYear });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `RouteOwner` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param ownerId - Route/shard key used to route unseeded child fetches.
+         * @param modelYear - Route/shard key used to route unseeded child fetches.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { MyKv: Env.MyKv }, rows: DeepPartial<Self>[], ownerId: string, modelYear: number, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, { ownerId, modelYear });
         }
     }
 }
@@ -2615,7 +3240,7 @@ export namespace ToyotaPrius {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
 
             /**
@@ -2644,6 +3269,57 @@ export namespace ToyotaPrius {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ToyotaPrius` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ToyotaPrius` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -2701,7 +3377,7 @@ export namespace ToyotaPrius {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
 
             /**
@@ -2728,6 +3404,57 @@ export namespace ToyotaPrius {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ToyotaPrius` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ToyotaPrius` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -2785,7 +3512,7 @@ export namespace ToyotaPrius {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]}]}]} as SelectPlan,
 
             /**
@@ -2812,6 +3539,57 @@ export namespace ToyotaPrius {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ToyotaPrius` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ToyotaPrius` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -2889,14 +3667,45 @@ export namespace ToyotaPrius {
         }
 
         /**
-         * Hydrate a partial `ToyotaPrius` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ToyotaPrius` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ToyotaPrius` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { MyKv: Env.MyKv, MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -2979,7 +3788,7 @@ export namespace BasicModel {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
 
             /**
@@ -3001,6 +3810,57 @@ export namespace BasicModel {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `BasicModel` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `BasicModel` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -3078,14 +3938,45 @@ export namespace BasicModel {
         }
 
         /**
-         * Hydrate a partial `BasicModel` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `BasicModel` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `BasicModel` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -3149,7 +4040,7 @@ export namespace ModelWithCustomDs {
             /** The include tree this data source hydrates. */
             tree: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Result":["id"]}},{"Literal":"/data"}],"shard":[]}},"result":["data"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel","oneToManyNav"]}]}]} as SelectPlan,
 
             /**
@@ -3182,6 +4073,57 @@ export namespace ModelWithCustomDs {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithCustomDs` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithCustomDs` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -3245,7 +4187,7 @@ export namespace ModelWithCustomDs {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Result":["id"]}},{"Literal":"/data"}],"shard":[]}},"result":["data"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel","oneToManyNav"]}]}]} as SelectPlan,
 
             /**
@@ -3278,6 +4220,57 @@ export namespace ModelWithCustomDs {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithCustomDs` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithCustomDs` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -3388,14 +4381,45 @@ export namespace ModelWithCustomDs {
         }
 
         /**
-         * Hydrate a partial `ModelWithCustomDs` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ModelWithCustomDs` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { MyR2: Env.MyR2, db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ModelWithCustomDs` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { MyR2: Env.MyR2, db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -3485,7 +4509,7 @@ export namespace HasOneToOne {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"basicModelId\" FROM \"HasOneToOne\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["basicModelId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"basicModelId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToOneNav"]}]}]} as SelectPlan,
 
             /**
@@ -3513,6 +4537,57 @@ export namespace HasOneToOne {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `HasOneToOne` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `HasOneToOne` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -3590,14 +4665,45 @@ export namespace HasOneToOne {
         }
 
         /**
-         * Hydrate a partial `HasOneToOne` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `HasOneToOne` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `HasOneToOne` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
@@ -3655,6 +4761,60 @@ export namespace ModelWithCruds {
             /** The include tree this data source hydrates. */
             tree: {},
 
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithCruds` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithCruds` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
+            },
+
             /**
              * Insert or update a `ModelWithCruds` and its included relations.
              *
@@ -3705,7 +4865,7 @@ export namespace ModelWithCruds {
                 return HttpResult.ok(200, res.value);
             },
 
-            /** @internal Precompiled select plan backing {@link list}. */
+            /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
             listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
 
             /**
@@ -3727,6 +4887,57 @@ export namespace ModelWithCruds {
                     return HttpResult.fail(400, CloesceError.displayErrors(res));
                 }
                 return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate pre-supplied ("seeded") `ModelWithCruds` rows against {@link listPlan}.
+             *
+             * The seeded `rows` become the complete root set, so the root fetch is skipped and
+             * no seek/filter params are needed. Any relation present on a seeded row (including
+             * `[]`) is authoritative and its fetch step is skipped for every parent; unseeded
+             * relations are fetched off the plan.
+             *
+             * @remarks
+             * - **Seeds are consumed.** Rows are mutated in place (shard/route fields stamped,
+             *   children attached). Do not reuse a seed array after hydrating.
+             * - **Join keys are required.** Seeded rows must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit on some rows
+             *   still counts as seeded if any row kept it; those rows degrade to empty, not an error.
+             *
+             * @returns An {@link HttpResult} with the hydrated rows, or 400 on validation errors.
+             */
+            async hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[]): Promise<HttpResult<Self[]>> {
+                const res = await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                return HttpResult.ok(200, res.value!);
+            },
+
+            /**
+             * Hydrate a single pre-supplied ("seeded") `ModelWithCruds` row against {@link listPlan}.
+             *
+             * As {@link hydrateAll}, but for one row. Returns 404 when the hydrated row is `null`.
+             *
+             * @remarks
+             * - **Seed is consumed.** The row is mutated in place. Do not reuse it after hydrating.
+             * - **Join keys are required.** The seeded row must carry the join keys for any unseeded
+             *   child path, or those children silently come back empty.
+             * - **JSON transport drops `undefined`.** A relation dropped in transit degrades to
+             *   empty rather than being refetched.
+             *
+             * @returns An {@link HttpResult} with the hydrated row, 404 if null, or 400 on validation errors.
+             */
+            async hydrate(env: { db: Env.db }, row: DeepPartial<Self>): Promise<HttpResult<Self>> {
+                const res = await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, this.tree, this.listPlan, {  });
+                if (res.errors.length > 0) {
+                    return HttpResult.fail(400, CloesceError.displayErrors(res));
+                }
+                if (res.value === null) {
+                    return HttpResult.fail(404);
+                }
+                return HttpResult.ok(200, res.value);
             },
 
             /**
@@ -3838,14 +5049,45 @@ export namespace ModelWithCruds {
         }
 
         /**
-         * Hydrate a partial `ModelWithCruds` into a full row, loading the included relations.
+         * Hydrate a single pre-supplied ("seeded") `ModelWithCruds` row, filling only the
+         * relations not already present on `row`.
+         *
+         * The seeded `row` is the complete root, so the root fetch is skipped. Any relation
+         * present on it (including `[]`) is authoritative and its fetch is skipped; unseeded
+         * relations load off the include tree.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse the row after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
          *
          * @param env - Environment with the required binding(s).
-         * @param base - Partial row with at least the primary/route key fields populated.
+         * @param row - Partial row, authoritative as given.
          * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
          */
-        export async function hydrate(env: { db: Env.db }, base: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
-            return await CloesceOrm.fromEnv(env).get<Self>(Meta, base as Record<string, unknown>, include);
+        export async function hydrate(env: { db: Env.db }, row: DeepPartial<Self>, include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self | null>> {
+            return await CloesceOrm.fromEnv(env).hydrate<Self>(Meta, row, include, undefined, {  });
+        }
+
+        /**
+         * Hydrate many pre-supplied ("seeded") `ModelWithCruds` rows. See {@link hydrate} for
+         * seeding semantics.
+         *
+         * @remarks
+         * - Seeds are consumed (mutated in place); do not reuse a rows array after hydrating.
+         * - Seeded rows must carry the join keys for any unseeded child path, or those
+         *   children come back empty.
+         * - JSON transport drops `undefined`, so a relation dropped in transit degrades to
+         *   empty rather than being refetched.
+         *
+         * @param env - Environment with the required binding(s).
+         * @param rows - Partial rows, authoritative as given. These become the complete root set.
+         * @param include - Include tree controlling which relations to load. Defaults to `Default.tree`.
+         */
+        export async function hydrateAll(env: { db: Env.db }, rows: DeepPartial<Self>[], include: IncludeTree<Self> = GeneratedSource.Default.tree): Promise<CloesceResult<Self[]>> {
+            return await CloesceOrm.fromEnv(env).hydrateAll<Self>(Meta, rows, include, undefined, {  });
         }
     }
 }
