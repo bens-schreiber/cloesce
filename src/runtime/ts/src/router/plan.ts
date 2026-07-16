@@ -36,7 +36,7 @@ export interface SelectStep {
   result: string[];
 }
 
-export type SelectArg = { Param: string } | { ParentField: string };
+export type SelectArg = { Param: string } | { Result: string[] };
 
 export interface JoinKeys {
   parent_key: string;
@@ -56,6 +56,7 @@ export type Select =
         arguments: SelectArg[];
         mapping: Mapping;
         shard: [string, SelectArg][];
+        route_fields?: [string, SelectArg][];
       };
     }
   | {

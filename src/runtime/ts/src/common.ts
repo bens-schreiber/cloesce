@@ -56,11 +56,11 @@ export class Either<L, R> {
 export type CloesceErrorKind =
   | { kind: "cloesce"; message: string }
   | { kind: "d1"; result: D1Result }
+  | { kind: "kv"; error: unknown }
+  | { kind: "r2"; error: unknown }
   | { kind: "generic"; error: unknown };
 
-export type CloesceResult<T> =
-  | { value: null; errors: CloesceErrorKind[] }
-  | { value: T; errors: [] };
+export type CloesceResult<T> = { value: T | null; errors: CloesceErrorKind[] };
 
 /**
  * A class to raise a user-facing `CloesceResult`.
@@ -99,6 +99,14 @@ export class CloesceError {
     return { value: null, errors: [{ kind: "d1", result }] };
   }
 
+  static kv(error: unknown): CloesceResult<never> {
+    return { value: null, errors: [{ kind: "kv", error }] };
+  }
+
+  static r2(error: unknown): CloesceResult<never> {
+    return { value: null, errors: [{ kind: "r2", error }] };
+  }
+
   static displayErrors(result: CloesceResult<unknown>): string {
     function display(v: unknown): string {
       if (v instanceof Error) {
@@ -118,6 +126,10 @@ export class CloesceError {
             return e.message;
           case "d1":
             return `A D1 error occurred: ${display(e.result)}`;
+          case "kv":
+            return `A KV error occurred: ${display(e.error)}`;
+          case "r2":
+            return `An R2 error occurred: ${display(e.error)}`;
           case "generic":
             return `An error occurred: ${display(e.error)}`;
         }

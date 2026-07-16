@@ -64,17 +64,9 @@ export class Orm {
     plan?: SelectPlan,
   ): Promise<CloesceResult<T | null>> {
     includeTree ??= {} as IncludeTree<T>;
-    return CloesceError.catchGeneric(async () => {
-      const selectPlan = plan ?? this.planSelect(meta, "get", includeTree);
-      const storage = this.storageResolver();
-      const body = await executeSelect(
-        selectPlan,
-        params,
-        storage,
-        this.keyWrapper(meta, includeTree),
-      );
+    return this.runSelect(meta, "get", params, includeTree, plan, (body) => {
       return this.coerce(meta, body, includeTree) as T | null;
-    }).then((res) => res);
+    });
   }
 
   /**
@@ -90,18 +82,36 @@ export class Orm {
     plan?: SelectPlan,
   ): Promise<CloesceResult<T[]>> {
     includeTree ??= {} as IncludeTree<T>;
-    return CloesceError.catchGeneric(async () => {
-      const selectPlan = plan ?? this.planSelect(meta, "list", includeTree);
-      const storage = this.storageResolver();
-      const body = await executeSelect(
-        selectPlan,
-        params,
-        storage,
-        this.keyWrapper(meta, includeTree),
-      );
+    return this.runSelect(meta, "list", params, includeTree, plan, (body) => {
       const rows = Array.isArray(body) ? body : [];
       return rows.map((row) => this.coerce(meta, row, includeTree) as T);
-    }).then((res) => res);
+    });
+  }
+
+  /**
+   * Plan (unless precompiled) and execute a select, shaping the hydrated body — which
+   * may be partial when the executor sunk step errors. Anything thrown here is generic.
+   */
+  private async runSelect<R>(
+    meta: Model,
+    op: "get" | "list",
+    params: Record<string, unknown>,
+    includeTree: IncludeTree<any>,
+    plan: SelectPlan | undefined,
+    shape: (body: unknown) => R,
+  ): Promise<CloesceResult<R>> {
+    try {
+      const selectPlan = plan ?? this.planSelect(meta, op, includeTree);
+      const res = await executeSelect(
+        selectPlan,
+        params,
+        this.storageResolver(),
+        this.keyWrapper(meta, includeTree),
+      );
+      return { value: shape(res.value), errors: res.errors };
+    } catch (e) {
+      return CloesceError.generic(e);
+    }
   }
 
   /**
@@ -118,15 +128,19 @@ export class Orm {
     if (planRes.isLeft()) {
       return CloesceError.cloesce(planRes.value);
     }
-    return CloesceError.catchGeneric(async () => {
-      const storage = this.storageResolver();
-      const body = await executeSave(planRes.unwrap(), storage);
-      if (body === null || body === undefined) return null;
-      return this.coerce(meta, body, includeTree) as T;
-    }).then((res) => res);
+    try {
+      const res = await executeSave(planRes.unwrap(), this.storageResolver());
+      const body = res.value;
+      return {
+        value:
+          body === null || body === undefined ? null : (this.coerce(meta, body, includeTree) as T),
+        errors: res.errors,
+      };
+    } catch (e) {
+      return CloesceError.generic(e);
+    }
   }
 
-  // --- Plan generation (WASM) ---
   private planSelect(meta: Model, op: string, includeTree: IncludeTree<any>): SelectPlan {
     const { wasm } = RuntimeContainer.get();
     const res = invokeOrmWasm(
@@ -166,7 +180,6 @@ export class Orm {
     return res.map((json) => JSON.parse(json) as SavePlan);
   }
 
-  // --- Storage wiring ---
   private storageResolver(): StorageResolver {
     const env = this.env;
     const durable = this.durable;
@@ -206,7 +219,6 @@ export class Orm {
     };
   }
 
-  // --- Post-plan scalar coercion ---
   /**
    * Coerce a plan-produced body's scalar fields into their JS runtime types (Date, Uint8Array,
    * boolean) recursively.
@@ -223,9 +235,6 @@ export class Orm {
   }
 }
 
-// ----------------------------------------------------------------------------
-// SQL stores
-// ----------------------------------------------------------------------------
 class D1SqlStore implements SqlStore {
   constructor(private db: D1Database) {
     if (!db) {
@@ -322,9 +331,6 @@ export function durableSqlBatch(
   return storage.transactionSync ? storage.transactionSync(runAll) : runAll();
 }
 
-// ----------------------------------------------------------------------------
-// Key stores
-// ----------------------------------------------------------------------------
 class WorkerKvStore implements KeyStore {
   private namespace: KVNamespace;
 
@@ -401,9 +407,6 @@ class RemoteDurableKeyStore implements KeyStore {
   }
 }
 
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
 /** Resolve the stub for a DO shard from the raw shard values, mirroring the router's naming. */
 function durableStub(env: any, binding: string, shard: unknown[]): any {
   const namespace = env[binding];
