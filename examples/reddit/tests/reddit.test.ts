@@ -1,86 +1,132 @@
 import { describe, expect, it } from "vitest";
-import { upgradeEnv } from "../.cloesce/backend.js";
-import { Comment, Post, SubReddit, User } from "../src/api/main.js";
-import { env, inSub, inUser } from "./setup.js";
+
+import { inPost, inUser, onWorker } from "./setup.js";
+import { SubReddit } from "../src/api/sub.js";
+import { Post, Comment } from "../src/api/post.js";
+import { User } from "../src/api/user.js";
+
+function newSub(as: string, title = "r/dogs", description = "woof") {
+  return onWorker(as, (e) => SubReddit.create(e, title, description), ["SubRedditDb", "UserDo"]);
+}
+
+function newPost(as: string, subId: number, title: string, content: string) {
+  return onWorker(as, (e) => Post.create(e, subId, title, content), ["SubRedditDb", "PostDo", "UserDo"]);
+}
+
+function newComment(as: string, doId: number, content: string) {
+  return inPost(doId, as, (e) => Comment.create(e, doId, content), ["PostDo", "UserDo"]);
+}
+
+function feedOf(as: string, sub: any) {
+  return onWorker(as, (e) => SubReddit.feed(sub, e), ["SubRedditDb", "PostDo"]);
+}
 
 describe("Auth", () => {
-  it("login claims a username and returns a token + profile", async () => {
-    const res = await inUser("alice", null, (e) => User.login(e, "alice"));
+  it("login claims a username and returns a token + user", async () => {
+    const res = await inUser("alice", null, (e) => User.login(e, "alice"), ["Sessions"]);
     expect(res.token).toBeTypeOf("string");
-    expect(res.user.username).toBe("alice");
+    expect(res.user.name).toBe("alice");
   });
 
   it("posting while anonymous is 401", async () => {
-    const res = await inSub("s1", null, (e) => Post.create(e, "s1", "anon", "nope"));
+    const sub = await newSub("alice");
+    const res = await newPost(null as any, sub.id, "anon", "nope");
     expect(res.status).toBe(401);
   });
 });
 
 describe("Subreddits", () => {
-  it("a logged-in user can create one (server assigns its id)", async () => {
-    const sub = await inSub("ignored", "alice", (e) =>
-      SubReddit.create(e, { name: "r/dogs", description: "woof" }),
-    );
-    expect(sub.subId).toBeTypeOf("string");
-    expect(sub.metadata.name).toBe("r/dogs");
+  it("a logged-in user can create one (D1 assigns its id)", async () => {
+    const sub = await newSub("alice");
+    expect(sub.id).toBeTypeOf("number");
+    expect(sub.title).toBe("r/dogs");
+    expect(sub.lastPostId).toBe(0);
   });
 
-  it("created subreddits appear in the global directory", async () => {
-    const sub = await inSub("ignored", "alice", (e) =>
-      SubReddit.create(e, { name: "r/listed", description: "" }),
-    );
-    const dir = await SubReddit.list({ SubReddits: upgradeEnv(env).SubReddits });
-    expect(dir.map((s: any) => s.subId)).toContain(sub.subId);
-    expect(dir.find((s: any) => s.subId === sub.subId)!.name).toBe("r/listed");
+  it("created subreddits appear in the global listing", async () => {
+    const sub = await newSub("alice", "r/listed", "");
+    const dir = await onWorker("alice", (e) => SubReddit.Default.list(e, 0, 100), ["SubRedditDb"]);
+    expect(dir.data!.map((s: any) => s.id)).toContain(sub.id);
   });
 });
 
 describe("Posts, comments, and the feed", () => {
   it("create a post, comment on it, then read it back with its comments", async () => {
-    const post = await inSub("r1", "alice", (e) => Post.create(e, "r1", "Cats", "Discuss."));
-    expect(post.author).toBe("alice");
-    expect(post.upvotes).toBe(0);
+    const sub = await newSub("alice");
+    const post = await newPost("alice", sub.id, "Cats", "Discuss.");
+    expect(post.meta.authorName).toBe("alice");
+    expect(post.meta.upvotes).toBe(0);
 
-    await inSub("r1", "alice", (e) => Comment.create(e, "r1", post.id, "agreed!"));
+    await newComment("alice", post.doId, "agreed!");
 
-    const view = (await inSub("r1", "alice", (e) => Post.Default.get(e, "r1", post.id))).data!;
+    const view = (await inPost(post.doId, "alice", (e) => Post.Default.get(e, post.doId))).data!;
+    expect(view.meta.title).toBe("Cats");
     expect(view.comments.map((c: any) => c.content)).toContain("agreed!");
   });
 
-  it("the feed lists a subreddit's posts, isolated per shard", async () => {
-    await inSub("r1", "alice", (e) => Post.create(e, "r1", "in r1", "body"));
-    const feed1 = await inSub("r1", "alice", (e) => SubReddit.feed(null as any, e, "r1"));
-    const feed2 = await inSub("r2", "alice", (e) => SubReddit.feed(null as any, e, "r2"));
-    expect(feed1.length).toBeGreaterThanOrEqual(1);
-    expect(feed2.length).toBe(0);
+  it("each post gets its own DO, so comments do not leak between posts", async () => {
+    const sub = await newSub("alice");
+    const a = await newPost("alice", sub.id, "A", "a");
+    const b = await newPost("alice", sub.id, "B", "b");
+    expect(a.doId).not.toBe(b.doId);
+
+    await newComment("alice", a.doId, "only on A");
+
+    const viewB = (await inPost(b.doId, "alice", (e) => Post.Default.get(e, b.doId))).data!;
+    expect(viewB.comments).toEqual([]);
+  });
+
+  it("the feed hydrates each post out of its own DO, isolated per sub", async () => {
+    const sub = await newSub("alice");
+    const other = await newSub("alice", "r/empty", "");
+    const post = await newPost("alice", sub.id, "in sub", "body");
+    await newComment("alice", post.doId, "nice");
+
+    const withPosts = (
+      await onWorker("alice", (e) => SubReddit.Default.get(e, sub.id), ["SubRedditDb"])
+    ).data!;
+    const feed = await feedOf("alice", withPosts);
+
+    expect(feed.map((p: any) => p.doId)).toEqual([post.doId]);
+    expect(feed[0].meta.title).toBe("in sub");
+    expect(feed[0].comments.map((c: any) => c.content)).toEqual(["nice"]);
+
+    const emptySub = (
+      await onWorker("alice", (e) => SubReddit.Default.get(e, other.id), ["SubRedditDb"])
+    ).data!;
+    expect(await feedOf("alice", emptySub)).toEqual([]);
   });
 });
 
 describe("Voting", () => {
   it("up then down nets to zero on a post; up works on a comment", async () => {
-    // vote is an instance method: pass the latest model back in each time.
-    const post = await inSub("r1", "alice", (e) => Post.create(e, "r1", "vote", "body"));
-    const up = await inSub("r1", "alice", (e) => Post.vote(post, e, "r1", 1));
-    expect(up.upvotes).toBe(1);
-    expect((await inSub("r1", "alice", (e) => Post.vote(up, e, "r1", -1))).upvotes).toBe(0);
+    const sub = await newSub("alice");
+    const post = await newPost("alice", sub.id, "vote", "body");
 
-    const c = await inSub("r1", "alice", (e) => Comment.create(e, "r1", post.id, "hi"));
-    expect((await inSub("r1", "alice", (e) => Comment.vote(c, e, "r1", 1))).upvotes).toBe(1);
+    // vote is an instance method: pass the latest model back in each time.
+    const up = await inPost(post.doId, "alice", (e) => Post.vote(post, e, 1));
+    expect(up.meta.upvotes).toBe(1);
+    const down = await inPost(post.doId, "alice", (e) => Post.vote(up, e, -1));
+    expect(down.meta.upvotes).toBe(0);
+
+    const c = await newComment("alice", post.doId, "hi");
+    const cUp = await inPost(post.doId, "alice", (e) => Comment.vote(c, e, 1));
+    expect(cUp.upvotes).toBe(1);
   });
 });
 
-describe("Profile activity", () => {
-  it("creating things records them in the user's profile", async () => {
-    await inUser("dana", null, (e) => User.login(e, "dana"));
-    const sub = await inSub("ignored", "dana", (e) =>
-      SubReddit.create(e, { name: "r/d", description: "d" }),
-    );
-    const post = await inSub("r9", "dana", (e) => Post.create(e, "r9", "p", "b"));
-    await inSub("r9", "dana", (e) => Comment.create(e, "r9", post.id, "c"));
+describe("Authorship", () => {
+  it("creating things records them in the author's own DO", async () => {
+    await inUser("dana", null, (e) => User.login(e, "dana"), ["Sessions"]);
+    const sub = await newSub("dana", "r/d", "d");
+    const post = await newPost("dana", sub.id, "p", "b");
+    await newComment("dana", post.doId, "c");
 
-    const profile = await inUser("dana", "dana", (e) => e.ctx.profile.get());
-    expect(profile.subReddits).toContain(sub.subId);
-    expect(profile.posts).toContain(post.id);
-    expect(profile.comments.length).toBe(1);
+    const user = (
+      await inUser("dana", "dana", (e) => User.Default.get(e, "dana"), ["SubRedditDb", "PostDo"])
+    ).data!;
+    expect(user.authoredSubReddits.map((s: any) => s.subRedditId)).toContain(sub.id);
+    expect(user.authoredPosts.map((p: any) => p.postId)).toContain(post.doId);
+    expect(user.authoredComments.length).toBe(1);
   });
 });

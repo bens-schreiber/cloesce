@@ -1,0 +1,18 @@
+// An injected class that handles authentication and authorization of Users
+// in exposed APIs
+inject {
+    AuthUser
+}
+
+// A key-value store that stores session tokens for Users
+kv Sessions {
+    session(token: string) -> string {
+        "sessions/{token}"
+    }
+}
+
+// An API result for when a User successfully logs in.
+poo AuthResult {
+    token: string
+    user: User
+}

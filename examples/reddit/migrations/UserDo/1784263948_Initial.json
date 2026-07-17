@@ -1,0 +1,91 @@
+{
+  "hash": 3193839443584885181,
+  "models": {
+    "AuthoredComment": {
+      "hash": 12445622412326550505,
+      "name": "AuthoredComment",
+      "backing": {
+        "binding": "UserDo",
+        "fields": [
+          "name"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 12992020416494447364,
+          "field": {
+            "name": "postId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 2951517456561281181,
+          "field": {
+            "name": "commentId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    },
+    "AuthoredPost": {
+      "hash": 3936263424114682355,
+      "name": "AuthoredPost",
+      "backing": {
+        "binding": "UserDo",
+        "fields": [
+          "name"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 12992020416494447364,
+          "field": {
+            "name": "postId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    },
+    "AuthoredSubReddit": {
+      "hash": 15944700840265927899,
+      "name": "AuthoredSubReddit",
+      "backing": {
+        "binding": "UserDo",
+        "fields": [
+          "name"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 6931431549360158302,
+          "field": {
+            "name": "subRedditId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    }
+  }
+}

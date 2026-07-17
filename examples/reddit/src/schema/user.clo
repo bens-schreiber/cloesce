@@ -1,0 +1,103 @@
+// Every User will live in their own Durable Object, sharded by name
+// (which is a globally unique identifier for a User in this system).
+durable UserDo {
+    shard {
+        name: string
+    }
+}
+
+// An r2 bucket specifically for the avatars of any User.
+r2 Avatar {
+    // Defines that this r2 bucket owns the avatar for a User at the
+    // dynamic key `"avatars/{name}.png"`.
+    avatar(name: string) {
+        "avatars/{name}"
+    }
+}
+
+// A User owns references to the subs, posts, and comments they have authored.
+// They do not own the actual data for those objects, which are stored in their own
+// Durable Objects.
+//
+// Because no SQL data is defined, `User` is not a table in UserDo.
+//
+// Each `many` relationship here has no discriminator aside from directing to this DO,
+// resolving to a SQL SELECT query that returns all rows.
+[crud get]
+model User for UserDo(name) {
+    many AuthoredSubReddit::name(name) {
+        authoredSubReddits
+    }
+    
+    many AuthoredPost::name(name) {
+        authoredPosts
+    }
+    
+    many AuthoredComment::name(name) {
+        authoredComments
+    }
+}
+
+api User {
+    // - Ran within the context of the User DO at `username`
+    // - Injects the `Sessions` environment binding
+    // 
+    // Returns an `AuthResult` object containing the session token and User if successful
+    [inject UserDo(username), Sessions]
+    post login(username: string) -> AuthResult
+    
+    // - Passes `self`, meaning only a hydrated User can call this endpoint
+    //    - By default, runs within the context of the User DO that
+    //      self is hydrated to.
+    // - Injects the `Avatar` environment binding
+    // - Accepts a stream of bytes representing the image to upload as the User's avatar
+    [inject Avatar]
+    put uploadAvatar(self, image: stream)
+    
+    // - Passes `self`, meaning only a hydrated User can call this endpoint
+    //    - By default, runs within the context of the User DO that
+    //      self is hydrated to.
+    // - Returns a stream of bytes representing the User's avatar image
+    [inject Avatar]
+    get downloadAvatar(self) -> stream
+}
+
+// A SQL table that stores the relationship between a User and the SubReddits
+// they authored.
+model AuthoredSubReddit for UserDo(name) {
+    primary {
+        subRedditId: int
+    }
+    
+    one SubReddit::id(subRedditId) {
+        // Navigates to the SubReddit row that this User authored.
+        subReddit
+    }
+}
+
+// A SQL table that stores the relationship between a User and the Posts
+// they authored.
+model AuthoredPost for UserDo(name) {
+    primary {
+        postId: int
+    }
+    
+    one Post::doId(postId) {
+        // Navigates to the Post DO that this User authored.
+        post
+    }
+}
+
+// A SQL table that stores the relationship between a User and the Comments
+// they authored.
+model AuthoredComment for UserDo(name) {
+    primary {
+        postId: int
+        commentId: int
+    }
+    
+    one Comment::{ doId(postId), id(commentId) } {
+        // Navigates to the Comment DO that this User authored.
+        comment
+    }
+}

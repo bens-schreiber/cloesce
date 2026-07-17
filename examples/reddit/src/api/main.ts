@@ -1,9 +1,9 @@
 import * as clo from "@cloesce/backend.js";
 import { AuthUser } from "./auth.js";
-import { Comment, Post, SubReddit, User } from "./models.js";
+import { User } from "./user.js";
+import { SubReddit } from "./sub.js";
+import { Post, Comment } from "./post.js";
 
-export { UserDo, SubRedditDo } from "./durable.js";
-export { User, SubReddit, Post, Comment } from "./models.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

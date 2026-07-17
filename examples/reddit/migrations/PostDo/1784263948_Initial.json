@@ -1,0 +1,80 @@
+{
+  "hash": 3193839443584885181,
+  "models": {
+    "Comment": {
+      "hash": 4427802139869132295,
+      "name": "Comment",
+      "backing": {
+        "binding": "PostDo",
+        "fields": [
+          "doId"
+        ],
+        "kind": "DurableObject"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 8717573070912162679,
+          "field": {
+            "name": "replyId",
+            "cidl_type": {
+              "Nullable": "Int"
+            },
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Comment",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5390241804535561539,
+          "field": {
+            "name": "upvotes",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5949639973474780892,
+          "field": {
+            "name": "authorName",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 10580003897996311112,
+          "field": {
+            "name": "content",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    }
+  }
+}

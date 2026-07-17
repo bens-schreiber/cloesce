@@ -1,0 +1,72 @@
+// Metadata for a Post
+poo PostMeta {
+    title: string
+    content: string
+    authorName: string
+    upvotes: int
+}
+
+// Every Post will live in its own Durable Object, sharded by doId
+// (which is a globally unique identifier for a Post in this system).
+durable PostDo {
+    shard {
+        doId: string
+    }
+    
+    // Defines that this DO owns metadata for a Post
+    // at `"meta"` in the KV store.
+    meta() -> PostMeta {
+        "meta"
+    }
+}
+
+// A Post owns references to the comments that have been made on it.
+// 
+// Because no SQL data is defined, `Post` is not a table in PostDo.
+[crud get, list]
+model Post for PostDo(doId) {
+    kv PostDo::{ meta, doId(doId) } {
+        // The post's own metadata.
+        meta
+    }
+    
+    many Comment::doId(doId) {
+        // Every comment on this post
+        comments
+    }
+}
+
+api Post {
+    [inject SubRedditDb, PostDo, AuthUser, UserDo]
+    post create(subRedditId: int, title: string, content: string) -> Post
+    
+    [inject AuthUser]
+    post vote(self, delta: int) -> Post
+}
+
+// A SQL table that stores the relationship between a Post and a Comment.
+// Each row represents a Comment that belongs to a Post.
+model Comment for PostDo(doId) {
+    primary {
+        id: int
+    }
+    
+    column {
+        upvotes: int
+        authorName: string
+        content: string
+    }
+    
+    one User::name(authorName) {
+        // The user who authored this comment
+        author
+    }
+}
+
+api Comment {
+    [inject PostDo(postId), AuthUser, UserDo]
+    post create(postId: string, content: string) -> Comment
+    
+    [inject AuthUser]
+    post vote(self, delta: int) -> Comment
+}

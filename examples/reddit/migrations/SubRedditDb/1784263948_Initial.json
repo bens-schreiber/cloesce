@@ -1,0 +1,100 @@
+{
+  "hash": 3193839443584885181,
+  "models": {
+    "SubReddit": {
+      "hash": 9359307123104755177,
+      "name": "SubReddit",
+      "backing": {
+        "binding": "SubRedditDb",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 16671312646982238929,
+          "field": {
+            "name": "title",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 17301296087702549672,
+          "field": {
+            "name": "description",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 14791206263591060700,
+          "field": {
+            "name": "lastPostId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    },
+    "SubRedditPost": {
+      "hash": 10261700762693661965,
+      "name": "SubRedditPost",
+      "backing": {
+        "binding": "SubRedditDb",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 12992020416494447364,
+          "field": {
+            "name": "postId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 14595591548189747742,
+          "field": {
+            "name": "subRedditId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "SubReddit",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    }
+  }
+}

@@ -1,5 +1,13 @@
 {
   "compatibility_date": "2025-10-02",
+  "d1_databases": [
+    {
+      "binding": "SubRedditDb",
+      "database_id": "replace_with_SubRedditDb_id",
+      "database_name": "replace_with_SubRedditDb_name",
+      "migrations_dir": "./migrations/SubRedditDb"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -7,8 +15,8 @@
         "name": "UserDo"
       },
       {
-        "class_name": "SubRedditDo",
-        "name": "SubRedditDo"
+        "class_name": "PostDo",
+        "name": "PostDo"
       }
     ]
   },
@@ -16,10 +24,6 @@
     {
       "binding": "Sessions",
       "id": "replace_with_Sessions_id"
-    },
-    {
-      "binding": "SubReddits",
-      "id": "replace_with_SubReddits_id"
     }
   ],
   "main": "./src/api/main.ts",
@@ -30,13 +34,25 @@
         "SubRedditDo"
       ],
       "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": [
+        "PostDo"
+      ],
+      "tag": "v2"
+    },
+    {
+      "deleted_classes": [
+        "SubRedditDo"
+      ],
+      "tag": "v3"
     }
   ],
   "name": "reddit",
   "r2_buckets": [
     {
-      "binding": "Avatars",
-      "bucket_name": "reddit-avatars"
+      "binding": "Avatar",
+      "bucket_name": "replace-with-avatar-name"
     }
   ]
 }

@@ -1,0 +1,48 @@
+// SubReddits are stored in a D1 Database rather than a Durable Object.
+// This is to avoid a secondary index on the SubReddits title just to support
+// a `list` query.
+d1 {
+    SubRedditDb
+}
+
+// SubReddit is a SQL table that stores the metadata for a SubReddit.
+[crud get, list]
+model SubReddit for SubRedditDb {
+    primary {
+        id: int
+    }
+    
+    column {
+        title: string
+        description: string
+    }
+    
+    many SubRedditPost::subRedditId(id) {
+        posts
+    }
+}
+
+api SubReddit {
+    [inject SubRedditDb, AuthUser, UserDo]
+    post create(title: string, description: string) -> SubReddit
+
+    [inject SubRedditDb, PostDo]
+    get feed(self) -> array<Post>
+}
+
+// Every post that belongs to a SubReddit is stored in its own Durable Object,
+// allowing a SubReddit to reference all of its own posts.
+model SubRedditPost for SubRedditDb {
+    primary {
+        postId: string
+    }
+    
+    foreign SubReddit::id {
+        subRedditId
+    }
+    
+    one Post::doId(postId) {
+        // Navigates to the Post that belongs to this SubReddit
+        post
+    }
+}
