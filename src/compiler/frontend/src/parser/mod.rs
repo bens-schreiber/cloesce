@@ -83,6 +83,7 @@ fn poo_block<'tokens, 'src: 'tokens>()
         .map(|(symbol, fields)| {
             AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields })
         })
+        .boxed()
 }
 
 /// ```cloesce
@@ -102,6 +103,7 @@ fn inject_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|symbols| AstBlockKind::Inject(InjectBlock { symbols }))
+        .boxed()
 }
 
 /// Parses any number of `[ ... ]` tags, returning them as a vector of spanned [Tag]s.
@@ -232,6 +234,7 @@ fn typed_symbol<'tokens, 'src: 'tokens>()
             cidl_type,
             ..sym
         })
+        .boxed()
 }
 
 /// ```cloesce
@@ -243,6 +246,7 @@ fn tagged_typed_symbol<'tokens, 'src: 'tokens>()
     tags()
         .then(typed_symbol())
         .map(|(tags, sym)| Symbol { tags, ..sym })
+        .boxed()
 }
 
 fn cidl_type<'tokens, 'src: 'tokens>()

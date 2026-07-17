@@ -424,14 +424,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         };
 
-        if adj_model_sym.name == self.name {
-            ma.sink.push(SemanticError::ForeignKeyReferencesSelf {
-                model: self.symbol,
-                foreign_key: adj_model_sym,
-            });
-            return;
-        }
-
         // Must belong to the same database
         let adj_binding = adj_model_block.database_binding.as_ref();
         if adj_binding.map(|s| s.name) != Some(binding) {

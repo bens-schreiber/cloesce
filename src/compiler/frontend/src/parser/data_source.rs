@@ -113,5 +113,5 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             },
         );
 
-    source_block.map_spanned(AstBlockKind::DataSource)
+    source_block.map_spanned(AstBlockKind::DataSource).boxed()
 }

@@ -25,6 +25,7 @@ pub fn d1_binding_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|bindings| AstBlockKind::D1Binding(D1BindingBlock { bindings }))
+        .boxed()
 }
 
 /// ```cloesce
@@ -43,6 +44,7 @@ pub fn vars_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|vars| AstBlockKind::Vars(VarsBlock { vars }))
+        .boxed()
 }
 
 /// Parses a single storage template of the form `[tag]* name(params) -> type { "format" }`.
@@ -74,6 +76,7 @@ fn kv_template<'tokens, 'src: 'tokens>()
                 key_format,
             },
         )
+        .boxed()
 }
 
 /// ```cloesce
@@ -100,6 +103,7 @@ pub fn kv_binding_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|(symbol, templates)| AstBlockKind::KvBinding(KvBindingBlock { symbol, templates }))
+        .boxed()
 }
 
 /// ```cloesce
@@ -142,6 +146,7 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|(symbol, templates)| AstBlockKind::R2Binding(R2BindingBlock { symbol, templates }))
+        .boxed()
 }
 
 /// ```cloesce
@@ -185,4 +190,5 @@ pub fn durable_binding_block<'tokens, 'src: 'tokens>()
                 templates,
             })
         })
+        .boxed()
 }

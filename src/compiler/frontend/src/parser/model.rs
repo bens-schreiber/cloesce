@@ -38,6 +38,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
             is_optional: optional.is_some(),
             fields,
         })
+        .boxed()
 }
 
 /// `kv Binding::target(local1, ...) { localField }`
@@ -83,6 +84,7 @@ fn kv_field_block<'tokens, 'src: 'tokens>()
             args,
             field,
         })
+        .boxed()
 }
 
 /// `r2 Binding::field(arg1, arg2, ...) { localField }`
@@ -112,6 +114,7 @@ fn r2_field_block<'tokens, 'src: 'tokens>()
             args,
             field,
         })
+        .boxed()
 }
 
 pub fn model_block<'tokens, 'src: 'tokens>()

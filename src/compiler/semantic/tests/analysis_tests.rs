@@ -157,10 +157,6 @@ fn d1_model_column_fk_errors() {
                 doesntExist
             }
 
-            foreign User::id {
-                shouldError
-            }
-
             foreign OtherD1Model::id {
                 shouldAlsoError
             }
@@ -209,7 +205,7 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 12);
+    assert_eq!(errors.len(), 11);
 
     let column = expect_err!(errors,
         SemanticError::NullablePrimaryKey { column } => column
@@ -220,11 +216,6 @@ fn d1_model_column_fk_errors() {
         SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "id");
-
-    let model = expect_err!(errors,
-        SemanticError::ForeignKeyReferencesSelf { model, .. } => model
-    );
-    assert_eq!(model.name, "User");
 
     let fk_model = expect_err!(errors,
         SemanticError::ForeignKeyReferencesDifferentDatabase { fk_model, .. } => fk_model.name

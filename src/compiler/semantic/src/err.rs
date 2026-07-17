@@ -44,12 +44,6 @@ pub enum SemanticError<'src, 'p> {
         column: &'p Symbol<'src>,
     },
 
-    /// A foreign key in a D1 model cannot reference it's own model
-    ForeignKeyReferencesSelf {
-        model: &'p Symbol<'src>,
-        foreign_key: &'p Symbol<'src>,
-    },
-
     /// A foreign key references a model in a different database (i.e. one with a different D1 binding)
     ForeignKeyReferencesDifferentDatabase {
         model: &'p Symbol<'src>,
@@ -366,25 +360,6 @@ fn display(
                     Label::new((path, range))
                         .with_message("remove the `option` from this column's type")
                         .with_color(Color::Red),
-                )
-        }
-        SemanticError::ForeignKeyReferencesSelf { model, foreign_key } => {
-            let (model_path, model_range) = span_parts(&model.span, file_table);
-            let (fk_path, fk_range) = span_parts(&foreign_key.span, file_table);
-            report!(fk_path.clone(), fk_range.clone())
-                .with_message(format!(
-                    "foreign key on model '{}' references its own model",
-                    model.name
-                ))
-                .with_label(
-                    Label::new((fk_path, fk_range))
-                        .with_message("a foreign key cannot reference the model it is defined on")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((model_path, model_range))
-                        .with_message(format!("model '{}' defined here", model.name))
-                        .with_color(Color::Yellow),
                 )
         }
         SemanticError::ForeignKeyReferencesDifferentDatabase {
