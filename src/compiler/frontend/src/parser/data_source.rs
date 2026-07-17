@@ -73,7 +73,6 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                         ..Default::default()
                     },
                     parameters,
-                    raw_sql: "",
                 },
             )
             .boxed()

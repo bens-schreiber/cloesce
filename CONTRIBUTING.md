@@ -2,9 +2,7 @@
 
 Before spending any effort on a change, discuss the idea with the repository authors via email or Discord.
 
-When contributing a significant feature or refactor, please first create a pull request with a detailed proposal in the `proposals/` directory. A basic template for proposals can be found in `proposals/template.md`. Name the proposal `proposal-0.md`, and a proper version will be added after the pull request is merged.
-
-When contributing a smaller change, such as a bug fix or documentation update, create a pull request directly against the `main` branch with a clear description of the change and its motivation.
+When contributing a small change, such as a bug fix or documentation update, create a pull request directly against the `main` branch with a clear description of the change and its motivation.
 
 ## Pull Request Process
 
