@@ -2,7 +2,7 @@ import type { R2Bucket, R2ObjectBody, D1Database, KVNamespace } from "@cloudflar
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import { Model, CidlType, Cidl, getNavigationCidlType, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
+import { Model, CidlType, Cidl, getNavigationCidlType } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue } from "../ui/backend.js";
 import {
@@ -21,12 +21,6 @@ type HydrateArgs = {
   env: any;
 };
 
-type DurableContext = {
-  state: {
-    storage: DurableStorage;
-  };
-};
-
 type DurableStorage = {
   sql: {
     exec(query: string, ...bindings: any[]): { toArray(): Record<string, unknown>[] };
@@ -40,14 +34,10 @@ type DurableStorage = {
 };
 
 export class Orm {
-  private constructor(
-    private env: any,
-    private durable: DurableContext | null,
-  ) {}
+  private constructor(private env: any) {}
 
   static fromEnv(env: any): Orm {
-    const durable = env[ENV_DURABLE_TARGET_KEY] as DurableContext | undefined;
-    return new Orm(env, durable ?? null);
+    return new Orm(env);
   }
 
   /**
@@ -235,18 +225,17 @@ export class Orm {
 
   private storageResolver(): StorageResolver {
     const env = this.env;
-    const durable = this.durable;
     return {
       sql(database: Database, shard: unknown[]): SqlStore {
         if (database.kind === "DurableObject") {
-          return durableSqlStore(env, durable, database, shard);
+          return durableSqlStore(env, database, shard);
         }
         return new D1SqlStore(env[database.name]);
       },
       key(database: Database, shard: unknown[]): KeyStore {
         switch (database.kind) {
           case "DurableObject":
-            return durableKeyStore(env, durable, database, shard);
+            return durableKeyStore(env, database, shard);
           case "R2":
             return new R2KeyStore(env, database.name);
           default:
@@ -321,40 +310,12 @@ class D1SqlStore implements SqlStore {
   }
 }
 
-/**
- * A DO's SQLite storage reached over RPC (from the Worker) or directly (inside the DO).
- * The Worker path routes to the stub identified by the shard tuple.
- */
-function durableSqlStore(
-  env: any,
-  durable: DurableContext | null,
-  database: Database,
-  shard: unknown[],
-): SqlStore {
-  if (durable) {
-    return new LocalDurableSqlStore(durable);
-  }
+function durableSqlStore(env: any, database: Database, shard: unknown[]): SqlStore {
   const stub = durableStub(env, database.name, shard);
-  return new RemoteDurableSqlStore(stub);
+  return new DurableSqlStore(stub);
 }
 
-/** Runs SQL directly against the DO context we are executing inside. */
-class LocalDurableSqlStore implements SqlStore {
-  constructor(private ctx: DurableContext) {}
-
-  async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
-    return durableSqlBatch(this.ctx.state.storage, [{ sql, bindings }])[0];
-  }
-
-  async batch(
-    statements: { sql: string; bindings: unknown[] }[],
-  ): Promise<Record<string, unknown>[][]> {
-    return durableSqlBatch(this.ctx.state.storage, statements);
-  }
-}
-
-/** Runs SQL against a remote DO stub via the generated `__cloesceSqlBatch` RPC. */
-class RemoteDurableSqlStore implements SqlStore {
+class DurableSqlStore implements SqlStore {
   constructor(private stub: any) {}
 
   async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
@@ -424,31 +385,11 @@ class R2KeyStore implements KeyStore {
   }
 }
 
-function durableKeyStore(
-  env: any,
-  durable: DurableContext | null,
-  database: Database,
-  shard: unknown[],
-): KeyStore {
-  if (durable) {
-    return new LocalDurableKeyStore(durable);
-  }
-  return new RemoteDurableKeyStore(durableStub(env, database.name, shard));
+function durableKeyStore(env: any, database: Database, shard: unknown[]): KeyStore {
+  return new DurableKeyStore(durableStub(env, database.name, shard));
 }
 
-class LocalDurableKeyStore implements KeyStore {
-  constructor(private ctx: DurableContext) {}
-
-  get(key: string): unknown {
-    return this.ctx.state.storage.kv.get(key) ?? null;
-  }
-
-  put(key: string, value: unknown): void {
-    this.ctx.state.storage.kv.put(key, value);
-  }
-}
-
-class RemoteDurableKeyStore implements KeyStore {
+class DurableKeyStore implements KeyStore {
   constructor(private stub: any) {}
 
   async get(key: string): Promise<unknown> {

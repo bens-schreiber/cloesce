@@ -7,11 +7,9 @@ function up(sql: SqlStorage): void {
     --- New Models
 CREATE TABLE IF NOT EXISTS "Comment" (
   "id" integer PRIMARY KEY,
-  "replyId" integer,
   "upvotes" integer NOT NULL,
   "authorName" text NOT NULL,
-  "content" text NOT NULL,
-  FOREIGN KEY ("replyId") REFERENCES "Comment" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+  "content" text NOT NULL
 );
 
 --- Cloesce Temporary Table
@@ -25,18 +23,18 @@ CREATE TABLE IF NOT EXISTS "$cloesce_tmp" (
 /**
  * The `Initial` migration for a DO's embedded SQLite database.
  *
- * Pass to `this.cloesce(env, [...])` in your DO constructor. Applied once, in order, before serving requests.
+ * Pass to `cloesce(env, this, [...])` in your DO constructor. Applied once, in order, before serving requests.
  *
  * @example
  * ```ts
- * import InitialMigration from "../../migrations/MyDo/Initial_1784263948.js";
+ * import InitialMigration from "../../migrations/MyDo/Initial_1784326759.js";
  *
- * export class MyDo extends clo.MyDo {
+ * export class MyDo extends DurableObject<clo.CfEnv> {
  *   private app: CloesceApp;
  *
  *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
  *     super(ctx, env);
- *     this.app = this.cloesce(env, [InitialMigration]);
+ *     this.app = clo.cloesce(env, this, [InitialMigration]);
  *     this.app.register(MyModel);
  *   }
  * }
@@ -44,7 +42,7 @@ CREATE TABLE IF NOT EXISTS "$cloesce_tmp" (
  */
 export default {
   name: "Initial",
-  timestamp: 1784263948,
-  id: "Initial_1784263948",
+  timestamp: 1784326759,
+  id: "Initial_1784326759",
   up,
 };

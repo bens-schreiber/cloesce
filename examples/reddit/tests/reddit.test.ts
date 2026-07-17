@@ -10,15 +10,19 @@ function newSub(as: string, title = "r/dogs", description = "woof") {
 }
 
 function newPost(as: string, subId: number, title: string, content: string) {
-  return onWorker(as, (e) => Post.create(e, subId, title, content), ["SubRedditDb", "PostDo", "UserDo"]);
+  return onWorker(as, (e) => Post.create(e, subId, title, content), [
+    "SubRedditDb",
+    "PostDo",
+    "UserDo",
+  ]);
 }
 
-function newComment(as: string, doId: number, content: string) {
+function newComment(as: string, doId: string, content: string) {
   return inPost(doId, as, (e) => Comment.create(e, doId, content), ["PostDo", "UserDo"]);
 }
 
 function feedOf(as: string, sub: any) {
-  return onWorker(as, (e) => SubReddit.feed(sub, e), ["SubRedditDb", "PostDo"]);
+  return onWorker(as, (e) => SubReddit.feed(sub, e), ["SubRedditDb", "PostDo", "UserDo"]);
 }
 
 describe("Auth", () => {
@@ -59,7 +63,9 @@ describe("Posts, comments, and the feed", () => {
 
     await newComment("alice", post.doId, "agreed!");
 
-    const view = (await inPost(post.doId, "alice", (e) => Post.Default.get(e, post.doId))).data!;
+    const view = (
+      await inPost(post.doId, "alice", (e) => Post.Default.get(e, post.doId), ["PostDo"])
+    ).data!;
     expect(view.meta.title).toBe("Cats");
     expect(view.comments.map((c: any) => c.content)).toContain("agreed!");
   });
@@ -72,7 +78,8 @@ describe("Posts, comments, and the feed", () => {
 
     await newComment("alice", a.doId, "only on A");
 
-    const viewB = (await inPost(b.doId, "alice", (e) => Post.Default.get(e, b.doId))).data!;
+    const viewB = (await inPost(b.doId, "alice", (e) => Post.Default.get(e, b.doId), ["PostDo"]))
+      .data!;
     expect(viewB.comments).toEqual([]);
   });
 
@@ -104,13 +111,16 @@ describe("Voting", () => {
     const post = await newPost("alice", sub.id, "vote", "body");
 
     // vote is an instance method: pass the latest model back in each time.
-    const up = await inPost(post.doId, "alice", (e) => Post.vote(post, e, 1));
+    const up = await inPost(post.doId, "alice", (e) => Post.vote(post, e, 1), ["PostDo"]);
     expect(up.meta.upvotes).toBe(1);
-    const down = await inPost(post.doId, "alice", (e) => Post.vote(up, e, -1));
+    const down = await inPost(post.doId, "alice", (e) => Post.vote(up, e, -1), ["PostDo"]);
     expect(down.meta.upvotes).toBe(0);
 
     const c = await newComment("alice", post.doId, "hi");
-    const cUp = await inPost(post.doId, "alice", (e) => Comment.vote(c, e, 1));
+    const cUp = await inPost(post.doId, "alice", (e) => Comment.vote(c, e, 1), [
+      "PostDo",
+      "UserDo",
+    ]);
     expect(cUp.upvotes).toBe(1);
   });
 });
@@ -123,7 +133,11 @@ describe("Authorship", () => {
     await newComment("dana", post.doId, "c");
 
     const user = (
-      await inUser("dana", "dana", (e) => User.Default.get(e, "dana"), ["SubRedditDb", "PostDo"])
+      await inUser("dana", "dana", (e) => User.Default.get(e, "dana"), [
+        "SubRedditDb",
+        "PostDo",
+        "UserDo",
+      ])
     ).data!;
     expect(user.authoredSubReddits.map((s: any) => s.subRedditId)).toContain(sub.id);
     expect(user.authoredPosts.map((p: any) => p.postId)).toContain(post.doId);

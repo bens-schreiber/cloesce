@@ -26,7 +26,7 @@ api SubReddit {
     [inject SubRedditDb, AuthUser, UserDo]
     post create(title: string, description: string) -> SubReddit
 
-    [inject SubRedditDb, PostDo]
+    [inject SubRedditDb, PostDo, UserDo]
     get feed(self) -> array<Post>
 }
 

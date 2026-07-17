@@ -1,8 +1,8 @@
 {
-  "hash": 3193839443584885181,
+  "hash": 11842886356438950275,
   "models": {
     "SubReddit": {
-      "hash": 9359307123104755177,
+      "hash": 15125336246236485789,
       "name": "SubReddit",
       "backing": {
         "binding": "SubRedditDb",
@@ -44,22 +44,11 @@
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
-        },
-        {
-          "hash": 14791206263591060700,
-          "field": {
-            "name": "lastPostId",
-            "cidl_type": "Int",
-            "validators": []
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
         }
       ]
     },
     "SubRedditPost": {
-      "hash": 10261700762693661965,
+      "hash": 692549536176019821,
       "name": "SubRedditPost",
       "backing": {
         "binding": "SubRedditDb",
@@ -68,10 +57,10 @@
       },
       "primary_columns": [
         {
-          "hash": 12992020416494447364,
+          "hash": 11210204011404722018,
           "field": {
             "name": "postId",
-            "cidl_type": "Int",
+            "cidl_type": "String",
             "validators": []
           },
           "foreign_key_reference": null,

@@ -700,20 +700,7 @@ pub fn model_bindings<'src>(
 ) -> Vec<&'src str> {
     let mut visited = HashSet::new();
     let mut bindings = BTreeSet::new();
-    let do_bindings = idl
-        .wrangler_env
-        .durable_bindings
-        .iter()
-        .map(|b| b.name)
-        .collect::<HashSet<_>>();
-    collect_model_bindings(
-        idl,
-        model,
-        include,
-        &mut visited,
-        &mut bindings,
-        &do_bindings,
-    );
+    collect_model_bindings(idl, model, include, &mut visited, &mut bindings);
     return bindings.into_iter().collect();
 
     // DFS
@@ -723,7 +710,6 @@ pub fn model_bindings<'src>(
         include: Option<&IncludeTree<'src>>,
         visited: &mut HashSet<&'src str>,
         bindings: &mut BTreeSet<&'src str>,
-        do_bindings: &HashSet<&'src str>,
     ) {
         if !visited.insert(model.name) {
             return;
@@ -731,18 +717,13 @@ pub fn model_bindings<'src>(
         let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
 
         if let Some(b) = model.backing.as_ref() {
-            // Ignore Durable Object bindings as the context for them is injected separately
-            if !do_bindings.contains(b.binding) {
-                bindings.insert(b.binding);
-            }
+            bindings.insert(b.binding);
         }
 
         for kv in &model.kv_fields {
-            if included(kv.field.name.as_ref()) && !do_bindings.contains(kv.binding) {
-                // Again, ignore Durable Object bindings
-                bindings.insert(kv.binding);
-            }
+            bindings.insert(kv.binding);
         }
+
         for r2 in &model.r2_fields {
             if included(r2.field.name.as_ref()) {
                 bindings.insert(r2.binding);
@@ -757,7 +738,7 @@ pub fn model_bindings<'src>(
                 None => None,
             };
             if let Some(referenced) = idl.models.get(nav.model_reference) {
-                collect_model_bindings(idl, referenced, subtree, visited, bindings, do_bindings);
+                collect_model_bindings(idl, referenced, subtree, visited, bindings);
             }
         }
     }

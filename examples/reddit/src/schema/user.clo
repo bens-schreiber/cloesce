@@ -41,9 +41,10 @@ model User for UserDo(name) {
 api User {
     // - Ran within the context of the User DO at `username`
     // - Injects the `Sessions` environment binding
+    // - Injects the `UserDo` environment binding at `username`
     // 
     // Returns an `AuthResult` object containing the session token and User if successful
-    [inject UserDo(username), Sessions]
+    [inject UserDo(username), Sessions, UserDo]
     post login(username: string) -> AuthResult
     
     // - Passes `self`, meaning only a hydrated User can call this endpoint
@@ -79,7 +80,7 @@ model AuthoredSubReddit for UserDo(name) {
 // they authored.
 model AuthoredPost for UserDo(name) {
     primary {
-        postId: int
+        postId: string
     }
     
     one Post::doId(postId) {
@@ -92,7 +93,7 @@ model AuthoredPost for UserDo(name) {
 // they authored.
 model AuthoredComment for UserDo(name) {
     primary {
-        postId: int
+        postId: string
         commentId: int
     }
     

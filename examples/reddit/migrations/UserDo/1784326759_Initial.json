@@ -1,8 +1,8 @@
 {
-  "hash": 3193839443584885181,
+  "hash": 11842886356438950275,
   "models": {
     "AuthoredComment": {
-      "hash": 12445622412326550505,
+      "hash": 2876471185808908361,
       "name": "AuthoredComment",
       "backing": {
         "binding": "UserDo",
@@ -13,10 +13,10 @@
       },
       "primary_columns": [
         {
-          "hash": 12992020416494447364,
+          "hash": 11210204011404722018,
           "field": {
             "name": "postId",
-            "cidl_type": "Int",
+            "cidl_type": "String",
             "validators": []
           },
           "foreign_key_reference": null,
@@ -38,7 +38,7 @@
       "columns": []
     },
     "AuthoredPost": {
-      "hash": 3936263424114682355,
+      "hash": 15090406369333911536,
       "name": "AuthoredPost",
       "backing": {
         "binding": "UserDo",
@@ -49,10 +49,10 @@
       },
       "primary_columns": [
         {
-          "hash": 12992020416494447364,
+          "hash": 11210204011404722018,
           "field": {
             "name": "postId",
-            "cidl_type": "Int",
+            "cidl_type": "String",
             "validators": []
           },
           "foreign_key_reference": null,

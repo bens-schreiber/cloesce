@@ -74,7 +74,8 @@ export async function executeSelect(
   wrap: KeyValueWrapper,
   seed?: Record<string, unknown>[],
 ): Promise<CloesceResult<any>> {
-  return new select.Execution(params, storage, wrap, seed).run(plan);
+  const exec = new select.Execution(params, storage, wrap, seed);
+  return exec.run(plan);
 }
 
 /** Execute a save plan; the value is the saved body as the database's truth. */
@@ -82,7 +83,8 @@ export async function executeSave(
   plan: SavePlan,
   storage: StorageResolver,
 ): Promise<CloesceResult<any>> {
-  return new save.Execution(storage).run(plan);
+  const exec = new save.Execution(storage);
+  return exec.run(plan);
 }
 
 /** Type a failed step's error by the storage it was targeting. */

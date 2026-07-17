@@ -47,7 +47,7 @@ export function inUser(
 }
 
 export function inPost(
-  doId: number,
+  doId: string,
   as: string | null,
   fn: (env: any) => any,
   bindings: Binding[] = [],

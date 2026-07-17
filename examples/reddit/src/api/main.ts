@@ -4,6 +4,9 @@ import { User } from "./user.js";
 import { SubReddit } from "./sub.js";
 import { Post, Comment } from "./post.js";
 
+// Durable Object classes must be exported from the wrangler entry module.
+export { UserDo } from "./user.js";
+export { PostDo } from "./post.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

@@ -6,32 +6,38 @@ function up(sql: SqlStorage): void {
   sql.exec(`
     --- New Models
 CREATE TABLE IF NOT EXISTS "AuthoredComment" (
-  "postId" integer NOT NULL,
+  "postId" text NOT NULL,
   "commentId" integer NOT NULL,
   PRIMARY KEY ("postId", "commentId")
 );
 
-CREATE TABLE IF NOT EXISTS "AuthoredPost" ("postId" integer PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS "AuthoredPost" ("postId" text PRIMARY KEY);
 
 CREATE TABLE IF NOT EXISTS "AuthoredSubReddit" ("subRedditId" integer PRIMARY KEY);
+
+--- Cloesce Temporary Table
+CREATE TABLE IF NOT EXISTS "$cloesce_tmp" (
+  "path" text PRIMARY KEY,
+  "primary_key" text NOT NULL
+);
   `);
 }
 
 /**
  * The `Initial` migration for a DO's embedded SQLite database.
  *
- * Pass to `this.cloesce(env, [...])` in your DO constructor. Applied once, in order, before serving requests.
+ * Pass to `cloesce(env, this, [...])` in your DO constructor. Applied once, in order, before serving requests.
  *
  * @example
  * ```ts
- * import InitialMigration from "../../migrations/MyDo/Initial_1784263948.js";
+ * import InitialMigration from "../../migrations/MyDo/Initial_1784326759.js";
  *
- * export class MyDo extends clo.MyDo {
+ * export class MyDo extends DurableObject<clo.CfEnv> {
  *   private app: CloesceApp;
  *
  *   constructor(ctx: DurableObjectState, env: clo.CfEnv) {
  *     super(ctx, env);
- *     this.app = this.cloesce(env, [InitialMigration]);
+ *     this.app = clo.cloesce(env, this, [InitialMigration]);
  *     this.app.register(MyModel);
  *   }
  * }
@@ -39,7 +45,7 @@ CREATE TABLE IF NOT EXISTS "AuthoredSubReddit" ("subRedditId" integer PRIMARY KE
  */
 export default {
   name: "Initial",
-  timestamp: 1784263948,
-  id: "Initial_1784263948",
+  timestamp: 1784326759,
+  id: "Initial_1784326759",
   up,
 };

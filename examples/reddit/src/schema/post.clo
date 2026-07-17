@@ -40,7 +40,7 @@ api Post {
     [inject SubRedditDb, PostDo, AuthUser, UserDo]
     post create(subRedditId: int, title: string, content: string) -> Post
     
-    [inject AuthUser]
+    [inject AuthUser, PostDo]
     post vote(self, delta: int) -> Post
 }
 
@@ -64,9 +64,9 @@ model Comment for PostDo(doId) {
 }
 
 api Comment {
-    [inject PostDo(postId), AuthUser, UserDo]
+    [inject PostDo(postId), PostDo, AuthUser, UserDo]
     post create(postId: string, content: string) -> Comment
     
-    [inject AuthUser]
+    [inject AuthUser, PostDo, UserDo]
     post vote(self, delta: int) -> Comment
 }

@@ -1,8 +1,8 @@
 {
-  "hash": 3193839443584885181,
+  "hash": 11842886356438950275,
   "models": {
     "Comment": {
-      "hash": 4427802139869132295,
+      "hash": 5272355978125235551,
       "name": "Comment",
       "backing": {
         "binding": "PostDo",
@@ -25,22 +25,6 @@
         }
       ],
       "columns": [
-        {
-          "hash": 8717573070912162679,
-          "field": {
-            "name": "replyId",
-            "cidl_type": {
-              "Nullable": "Int"
-            },
-            "validators": []
-          },
-          "foreign_key_reference": {
-            "model_name": "Comment",
-            "column_name": "id"
-          },
-          "unique_ids": [],
-          "composite_id": null
-        },
         {
           "hash": 5390241804535561539,
           "field": {

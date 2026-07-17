@@ -355,7 +355,7 @@ impl<'src> Planner<'src> {
         let mut pks = Vec::new();
         self.batches[batch_idx]
             .writes
-            .push(row.write(has_missing_non_nullable));
+            .extend(row.write(has_missing_non_nullable));
 
         if let Some(pk_name) = cols
             .iter()
@@ -385,7 +385,7 @@ impl<'src> Planner<'src> {
             if col.is_pk {
                 match &col.spec {
                     ColSpec::Arg(SaveArg::Payload(Cow::Borrowed(v))) if !v.is_null() => {
-                        pks.push((col.name, PkSource::Payload(*v)))
+                        pks.push((col.name, PkSource::Payload(v)))
                     }
                     ColSpec::Generated(src) => pks.push((col.name, src.clone())),
                     _ => {
@@ -864,13 +864,14 @@ struct RowSql<'a, 'src> {
 
 impl<'src> RowSql<'_, 'src> {
     /// The row `Write` statement. A present PK with a missing non-nullable column
-    /// (`partial`) forces a keyed UPDATE.
-    fn write(&self, partial: bool) -> SqlStatement<'src> {
+    /// (`partial`) forces a keyed UPDATE. `None` when there is nothing to write
+    /// (a children-only update); the hydrate SELECT still detects a vanished row.
+    fn write(&self, partial: bool) -> Option<SqlStatement<'src>> {
         let any_pk = self.cols.iter().any(|c| c.is_pk);
         if any_pk && partial {
             self.update()
         } else {
-            self.insert()
+            Some(self.insert())
         }
     }
 
@@ -937,7 +938,7 @@ impl<'src> RowSql<'_, 'src> {
         SqlStatement::Write { sql, arguments }
     }
 
-    fn update(&self) -> SqlStatement<'src> {
+    fn update(&self) -> Option<SqlStatement<'src>> {
         let mut arguments = Vec::new();
         let mut clause = |pk: bool| {
             self.cols
@@ -955,6 +956,9 @@ impl<'src> RowSql<'_, 'src> {
         };
 
         let sets = clause(false);
+        if sets.is_empty() {
+            return None;
+        }
         let wheres = clause(true);
         let sql = format!(
             "UPDATE {} SET {} WHERE {}",
@@ -962,7 +966,7 @@ impl<'src> RowSql<'_, 'src> {
             sets.join(", "),
             wheres.join(" AND ")
         );
-        SqlStatement::Write { sql, arguments }
+        Some(SqlStatement::Write { sql, arguments })
     }
 
     /// The read-back `SELECT` for this instance
