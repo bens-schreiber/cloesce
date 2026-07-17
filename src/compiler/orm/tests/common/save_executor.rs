@@ -277,7 +277,7 @@ fn build_fields(fields: &[(&str, SaveArg<'_>)], body: &Value) -> Value {
 /// failure in tests.
 fn resolve(arg: &SaveArg<'_>, body: &Value) -> Value {
     match arg {
-        SaveArg::Payload(v) => (*v).clone(),
+        SaveArg::Payload(v) => v.clone().into_owned(),
         SaveArg::Result(path) => body_at(body, path)
             .cloned()
             .expect("Body value to exist in tests"),

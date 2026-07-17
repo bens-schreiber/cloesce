@@ -474,6 +474,11 @@ function durableStub(env: any, binding: string, shard: unknown[]): any {
 function toSqlBind(value: unknown): unknown {
   if (typeof value === "boolean") return value ? 1 : 0;
   if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) {
+    // A blob binding arrives as a byte array (the save planner decodes its base64 wire form);
+    // D1/SQLite only bind bytes for a BLOB column, so widen it to a Uint8Array.
+    return new Uint8Array(value as number[]);
+  }
   return value;
 }
 

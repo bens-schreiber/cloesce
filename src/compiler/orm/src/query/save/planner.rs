@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationCardinality};
 use serde_json::Value as JsonValue;
 
@@ -68,7 +70,7 @@ impl<'src> PkSource<'src> {
     /// the hydrated PK back from the body.
     fn save_arg(&self) -> SaveArg<'src> {
         match self {
-            PkSource::Payload(v) => SaveArg::Payload(v),
+            PkSource::Payload(v) => SaveArg::Payload(Cow::Borrowed(v)),
             PkSource::Generated { path, column, .. } => {
                 let mut path = path.clone();
                 path.push(PathSegment::Field(column));
@@ -105,7 +107,7 @@ impl<'src> Instance<'src> {
         }
 
         if let Some(value) = obj.and_then(|o| o.get(field)) {
-            return SaveArg::Payload(value);
+            return SaveArg::Payload(Cow::Borrowed(value));
         }
 
         let mut path = self.path.clone();
@@ -152,7 +154,10 @@ impl<'src> Planner<'src> {
                     .iter()
                     .filter_map(|f| {
                         let name = f.name.as_ref();
-                        Some((name, SaveArg::Payload(obj.and_then(|o| o.get(name))?)))
+                        Some((
+                            name,
+                            SaveArg::Payload(Cow::Borrowed(obj.and_then(|o| o.get(name))?)),
+                        ))
                     })
                     .collect::<Vec<_>>();
 
@@ -243,12 +248,22 @@ impl<'src> Planner<'src> {
             let spec = match (provided, fk_source, is_pk) {
                 (Some(value), _, _) => {
                     // The value exists in the payload and must be validated.
-                    validate_cidl_type(&col.field, Some(value.clone()), self.idl, false)?;
-                    ColSpec::Arg(SaveArg::Payload(value))
+                    let coerced =
+                        validate_cidl_type(&col.field, Some(value.clone()), self.idl, false)?;
+                    let arg = match coerced {
+                        Some(decoded)
+                            if matches!(col.field.cidl_type.root_type(), CidlType::Blob) =>
+                        {
+                            // Blobs decode to a byte array
+                            SaveArg::Payload(Cow::Owned(decoded))
+                        }
+                        _ => SaveArg::Payload(Cow::Borrowed(value)),
+                    };
+                    ColSpec::Arg(arg)
                 }
                 (None, Some(PkSource::Payload(v)), _) => {
                     // A parent/nav supplied the value (validation defers to the parent).
-                    ColSpec::Arg(SaveArg::Payload(v))
+                    ColSpec::Arg(SaveArg::Payload(Cow::Borrowed(v)))
                 }
                 (None, Some(src @ PkSource::Generated { .. }), _) => {
                     // A parent/nav supplied a generated value (we trust sql)
@@ -267,7 +282,7 @@ impl<'src> Planner<'src> {
                 }
                 (None, None, _) if pk_missing && col.field.cidl_type.is_nullable() => {
                     // Coerce to NULL for a missing nullable PK
-                    ColSpec::Arg(SaveArg::Payload(&JsonValue::Null))
+                    ColSpec::Arg(SaveArg::Payload(Cow::Borrowed(&JsonValue::Null)))
                 }
                 (None, None, false) if !pk_missing => {
                     // PK is present so this is an update OR insert (upsert).
@@ -301,7 +316,10 @@ impl<'src> Planner<'src> {
                     .iter()
                     .find(|(n, _)| n == f)
                     .map(|(_, a)| a.clone())
-                    .or_else(|| obj.and_then(|o| o.get(*f)).map(SaveArg::Payload))
+                    .or_else(|| {
+                        obj.and_then(|o| o.get(*f))
+                            .map(|v| SaveArg::Payload(Cow::Borrowed(v)))
+                    })
                     .or_else(|| {
                         nav_fks
                             .iter()
@@ -366,8 +384,8 @@ impl<'src> Planner<'src> {
         for col in &cols {
             if col.is_pk {
                 match &col.spec {
-                    ColSpec::Arg(SaveArg::Payload(v)) if !v.is_null() => {
-                        pks.push((col.name, PkSource::Payload(v)))
+                    ColSpec::Arg(SaveArg::Payload(Cow::Borrowed(v))) if !v.is_null() => {
+                        pks.push((col.name, PkSource::Payload(*v)))
                     }
                     ColSpec::Generated(src) => pks.push((col.name, src.clone())),
                     _ => {
@@ -397,7 +415,7 @@ impl<'src> Planner<'src> {
             .filter_map(|f| {
                 let arg = match nav_fks.iter().find(|(local, _)| *local == f) {
                     Some((_, src)) => src.save_arg(),
-                    None => SaveArg::Payload(obj.and_then(|o| o.get(f))?),
+                    None => SaveArg::Payload(Cow::Borrowed(obj.and_then(|o| o.get(f))?)),
                 };
                 Some((f, arg))
             })
@@ -763,8 +781,6 @@ struct Column<'src> {
 
 enum ColSpec<'src> {
     /// A bound `?N` argument.
-    /// - The planner *does not* directly inline payload values to avoid
-    ///   SQL injection, using bound arguments instead.
     Arg(SaveArg<'src>),
 
     /// A FK pointing at a generated PK (finalized once the batch is chosen).

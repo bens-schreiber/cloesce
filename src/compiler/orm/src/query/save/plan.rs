@@ -8,6 +8,8 @@
 //! NOTE: The `'src` lifetime is used to tie the plan to both the lifetime of the source code
 //! that made the Cloesce IDL, as well as the JSON payload (for the sake of this planner, they are the same).
 
+use std::borrow::Cow;
+
 use serde::Serialize;
 
 use crate::query::select::plan::MapCardinality;
@@ -131,8 +133,11 @@ pub enum SqlStatement<'src> {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum SaveArg<'src> {
-    /// A value from the save payload
-    Payload(&'src serde_json::Value),
+    /// A value from the save payload.
+    ///
+    /// [crate::validate::validate_cidl_type] will coerce some values into a normalized form,
+    /// (e.g. base64-encoded `blob` into a byte array), so a [Cow] is used to avoid unnecessary cloning
+    Payload(Cow<'src, serde_json::Value>),
 
     /// A value read from the hydrated result at an exact path (a generated PK
     /// hydrated by an earlier stage's read-back).
