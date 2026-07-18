@@ -46,8 +46,10 @@ struct ParentCtx<'src> {
     /// child column name -> the value the parent supplies for it.
     bindings: Vec<(&'src str, PkSource<'src>)>,
 
-    /// Shard args for a nested DO child, if the parent routes it to a specific stub.
-    shard: Vec<(&'src str, SaveArg<'src>)>,
+    /// Shard sources for a nested DO child, if the parent routes it to a specific stub.
+    ///
+    /// May come from a generated primary key, so [PkSource] is used.
+    shard: Vec<(&'src str, PkSource<'src>)>,
 }
 
 #[derive(Clone)]
@@ -89,7 +91,7 @@ struct Instance<'src> {
     pks: Vec<(&'src str, PkSource<'src>)>,
     stage: usize,
     path: Vec<PathSegment<'src>>,
-    shard: Vec<(&'src str, SaveArg<'src>)>,
+    shard: Vec<(&'src str, PkSource<'src>)>,
 }
 
 impl<'src> Instance<'src> {
@@ -102,8 +104,8 @@ impl<'src> Instance<'src> {
 
     fn save_arg(&self, obj: PayloadSubObject<'src>, field: &'src str) -> SaveArg<'src> {
         let value = self.shard.iter().find(|(name, _)| *name == field);
-        if let Some((_, arg)) = value {
-            return arg.clone();
+        if let Some((_, src)) = value {
+            return src.save_arg();
         }
 
         if let Some(value) = obj.and_then(|o| o.get(field)) {
@@ -223,7 +225,7 @@ impl<'src> Planner<'src> {
         obj: PayloadSubObject<'src>,
         tree: &IncludeTree<'src>,
         path: Vec<PathSegment<'src>>,
-        parent_shard: Vec<(&'src str, SaveArg<'src>)>,
+        parent_shard: Vec<(&'src str, PkSource<'src>)>,
         nav_fks: Vec<(&'src str, PkSource<'src>)>,
     ) -> Result<Instance<'src>> {
         let backing = model.backing.as_ref().expect("sqlite model has a backing");
@@ -312,31 +314,38 @@ impl<'src> Planner<'src> {
             .fields
             .iter()
             .map(|f| {
-                let arg = parent_shard
+                let src = parent_shard
                     .iter()
                     .find(|(n, _)| n == f)
-                    .map(|(_, a)| a.clone())
-                    .or_else(|| {
-                        obj.and_then(|o| o.get(*f))
-                            .map(|v| SaveArg::Payload(Cow::Borrowed(v)))
-                    })
+                    .map(|(_, s)| s.clone())
+                    .or_else(|| obj.and_then(|o| o.get(*f)).map(PkSource::Payload))
                     .or_else(|| {
                         nav_fks
                             .iter()
                             .find(|(local, _)| local == f)
-                            .map(|(_, src)| src.save_arg())
+                            .map(|(_, src)| src.clone())
                     })
                     .ok_or_else(|| OrmErrorKind::MissingField {
                         expected: "all shard keys present".to_string(),
                         missing: f.to_string(),
                     })?;
-                Ok((*f, arg))
+                Ok((*f, src))
             })
             .collect::<Result<Vec<_>>>()?;
 
         // Pick (or create) the batch this row belongs to, based on its generated deps.
-        let deps = Column::generated_deps(&cols);
-        let batch_idx = self.find_or_create_batch(backing.into(), shard.clone(), &deps);
+        // A shard key read back from another batch's generated PK is a dep too: the
+        // stub cannot be routed until that batch has run.
+        let mut deps = Column::generated_deps(&cols);
+        deps.extend(shard.iter().filter_map(|(_, src)| match src {
+            PkSource::Generated { batch, .. } => Some(*batch),
+            PkSource::Payload(_) => None,
+        }));
+        let shard_args = shard
+            .iter()
+            .map(|(f, src)| (*f, src.save_arg()))
+            .collect::<Vec<_>>();
+        let batch_idx = self.find_or_create_batch(backing.into(), shard_args, &deps);
         let stage = self.batches[batch_idx].stage;
 
         // Finalize generated FKs against the chosen batch.
@@ -720,7 +729,7 @@ impl<'src> Planner<'src> {
                         bindings
                             .iter()
                             .find(|(target, _)| target == f)
-                            .map(|(_, src)| (*f, src.save_arg()))
+                            .map(|(_, src)| (*f, src.clone()))
                     })
                     .collect::<Vec<_>>()
             })
