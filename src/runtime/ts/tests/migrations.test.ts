@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import type { SqlStorage } from "@cloudflare/workers-types";
-import { applyDurableMigrations, DurableMigration } from "../src/migrations.js";
+import { applyDurableMigrations, DurableMigration } from "../src/ui/migrations.js";
 
 function mockSqlStorage() {
   const executed: { query: string; bindings: any[] }[] = [];

@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use idl::{CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField};
 
-use crate::query::select::plan::{JoinKeys, Mapping, Select, SelectArg, SelectPlan, SelectStep};
+use crate::query::select::plan::{
+    JoinKeys, Mapping, Select, SelectArg, SelectPlan, SelectStep, SqlArgument, SqlSegment,
+    TableParent,
+};
 use crate::query::{Database, DatabaseKind, TemplateSegment};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +56,9 @@ pub fn plan<'src>(
         }
     }
 
+    // The root table (id 0) hydrates the top-level result.
+    let root = plan.register_table(None);
+
     if let Some(backing) = model.backing.as_ref().filter(|_| model.uses_sqlite()) {
         // Every root shard field value comes from runtime parameters
         let shard = backing
@@ -72,19 +78,24 @@ pub fn plan<'src>(
         let query = match operation {
             SelectOperation::Get => {
                 // GET is always a fetch-by-pk. Gather all WHERE predicates, e.g.
-                // "id = ?1", ... "name = ?N"
+                // `"id" = ` Bind(0), ... `"name" = ` Bind(N-1)
                 let predicates = model
                     .primary_columns
                     .iter()
                     .enumerate()
-                    .map(|(i, c)| format!("\"{}\" = ?{}", c.field.name, i + 1))
+                    .map(|(i, c)| {
+                        vec![
+                            SqlSegment::Literal(format!("\"{}\" = ", c.field.name)),
+                            SqlSegment::Bind(i),
+                        ]
+                    })
                     .collect::<Vec<_>>();
 
                 // Every primary key column's value comes from runtime parameters
                 let arguments = model
                     .primary_columns
                     .iter()
-                    .map(|c| SelectArg::Param(c.field.name.as_ref().into()))
+                    .map(|c| SqlArgument::scalar(SelectArg::Param(c.field.name.as_ref().into())))
                     .collect::<Vec<_>>();
 
                 Select::Sql {
@@ -99,17 +110,27 @@ pub fn plan<'src>(
             SelectOperation::List => {
                 let pks = &model.primary_columns;
 
-                // ex: `"id" > ?1` or `("region", "num") > (?1, ?2)`
-                let placeholders = (1..=pks.len()).map(|i| format!("?{i}")).collect::<Vec<_>>();
+                // ex: `"id" > ` Bind(0) or `("region", "num") > (` Bind(0) `, ` Bind(1) `)`
                 let predicate = if pks.len() == 1 {
-                    format!("\"{}\" > {}", pks[0].field.name, placeholders[0])
+                    vec![
+                        SqlSegment::Literal(format!("\"{}\" > ", pks[0].field.name)),
+                        SqlSegment::Bind(0),
+                    ]
                 } else {
                     let cols = pks
                         .iter()
                         .map(|c| format!("\"{}\"", c.field.name))
                         .collect::<Vec<_>>()
                         .join(", ");
-                    format!("({}) > ({})", cols, placeholders.join(", "))
+                    let mut predicate = vec![SqlSegment::Literal(format!("({cols}) > ("))];
+                    for i in 0..pks.len() {
+                        if i > 0 {
+                            predicate.push(SqlSegment::Literal(", ".into()));
+                        }
+                        predicate.push(SqlSegment::Bind(i));
+                    }
+                    predicate.push(SqlSegment::Literal(")".into()));
+                    predicate
                 };
 
                 // One `lastSeen_<pk>` cursor value per pk column, then `limit`.
@@ -117,11 +138,12 @@ pub fn plan<'src>(
                     .iter()
                     .map(|c| SelectArg::Param(format!("lastSeen_{}", c.field.name).into()))
                     .chain(std::iter::once(SelectArg::Param(LIMIT_PARAM.into())))
+                    .map(SqlArgument::scalar)
                     .collect::<Vec<_>>();
 
                 Select::Sql {
                     database: backing.into(),
-                    sql: select_sql(model, &[predicate], Some(pks.len() + 1)),
+                    sql: select_sql(model, &[predicate], Some(pks.len())),
                     arguments,
                     shard,
                     mapping,
@@ -130,10 +152,9 @@ pub fn plan<'src>(
             }
         };
 
-        plan.stage_at(0).steps.push(SelectStep {
-            query,
-            result: vec![],
-        });
+        plan.stage_at(0)
+            .steps
+            .push(SelectStep { query, table: root });
     } else {
         // A non-sqlite-backed model has no database to select from, just a state
         // synthesized from its route fields, which must be supplied by the runtime.
@@ -151,11 +172,11 @@ pub fn plan<'src>(
                 fields,
                 cardinality: mapping.cardinality,
             },
-            result: vec![],
+            table: root,
         });
     }
 
-    hydrate_model(model, idl, tree, &mut plan, &params, &[], 0);
+    hydrate_model(model, idl, tree, &mut plan, &params, root, 0);
 
     plan
 }
@@ -166,11 +187,11 @@ fn hydrate_model<'src>(
     tree: &IncludeTree<'src>,
     plan: &mut SelectPlan<'src>,
     params: &Params<'src>,
-    path: &[&'src str],
+    table: usize,
     stage: usize,
 ) {
-    select_keys(model, idl, tree, plan, params, path, stage);
-    select_navs(model, idl, tree, plan, params, path, stage);
+    select_keys(model, idl, tree, plan, params, table, stage);
+    select_navs(model, idl, tree, plan, params, table, stage);
 }
 
 /// Emit one [Select::Key] [SelectStep] per included R2 and KV field of `model`.
@@ -184,7 +205,7 @@ fn select_keys<'src>(
     tree: &IncludeTree<'src>,
     plan: &mut SelectPlan<'src>,
     params: &Params<'src>,
-    path: &[&'src str],
+    table: usize,
     stage: usize,
 ) {
     let mut push =
@@ -194,15 +215,15 @@ fn select_keys<'src>(
                 return;
             }
 
-            // The key template and shard fields are owned by `model` at `path`, hydrated at `stage`.
+            // The key template and shard fields are owned by `model` at `table`, hydrated at `stage`.
             let mut inputs = shard_fields.to_vec();
             let segments = TemplateSegment::parse(key, |arg| {
                 inputs.push(arg);
-                params.arg(path, arg)
+                params.arg(table, arg)
             });
             let shard = shard_fields
                 .iter()
-                .map(|f| (*f, params.arg(path, f)))
+                .map(|f| (*f, params.arg(table, f)))
                 .collect();
 
             // The step runs no earlier than the latest stage any of its inputs becomes readable.
@@ -211,8 +232,7 @@ fn select_keys<'src>(
                 .map(|f| params.min_stage(stage, f))
                 .fold(stage, usize::max);
 
-            let mut result = path.to_vec();
-            result.push(field);
+            let key_table = plan.register_table(Some(TableParent { table, field }));
 
             plan.stage_at(step_stage).steps.push(SelectStep {
                 query: Select::Key {
@@ -220,7 +240,7 @@ fn select_keys<'src>(
                     segments,
                     shard,
                 },
-                result,
+                table: key_table,
             });
         };
 
@@ -267,7 +287,7 @@ fn select_navs<'src>(
     tree: &IncludeTree<'src>,
     plan: &mut SelectPlan<'src>,
     params: &Params<'src>,
-    parent_path: &[&'src str],
+    parent_table: usize,
     depth: usize,
 ) {
     for nav in &model.navigation_fields {
@@ -280,11 +300,13 @@ fn select_navs<'src>(
             continue;
         };
 
-        let mut path = parent_path.to_vec();
-        path.push(nav.field.name.as_ref());
+        let nav_table = plan.register_table(Some(TableParent {
+            table: parent_table,
+            field: nav.field.name.as_ref(),
+        }));
 
         // The nav runs no earlier than the latest stage any of its key locals (owned by the
-        // parent model at `parent_path`, hydrated at `depth`) becomes readable.
+        // parent model at `parent_table`, hydrated at `depth`) becomes readable.
         let stage = nav
             .keys
             .iter()
@@ -300,7 +322,7 @@ fn select_navs<'src>(
                     (
                         k.target,
                         (
-                            params.arg(parent_path, k.local),
+                            params.arg(parent_table, k.local),
                             params.min_stage(depth, k.local),
                         ),
                     )
@@ -314,31 +336,31 @@ fn select_navs<'src>(
                 target,
                 backing,
                 params,
-                parent_path,
-                &path,
+                parent_table,
+                nav_table,
                 plan,
                 stage,
             );
         } else {
-            synthesize_nav(nav, params, parent_path, &path, plan, stage);
+            synthesize_nav(nav, params, parent_table, nav_table, plan, stage);
         }
 
-        hydrate_model(target, idl, subtree, plan, &child_params, &path, stage);
+        hydrate_model(target, idl, subtree, plan, &child_params, nav_table, stage);
     }
 
     /// Emit a [Select::Synthesize] nav step
     fn synthesize_nav<'src>(
         nav: &'src NavigationField<'src>,
         params: &Params<'src>,
-        parent_path: &[&'src str],
-        path: &[&'src str],
+        parent_table: usize,
+        nav_table: usize,
         plan: &mut SelectPlan<'src>,
         stage: usize,
     ) {
         let fields = nav
             .keys
             .iter()
-            .map(|k| (k.target, params.arg(parent_path, k.local)))
+            .map(|k| (k.target, params.arg(parent_table, k.local)))
             .collect();
 
         plan.stage_at(stage).steps.push(SelectStep {
@@ -346,7 +368,7 @@ fn select_navs<'src>(
                 fields,
                 cardinality: nav.cardinality.clone().into(),
             },
-            result: path.to_vec(),
+            table: nav_table,
         });
     }
 
@@ -358,8 +380,8 @@ fn select_navs<'src>(
         target: &'src Model<'src>,
         backing: &'src ModelBacking<'src>,
         params: &Params<'src>,
-        parent_path: &[&'src str],
-        path: &[&'src str],
+        parent_table: usize,
+        nav_table: usize,
         plan: &mut SelectPlan<'src>,
         stage: usize,
     ) {
@@ -370,7 +392,7 @@ fn select_navs<'src>(
             .keys
             .iter()
             .filter(|k| is_shard(k.target))
-            .map(|k| (k.target, params.arg(parent_path, k.local)))
+            .map(|k| (k.target, params.arg(parent_table, k.local)))
             .collect();
 
         // Remaining (non-shard, non-route) keys become `target IN (?N)` predicates.
@@ -382,11 +404,19 @@ fn select_navs<'src>(
         let predicates = sql_keys
             .iter()
             .enumerate()
-            .map(|(i, k)| format!("\"{}\" IN (?{})", k.target, i + 1))
+            .map(|(i, k)| {
+                vec![
+                    SqlSegment::Literal(format!("\"{}\" IN (", k.target)),
+                    SqlSegment::Bind(i),
+                    SqlSegment::Literal(")".into()),
+                ]
+            })
             .collect::<Vec<_>>();
-        let bindings = sql_keys
+
+        // Each nav predicate spreads the distinct parent values into an `IN (?, ?, ...)` list.
+        let arguments = sql_keys
             .iter()
-            .map(|k| params.arg(parent_path, k.local))
+            .map(|k| SqlArgument::spread(params.arg(parent_table, k.local)))
             .collect();
 
         let join = nav
@@ -404,14 +434,14 @@ fn select_navs<'src>(
             .keys
             .iter()
             .filter(|k| is_shard(k.target) || is_route(k.target))
-            .map(|k| (k.target, params.arg(parent_path, k.local)))
+            .map(|k| (k.target, params.arg(parent_table, k.local)))
             .collect();
 
         plan.stage_at(stage).steps.push(SelectStep {
             query: Select::Sql {
                 database: backing.into(),
                 sql: select_sql(target, &predicates, None),
-                arguments: bindings,
+                arguments,
                 shard,
                 mapping: Mapping {
                     cardinality: nav.cardinality.clone().into(),
@@ -419,14 +449,19 @@ fn select_navs<'src>(
                 },
                 route_fields,
             },
-            result: path.to_vec(),
+            table: nav_table,
         });
     }
 }
 
-/// Build an ordered SQL `SELECT` over the model's columns. Ordered by
-/// primary key column(s).
-fn select_sql(model: &Model, preds: &[String], limit_placeholder: Option<usize>) -> String {
+/// Build an ordered SQL `SELECT` over the model's columns as [SqlSegment]s, ordered by
+/// primary key column(s). Each predicate is already split into its own segments, and
+/// `limit_bind` (0-based) appends a trailing `LIMIT` placeholder.
+fn select_sql(
+    model: &Model,
+    preds: &[Vec<SqlSegment>],
+    limit_bind: Option<usize>,
+) -> Vec<SqlSegment> {
     let columns = model
         .primary_columns
         .iter()
@@ -434,30 +469,52 @@ fn select_sql(model: &Model, preds: &[String], limit_placeholder: Option<usize>)
         .map(|c| format!("\"{}\"", c.field.name))
         .collect::<Vec<_>>()
         .join(", ");
-
-    // ex: `SELECT "id", "name" FROM "Horse"`
-    let mut sql = format!("SELECT {columns} FROM \"{}\"", model.name);
-
-    if !preds.is_empty() {
-        // ... WHERE "id" = ?1 AND "name" = ?2
-        sql.push_str(&format!(" WHERE {}", preds.join(" AND ")));
-    }
-
-    // ... ORDER BY "id" ASC, "name" ASC
     let order = model
         .primary_columns
         .iter()
         .map(|c| format!("\"{}\" ASC", c.field.name))
         .collect::<Vec<_>>()
         .join(", ");
-    sql.push_str(&format!(" ORDER BY {order}"));
 
-    if let Some(n) = limit_placeholder {
-        // ... LIMIT ?N
-        sql.push_str(&format!(" LIMIT ?{n}"));
+    // ex: `SELECT "id", "name" FROM "Horse"`
+    let mut segments = vec![SqlSegment::Literal(format!(
+        "SELECT {columns} FROM \"{}\"",
+        model.name
+    ))];
+
+    if !preds.is_empty() {
+        // ... WHERE "id" = ?1 AND "name" = ?2
+        segments.push(SqlSegment::Literal(" WHERE ".into()));
+        for (i, pred) in preds.iter().enumerate() {
+            if i > 0 {
+                segments.push(SqlSegment::Literal(" AND ".into()));
+            }
+            segments.extend(pred.iter().cloned());
+        }
     }
 
-    sql
+    // ... ORDER BY "id" ASC, "name" ASC
+    segments.push(SqlSegment::Literal(format!(" ORDER BY {order}")));
+
+    if let Some(bind) = limit_bind {
+        // ... LIMIT ?N
+        segments.push(SqlSegment::Literal(" LIMIT ".into()));
+        segments.push(SqlSegment::Bind(bind));
+    }
+
+    merge_literals(segments)
+}
+
+/// Coalesce adjacent [SqlSegment::Literal]s into one, so a composed statement carries a
+/// single literal between binds.
+fn merge_literals(segments: Vec<SqlSegment>) -> Vec<SqlSegment> {
+    segments.into_iter().fold(Vec::new(), |mut acc, seg| {
+        match (acc.last_mut(), seg) {
+            (Some(SqlSegment::Literal(prev)), SqlSegment::Literal(text)) => prev.push_str(&text),
+            (_, seg) => acc.push(seg),
+        }
+        acc
+    })
 }
 
 /// Maps a field on the current model to the [SelectArg] that fixes its value,
@@ -468,16 +525,12 @@ struct Params<'src> {
 }
 
 impl<'src> Params<'src> {
-    /// Resolve `field`, owned by the model at `parent_path`, to its source.
-    fn arg(&self, parent_path: &[&'src str], field: &'src str) -> SelectArg<'src> {
+    /// Resolve `field`, owned by the model at `table`, to its source.
+    fn arg(&self, table: usize, field: &'src str) -> SelectArg<'src> {
         self.map
             .get(field)
             .map(|(arg, _)| arg.clone())
-            .unwrap_or_else(|| {
-                let mut path = parent_path.to_vec();
-                path.push(field);
-                SelectArg::Result(path)
-            })
+            .unwrap_or(SelectArg::Field { table, field })
     }
 
     /// The first stage at which `field`'s value is readable.

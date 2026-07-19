@@ -32,7 +32,12 @@ export type MapCardinality = "One" | "Many";
 
 //#region: Select IR
 export interface SelectPlan {
+  tables: TableDef[];
   stages: SelectStage[];
+}
+
+export interface TableDef {
+  parent: { table: number; field: string } | null;
 }
 
 export interface SelectStage {
@@ -41,11 +46,17 @@ export interface SelectStage {
 
 export interface SelectStep {
   query: Select;
-  /** Path of field names to the slot this step attaches to; empty = root. */
-  result: string[];
+  table: number;
 }
 
-export type SelectArg = { Param: string } | { Result: string[] };
+export type SelectArg = { Param: string } | { Field: { table: number; field: string } };
+
+export type SqlSegment = { Literal: string } | { Bind: number };
+
+export interface SqlArgument {
+  value: SelectArg;
+  spread: boolean;
+}
 
 export interface JoinKeys {
   parent_key: string;
@@ -61,11 +72,11 @@ export type Select =
   | {
       Sql: {
         database: Database;
-        sql: string;
-        arguments: SelectArg[];
+        sql: SqlSegment[];
+        arguments: SqlArgument[];
         mapping: Mapping;
         shard: [string, SelectArg][];
-        route_fields?: [string, SelectArg][];
+        route_fields: [string, SelectArg][];
       };
     }
   | {

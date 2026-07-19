@@ -1,4 +1,8 @@
-/** NOTE: These definitions mirror the definitions in the Compiler */
+/**
+ * @internal
+ * TypeScript mirror of the Cloesce IDL (see `src/compiler/idl`).
+ */
+
 export type CrudKind = "Save" | "Get" | "List";
 
 export type CidlType =

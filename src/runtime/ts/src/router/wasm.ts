@@ -1,5 +1,5 @@
 import { Cidl } from "../cidl.js";
-import { Either } from "../common.js";
+import { Either, InternalError } from "../common.js";
 
 // NOTE: Requires the ORM binary to have been built
 import * as mod from "../../dist/orm.wasm";
@@ -101,10 +101,10 @@ export async function loadOrmWasm(idl: Cidl): Promise<OrmWasmExports> {
       new Uint8Array(exports.memory.buffer, resPtr, resLen),
     );
 
-    throw Error(`The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`);
+    throw new InternalError(`The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`);
   }
 
-  // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
+  // Intentionally leak `idlJson`, it should exist for the programs lifetime.
   return exports;
 }
 

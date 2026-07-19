@@ -149,6 +149,9 @@ export interface {{ binding.name }} {
     /** @internal RPC used by the Cloesce plan executor: reads a key from this DO's KV storage. */
     __cloesceKvGet(key: string): unknown;
 
+    /** @internal RPC used by the Cloesce plan executor: bulk-reads keys from this DO's KV storage. */
+    __cloesceKvGetMany(keys: string[]): [string, unknown][];
+
     /** @internal RPC used by the Cloesce plan executor: writes a key to this DO's KV storage. */
     __cloesceKvPut(key: string, value: unknown): void;
 }
@@ -929,6 +932,9 @@ export function cloesce(env: CfEnv, host?: object, migrations: DurableMigration[
             };
             proto.__cloesceKvGet = function (this: { ctx: DurableObjectState }, key: string) {
                 return this.ctx.storage.kv.get(key) ?? null;
+            };
+            proto.__cloesceKvGetMany = function (this: { ctx: DurableObjectState }, keys: string[]) {
+                return keys.map((key) => [key, this.ctx.storage.kv.get(key) ?? null]);
             };
             proto.__cloesceKvPut = function (this: { ctx: DurableObjectState }, key: string, value: unknown) {
                 this.ctx.storage.kv.put(key, value);

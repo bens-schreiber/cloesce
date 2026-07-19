@@ -1,6 +1,8 @@
 //! The select (read) query plan IR.
 //!
 //! Consists of a sequence of stages, each containing a set of steps that may execute in parallel.
+//! A plan additionally stores a list of linked tables (result objects from each individual query),
+//! which are referenced by each step to indicate where the step's result should be hydrated into the final result.
 //!
 //! Each stage is intended to run after the previous stage has completed, and may read values from the hydrated
 //! result produced by earlier stages.
@@ -13,6 +15,7 @@ use crate::query::{Database, TemplateSegment};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct SelectPlan<'src> {
+    pub tables: Vec<TableDef<'src>>,
     pub stages: Vec<SelectStage<'src>>,
 }
 
@@ -25,6 +28,25 @@ impl<'src> SelectPlan<'src> {
         }
         &mut self.stages[index]
     }
+
+    /// Register a table with the given parent, returning its id.
+    pub fn register_table(&mut self, parent: Option<TableParent<'src>>) -> usize {
+        let id = self.tables.len();
+        self.tables.push(TableDef { parent });
+        id
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TableDef<'src> {
+    /// Where this table attaches in the hydrated result; `None` only for the root.
+    pub parent: Option<TableParent<'src>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TableParent<'src> {
+    pub table: usize,
+    pub field: &'src str,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
@@ -36,24 +58,23 @@ pub struct SelectStage<'src> {
 pub struct SelectStep<'src> {
     pub query: Select<'src>,
 
-    /// The location in the hydrated result where this step's result is attached.
-    ///
-    /// An empty path means the result is to be attached at the root of the hydrated result.
-    pub result: Vec<&'src str>,
+    /// The table this step's result hydrates.
+    pub table: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Select<'src> {
     /// A SQL query to execute against a Durable Object or D1 database, composed of
-    /// positional `?N` placeholders referencing `arguments` (1-based).
+    /// literal [SqlSegment]s and [SqlSegment::Bind] placeholders referencing
+    /// `arguments` (0-based).
     ///
     /// For example:
-    /// - sql => `SELECT * FROM users WHERE id = ?1 AND name = ?2`
-    /// - arguments => `vec![SqlArg::Param("id"), SqlArg::Param("name")]`
+    /// - sql => `SELECT * FROM users WHERE id = ` `Bind(0)` ` AND name = ` `Bind(1)`
+    /// - arguments => `vec![SqlArgument { Param("id"), .. }, SqlArgument { Param("name"), .. }]`
     Sql {
         database: Database<'src>,
-        sql: String,
-        arguments: Vec<SelectArg<'src>>,
+        sql: Vec<SqlSegment>,
+        arguments: Vec<SqlArgument<'src>>,
         mapping: Mapping<'src>,
 
         /// For a [Database::DurableObject] step, the `(field, value)` pairs
@@ -75,8 +96,8 @@ pub enum Select<'src> {
         shard: Vec<(&'src str, SelectArg<'src>)>,
     },
 
-    /// Set `fields` on the object(s) at [Step::result] from runtime params or parent
-    /// field values, without querying an external database.
+    /// Set `fields` on the object(s) of the step's [SelectStep::table] from runtime
+    /// params or parent field values, without querying an external database.
     ///
     /// Will never synthesize onto the result(s) of a [Select::Sql] call, only
     /// on some non-sql backed parent object.
@@ -143,7 +164,40 @@ pub enum SelectArg<'src> {
     /// A scalar runtime parameter that must be provided to execute the step.
     Param(Cow<'src, str>),
 
-    /// A path to a value in the hydrated result produced by an earlier step
-    /// (same semantics as [SelectStep::result]).
-    Result(Vec<&'src str>),
+    /// A field of a table hydrated by an earlier step.
+    Field { table: usize, field: &'src str },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum SqlSegment {
+    /// Verbatim SQL text.
+    Literal(String),
+    /// A placeholder bound to `arguments[i]` (0-based).
+    Bind(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SqlArgument<'src> {
+    pub value: SelectArg<'src>,
+
+    /// Expand to a `(?, ?, ...)` list instead of a single `?`, for use in `IN` clauses.
+    pub spread: bool,
+}
+
+impl<'src> SqlArgument<'src> {
+    /// A single-value binding.
+    pub fn scalar(value: SelectArg<'src>) -> Self {
+        Self {
+            value,
+            spread: false,
+        }
+    }
+
+    /// A binding that spreads its distinct values.
+    pub fn spread(value: SelectArg<'src>) -> Self {
+        Self {
+            value,
+            spread: true,
+        }
+    }
 }

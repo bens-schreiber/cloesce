@@ -3,7 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use orm::query::select::plan::{
-    JoinKeys, MapCardinality, Select, SelectArg, SelectPlan, SelectStep,
+    JoinKeys, MapCardinality, Select, SelectArg, SelectPlan, SelectStep, SqlArgument, SqlSegment,
+    TableDef,
 };
 use orm::query::{Database, DatabaseKind, TemplateSegment};
 use serde_json::{Map, Value as JsonValue, json};
@@ -29,6 +30,7 @@ pub async fn execute<'p>(
     let mut ctx = Context {
         params,
         storage,
+        defs: &plan.tables,
         tables: HashMap::new(),
     };
 
@@ -42,26 +44,27 @@ pub async fn execute<'p>(
             fetched.push((step, ctx.fetch(step).await));
         }
 
-        // Hydrate parents before children.
-        fetched.sort_by_key(|(step, _)| step.result.len());
+        // Hydrate parents before children: table ids ascend from parent to child
+        // (a plan invariant), so id order is already parent-before-child order.
+        fetched.sort_by_key(|(step, _)| step.table);
         for (step, data) in fetched {
             let table = ctx.attach(step, data);
-            ctx.tables.insert(step.result.as_slice(), table);
+            ctx.tables.insert(step.table, table);
         }
     }
 
     ctx.assemble()
 }
 
-/// A step's location in the hydrated result ([SelectStep::result]).
-type Path<'p> = &'p [&'p str];
-
 struct Context<'p> {
     params: Map<String, JsonValue>,
     storage: &'p MockStorage,
 
-    /// The hydrated tables of every completed stage, by result path.
-    tables: HashMap<Path<'p>, Table>,
+    /// The plan's flat table tree, used to climb parent links.
+    defs: &'p [TableDef<'p>],
+
+    /// The hydrated tables of every completed stage, by table id.
+    tables: HashMap<usize, Table>,
 }
 
 enum StepResult {
@@ -115,35 +118,43 @@ impl<'p> Context<'p> {
     async fn fetch_sql(
         &self,
         database: &Database<'_>,
-        sql: &str,
-        arguments: &[SelectArg<'p>],
+        sql: &[SqlSegment],
+        arguments: &[SqlArgument<'p>],
         shard: &[(&'p str, SelectArg<'p>)],
         route_fields: &[(&'p str, SelectArg<'p>)],
     ) -> Vec<JsonValue> {
-        let spreads = arguments.iter().map(|a| self.spread(a)).collect::<Vec<_>>();
-        if spreads.iter().any(Vec::is_empty) {
-            // A spread over zero parent values selects nothing.
+        // Each argument contributes its bound values: a spread expands to its distinct
+        // values, a non-spread argument binds exactly one. A spread over zero parent
+        // values selects nothing.
+        let values = arguments
+            .iter()
+            .map(|a| match a.spread {
+                true => self.spread(&a.value),
+                false => vec![self.single(&a.value)],
+            })
+            .collect::<Vec<_>>();
+        if values.iter().any(Vec::is_empty) {
             return Vec::new();
         }
 
         let mut slots = 1..;
-        let expansions = spreads
+        let expansions = values
             .iter()
-            .map(|s| {
-                let slots = slots.by_ref().take(s.len()).map(|i| format!("?{i}"));
+            .map(|group| {
+                let slots = slots.by_ref().take(group.len()).map(|i| format!("?{i}"));
                 slots.collect::<Vec<_>>().join(", ")
             })
             .collect::<Vec<_>>();
-        let sql = expand_placeholders(sql, &expansions);
-        let binds = spreads.into_iter().flatten().collect::<Vec<_>>();
+        let binds = values.into_iter().flatten().collect::<Vec<_>>();
+        let sql = build_sql(sql, &expansions);
 
-        // Param route fields are constant across shards; `Result` route fields
+        // Param route fields are constant across shards; `Field` route fields
         // are deferred to hydration.
         let constants = route_fields
             .iter()
             .filter_map(|(field, arg)| match arg {
                 SelectArg::Param(name) => Some((*field, self.param(name))),
-                SelectArg::Result(_) => None,
+                SelectArg::Field { .. } => None,
             })
             .collect::<Vec<_>>();
 
@@ -229,6 +240,17 @@ impl<'p> Context<'p> {
             .collect()
     }
 
+    /// The single value a non-spread argument binds.
+    fn single(&self, arg: &SelectArg<'p>) -> JsonValue {
+        let mut values = self.spread(arg);
+        assert_eq!(
+            values.len(),
+            1,
+            "non-spread argument to bind exactly one value"
+        );
+        values.pop().unwrap()
+    }
+
     /// Resolve `args` to the distinct value tuples, one per hydrated object of the deepest
     /// table any arg references. An arg owned by a strict ancestor of that table is
     /// resolved by climbing the parent back-refs (never a cross product).
@@ -236,30 +258,50 @@ impl<'p> Context<'p> {
         let tables = args
             .iter()
             .filter_map(|arg| match arg {
-                SelectArg::Result(q) => Some(&q[..q.len() - 1]),
+                SelectArg::Field { table, .. } => Some(*table),
                 SelectArg::Param(_) => None,
             })
             .collect::<HashSet<_>>();
 
         // Param-only tuples resolve without a source table.
-        let Some(deepest) = tables.iter().copied().max_by_key(|t| t.len()) else {
-            let tuple = args.iter().map(|arg| self.resolve_at(&[], 0, arg));
+        // The referenced tables all lie on one ancestor line (asserted below), so the
+        // deepest is the one with the largest id (a child's id exceeds its parent's).
+        let Some(deepest) = tables.iter().copied().max() else {
+            let tuple = args.iter().map(|arg| self.resolve_at(0, 0, arg));
             return vec![tuple.collect()];
         };
         assert!(
-            tables.iter().all(|t| deepest.starts_with(t)),
+            tables.iter().all(|t| self.is_ancestor(*t, deepest)),
             "key/shard arguments spanning unrelated source tables are unsupported"
         );
 
         let table = self
             .tables
-            .get(deepest)
-            .expect("result arg to reference an earlier stage's table");
+            .get(&deepest)
+            .expect("field arg to reference an earlier stage's table");
         distinct((0..table.attachments.len()).map(|idx| {
             args.iter()
                 .map(|arg| self.resolve_at(deepest, idx, arg))
                 .collect::<Vec<_>>()
         }))
+    }
+
+    /// The parent table of `table`, or `None` for the root.
+    fn parent_table(&self, table: usize) -> Option<usize> {
+        self.defs[table].parent.as_ref().map(|p| p.table)
+    }
+
+    /// Whether `ancestor` is `node` or one of its ancestors.
+    fn is_ancestor(&self, ancestor: usize, mut node: usize) -> bool {
+        loop {
+            if node == ancestor {
+                return true;
+            }
+            match self.parent_table(node) {
+                Some(parent) => node = parent,
+                None => return false,
+            }
+        }
     }
 
     fn param(&self, name: &str) -> JsonValue {
@@ -270,35 +312,35 @@ impl<'p> Context<'p> {
     /// Fold every hydrated table into its parent, deepest first, producing the final
     /// result.
     fn assemble(&mut self) -> JsonValue {
-        let mut paths = self.tables.keys().copied().collect::<Vec<_>>();
-        paths.sort_by_key(|path| std::cmp::Reverse(path.len()));
-        for path in paths {
-            let Some((field, parent_path)) = path.split_last() else {
+        // A child's id always exceeds its parent's (a plan invariant), so folding in
+        // descending id order always hydrates a child before its parent.
+        let mut ids = self.tables.keys().copied().collect::<Vec<_>>();
+        ids.sort_unstable_by(|a, b| b.cmp(a));
+        for id in ids {
+            let Some(parent) = self.defs[id].parent.as_ref() else {
                 break;
             };
-            let child = self.tables.remove(path).unwrap();
+            let (field, parent_table) = (parent.field, parent.table);
+            let child = self.tables.remove(&id).unwrap();
             let parents = &mut self
                 .tables
-                .get_mut(parent_path)
+                .get_mut(&parent_table)
                 .expect("parent table")
                 .attachments;
             if child.many {
                 for parent in parents.iter_mut() {
-                    parent.value[*field] = json!([]);
+                    parent.value[field] = json!([]);
                 }
             }
             for attachment in child.attachments {
-                match &mut parents[attachment.parent].value[*field] {
+                match &mut parents[attachment.parent].value[field] {
                     JsonValue::Array(values) if child.many => values.push(attachment.value),
                     slot => *slot = attachment.value,
                 }
             }
         }
 
-        let root = self
-            .tables
-            .remove(&[] as &[&str])
-            .expect("root table to exist");
+        let root = self.tables.remove(&0).expect("root table to exist");
         let mut values = root.attachments.into_iter().map(|a| a.value);
         match root.many {
             true => JsonValue::Array(values.collect()),
@@ -310,7 +352,7 @@ impl<'p> Context<'p> {
     /// per-parent fields (route fields, synthesized fields, key lookups) resolved by
     /// climbing the ancestor back-refs.
     fn attach(&self, step: &'p SelectStep<'p>, fetched: StepResult) -> Table {
-        let path = step.result.as_slice();
+        let table = step.table;
         match (&step.query, fetched) {
             (
                 Select::Sql {
@@ -321,7 +363,7 @@ impl<'p> Context<'p> {
                 StepResult::Rows(rows),
             ) => {
                 let many = mapping.cardinality == MapCardinality::Many;
-                let Some((_, parent_path)) = path.split_last() else {
+                let Some(parent_table) = self.parent_table(table) else {
                     let attachments = rows
                         .into_iter()
                         .map(|value| Attachment { parent: 0, value });
@@ -334,7 +376,7 @@ impl<'p> Context<'p> {
                 // Bucket parents by join key, then hand each row to its matching parents;
                 // a One mapping serves each parent at most once.
                 let mut index = HashMap::<Vec<JsonValue>, Vec<usize>>::new();
-                for (i, parent) in self.tables[parent_path].attachments.iter().enumerate() {
+                for (i, parent) in self.tables[&parent_table].attachments.iter().enumerate() {
                     let key = join_key(&parent.value, &mapping.join, |j| j.parent_key);
                     index.entry(key).or_default().push(i);
                 }
@@ -349,8 +391,8 @@ impl<'p> Context<'p> {
                         }
                         let mut value = row.clone();
                         for (field, arg) in route_fields {
-                            if matches!(arg, SelectArg::Result(_)) {
-                                value[*field] = self.resolve_at(parent_path, parent, arg);
+                            if matches!(arg, SelectArg::Field { .. }) {
+                                value[*field] = self.resolve_at(parent_table, parent, arg);
                             }
                         }
                         attachments.push(Attachment { parent, value });
@@ -365,10 +407,10 @@ impl<'p> Context<'p> {
                 StepResult::Keys(fetched),
             ) => {
                 let args = key_args(shard, segments);
-                self.singletons(path, |parent_path, parent| {
+                self.singletons(table, |parent_table, parent| {
                     let tuple = args
                         .iter()
-                        .map(|arg| self.resolve_at(parent_path, parent, arg))
+                        .map(|arg| self.resolve_at(parent_table, parent, arg))
                         .collect::<Vec<_>>();
                     fetched[&tuple].clone()
                 })
@@ -382,11 +424,14 @@ impl<'p> Context<'p> {
             ) => {
                 // A Many synthesize is a singleton array, folded as a single value.
                 // At the root every field is param-sourced by construction.
-                self.singletons(path, |parent_path, parent| {
+                self.singletons(table, |parent_table, parent| {
                     let object = fields
                         .iter()
                         .map(|(field, arg)| {
-                            (field.to_string(), self.resolve_at(parent_path, parent, arg))
+                            (
+                                field.to_string(),
+                                self.resolve_at(parent_table, parent, arg),
+                            )
                         })
                         .collect();
                     match cardinality {
@@ -400,17 +445,17 @@ impl<'p> Context<'p> {
     }
 
     /// A `Table` with exactly one attachment per parent object (a single root-level
-    /// attachment when `path` is the root), each built from its parent's location.
-    fn singletons(&self, path: Path<'p>, build: impl Fn(Path<'p>, usize) -> JsonValue) -> Table {
-        let attachments = match path.split_last() {
+    /// attachment when `table` is the root), each built from its parent's location.
+    fn singletons(&self, table: usize, build: impl Fn(usize, usize) -> JsonValue) -> Table {
+        let attachments = match self.parent_table(table) {
             None => vec![Attachment {
                 parent: 0,
-                value: build(path, 0),
+                value: build(table, 0),
             }],
-            Some((_, parent_path)) => (0..self.tables[parent_path].attachments.len())
+            Some(parent_table) => (0..self.tables[&parent_table].attachments.len())
                 .map(|parent| Attachment {
                     parent,
-                    value: build(parent_path, parent),
+                    value: build(parent_table, parent),
                 })
                 .collect(),
         };
@@ -420,18 +465,20 @@ impl<'p> Context<'p> {
         }
     }
 
-    /// Resolve an argument for the object at (`path`, `idx`)
-    fn resolve_at(&self, path: &[&'p str], idx: usize, arg: &SelectArg<'p>) -> JsonValue {
+    /// Resolve an argument for the object at (`table`, `idx`)
+    fn resolve_at(&self, table: usize, idx: usize, arg: &SelectArg<'p>) -> JsonValue {
         match arg {
             SelectArg::Param(name) => self.param(name),
-            SelectArg::Result(q) => {
-                let (field, owner) = q.split_last().expect("non-empty result arg");
-                let (mut path, mut idx) = (path, idx);
-                while path.len() > owner.len() {
-                    idx = self.tables[path].attachments[idx].parent;
-                    path = &path[..path.len() - 1];
+            SelectArg::Field {
+                table: owner,
+                field,
+            } => {
+                let (mut table, mut idx) = (table, idx);
+                while table != *owner {
+                    idx = self.tables[&table].attachments[idx].parent;
+                    table = self.parent_table(table).expect("owner to be an ancestor");
                 }
-                field_of(&self.tables[path].attachments[idx].value, field)
+                field_of(&self.tables[&table].attachments[idx].value, field)
             }
         }
     }
@@ -472,18 +519,16 @@ fn render_key(segments: &[TemplateSegment<'_, SelectArg<'_>>], values: &[JsonVal
         .collect()
 }
 
-/// Rewrite `?N` placeholders, replacing the N-th argument's placeholder with its
-/// (possibly spread) expansion.
-fn expand_placeholders(sql: &str, expansions: &[String]) -> String {
-    let mut parts = sql.split('?');
-    let mut out = parts.next().unwrap_or_default().to_string();
-    for part in parts {
-        let digits = part.chars().take_while(char::is_ascii_digit).count();
-        let n: usize = part[..digits].parse().expect("numbered placeholder");
-        out.push_str(&expansions[n - 1]);
-        out.push_str(&part[digits..]);
-    }
-    out
+/// Assemble a step's SQL text, replacing each [SqlSegment::Bind] with the
+/// (possibly spread) placeholder expansion of its argument.
+fn build_sql(segments: &[SqlSegment], expansions: &[String]) -> String {
+    segments
+        .iter()
+        .map(|seg| match seg {
+            SqlSegment::Literal(text) => text.as_str(),
+            SqlSegment::Bind(i) => expansions[*i].as_str(),
+        })
+        .collect()
 }
 
 fn field_of(row: &JsonValue, field: &str) -> JsonValue {

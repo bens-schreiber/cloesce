@@ -10,21 +10,6 @@ import type {
   TemplateSegment,
 } from "./plan";
 
-/** A step's output, deferred to the sequential sink: body attachments or a synthesize. */
-type Sunk = { kind: "attach"; entries: [PathSegment[], unknown][] } | { kind: "synthesize" };
-
-/** The storage a step targets, for error typing; Synthesize steps touch none. */
-function database(step: SaveStep): Database | null {
-  const q = step.query;
-  if ("SqlBatch" in q) {
-    return q.SqlBatch.database;
-  }
-  if ("KeyWrite" in q) {
-    return q.KeyWrite.database;
-  }
-  return null;
-}
-
 export async function execute(
   plan: SavePlan,
   storage: StorageResolver,
@@ -49,6 +34,9 @@ export async function execute(
   }
   return sinkResult(exec.body.value(), errors);
 }
+
+/** A step's output, deferred to the sequential sink: body attachments or a synthesize. */
+type Sunk = { kind: "attach"; entries: [PathSegment[], unknown][] } | { kind: "synthesize" };
 
 /** The working save body */
 class WorkingResultBody {
@@ -266,6 +254,18 @@ class Executor {
 
     this.body.merge(result, buildFields());
   }
+}
+
+/** The storage a step targets, for error typing; Synthesize steps touch none. */
+function database(step: SaveStep): Database | null {
+  const q = step.query;
+  if ("SqlBatch" in q) {
+    return q.SqlBatch.database;
+  }
+  if ("KeyWrite" in q) {
+    return q.KeyWrite.database;
+  }
+  return null;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

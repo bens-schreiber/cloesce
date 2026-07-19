@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": null,
+    "outDir": null,
+    "types": ["@cloudflare/workers-types", "vitest/globals"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["dist"]
+}

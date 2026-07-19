@@ -109,6 +109,9 @@ export interface GlobalDo {
     /** @internal RPC used by the Cloesce plan executor: reads a key from this DO's KV storage. */
     __cloesceKvGet(key: string): unknown;
 
+    /** @internal RPC used by the Cloesce plan executor: bulk-reads keys from this DO's KV storage. */
+    __cloesceKvGetMany(keys: string[]): [string, unknown][];
+
     /** @internal RPC used by the Cloesce plan executor: writes a key to this DO's KV storage. */
     __cloesceKvPut(key: string, value: unknown): void;
 }
@@ -156,6 +159,9 @@ export interface LeaderboardDo {
 
     /** @internal RPC used by the Cloesce plan executor: reads a key from this DO's KV storage. */
     __cloesceKvGet(key: string): unknown;
+
+    /** @internal RPC used by the Cloesce plan executor: bulk-reads keys from this DO's KV storage. */
+    __cloesceKvGetMany(keys: string[]): [string, unknown][];
 
     /** @internal RPC used by the Cloesce plan executor: writes a key to this DO's KV storage. */
     __cloesceKvPut(key: string, value: unknown): void;
@@ -664,7 +670,7 @@ export namespace GlobalSettings {
             tree: {"config":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[]}},"result":[]},{"query":{"Key":{"database":{"kind":"DurableObject","name":"GlobalDo"},"segments":[{"Literal":"config"}],"shard":[]}},"result":["config"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[]}},"table":0},{"query":{"Key":{"database":{"kind":"DurableObject","name":"GlobalDo"},"segments":[{"Literal":"config"}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"config","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `GlobalSettings`.
@@ -872,7 +878,7 @@ export namespace HasSqlColumnTypes {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"str\", \"integer\", \"dub\", \"boo\", \"dat\", \"strNull\", \"integerNull\", \"dubNull\", \"booNull\", \"dateNull\" FROM \"HasSqlColumnTypes\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"str\", \"integer\", \"dub\", \"boo\", \"dat\", \"strNull\", \"integerNull\", \"dubNull\", \"booNull\", \"dateNull\" FROM \"HasSqlColumnTypes\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load a single `HasSqlColumnTypes`.
@@ -899,7 +905,7 @@ export namespace HasSqlColumnTypes {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"str\", \"integer\", \"dub\", \"boo\", \"dat\", \"strNull\", \"integerNull\", \"dubNull\", \"booNull\", \"dateNull\" FROM \"HasSqlColumnTypes\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"str\", \"integer\", \"dub\", \"boo\", \"dat\", \"strNull\", \"integerNull\", \"dubNull\", \"booNull\", \"dateNull\" FROM \"HasSqlColumnTypes\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load all matching `HasSqlColumnTypes` rows.
@@ -1147,7 +1153,7 @@ export namespace Leaderboard {
             tree: {"topEntries":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["tenantId",{"Param":"tenantId"}]]}},"result":[]},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"result":["topEntries"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["tenantId",{"Param":"tenantId"}]]}},"table":0},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"topEntries","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `Leaderboard`.
@@ -1352,7 +1358,7 @@ export namespace LeaderboardEntry {
             tree: {"topEntries":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"DurableObject","name":"LeaderboardDo"},"mapping":{"cardinality":"One","join":[]},"route_fields":[["tenantId",{"Param":"tenantId"}]],"shard":[["tenantId",{"Param":"tenantId"}]],"sql":"SELECT \"id\", \"playerName\", \"score\" FROM \"LeaderboardEntry\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"result":["topEntries"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"DurableObject","name":"LeaderboardDo"},"mapping":{"cardinality":"One","join":[]},"route_fields":[["tenantId",{"Param":"tenantId"}]],"shard":[["tenantId",{"Param":"tenantId"}]],"sql":[{"Literal":"SELECT \"id\", \"playerName\", \"score\" FROM \"LeaderboardEntry\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"topEntries","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `LeaderboardEntry`.
@@ -1384,7 +1390,7 @@ export namespace LeaderboardEntry {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"DurableObject","name":"LeaderboardDo"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[["tenantId",{"Param":"tenantId"}]],"shard":[["tenantId",{"Param":"tenantId"}]],"sql":"SELECT \"id\", \"playerName\", \"score\" FROM \"LeaderboardEntry\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"result":["topEntries"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"DurableObject","name":"LeaderboardDo"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[["tenantId",{"Param":"tenantId"}]],"shard":[["tenantId",{"Param":"tenantId"}]],"sql":[{"Literal":"SELECT \"id\", \"playerName\", \"score\" FROM \"LeaderboardEntry\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0},{"query":{"Key":{"database":{"kind":"DurableObject","name":"LeaderboardDo"},"segments":[{"Literal":"top"}],"shard":[["tenantId",{"Param":"tenantId"}]]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"topEntries","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `LeaderboardEntry` rows.
@@ -1647,7 +1653,7 @@ export namespace ModelWithCompositePk {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"tenantId"},{"Param":"rowId"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"tenantId\", \"rowId\", \"name\" FROM \"ModelWithCompositePk\" WHERE \"tenantId\" = ?1 AND \"rowId\" = ?2 ORDER BY \"tenantId\" ASC, \"rowId\" ASC"}},"result":[]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"tenantId"}},{"spread":false,"value":{"Param":"rowId"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"tenantId\", \"rowId\", \"name\" FROM \"ModelWithCompositePk\" WHERE \"tenantId\" = "},{"Bind":0},{"Literal":" AND \"rowId\" = "},{"Bind":1},{"Literal":" ORDER BY \"tenantId\" ASC, \"rowId\" ASC"}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load a single `ModelWithCompositePk`.
@@ -1674,7 +1680,7 @@ export namespace ModelWithCompositePk {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_tenantId"},{"Param":"lastSeen_rowId"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"tenantId\", \"rowId\", \"name\" FROM \"ModelWithCompositePk\" WHERE (\"tenantId\", \"rowId\") > (?1, ?2) ORDER BY \"tenantId\" ASC, \"rowId\" ASC LIMIT ?3"}},"result":[]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_tenantId"}},{"spread":false,"value":{"Param":"lastSeen_rowId"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"tenantId\", \"rowId\", \"name\" FROM \"ModelWithCompositePk\" WHERE (\"tenantId\", \"rowId\") > ("},{"Bind":0},{"Literal":", "},{"Bind":1},{"Literal":") ORDER BY \"tenantId\" ASC, \"rowId\" ASC LIMIT "},{"Bind":2}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithCompositePk` rows.
@@ -1938,7 +1944,7 @@ export namespace ModelWithKv {
             tree: {"someValue":{},"streamValue":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id1"},{"Param":"id2"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id1\", \"id2\" FROM \"ModelWithKv\" WHERE \"id1\" = ?1 AND \"id2\" = ?2 ORDER BY \"id1\" ASC, \"id2\" ASC"}},"result":[]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Param":"id1"}},{"Literal":"/"},{"Value":{"Param":"id2"}}],"shard":[]}},"result":["someValue"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"stream/"},{"Value":{"Param":"id1"}},{"Literal":"/"},{"Value":{"Param":"id2"}}],"shard":[]}},"result":["streamValue"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id1"}},{"spread":false,"value":{"Param":"id2"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id1\", \"id2\" FROM \"ModelWithKv\" WHERE \"id1\" = "},{"Bind":0},{"Literal":" AND \"id2\" = "},{"Bind":1},{"Literal":" ORDER BY \"id1\" ASC, \"id2\" ASC"}]}},"table":0},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Param":"id1"}},{"Literal":"/"},{"Value":{"Param":"id2"}}],"shard":[]}},"table":1},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"stream/"},{"Value":{"Param":"id1"}},{"Literal":"/"},{"Value":{"Param":"id2"}}],"shard":[]}},"table":2}]}],"tables":[{"parent":null},{"parent":{"field":"someValue","table":0}},{"parent":{"field":"streamValue","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `ModelWithKv`.
@@ -1970,7 +1976,7 @@ export namespace ModelWithKv {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id1"},{"Param":"lastSeen_id2"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id1\", \"id2\" FROM \"ModelWithKv\" WHERE (\"id1\", \"id2\") > (?1, ?2) ORDER BY \"id1\" ASC, \"id2\" ASC LIMIT ?3"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["id1"]}},{"Literal":"/"},{"Value":{"Result":["id2"]}}],"shard":[]}},"result":["someValue"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"stream/"},{"Value":{"Result":["id1"]}},{"Literal":"/"},{"Value":{"Result":["id2"]}}],"shard":[]}},"result":["streamValue"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id1"}},{"spread":false,"value":{"Param":"lastSeen_id2"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id1\", \"id2\" FROM \"ModelWithKv\" WHERE (\"id1\", \"id2\") > ("},{"Bind":0},{"Literal":", "},{"Bind":1},{"Literal":") ORDER BY \"id1\" ASC, \"id2\" ASC LIMIT "},{"Bind":2}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Field":{"field":"id1","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"id2","table":0}}}],"shard":[]}},"table":1},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"stream/"},{"Value":{"Field":{"field":"id1","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"id2","table":0}}}],"shard":[]}},"table":2}]}],"tables":[{"parent":null},{"parent":{"field":"someValue","table":0}},{"parent":{"field":"streamValue","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithKv` rows.
@@ -2229,7 +2235,7 @@ export namespace ModelWithR2 {
             tree: {"fileData":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"ModelWithR2\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]},{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"files/"},{"Value":{"Param":"id"}}],"shard":[]}},"result":["fileData"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"ModelWithR2\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0},{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"files/"},{"Value":{"Param":"id"}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"fileData","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `ModelWithR2`.
@@ -2259,7 +2265,7 @@ export namespace ModelWithR2 {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"ModelWithR2\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"files/"},{"Value":{"Result":["id"]}}],"shard":[]}},"result":["fileData"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"ModelWithR2\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"files/"},{"Value":{"Field":{"field":"id","table":0}}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"fileData","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithR2` rows.
@@ -2512,7 +2518,7 @@ export namespace OneToManyModel {
             tree: {"oneToManyNav":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]},{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyNav"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"oneToManyNav","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `OneToManyModel`.
@@ -2543,7 +2549,7 @@ export namespace OneToManyModel {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["id"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyNav"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"id","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"oneToManyNav","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `OneToManyModel` rows.
@@ -2796,7 +2802,7 @@ export namespace RouteCar {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}]]}},"result":[]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}]]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load a single `RouteCar`.
@@ -2997,7 +3003,7 @@ export namespace RouteOwner {
             tree: {"car":{},"metadata":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}],["modelYear",{"Param":"modelYear"}]]}},"result":[]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Param":"ownerId"}},{"Literal":"/"},{"Value":{"Param":"modelYear"}}],"shard":[]}},"result":["metadata"]},{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}]]}},"result":["car"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}],["modelYear",{"Param":"modelYear"}]]}},"table":0},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Param":"ownerId"}},{"Literal":"/"},{"Value":{"Param":"modelYear"}}],"shard":[]}},"table":1},{"query":{"Synthesize":{"cardinality":"One","fields":[["ownerId",{"Param":"ownerId"}]]}},"table":2}]}],"tables":[{"parent":null},{"parent":{"field":"metadata","table":0}},{"parent":{"field":"car","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `RouteOwner`.
@@ -3212,7 +3218,7 @@ export namespace ToyotaPrius {
             tree: {"metadata":{},"photoData":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Field":{"field":"ownerId","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":2}]}],"tables":[{"parent":null},{"parent":{"field":"photoData","table":0}},{"parent":{"field":"metadata","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `ToyotaPrius`.
@@ -3246,7 +3252,7 @@ export namespace ToyotaPrius {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1},{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Field":{"field":"ownerId","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":2}]}],"tables":[{"parent":null},{"parent":{"field":"photoData","table":0}},{"parent":{"field":"metadata","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `ToyotaPrius` rows.
@@ -3355,7 +3361,7 @@ export namespace ToyotaPrius {
             tree: {"metadata":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Field":{"field":"ownerId","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"metadata","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `ToyotaPrius`.
@@ -3387,7 +3393,7 @@ export namespace ToyotaPrius {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Result":["ownerId"]}},{"Literal":"/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["metadata"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"Kv","name":"MyKv"},"segments":[{"Literal":"value/"},{"Value":{"Field":{"field":"ownerId","table":0}}},{"Literal":"/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"metadata","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `ToyotaPrius` rows.
@@ -3494,7 +3500,7 @@ export namespace ToyotaPrius {
             tree: {"photoData":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"photoData","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `ToyotaPrius`.
@@ -3526,7 +3532,7 @@ export namespace ToyotaPrius {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Result":["modelYear"]}}],"shard":[]}},"result":["photoData"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"ownerId\", \"modelYear\" FROM \"ToyotaPrius\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"photos/"},{"Value":{"Field":{"field":"modelYear","table":0}}}],"shard":[]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"photoData","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `ToyotaPrius` rows.
@@ -3779,7 +3785,7 @@ export namespace BasicModel {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load a single `BasicModel`.
@@ -3806,7 +3812,7 @@ export namespace BasicModel {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load all matching `BasicModel` rows.
@@ -4062,7 +4068,7 @@ export namespace ModelWithCustomDs {
             tree: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Result":["id"]}},{"Literal":"/data"}],"shard":[]}},"result":["data"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel","oneToManyNav"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Field":{"field":"id","table":0}}},{"Literal":"/data"}],"shard":[]}},"table":1},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":2},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":3}]}],"tables":[{"parent":null},{"parent":{"field":"data","table":0}},{"parent":{"field":"oneToManyModel","table":0}},{"parent":{"field":"oneToManyNav","table":2}}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithCustomDs` rows.
@@ -4175,7 +4181,7 @@ export namespace ModelWithCustomDs {
             tree: {"data":{},"oneToManyModel":{"oneToManyNav":{}}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]},{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Param":"id"}},{"Literal":"/data"}],"shard":[]}},"result":["data"]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel","oneToManyNav"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0},{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Param":"id"}},{"Literal":"/data"}],"shard":[]}},"table":1}]},{"steps":[{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":2},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":3}]}],"tables":[{"parent":null},{"parent":{"field":"data","table":0}},{"parent":{"field":"oneToManyModel","table":0}},{"parent":{"field":"oneToManyNav","table":2}}]} as SelectPlan,
 
             /**
              * Load a single `ModelWithCustomDs`.
@@ -4213,7 +4219,7 @@ export namespace ModelWithCustomDs {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Result":["id"]}},{"Literal":"/data"}],"shard":[]}},"result":["data"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel"]},{"query":{"Sql":{"arguments":[{"Result":["oneToManyId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToManyModel","oneToManyNav"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"oneToManyId\" FROM \"ModelWithCustomDs\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Key":{"database":{"kind":"R2","name":"MyR2"},"segments":[{"Literal":"custom/"},{"Value":{"Field":{"field":"id","table":0}}},{"Literal":"/data"}],"shard":[]}},"table":1},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"oneToManyId"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\" FROM \"OneToManyModel\" WHERE \"id\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":2},{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"oneToManyId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[{"child_key":"fk_to_model","parent_key":"id"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"fk_to_model\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":3}]}],"tables":[{"parent":null},{"parent":{"field":"data","table":0}},{"parent":{"field":"oneToManyModel","table":0}},{"parent":{"field":"oneToManyNav","table":2}}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithCustomDs` rows.
@@ -4506,7 +4512,7 @@ export namespace HasOneToOne {
             tree: {"oneToOneNav":{}},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"basicModelId\" FROM \"HasOneToOne\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["basicModelId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"basicModelId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToOneNav"]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"basicModelId\" FROM \"HasOneToOne\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]},{"steps":[{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"basicModelId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"basicModelId"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"oneToOneNav","table":0}}]} as SelectPlan,
 
             /**
              * Load a single `HasOneToOne`.
@@ -4539,7 +4545,7 @@ export namespace HasOneToOne {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"basicModelId\" FROM \"HasOneToOne\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]},{"steps":[{"query":{"Sql":{"arguments":[{"Result":["basicModelId"]}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"basicModelId"}]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" IN (?1) ORDER BY \"id\" ASC"}},"result":["oneToOneNav"]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"basicModelId\" FROM \"HasOneToOne\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]},{"steps":[{"query":{"Sql":{"arguments":[{"spread":true,"value":{"Field":{"field":"basicModelId","table":0}}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[{"child_key":"id","parent_key":"basicModelId"}]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"fk_to_model\" FROM \"BasicModel\" WHERE \"id\" IN ("},{"Bind":0},{"Literal":") ORDER BY \"id\" ASC"}]}},"table":1}]}],"tables":[{"parent":null},{"parent":{"field":"oneToOneNav","table":0}}]} as SelectPlan,
 
             /**
              * Load all matching `HasOneToOne` rows.
@@ -4795,7 +4801,7 @@ export namespace ModelWithCruds {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Hydrate pre-supplied ("seeded") `ModelWithCruds` rows against {@link listPlan}.
@@ -4876,7 +4882,7 @@ export namespace ModelWithCruds {
             tree: {},
 
             /** @internal Precompiled select plan backing {@link get}. */
-            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"id"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" = ?1 ORDER BY \"id\" ASC"}},"result":[]}]}]} as SelectPlan,
+            getPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"id"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"One","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" = "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC"}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load a single `ModelWithCruds`.
@@ -4903,7 +4909,7 @@ export namespace ModelWithCruds {
             },
 
             /** @internal Precompiled select plan backing {@link list} and {@link hydrateAll}. */
-            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"Param":"lastSeen_id"},{"Param":"limit"}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > ?1 ORDER BY \"id\" ASC LIMIT ?2"}},"result":[]}]}]} as SelectPlan,
+            listPlan: {"stages":[{"steps":[{"query":{"Sql":{"arguments":[{"spread":false,"value":{"Param":"lastSeen_id"}},{"spread":false,"value":{"Param":"limit"}}],"database":{"kind":"D1","name":"db"},"mapping":{"cardinality":"Many","join":[]},"route_fields":[],"shard":[],"sql":[{"Literal":"SELECT \"id\", \"name\", \"categoryId\" FROM \"ModelWithCruds\" WHERE \"id\" > "},{"Bind":0},{"Literal":" ORDER BY \"id\" ASC LIMIT "},{"Bind":1}]}},"table":0}]}],"tables":[{"parent":null}]} as SelectPlan,
 
             /**
              * Load all matching `ModelWithCruds` rows.
@@ -5213,6 +5219,9 @@ export function cloesce(env: CfEnv, host?: object, migrations: DurableMigration[
             };
             proto.__cloesceKvGet = function (this: { ctx: DurableObjectState }, key: string) {
                 return this.ctx.storage.kv.get(key) ?? null;
+            };
+            proto.__cloesceKvGetMany = function (this: { ctx: DurableObjectState }, keys: string[]) {
+                return keys.map((key) => [key, this.ctx.storage.kv.get(key) ?? null]);
             };
             proto.__cloesceKvPut = function (this: { ctx: DurableObjectState }, key: string, value: unknown) {
                 this.ctx.storage.kv.put(key, value);

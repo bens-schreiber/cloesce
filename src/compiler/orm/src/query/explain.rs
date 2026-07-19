@@ -35,7 +35,13 @@ pub fn explain_select(
         tree,
         plan.stages
             .iter()
-            .map(|stage| stage.steps.iter().map(select::step).collect())
+            .map(|stage| {
+                stage
+                    .steps
+                    .iter()
+                    .map(|step| select::step(step, &plan.tables))
+                    .collect()
+            })
             .collect(),
     )
 }
@@ -323,18 +329,24 @@ mod select {
 
     use super::render::Node;
     use super::{fmt, sql};
-    use crate::query::select::plan::{JoinKeys, MapCardinality, Select, SelectArg, SelectStep};
+    use crate::query::select::plan::{
+        JoinKeys, MapCardinality, Select, SelectArg, SelectStep, SqlSegment, TableDef,
+    };
 
-    pub fn step(step: &SelectStep) -> Node {
+    pub fn step(step: &SelectStep, tables: &[TableDef]) -> Node {
+        let arg = |a: &SelectArg| arg_str(a, tables);
+        let path = table_path(tables, step.table);
         match &step.query {
             Select::Sql {
                 database: db,
-                sql: query,
+                sql,
                 mapping,
                 shard,
                 route_fields,
                 ..
             } => {
+                let query = render_sql(sql);
+
                 // SEARCH when there is a predicate, SCAN for an unfiltered read
                 let verb = if query.contains(" WHERE ") {
                     "SEARCH"
@@ -344,11 +356,11 @@ mod select {
 
                 let mut head = format!(
                     "{verb} `{}` ON {}",
-                    sql::select_model(query),
+                    sql::select_model(&query),
                     fmt::database(db)
                 );
-                if !step.result.is_empty() {
-                    let _ = write!(head, " INTO `{}`", str_path(&step.result));
+                if !path.is_empty() {
+                    let _ = write!(head, " INTO `{}`", str_path(&path));
                 }
                 if query.contains(" LIMIT ") {
                     head.push_str(" LIMIT `$limit`");
@@ -359,10 +371,10 @@ mod select {
                     let _ = write!(head, "\n{}", join_clause(&mapping.join));
                 }
                 if !shard.is_empty() {
-                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, arg).trim_start());
+                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, &arg).trim_start());
                 }
                 if !route_fields.is_empty() {
-                    let _ = write!(head, "\n{}", attach_clause(route_fields));
+                    let _ = write!(head, "\n{}", attach_clause(route_fields, &arg));
                 }
                 Node::leaf(head)
             }
@@ -373,21 +385,49 @@ mod select {
             } => Node::leaf(format!(
                 "READ {} KEY {} INTO `{}`{}",
                 fmt::database(db),
-                fmt::key_template(key, arg),
-                str_path(&step.result),
-                fmt::shard_clause(shard, arg)
+                fmt::key_template(key, &arg),
+                str_path(&path),
+                fmt::shard_clause(shard, &arg)
             )),
             Select::Synthesize { fields, .. } => Node {
-                text: format!("SYNTHESIZE INTO `{}`", str_path(&step.result),),
-                children: fmt::synth_fields(fields, arg),
+                text: format!("SYNTHESIZE INTO `{}`", str_path(&path)),
+                children: fmt::synth_fields(fields, &arg),
             },
         }
     }
 
-    fn arg(arg: &SelectArg) -> String {
+    fn arg_str(arg: &SelectArg, tables: &[TableDef]) -> String {
         match arg {
             SelectArg::Param(p) => format!("`${p}`"),
-            SelectArg::Result(path) => path.join("."),
+            SelectArg::Field { table, field } => {
+                let mut path = table_path(tables, *table);
+                path.push(field);
+                path.join(".")
+            }
+        }
+    }
+
+    /// Render a step's SQL segments to a display string, with each [SqlSegment::Bind]
+    /// shown as its 1-based `?N` placeholder.
+    fn render_sql(segments: &[SqlSegment]) -> String {
+        segments
+            .iter()
+            .map(|seg| match seg {
+                SqlSegment::Literal(text) => text.clone(),
+                SqlSegment::Bind(i) => format!("?{}", i + 1),
+            })
+            .collect()
+    }
+
+    /// The dotted result path of a table, climbing parent links from the root.
+    fn table_path<'a>(tables: &[TableDef<'a>], id: usize) -> Vec<&'a str> {
+        match &tables[id].parent {
+            None => vec![],
+            Some(parent) => {
+                let mut path = table_path(tables, parent.table);
+                path.push(parent.field);
+                path
+            }
         }
     }
 
@@ -407,7 +447,7 @@ mod select {
     }
 
     /// `ATTACH `<field>` = <arg>, ...` for each route field riding onto the rows.
-    fn attach_clause(fields: &[(&str, SelectArg)]) -> String {
+    fn attach_clause(fields: &[(&str, SelectArg)], arg: impl Fn(&SelectArg) -> String) -> String {
         let body = fields
             .iter()
             .map(|(f, a)| format!("`{f}` = {}", arg(a)))

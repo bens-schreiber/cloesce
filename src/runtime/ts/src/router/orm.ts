@@ -6,8 +6,10 @@ import { Model, CidlType, Cidl, getNavigationCidlType } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree } from "../ui/backend.js";
 import {
+  chunk,
   executeSave,
   executeSelect,
+  MAX_BULK_READ_KEYS,
   type KeyStore,
   type SqlStore,
   type StorageResolver,
@@ -324,6 +326,17 @@ class WorkerKvStore implements KeyStore {
     return { value, metadata };
   }
 
+  async getMany(keys: string[]): Promise<Map<string, unknown>> {
+    const out = new Map();
+    for (const batch of chunk(keys, MAX_BULK_READ_KEYS)) {
+      const found = await this.namespace.getWithMetadata(batch, { type: "json" });
+      for (const [key, { value, metadata }] of found) {
+        out.set(key, { value, metadata });
+      }
+    }
+    return out;
+  }
+
   put(key: string, value: unknown, metadata?: unknown): Promise<void> {
     return this.namespace.put(key, JSON.stringify(value), {
       metadata: metadata as any,
@@ -355,6 +368,16 @@ class DurableKeyStore implements KeyStore {
 
   async get(key: string): Promise<unknown> {
     return (await this.stub.__cloesceKvGet(key)) ?? null;
+  }
+
+  async getMany(keys: string[]): Promise<Map<string, unknown>> {
+    // Chunk so a large key list can't produce one unbounded RPC payload.
+    const batches = await Promise.all(
+      chunk(keys, MAX_BULK_READ_KEYS).map(
+        (batch) => this.stub.__cloesceKvGetMany(batch) as Promise<[string, unknown][]>,
+      ),
+    );
+    return new Map(batches.flat());
   }
 
   async put(key: string, value: unknown): Promise<void> {

@@ -1,4 +1,12 @@
-import { interpolate, sinkResult, stepError, templateArgs, StorageResolver } from "./index.js";
+import {
+  chunk,
+  interpolate,
+  sinkResult,
+  stepError,
+  templateArgs,
+  KeyStore,
+  StorageResolver,
+} from "./index.js";
 import { CloesceErrorKind, CloesceResult, InternalError } from "../../common.js";
 import {
   Database,
@@ -7,46 +15,23 @@ import {
   SelectArg,
   SelectPlan,
   SelectStep,
+  SqlArgument,
+  SqlSegment,
+  TableDef,
   TemplateSegment,
 } from "./plan.js";
 import { KValue } from "../../ui/backend.js";
 
 /**
- * SQLite's bound-parameter budget per statement.
+ *
+ * D1's documented limit is "Maximum bound parameters per query: 100", per
+ * https://developers.cloudflare.com/d1/platform/limits/, and applies per statement within
+ * batches.
  *
  * TODO: This is a good place to optimize in the future
  * (e.g., insert into a temp table rather than use bound parameters)
  */
 export const MAX_BOUND_PARAMETERS = 100;
-
-interface Attachment {
-  /** Back reference to the parent row */
-  parent: number;
-
-  /** A hydrated value */
-  value: any;
-}
-
-/** The hydrated output of one step. */
-interface Table {
-  attachments: Attachment[];
-
-  /** Whether the table contains multiple rows. */
-  many: boolean;
-}
-
-/** A {@link SelectArg} split into its owner table path and field. */
-type Arg = { kind: "param"; name: string } | { kind: "field"; owner: string[]; field: string };
-
-type Fetched =
-  /** A SQL query result. */
-  | { kind: "rows"; rows: Record<string, unknown>[] }
-
-  /** Key reads by their resolved argument tuple (JSON-encoded). */
-  | { kind: "keys"; values: Map<string, unknown> }
-
-  /** No data was produced. */
-  | { kind: "none" };
 
 export async function execute(
   plan: SelectPlan,
@@ -60,7 +45,7 @@ export async function execute(
 
   const errors = [] as CloesceErrorKind[];
   for (const stage of plan.stages) {
-    const pending = stage.steps.filter((s) => !seeded.has(JSON.stringify(s.result)));
+    const pending = stage.steps.filter((s) => !seeded.has(s.table));
     const settled = await Promise.allSettled(pending.map((s) => exec.fetch(s)));
 
     for (const [i, res] of settled.entries()) {
@@ -81,54 +66,105 @@ export async function execute(
   return sinkResult(sink.assemble(), errors);
 }
 
+interface Attachment {
+  /** Back reference to the parent row */
+  parent: number;
+
+  /** A hydrated value */
+  value: any;
+}
+
+/** The hydrated output of one step. */
+interface Table {
+  attachments: Attachment[];
+
+  /** Whether the table contains multiple rows. */
+  many: boolean;
+}
+
+/** A {@link SelectArg} split into its owner table id and field. */
+type Arg = { kind: "param"; name: string } | { kind: "field"; table: number; field: string };
+
+type Fetched =
+  /** A SQL query result. */
+  | { kind: "rows"; rows: Record<string, unknown>[] }
+
+  /** Key reads by their resolved argument tuple (JSON-encoded). */
+  | { kind: "keys"; values: Map<string, unknown> }
+
+  /** No data was produced. */
+  | { kind: "none" };
+
 /** An interface for the working set of all fetched/seeded data */
 class WorkingResultBody {
-  public tables: Map<string, Table> = new Map();
-  constructor(private params: Record<string, unknown>) {}
+  /** The hydrated tables of every completed step, indexed by table id. */
+  public tables: (Table | undefined)[] = [];
 
-  /** Get a table by its result path. */
-  get(path: string[]): Table | undefined {
-    return this.tables.get(JSON.stringify(path));
+  constructor(
+    public defs: TableDef[],
+    private params: Record<string, unknown>,
+  ) {}
+
+  /** Get a table by its id. */
+  get(table: number): Table | undefined {
+    return this.tables[table];
   }
 
-  /** Set a table by its result path. */
-  set(path: string[], table: Table): void {
-    this.tables.set(JSON.stringify(path), table);
+  /** Set a table by its id. */
+  set(table: number, value: Table): void {
+    this.tables[table] = value;
+  }
+
+  /** The parent table of `table`, or `undefined` for the root. */
+  parentTable(table: number): number | undefined {
+    return this.defs[table]?.parent?.table;
+  }
+
+  /** Whether `ancestor` is `node` or one of its ancestors. */
+  isAncestor(ancestor: number, node: number): boolean {
+    let cur: number | undefined = node;
+    while (cur !== undefined) {
+      if (cur === ancestor) {
+        return true;
+      }
+      cur = this.parentTable(cur);
+    }
+    return false;
   }
 
   /**
-   * Resolve an argument for the object at (`path`, `idx`), climbing the parent
+   * Resolve an argument for the object at (`table`, `idx`), climbing the parent
    * back-refs up to the argument's owner table.
    *
    * @returns `undefined` when a value is absent.
    */
-  resolve(path: string[], idx: number, a: Arg): unknown | undefined {
-    return this.resolver(path, a)(idx);
+  resolve(table: number, idx: number, a: Arg): unknown | undefined {
+    return this.resolver(table, a)(idx);
   }
 
   /**
-   * An argument resolver for objects of the table at `path`.
+   * An argument resolver for objects of the table at `table`.
    *
    * Parent climb tables are looked up once, so resolving each object only
    * walks back-refs.
    */
-  resolver(path: string[], a: Arg): (idx: number) => unknown | undefined {
+  resolver(table: number, a: Arg): (idx: number) => unknown | undefined {
     if (a.kind === "param") {
       const value = this.param(a.name);
       return () => value;
     }
 
     const climb: (Table | undefined)[] = [];
-    let cur = path;
-    while (cur.length > a.owner.length) {
+    let cur: number | undefined = table;
+    while (cur !== undefined && cur !== a.table) {
       climb.push(this.get(cur));
-      cur = cur.slice(0, -1);
+      cur = this.parentTable(cur);
     }
-    const owner = this.get(cur);
+    const owner = cur === a.table ? this.get(a.table) : undefined;
 
     return (idx) => {
-      for (const table of climb) {
-        idx = table?.attachments[idx]?.parent ?? 0;
+      for (const t of climb) {
+        idx = t?.attachments[idx]?.parent ?? 0;
       }
       return owner?.attachments[idx]?.value?.[a.field];
     };
@@ -151,18 +187,25 @@ class WorkingResultBody {
    *   back-refs.
    * - Tuples with a missing value are skipped.
    */
-  tuples(args: Arg[], at: string[]): unknown[][] {
-    const owners = args.flatMap((a) => (a.kind === "field" ? [a.owner] : []));
-    if (owners.length === 0) {
-      return [args.map((a) => this.resolve([], 0, a))];
+  tuples(args: Arg[], at: number): unknown[][] {
+    const tables = args.flatMap((a) => (a.kind === "field" ? [a.table] : []));
+    if (tables.length === 0) {
+      return [args.map((a) => this.resolve(0, 0, a))];
     }
 
-    const deepest = owners.reduce((a, b) => (b.length > a.length ? b : a));
+    // The referenced tables all lie on one ancestor line, so the deepest is the one
+    // with the largest id (a child's id exceeds its parent's).
+    const deepest = Math.max(...tables);
+    if (!tables.every((t) => this.isAncestor(t, deepest))) {
+      throw new InternalError(
+        `select step for table ${at} reads key/shard arguments spanning unrelated source tables`,
+      );
+    }
+
     const table = this.get(deepest);
     if (table === undefined) {
       throw new InternalError(
-        `select step at ${JSON.stringify(at)} reads table ${JSON.stringify(deepest)} ` +
-          `before an earlier stage produced it`,
+        `select step for table ${at} reads table ${deepest} before an earlier stage produced it`,
       );
     }
 
@@ -210,42 +253,62 @@ class Executor {
     step: SelectStep,
     q: {
       database: Database;
-      sql: string;
-      arguments: SelectArg[];
+      sql: SqlSegment[];
+      arguments: SqlArgument[];
       shard: [string, SelectArg][];
-      route_fields?: [string, SelectArg][];
+      route_fields: [string, SelectArg][];
     },
   ): Promise<Record<string, unknown>[]> {
-    // A `Param` binds one value; a `Result` spreads the distinct values of its owner
-    // table's field. A spread over zero values selects nothing.
-    const args = q.arguments.map(arg);
+    const shardArgs = q.shard.map(([, a]) => arg(a));
+    const spreads = q.arguments.map((sa) => sa.spread);
 
-    // The full set of distinct values that will be bound to the SQL query.
-    const spreads = args.map((a) => this.body.tuples([a], step.result).map(([v]) => v));
+    // One deduped tuple per distinct (shard values..., argument values...) combination,
+    // resolved together in a single owner-table pass. Params bind their constant value; a
+    // tuple with any missing value is dropped, so a spread over zero parent values selects
+    // nothing.
+    const combined = this.body.tuples(
+      [...shardArgs, ...q.arguments.map((sa) => arg(sa.value))],
+      step.table,
+    );
 
-    if (spreads.some((s) => s.length === 0)) {
-      // Spread over zero values selects nothing.
-      return [];
-    }
-    const statements = chunkStatements(q.sql, args, spreads);
+    const shardLen = q.shard.length;
 
-    const shardArgs = (q.shard ?? []).map(([, a]) => arg(a));
-    const shardValues = this.body.tuples(shardArgs, step.result);
-
-    const constantFields = (q.route_fields ?? []).flatMap(([field, raw]) => {
+    const constantFields = q.route_fields.flatMap(([field, raw]) => {
       const a = arg(raw);
-      if (a.kind === "field") {
-        // Deferred to assembly
-        return [];
-      }
-
-      // Param route fields are constant across shards.
-      return [[field, this.body.param(a.name)] as const];
+      // Field route fields are deferred to assembly; params are constant across shards.
+      return a.kind === "field" ? [] : [[field, this.body.param(a.name)] as const];
     });
 
-    const perShard = await Promise.all(
-      shardValues.map(async (tuple) => {
-        const store = this.storage.sql(q.database, tuple);
+    // Group by shard prefix; each shard resolves and chunks its own arguments in isolation.
+    const groups = new Map<string, unknown[][]>();
+    for (const tuple of combined) {
+      const slot = JSON.stringify(tuple.slice(0, shardLen));
+      (groups.get(slot) ?? groups.set(slot, []).get(slot)!).push(tuple);
+    }
+
+    const perGroup = await Promise.all(
+      [...groups.values()].map(async (tuples) => {
+        const shardTuple = tuples[0].slice(0, shardLen);
+
+        // Within this shard each argument dedupes its own column: a spread keeps every value,
+        // a non-spread argument must resolve to exactly one.
+        const values = q.arguments.map((_, i) => {
+          const column = distinct(tuples.map((t) => t[shardLen + i]));
+          if (!spreads[i] && column.length > 1) {
+            throw new InternalError(
+              `select step for table ${step.table} binds a non-spread argument resolving to ${column.length} distinct values`,
+            );
+          }
+          return column;
+        });
+
+        if (values.some((v) => v.length === 0)) {
+          // A bind over zero values selects nothing in this shard.
+          return [];
+        }
+
+        const statements = chunkStatements(q.sql, spreads, values);
+        const store = this.storage.sql(q.database, shardTuple);
         const results =
           statements.length === 1
             ? [await store.query(statements[0].sql, statements[0].bindings)]
@@ -253,7 +316,7 @@ class Executor {
 
         // Stamp shard fields so joins and deeper shards can read them off the row.
         const stamps = [
-          ...q.shard.map(([field], i) => [field, tuple[i]] as const),
+          ...q.shard.map(([field], i) => [field, shardTuple[i]] as const),
           ...constantFields,
         ];
         return results.flat().map((row) => {
@@ -265,11 +328,13 @@ class Executor {
       }),
     );
 
-    return perShard.flat();
+    return perGroup.flat();
   }
 
   /**
-   * Read from a key store. Makes one fetch per distinct parent row, concurrently.
+   * Read from a key store. Groups keys by their shard store so a store that supports
+   * bulk reads fetches them in one {@link KeyStore.getMany} call; the rest fall back to
+   * per-key {@link KeyStore.get}, concurrently.
    */
   private async fetchKeys(
     step: SelectStep,
@@ -280,28 +345,49 @@ class Executor {
     },
   ): Promise<Map<string, unknown>> {
     const args = keyArgs(q.shard, q.segments);
-    const tuples = this.body.tuples(args, step.result);
+    const tuples = this.body.tuples(args, step.table);
 
-    const fetches = tuples.map(async (tuple) => {
-      // Tuple contains the shard values first, then the template values.
-      const shardValues = tuple.slice(0, q.shard.length);
-      const keyValues = tuple.slice(q.shard.length);
-
-      const key = interpolate(q.segments, keyValues);
-      const raw = await this.storage.key(q.database, shardValues).get(key);
-
-      let wrapped: unknown = raw ?? null;
-      if (q.database.kind === "Kv") {
-        // Coerce into a KValue
-        const inner = (raw ?? {}) as { value?: unknown; metadata?: unknown };
-        wrapped = new KValue(inner.value ?? null, inner.metadata ?? null);
+    const wrap = (raw: unknown): unknown => {
+      if (q.database.kind !== "Kv") {
+        return raw ?? null;
       }
+      // Coerce into a KValue.
+      const inner = (raw ?? {}) as { value?: unknown; metadata?: unknown };
+      return new KValue(inner.value ?? null, inner.metadata ?? null);
+    };
 
-      return [JSON.stringify(tuple), wrapped] as const;
-    });
+    // Group tuples by their shard store (tuple = [...shard values, ...template values]).
+    const groups = new Map<
+      string,
+      { store: KeyStore; items: { tuple: unknown[]; key: string }[] }
+    >();
+    for (const tuple of tuples) {
+      const shardValues = tuple.slice(0, q.shard.length);
+      const key = interpolate(q.segments, tuple.slice(q.shard.length));
+      const slot = JSON.stringify(shardValues);
+      const group =
+        groups.get(slot) ??
+        groups
+          .set(slot, { store: this.storage.key(q.database, shardValues), items: [] })
+          .get(slot)!;
+      group.items.push({ tuple, key });
+    }
 
-    const entries = await Promise.all(fetches);
-    return new Map(entries);
+    const entries = await Promise.all(
+      [...groups.values()].map(async ({ store, items }) => {
+        if (store.getMany) {
+          const found = await store.getMany(items.map((it) => it.key));
+          return items.map((it) => [JSON.stringify(it.tuple), wrap(found.get(it.key))] as const);
+        }
+        return Promise.all(
+          items.map(
+            async (it) => [JSON.stringify(it.tuple), wrap(await store.get(it.key))] as const,
+          ),
+        );
+      }),
+    );
+
+    return new Map(entries.flat());
   }
 }
 
@@ -311,39 +397,45 @@ class ResultAssembler {
 
   /** Fold every table into its parent, deepest first, producing the final body. */
   assemble(): unknown {
-    const tables = [...this.body.tables.entries()]
-      .map(([key, table]) => ({ path: JSON.parse(key) as string[], table }))
-      .sort((a, b) => b.path.length - a.path.length);
+    // A child's id always exceeds its parent's (a plan invariant), so folding in
+    // descending id order always hydrates a child before its parent.
+    const ids = this.body.defs.map((_, id) => id).sort((a, b) => b - a);
 
-    for (const { path, table: child } of tables) {
-      if (path.length === 0) {
-        break;
-      }
-
-      const field = path[path.length - 1];
-      const parent = this.body.get(path.slice(0, -1));
+    for (const id of ids) {
+      const parent = this.body.defs[id].parent;
       if (!parent) {
         continue;
       }
+
+      const child = this.body.get(id);
+      if (!child) {
+        continue;
+      }
+      const slot = this.body.get(parent.table);
+      if (!slot) {
+        continue;
+      }
+
+      const field = parent.field;
       if (child.many) {
-        for (const a of parent.attachments) {
+        for (const a of slot.attachments) {
           a.value[field] = [];
         }
       }
       for (const att of child.attachments) {
-        const slot = parent.attachments[att.parent];
-        if (!slot) {
+        const target = slot.attachments[att.parent];
+        if (!target) {
           continue;
         }
         if (child.many) {
-          slot.value[field].push(att.value);
+          target.value[field].push(att.value);
         } else {
-          slot.value[field] = att.value;
+          target.value[field] = att.value;
         }
       }
     }
 
-    const root = this.body.get([]);
+    const root = this.body.get(0);
     if (!root) {
       return null;
     }
@@ -351,93 +443,84 @@ class ResultAssembler {
     return root.many ? values : (values[0] ?? null);
   }
 
-  /** Attach the fetched data to the step's result. */
+  /** Attach the fetched data to the step's table. */
   attach(step: SelectStep, fetched: Fetched): void {
     const q = step.query;
+    const table = step.table;
     if ("Sql" in q && fetched.kind === "rows") {
-      this.body.set(step.result, this.rowTable(step.result, q.Sql, fetched.rows));
+      this.body.set(table, this.rowTable(table, q.Sql, fetched.rows));
     } else if ("Key" in q && fetched.kind === "keys") {
-      const parentPath = step.result.slice(0, -1);
-      const resolvers = keyArgs(q.Key.shard, q.Key.segments).map((a) =>
-        this.body.resolver(parentPath, a),
-      );
+      const at = this.resolveTable(table);
+      const resolvers = keyArgs(q.Key.shard, q.Key.segments).map((a) => this.body.resolver(at, a));
       this.body.set(
-        step.result,
-        this.singletons(step.result, (idx) => {
+        table,
+        this.singletons(table, (idx) => {
           const tuple = resolvers.map((r) => r(idx));
           return fetched.values.get(JSON.stringify(tuple)) ?? null;
         }),
       );
     } else if ("Synthesize" in q) {
-      this.synthesize(step.result, q.Synthesize);
+      this.synthesize(table, q.Synthesize);
     }
   }
 
   /**
-   * Sink a failed step as an empty table (unless a sibling already produced one at the
-   * path), so steps of later stages that read it degrade to empty instead of failing.
+   * Sink a failed step as an empty table (unless a sibling already produced one for the
+   * table), so steps of later stages that read it degrade to empty instead of failing.
    */
   attachBlank(step: SelectStep): void {
-    if (this.body.get(step.result)) {
+    if (this.body.get(step.table)) {
       return;
     }
     const q = step.query;
     const many = "Sql" in q && q.Sql.mapping.cardinality === "Many";
-    this.body.set(step.result, { attachments: [], many });
+    this.body.set(step.table, { attachments: [], many });
   }
 
   /** Tie each fetched row to its parents via the mapping's join keys. */
   private rowTable(
-    path: string[],
-    q: { mapping: Mapping; route_fields?: [string, SelectArg][] },
+    table: number,
+    q: { mapping: Mapping; route_fields: [string, SelectArg][] },
     rows: Record<string, unknown>[],
   ): Table {
     const many = q.mapping.cardinality === "Many";
-    if (path.length === 0) {
+    const parent = this.body.defs[table].parent;
+    if (!parent) {
       return { attachments: rows.map((value) => ({ parent: 0, value })), many };
     }
 
-    const parentPath = path.slice(0, -1);
-    const parent = this.body.get(parentPath);
-    if (!parent) {
+    const parents = this.body.get(parent.table);
+    if (!parents) {
       return { attachments: [], many };
     }
 
     // Bucket parents by join key, then hand each row to its matching parents;
     // a One mapping serves each parent at most once.
-    const joinKey = (row: any, side: (j: JoinKeys) => string) =>
-      JSON.stringify(q.mapping.join.map((j) => row[side(j)] ?? null));
-    const index = new Map<string, number[]>();
-    parent.attachments.forEach((a, i) => {
-      const k = joinKey(a.value, (j) => j.parent_key);
-      const bucket = index.get(k);
-      if (bucket) {
-        bucket.push(i);
-      } else {
-        index.set(k, [i]);
-      }
-    });
+    const match = bucketParents(parents.attachments, q.mapping.join);
 
     const routeResolvers = (q.route_fields ?? []).flatMap(([field, raw]) => {
       const a = arg(raw);
       if (a.kind !== "field") {
         return [];
       }
-      return [[field, this.body.resolver(parentPath, a)] as const];
+      return [[field, this.body.resolver(parent.table, a)] as const];
     });
 
     const served = new Set<number>();
+    const cloned = new Set<Record<string, unknown>>();
     const attachments: Attachment[] = [];
     for (const row of rows) {
-      for (const p of index.get(joinKey(row, (j) => j.child_key)) ?? []) {
+      for (const p of match(row)) {
         if (!many) {
           if (served.has(p)) {
             continue;
           }
           served.add(p);
         }
-        // Clone: a row may attach under several parents, each hydrated independently.
-        const value: Record<string, unknown> = { ...row };
+        // A row may attach under several parents, each hydrated independently: keep the
+        // fetched object for its first parent and clone it for any further ones.
+        const value: Record<string, unknown> = cloned.has(row) ? { ...row } : row;
+        cloned.add(row);
         for (const [field, resolve] of routeResolvers) {
           value[field] = resolve(p);
         }
@@ -448,22 +531,25 @@ class ResultAssembler {
   }
 
   /**
-   * Materialize or merge a synthesized object. When a table already exists at the path
-   * (produced by an earlier step), fields merge onto each of its values; otherwise a
-   * fresh singleton is built per parent.
+   * Materialize or merge a synthesized object. When a table already exists (produced by an
+   * earlier step), fields merge onto each of its values; otherwise a fresh singleton is
+   * built per parent.
    */
   private synthesize(
-    path: string[],
+    table: number,
     q: { fields: [string, SelectArg][]; cardinality: "One" | "Many" },
   ): void {
-    const parentPath = path.slice(0, -1);
-    const fields = q.fields.map(([field, raw]) => [field, arg(raw)] as const);
+    const at = this.resolveTable(table);
+    // Build each field's parent-climb resolver once, then resolve it per row.
+    const resolvers = q.fields.map(
+      ([field, raw]) => [field, this.body.resolver(at, arg(raw))] as const,
+    );
 
-    const existing = this.body.get(path);
+    const existing = this.body.get(table);
     if (existing) {
       for (const att of existing.attachments) {
-        for (const [field, a] of fields) {
-          att.value[field] = this.body.resolve(parentPath, att.parent, a);
+        for (const [field, resolve] of resolvers) {
+          att.value[field] = resolve(att.parent);
         }
       }
       return;
@@ -472,23 +558,29 @@ class ResultAssembler {
     // A Many synthesize is a singleton array, folded as a single value.
     // At the root every field is param-sourced by construction.
     this.body.set(
-      path,
-      this.singletons(path, (idx) => {
+      table,
+      this.singletons(table, (idx) => {
         const object = Object.fromEntries(
-          fields.map(([field, a]) => [field, this.body.resolve(parentPath, idx, a)]),
+          resolvers.map(([field, resolve]) => [field, resolve(idx)]),
         );
         return q.cardinality === "One" ? object : [object];
       }),
     );
   }
 
-  /** A table with exactly one value per parent row (one root value when `path` is root). */
-  private singletons(path: string[], build: (parentIdx: number) => unknown): Table {
-    if (path.length === 0) {
+  /** The table an object's per-parent fields resolve against: its parent, or itself at the root. */
+  private resolveTable(table: number): number {
+    return this.body.defs[table].parent?.table ?? table;
+  }
+
+  /** A table with exactly one value per parent row (one root value when `table` is the root). */
+  private singletons(table: number, build: (parentIdx: number) => unknown): Table {
+    const parent = this.body.defs[table].parent;
+    if (!parent) {
       return { attachments: [{ parent: 0, value: build(0) }], many: false };
     }
-    const parent = this.body.get(path.slice(0, -1));
-    const attachments = (parent?.attachments ?? []).map((_, i) => ({
+    const parents = this.body.get(parent.table);
+    const attachments = (parents?.attachments ?? []).map((_, i) => ({
       parent: i,
       value: build(i),
     }));
@@ -498,13 +590,13 @@ class ResultAssembler {
 
 class SeedFactory {
   private constructor(
-    private seeded: Set<string>,
+    private seeded: Set<number>,
     private body: WorkingResultBody,
   ) {}
 
   /**
    * @remarks
-   *  - A step is seeded when its parent path is already seeded and its field is
+   *  - A step is seeded when its parent table is already seeded and its field is
    *   present (`!== undefined`) on at least one parent attachment.
    * - Parents lacking the field contribute no attachments, so they degrade to
    *   empty. Missing data is never an error.
@@ -513,45 +605,45 @@ class SeedFactory {
    * - Seeds are **mutated in place**.
    *
    * @param plan The select plan to seed for.
-   *  Result paths in the plan are stored in the seeded set.
+   *  Table ids in the plan are stored in the seeded set.
    * @param params The parameters to bind to the plan's `Param` arguments.
    * @param seed The seed data to use for populating the tables.
    *  Data within the seed is placed directly into the tables result.
    *
-   * @returns the set of seeded paths and the hydrated body.
+   * @returns the set of seeded table ids and the hydrated body.
    */
   static seed(
     plan: SelectPlan,
     params: Record<string, unknown>,
     seed: Record<string, unknown>[],
-  ): { seeded: Set<string>; body: WorkingResultBody } {
-    const factory = new SeedFactory(new Set<string>(), new WorkingResultBody(params));
+  ): { seeded: Set<number>; body: WorkingResultBody } {
+    const factory = new SeedFactory(new Set<number>(), new WorkingResultBody(plan.tables, params));
     return factory.run(plan, seed);
   }
 
   private run(
     plan: SelectPlan,
     seed: Record<string, unknown>[],
-  ): { seeded: Set<string>; body: WorkingResultBody } {
+  ): { seeded: Set<number>; body: WorkingResultBody } {
     if (seed.length === 0) {
       return { seeded: this.seeded, body: this.body };
     }
 
-    this.body.set([], {
+    this.body.set(0, {
       attachments: seed.map((value) => ({ parent: 0, value })),
       many: true,
     });
-    this.seeded.add(JSON.stringify([]));
+    this.seeded.add(0);
 
     for (const stage of plan.stages) {
       for (const step of stage.steps) {
-        const path = step.result;
-        const parentSeeded = this.seeded.has(JSON.stringify(path.slice(0, -1)));
-        const seededHere = this.seeded.has(JSON.stringify(path));
+        const parent = this.body.defs[step.table].parent;
+        const parentSeeded = parent === null || this.seeded.has(parent.table);
+        const seededHere = this.seeded.has(step.table);
 
         const seeded = parentSeeded && !seededHere && this.seedChild(step);
 
-        if (path.length === 0 || seeded) {
+        if (parent === null || seeded) {
           this.stampDerived(step);
         }
       }
@@ -569,10 +661,10 @@ class SeedFactory {
    *   contributes nothing.
    */
   private seedChild(step: SelectStep): boolean {
-    const path = step.result;
-    const field = path[path.length - 1];
-    const parent = this.body.get(path.slice(0, -1))!;
-    if (parent.attachments.every((a) => a.value[field] === undefined)) {
+    const parent = this.body.defs[step.table].parent!;
+    const field = parent.field;
+    const parents = this.body.get(parent.table)!;
+    if (parents.attachments.every((a) => a.value[field] === undefined)) {
       return false;
     }
 
@@ -585,7 +677,7 @@ class SeedFactory {
     }
 
     const attachments = [] as Attachment[];
-    for (const [idx, a] of parent.attachments.entries()) {
+    for (const [idx, a] of parents.attachments.entries()) {
       const value = a.value[field];
       if (value === undefined || value === null) {
         continue;
@@ -606,8 +698,8 @@ class SeedFactory {
       }
     }
 
-    this.body.set(path, { attachments, many });
-    this.seeded.add(JSON.stringify(path));
+    this.body.set(step.table, { attachments, many });
+    this.seeded.add(step.table);
     return true;
   }
 
@@ -629,11 +721,11 @@ class SeedFactory {
       return;
     }
 
-    const table = this.body.get(step.result)!;
+    const table = this.body.get(step.table)!;
     for (const [field, raw] of fields) {
       let resolve: (idx: number) => unknown;
       try {
-        resolve = this.body.resolver(step.result, arg(raw));
+        resolve = this.body.resolver(step.table, arg(raw));
       } catch {
         // A seed needn't supply what a live fetch would have; leave the field absent.
         continue;
@@ -670,38 +762,53 @@ function keyArgs(shard: [string, SelectArg][], segments: TemplateSegment<SelectA
 }
 
 /**
- * Expand a SQL statement's spread placeholders into concrete `(sql, bindings)` chunks.
- * Every chunk stays within {@link MAX_BOUND_PARAMETERS}: fixed params are re-bound in
- * each, and spread values split the remaining budget evenly. Multiple spreads chunk as
- * a cross product so every value combination is covered exactly once.
+ * Render a SQL statement's segments into concrete `(sql, bindings)` chunks. Every chunk
+ * stays within {@link MAX_BOUND_PARAMETERS}: fixed args are re-bound in each, and spread
+ * values split the remaining budget evenly. Multiple spreads chunk as a cross product so
+ * every value combination is covered exactly once.
  *
- * For example, `SELECT * FROM t WHERE a IN (?1) AND b IN (?2)`
- * with `?1` bound to `[1, 2...100]` and `?2` bound to `[101, 102, 103]` produces:
+ * A {@link SqlSegment.Bind} renders as one `?` per bound value; a spread argument expands
+ * to its chunk's `?, ?, ...` list.
+ *
+ * For example, `SELECT * FROM t WHERE a IN (Bind 0) AND b IN (Bind 1)`
+ * with arg 0 spread over `[1, 2...100]` and arg 1 spread over `[101, 102, 103]` produces:
  * ```
  * { sql: "... a IN (?, ?, ... 50) AND b IN (?, ?, ?)", bindings: [1..50, 101, 102, 103] }
  * { sql: "... a IN (?, ?, ... 50) AND b IN (?, ?, ?)", bindings: [51..100, 101, 102, 103] }
  * ```
  */
 function chunkStatements(
-  sql: string,
-  args: Arg[],
-  spreads: unknown[][],
+  sql: SqlSegment[],
+  spreads: boolean[],
+  values: unknown[][],
 ): { sql: string; bindings: unknown[] }[] {
-  const isSpread = args.map((a) => a.kind === "field");
-  const fixedCount = isSpread.filter((s) => !s).length;
-  const spreadCount = isSpread.length - fixedCount;
+  const fixedCount = spreads.filter((s) => !s).length;
+  const spreadCount = spreads.length - fixedCount;
   const size = Math.max(1, Math.floor((MAX_BOUND_PARAMETERS - fixedCount) / (spreadCount || 1)));
 
-  const perArgChunks = spreads.map((values, i) => (isSpread[i] ? chunk(values, size) : [values]));
+  const perArgChunks = values.map((vals, i) => (spreads[i] ? chunk(vals, size) : [vals]));
 
   // Each chunk is a cross prod of the per-arg chunks.
-  return cartesian(perArgChunks).map((chunks) => ({
-    sql: expandPlaceholders(
-      sql,
-      chunks.map((c) => c.length),
-    ),
-    bindings: chunks.flat(),
-  }));
+  return cartesian(perArgChunks).map((chunks) => render(sql, chunks));
+
+  /** Join segments into SQL, binding each `Bind` to its argument's chunk (in `?` order). */
+  function render(
+    segments: SqlSegment[],
+    chunks: unknown[][],
+  ): { sql: string; bindings: unknown[] } {
+    const bindings: unknown[] = [];
+    const text = segments
+      .map((seg) => {
+        if ("Literal" in seg) {
+          return seg.Literal;
+        }
+        const vals = chunks[seg.Bind];
+        bindings.push(...vals);
+        return Array(vals.length).fill("?").join(", ");
+      })
+      .join("");
+    return { sql: text, bindings };
+  }
 
   function cartesian<T>(lists: T[][]): T[][] {
     return lists.reduce<T[][]>(
@@ -709,39 +816,54 @@ function chunkStatements(
       [[]],
     );
   }
+}
 
-  function chunk<T>(values: T[], size: number): T[][] {
-    const out: T[][] = [];
-    for (let i = 0; i < values.length; i += size) {
-      out.push(values.slice(i, i + size));
-    }
-    return out;
-  }
-
-  /** Rewrite each `?N` placeholder into the N-th argument's anonymous `?` expansion. */
-  function expandPlaceholders(sql: string, counts: number[]): string {
-    const [head, ...rest] = sql.split("?");
-    return rest.reduce((out, part) => {
-      const digits = part.match(/^\d+/)?.[0];
-      if (!digits) {
-        throw new InternalError(`unnumbered placeholder in plan SQL: ${sql}`);
-      }
-      const expansion = Array(counts[Number(digits) - 1])
-        .fill("?")
-        .join(", ");
-      return out + expansion + part.slice(digits.length);
-    }, head);
-  }
+/** Order-preserving distinct over raw scalar identity. */
+function distinct(values: unknown[]): unknown[] {
+  const seen = new Set<unknown>();
+  return values.filter((v) => (seen.has(v) ? false : (seen.add(v), true)));
 }
 
 function arg(raw: SelectArg): Arg {
   if ("Param" in raw) {
     return { kind: "param", name: raw.Param };
   }
-  const path = raw.Result;
-  return {
-    kind: "field",
-    owner: path.slice(0, -1),
-    field: path[path.length - 1],
+  return { kind: "field", table: raw.Field.table, field: raw.Field.field };
+}
+
+/** Bucket key for a null/undefined join value, kept apart from any real value. */
+const NULL_KEY = Symbol("null");
+
+/**
+ * Index the parent attachments by their join keys, returning a lookup from a child row to
+ * its matching parent indices. A single join key buckets by the raw value (null/undefined
+ * folded to a sentinel); multiple keys bucket by the JSON-encoded tuple.
+ */
+function bucketParents(
+  parents: Attachment[],
+  join: JoinKeys[],
+): (row: Record<string, unknown>) => number[] {
+  const push = <K>(buckets: Map<K, number[]>, k: K, i: number) => {
+    const bucket = buckets.get(k);
+    bucket ? bucket.push(i) : buckets.set(k, [i]);
   };
+
+  if (join.length === 1) {
+    const { parent_key, child_key } = join[0];
+    const buckets = new Map<unknown, number[]>();
+    parents.forEach((a, i) => push(buckets, a.value[parent_key] ?? NULL_KEY, i));
+    return (row) => buckets.get(row[child_key] ?? NULL_KEY) ?? [];
+  }
+
+  const joinKey = (row: Record<string, unknown>, side: (j: JoinKeys) => string) =>
+    JSON.stringify(join.map((j) => row[side(j)] ?? null));
+  const buckets = new Map<string, number[]>();
+  parents.forEach((a, i) =>
+    push(
+      buckets,
+      joinKey(a.value, (j) => j.parent_key),
+      i,
+    ),
+  );
+  return (row) => buckets.get(joinKey(row, (j) => j.child_key)) ?? [];
 }

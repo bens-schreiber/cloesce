@@ -10,6 +10,24 @@ import * as save from "./save.js";
 
 export { MAX_BOUND_PARAMETERS } from "./select.js";
 
+/**
+ * Workers KV's bulk-read key budget per call.
+ *
+ * The bulk `get`/`getWithMetadata` overloads accept at most 100 keys per invocation (a
+ * response over 25 MB fails with a 413), per
+ * https://developers.cloudflare.com/kv/api/read-key-value-pairs/
+ */
+export const MAX_BULK_READ_KEYS = 100;
+
+/** Split `values` into contiguous chunks of at most `size`. */
+export function chunk<T>(values: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < values.length; i += size) {
+    out.push(values.slice(i, i + size));
+  }
+  return out;
+}
+
 /** A SQL backend (D1 database or a DO shard's SQLite) a plan step queries. */
 export interface SqlStore {
   query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]>;
@@ -22,6 +40,7 @@ export interface SqlStore {
 export interface KeyStore {
   get(key: string): unknown;
   put(key: string, value: unknown, metadata?: unknown): unknown;
+  getMany?(keys: string[]): Promise<Map<string, unknown>>;
 }
 
 /** Resolves a plan {@link Database} handle to a concrete store. */
@@ -87,15 +106,14 @@ export function sinkResult(body: unknown, errors: CloesceErrorKind[]): CloesceRe
   return { value: body, errors };
 }
 
-/** Render one segment value of a KV/R2 key template. */
-export function keyText(value: unknown): string {
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
 /** Interpolate a key template from its already-resolved `Value` arguments, in order. */
 export function interpolate<A>(segments: TemplateSegment<A>[], values: unknown[]): string {
   let next = 0;
   return segments.map((s) => ("Literal" in s ? s.Literal : keyText(values[next++]))).join("");
+
+  function keyText(value: unknown): string {
+    return typeof value === "string" ? value : JSON.stringify(value);
+  }
 }
 
 /** The `Value` arguments of a key template, in interpolation order. */

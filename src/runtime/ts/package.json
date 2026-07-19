@@ -35,7 +35,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "build": "tsc -p tsconfig.json && pnpm run copy-rs-orm-wasm",
     "copy-rs-orm-wasm": "cp ../../../target/wasm32-unknown-unknown/wasm-release/orm.wasm ./dist/orm.wasm"
   },

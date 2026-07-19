@@ -1,207 +1,35 @@
 import { describe, test, expect } from "vitest";
 import {
   executeSelect,
-  executeSave,
   MAX_BOUND_PARAMETERS,
   type KeyStore,
   type SqlStore,
-  type StorageResolver,
 } from "../src/router/executor/index.js";
-import type {
-  Database,
-  MapCardinality,
-  Mapping,
-  PathSegment,
-  SaveArg,
-  SavePlan,
-  SaveStep,
-  SelectArg,
-  SelectPlan,
-  SelectStep,
-  SqlStatement,
-  TemplateSegment,
-} from "../src/router/executor/plan.js";
+import type { Mapping } from "../src/router/executor/plan.js";
 import { KValue } from "../src/ui/backend.js";
-
-type QueryCall = { sql: string; bindings: unknown[] };
-type BatchCall = { statements: QueryCall[] };
-
-class MockSqlStore implements SqlStore {
-  queries: QueryCall[] = [];
-  batches: BatchCall[] = [];
-
-  constructor(
-    private queryResponder: (call: QueryCall) => Record<string, unknown>[] = () => [],
-    private batchResponder: (call: BatchCall) => Record<string, unknown>[][] = () => [],
-  ) {}
-
-  async query(sql: string, bindings: unknown[]): Promise<Record<string, unknown>[]> {
-    const call = { sql, bindings };
-    this.queries.push(call);
-    return this.queryResponder(call);
-  }
-
-  async batch(statements: QueryCall[]): Promise<Record<string, unknown>[][]> {
-    const call = { statements };
-    this.batches.push(call);
-    return this.batchResponder(call);
-  }
-}
-
-class MockKeyStore implements KeyStore {
-  gets: string[] = [];
-  puts: { key: string; value: unknown; metadata: unknown }[] = [];
-
-  constructor(private store: Map<string, unknown> = new Map()) {}
-
-  get(key: string): unknown {
-    this.gets.push(key);
-    return this.store.has(key) ? this.store.get(key) : null;
-  }
-
-  put(key: string, value: unknown, metadata?: unknown): void {
-    this.puts.push({ key, value, metadata });
-    this.store.set(key, value);
-  }
-}
-
-/**
- * A mock {@link StorageResolver}. `sql`/`key` are resolved by a `(database, shard) -> store`
- * lookup; every distinct `(name, shard)` gets its own recorded store so shard fan-out and
- * routing are observable.
- */
-class MockResolver implements StorageResolver {
-  sqlStores = new Map<string, MockSqlStore>();
-  keyStores = new Map<string, MockKeyStore>();
-
-  constructor(
-    private sqlFactory: (database: Database, shard: unknown[]) => MockSqlStore = () =>
-      new MockSqlStore(),
-    private keyFactory: (database: Database, shard: unknown[]) => MockKeyStore = () =>
-      new MockKeyStore(),
-  ) {}
-
-  private slot(database: Database, shard: unknown[]): string {
-    return `${database.name}|${JSON.stringify(shard)}`;
-  }
-
-  sql(database: Database, shard: unknown[]): SqlStore {
-    const slot = this.slot(database, shard);
-    if (!this.sqlStores.has(slot)) {
-      this.sqlStores.set(slot, this.sqlFactory(database, shard));
-    }
-    return this.sqlStores.get(slot)!;
-  }
-
-  key(database: Database, shard: unknown[]): KeyStore {
-    const slot = this.slot(database, shard);
-    if (!this.keyStores.has(slot)) {
-      this.keyStores.set(slot, this.keyFactory(database, shard));
-    }
-    return this.keyStores.get(slot)!;
-  }
-}
-
-function d1(name = "db"): Database {
-  return { name, kind: "D1" };
-}
-function doDb(name = "doDb"): Database {
-  return { name, kind: "DurableObject" };
-}
-function kvDb(name = "kv"): Database {
-  return { name, kind: "Kv" };
-}
-function r2Db(name = "r2"): Database {
-  return { name, kind: "R2" };
-}
-
-const one: Mapping = { cardinality: "One", join: [] };
-const many: Mapping = { cardinality: "Many", join: [] };
-function mapping(cardinality: MapCardinality, join: Mapping["join"] = []): Mapping {
-  return {
-    cardinality,
-    join,
-  };
-}
-
-// A Sql `arguments` slot is a SelectArg: a `Param` binds one value, a `Result` path spreads
-// the distinct values of that owner-table field across its rows into an `IN (...)` list.
-function param(name: string): SelectArg {
-  return { Param: name };
-}
-function spread(...path: string[]): SelectArg {
-  return { Result: path };
-}
-
-/** Each variadic argument is one stage's steps. */
-function selectPlan(...stages: SelectStep[][]): SelectPlan {
-  return {
-    stages: stages.map((steps) => ({ steps })),
-  };
-}
-
-function sqlStep(
-  result: string[],
-  sql: string,
-  opts: {
-    args?: SelectArg[];
-    mapping?: Mapping;
-    db?: Database;
-    shard?: [string, SelectArg][];
-  } = {},
-): SelectStep {
-  return {
-    result,
-    query: {
-      Sql: {
-        database: opts.db ?? d1(),
-        sql,
-        arguments: opts.args ?? [],
-        mapping: opts.mapping ?? one,
-        shard: opts.shard ?? [],
-      },
-    },
-  };
-}
-
-function keyStep(
-  result: string[],
-  database: Database,
-  segments: TemplateSegment<SelectArg>[],
-  shard: [string, SelectArg][] = [],
-): SelectStep {
-  return { result, query: { Key: { database, segments, shard } } };
-}
-
-function synthStep(
-  result: string[],
-  fields: [string, SelectArg][],
-  cardinality: MapCardinality = "One",
-): SelectStep {
-  return { result, query: { Synthesize: { fields, cardinality } } };
-}
-
-/** Run a select expected to sink no errors, returning the hydrated body. */
-async function executeSelectOk(...args: Parameters<typeof executeSelect>): Promise<any> {
-  const res = await executeSelect(...args);
-  expect(res.errors).toEqual([]);
-  return res.value;
-}
-
-/** Run a save expected to sink no errors, returning the saved body. */
-async function executeSaveOk(...args: Parameters<typeof executeSave>): Promise<any> {
-  const res = await executeSave(...args);
-  expect(res.errors).toEqual([]);
-  return res.value;
-}
-
-/** Match a sunk error of `kind` whose Error message matches `message`. */
-function sunkError(kind: string, message: RegExp) {
-  return expect.objectContaining({
-    kind,
-    error: expect.objectContaining({ message: expect.stringMatching(message) }),
-  });
-}
+import {
+  MockKeyStore,
+  MockResolver,
+  MockSqlStore,
+  d1,
+  doDb,
+  kvDb,
+  r2Db,
+  sunkError,
+} from "./common/executor.js";
+import {
+  executeSelectOk,
+  keyStep,
+  many,
+  mapping,
+  param,
+  scalarField,
+  selectPlan,
+  spread,
+  sqlStep,
+  synthStep,
+  type RawArg,
+} from "./common/select.js";
 
 describe("executeSelect cardinality", () => {
   test("One cardinality maps the first row to a root object", async () => {
@@ -309,9 +137,206 @@ describe("executeSelect nested include joins", () => {
   });
 });
 
+describe("executeSelect join bucketing", () => {
+  /** A Many root over `parents`, then a child stage joining on `join` with `child` rows. */
+  const joinPlan = (join: Mapping["join"]) =>
+    selectPlan(
+      [sqlStep([], "SELECT * FROM parents", { db: d1("parents"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "pid" IN (?1)', {
+          db: d1("children"),
+          args: [spread("id")],
+          mapping: mapping("Many", join),
+        }),
+      ],
+    );
+
+  const runJoin = (join: Mapping["join"], parents: any[], children: any[]) => {
+    const resolver = new MockResolver((database) =>
+      database.name === "parents"
+        ? new MockSqlStore(() => parents)
+        : new MockSqlStore(() => children),
+    );
+    return executeSelectOk(joinPlan(join), {}, resolver);
+  };
+
+  test("single-key join distributes rows identically to the multi-key path, including nulls", async () => {
+    // A null parent key matches a null child key (existing `?? null` joinKey semantics); a
+    // real key matches only its own. Parent 2's key is null, so it collects the null child.
+    const parents = [
+      { id: 1, k: "a", g: "x" },
+      { id: 2, k: null, g: "x" },
+      { id: 3, k: "b", g: "x" },
+    ];
+    const children = [
+      { c: 10, pid: "a", g: "x" },
+      { c: 11, pid: null, g: "x" },
+      { c: 12, pid: "b", g: "x" },
+      { c: 13, pid: "a", g: "x" },
+    ];
+
+    // The single-key fast path and a two-key join whose extra pair always matches (`g`)
+    // must distribute the rows the same way.
+    const single = await runJoin([{ parent_key: "k", child_key: "pid" }], parents, children);
+    const multi = await runJoin(
+      [
+        { parent_key: "k", child_key: "pid" },
+        { parent_key: "g", child_key: "g" },
+      ],
+      parents,
+      children,
+    );
+
+    const expected = [
+      {
+        id: 1,
+        k: "a",
+        g: "x",
+        children: [
+          { c: 10, pid: "a", g: "x" },
+          { c: 13, pid: "a", g: "x" },
+        ],
+      },
+      { id: 2, k: null, g: "x", children: [{ c: 11, pid: null, g: "x" }] },
+      { id: 3, k: "b", g: "x", children: [{ c: 12, pid: "b", g: "x" }] },
+    ];
+    expect(single).toEqual(expected);
+    expect(multi).toEqual(single);
+  });
+
+  test("one fetched row matching two parents yields independent objects per parent", async () => {
+    // Two parents share the single join key "a"; one child row matches both. The first parent
+    // gets the fetched object itself, the second a clone — so mutating one must not touch the
+    // other.
+    const parents = [
+      { id: 1, k: "a" },
+      { id: 2, k: "a" },
+    ];
+    const body = await runJoin([{ parent_key: "k", child_key: "pid" }], parents, [
+      { c: 10, pid: "a" },
+    ]);
+
+    expect(body[0].children[0]).toEqual({ c: 10, pid: "a" });
+    expect(body[1].children[0]).toEqual({ c: 10, pid: "a" });
+    expect(body[0].children[0]).not.toBe(body[1].children[0]);
+
+    body[0].children[0].c = 999;
+    expect(body[1].children[0].c).toBe(10);
+  });
+
+  test("a single parent match attaches the fetched row's data", async () => {
+    const body = await runJoin(
+      [{ parent_key: "k", child_key: "pid" }],
+      [{ id: 1, k: "a" }],
+      [{ c: 10, pid: "a", extra: "kept" }],
+    );
+    expect(body).toEqual([{ id: 1, k: "a", children: [{ c: 10, pid: "a", extra: "kept" }] }]);
+  });
+});
+
+describe("executeSelect scalar (non-spread) SQL argument", () => {
+  /** A Many root over `parents`, then a child binding `id` as a scalar (non-spread) arg. */
+  const scalarPlan = () =>
+    selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" = ?1', {
+          db: d1("children"),
+          args: [scalarField("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "parentId" }]),
+        }),
+      ],
+    );
+
+  test("a non-spread field resolving to one distinct value binds it", async () => {
+    // Every parent shares the same id, so the scalar arg has exactly one value to bind.
+    const parents = [{ id: 1 }, { id: 1 }];
+    const childStore = new MockSqlStore(() => []);
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : childStore,
+    );
+
+    await executeSelectOk(scalarPlan(), {}, resolver);
+
+    expect(childStore.queries).toEqual([
+      { sql: 'SELECT * FROM children WHERE "parentId" = ?', bindings: [1] },
+    ]);
+  });
+
+  test("a non-spread field resolving to multiple distinct values fails the step", async () => {
+    // Three distinct parent ids can't collapse to a single scalar bind, so the step errors.
+    const parents = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const childStore = new MockSqlStore(() => []);
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : childStore,
+    );
+
+    const res = await executeSelect(scalarPlan(), {}, resolver);
+
+    // The Many child degrades to [] on each parent and the error is sunk; no query ran.
+    expect(res.value).toEqual([
+      { id: 1, children: [] },
+      { id: 2, children: [] },
+      { id: 3, children: [] },
+    ]);
+    expect(res.errors).toEqual([
+      sunkError("generic", /non-spread argument resolving to 3 distinct values/),
+    ]);
+    expect(childStore.queries).toEqual([]);
+  });
+});
+
+describe("executeSelect bulk key reads", () => {
+  /** A {@link KeyStore} exposing `getMany`, recording both bulk and per-key reads. */
+  class MockBulkKeyStore implements KeyStore {
+    getManyCalls: string[][] = [];
+    gets: string[] = [];
+
+    constructor(private store: Map<string, unknown> = new Map()) {}
+
+    get(key: string): unknown {
+      this.gets.push(key);
+      return this.store.has(key) ? this.store.get(key) : null;
+    }
+
+    async getMany(keys: string[]): Promise<Map<string, unknown>> {
+      this.getManyCalls.push(keys);
+      return new Map(keys.map((k) => [k, this.store.has(k) ? this.store.get(k) : null]));
+    }
+
+    put(): void {}
+  }
+
+  test("prefers getMany, calling it once with every key instead of per-key get", async () => {
+    const bulk = new MockBulkKeyStore(
+      new Map<string, unknown>([
+        ["k/1", { value: "A" }],
+        ["k/2", { value: "B" }],
+      ]),
+    );
+    const resolver = new MockResolver(
+      () => new MockSqlStore(() => [{ id: 1 }, { id: 2 }]),
+      () => bulk as unknown as MockKeyStore,
+    );
+    const plan = selectPlan(
+      [sqlStep([], "SELECT * FROM M", { mapping: many })],
+      [keyStep(["data"], kvDb("kv"), [{ Literal: "k/" }, { Value: spread("id") }])],
+    );
+
+    const body = await executeSelectOk(plan, {}, resolver);
+
+    expect(bulk.getManyCalls).toEqual([["k/1", "k/2"]]);
+    expect(bulk.gets).toEqual([]);
+    expect(body).toEqual([
+      { id: 1, data: new KValue("A") },
+      { id: 2, data: new KValue("B") },
+    ]);
+  });
+});
+
 describe("executeSelect spread IN expansion", () => {
   /** A root list stage plus one child stage joining `children.parentId -> root.id`. */
-  const childPlan = (childArgs: SelectArg[], childSql: string): SelectPlan =>
+  const childPlan = (childArgs: RawArg[], childSql: string) =>
     selectPlan(
       [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
       [
@@ -386,7 +411,7 @@ describe("executeSelect spread IN expansion", () => {
   test("expands ?1 vs ?10 without a naive string-replace collision", async () => {
     // Ten single-value params: only ?1 and ?10 differ by a prefix; a naive replace of `?1`
     // would corrupt `?10`. `IN (?1)` must stay one placeholder and `?10` its own.
-    const args: SelectArg[] = Array.from({ length: 10 }, (_, i) => param(`p${i + 1}`));
+    const args: RawArg[] = Array.from({ length: 10 }, (_, i) => param(`p${i + 1}`));
     const params = Object.fromEntries(args.map((_, i) => [`p${i + 1}`, i + 1]));
     const store = new MockSqlStore(() => [{ ok: 1 }]);
     const resolver = new MockResolver(() => store);
@@ -407,7 +432,7 @@ describe("executeSelect spread IN expansion", () => {
 
 describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
   /** Build a two-stage plan whose child SQL spreads `id` over `?1`, plus optional fixed params. */
-  const chunkPlan = (childArgs: SelectArg[], childSql: string): SelectPlan =>
+  const chunkPlan = (childArgs: RawArg[], childSql: string) =>
     selectPlan(
       [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
       [
@@ -587,6 +612,63 @@ describe("executeSelect DO shard fan-out", () => {
       { id: 2, tenant: "A", notes: [{ note: "n-A", tenant: "A" }] },
       { id: 3, tenant: "B", notes: [{ note: "n-B", tenant: "B" }] },
     ]);
+  });
+});
+
+describe("executeSelect DO shard-correlated spreads", () => {
+  /** A Many root over `parents`, then a DO nav sharded by `tenant` and spreading `id`. */
+  const shardedSpreadPlan = () =>
+    selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["notes"], 'SELECT * FROM notes WHERE "ownerId" IN (?1)', {
+          db: doDb("notes"),
+          args: [spread("id")],
+          mapping: mapping("Many", [{ parent_key: "id", child_key: "ownerId" }]),
+          shard: [["tenant", spread("tenant")]],
+        }),
+      ],
+    );
+
+  test("each shard binds only its own distinct spread values, not the global set", async () => {
+    const parents = [
+      { id: 1, tenant: "A" },
+      { id: 2, tenant: "A" },
+      { id: 3, tenant: "B" },
+    ];
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : new MockSqlStore(() => []),
+    );
+
+    await executeSelectOk(shardedSpreadPlan(), {}, resolver);
+
+    // Shard A queries only ids 1,2; shard B only id 3 — never the global [1,2,3].
+    expect(resolver.sqlStores.get('notes|["A"]')!.queries).toEqual([
+      { sql: 'SELECT * FROM notes WHERE "ownerId" IN (?, ?)', bindings: [1, 2] },
+    ]);
+    expect(resolver.sqlStores.get('notes|["B"]')!.queries).toEqual([
+      { sql: 'SELECT * FROM notes WHERE "ownerId" IN (?)', bindings: [3] },
+    ]);
+  });
+
+  test("chunking is scoped per shard: a local count under the limit is never chunked", async () => {
+    // Two shards of 60 ids each — 120 global would chunk, but 60 < limit per shard.
+    const parents = [
+      ...Array.from({ length: 60 }, (_, i) => ({ id: i + 1, tenant: "A" })),
+      ...Array.from({ length: 60 }, (_, i) => ({ id: 100 + i + 1, tenant: "B" })),
+    ];
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : new MockSqlStore(() => []),
+    );
+
+    await executeSelectOk(shardedSpreadPlan(), {}, resolver);
+
+    for (const tenant of ["A", "B"]) {
+      const store = resolver.sqlStores.get(`notes|["${tenant}"]`)!;
+      expect(store.queries.length).toBe(1);
+      expect(store.batches.length).toBe(0);
+      expect(store.queries[0].bindings.length).toBe(60);
+    }
   });
 });
 
@@ -1176,365 +1258,5 @@ describe("seeded select", () => {
 
     expect(childStore.queries).toEqual([]);
     expect(body).toEqual([{ name: "no-id", children: [] }]);
-  });
-});
-
-function write(sql: string, args: SaveArg[] = []): SqlStatement {
-  return {
-    Write: { sql, arguments: args },
-  };
-}
-function hydrate(sql: string, result: PathSegment[], args: SaveArg[] = []): SqlStatement {
-  return {
-    Hydrate: { sql, arguments: args, result },
-  };
-}
-function payload(v: unknown): SaveArg {
-  return { Payload: v };
-}
-function resultRef(path: PathSegment[]): SaveArg {
-  return { Result: path };
-}
-function field(name: string): PathSegment {
-  return { Field: name };
-}
-function index(i: number): PathSegment {
-  return { Index: i };
-}
-
-function savePlan(...stages: SaveStep[][]): SavePlan {
-  return {
-    stages: stages.map((steps) => ({ steps })),
-  };
-}
-
-function batchStep(
-  result: PathSegment[],
-  statements: SqlStatement[],
-  opts: { db?: Database; shard?: [string, SaveArg][] } = {},
-): SaveStep {
-  return {
-    result,
-    query: {
-      SqlBatch: {
-        database: opts.db ?? d1(),
-        shard: opts.shard ?? [],
-        statements,
-      },
-    },
-  };
-}
-
-function keyWriteStep(
-  result: PathSegment[],
-  database: Database,
-  segments: TemplateSegment<SaveArg>[],
-  value: unknown,
-  metadata: unknown | null = null,
-  shard: [string, SaveArg][] = [],
-): SaveStep {
-  return {
-    result,
-    query: { KeyWrite: { database, segments, value, metadata, shard } },
-  };
-}
-
-function saveSynthStep(
-  result: PathSegment[],
-  fields: [string, SaveArg][],
-  create: boolean,
-  cardinality: MapCardinality = "One",
-): SaveStep {
-  return { result, query: { Synthesize: { fields, create, cardinality } } };
-}
-
-describe("executeSave SqlBatch", () => {
-  test("runs Write then Hydrate and places the read-back row at the result path", async () => {
-    const resolver = new MockResolver(
-      () =>
-        new MockSqlStore(undefined, () => [
-          [], // Write returns no rows
-          [{ id: 1, name: "a" }], // Hydrate read-back
-        ]),
-    );
-    const plan = savePlan([
-      batchStep(
-        [],
-        [
-          write('INSERT INTO "M" ("name") VALUES (?1)', [payload("a")]),
-          hydrate('SELECT * FROM "M" WHERE "id" = ?1', [], [payload(1)]),
-        ],
-      ),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(body).toEqual({ id: 1, name: "a" });
-    expect(resolver.sqlStores.get("db|[]")!.batches).toEqual([
-      {
-        statements: [
-          { sql: 'INSERT INTO "M" ("name") VALUES (?1)', bindings: ["a"] },
-          { sql: 'SELECT * FROM "M" WHERE "id" = ?1', bindings: [1] },
-        ],
-      },
-    ]);
-  });
-
-  test("$cloesce_tmp autoincrement capture: hydrate reads back the generated id", async () => {
-    // The $cloesce_tmp mechanism lives entirely in the SQL strings; the executor just runs
-    // the batch in order. The mock store models a store that captured last_insert_rowid()=42
-    // in the tmp table and the hydrate select reads it back.
-    let captured: number | null = null;
-    const store = new MockSqlStore(undefined, (call) => {
-      return call.statements.map((s) => {
-        if (s.sql.startsWith("SELECT")) return [{ id: captured, name: "ed" }];
-        if (s.sql.startsWith('INSERT INTO "Horse"')) return [];
-        if (s.sql.includes("$cloesce_tmp")) {
-          captured = 42;
-          return [];
-        }
-        return [];
-      });
-    });
-    const resolver = new MockResolver(() => store);
-    const plan = savePlan([
-      batchStep(
-        [],
-        [
-          write('INSERT INTO "Horse" ("name") VALUES (?1)', [payload("ed")]),
-          write(
-            'INSERT OR REPLACE INTO "$cloesce_tmp" ("path", "primary_key") VALUES (\'\', json_object(\'id\', last_insert_rowid()))',
-          ),
-          hydrate(
-            'SELECT "id", "name" FROM "Horse" WHERE "id" = (SELECT json_extract("primary_key", \'$.id\') FROM "$cloesce_tmp" WHERE "path" = \'\')',
-            [],
-          ),
-        ],
-      ),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-    expect(body).toEqual({ id: 42, name: "ed" });
-  });
-
-  test("a Hydrate read-back with no row attaches nothing, silently", async () => {
-    const resolver = new MockResolver(() => new MockSqlStore(undefined, () => [[]]));
-    const plan = savePlan([batchStep([], [hydrate("SELECT * FROM M", [])])]);
-
-    const res = await executeSave(plan, resolver);
-
-    expect(res.value).toBeNull();
-    expect(res.errors).toEqual([]);
-  });
-
-  test("a batch failure sinks, and an independent later step still runs", async () => {
-    const kvStore = new MockKeyStore();
-    const resolver = new MockResolver(
-      () =>
-        new MockSqlStore(undefined, () => {
-          throw new Error("constraint failed");
-        }),
-      () => kvStore,
-    );
-    const plan = savePlan(
-      [batchStep([], [write("INSERT INTO M DEFAULT VALUES")])],
-      [
-        keyWriteStep([field("blob")], kvDb(), [{ Literal: "k/1" }], {
-          ok: true,
-        }),
-      ],
-    );
-
-    const res = await executeSave(plan, resolver);
-
-    // The failure did not halt the plan: the later KV write still landed and its
-    // attachment survives in the partial body.
-    expect(res.value).toEqual({ blob: { ok: true } });
-    expect(res.errors).toEqual([sunkError("generic", /constraint failed/)]);
-    expect(kvStore.puts.length).toBe(1);
-  });
-});
-
-describe("executeSave DO SqlBatch shard tagging", () => {
-  test("routes to the shard stub and tags hydrated rows with route fields", async () => {
-    const resolver = new MockResolver(
-      () => new MockSqlStore(undefined, () => [[], [{ id: 1, name: "n" }]]),
-    );
-    const plan = savePlan([
-      batchStep(
-        [],
-        [
-          write('INSERT INTO "M" ("name") VALUES (?1)', [payload("n")]),
-          hydrate('SELECT * FROM "M" WHERE "id" = ?1', [], [payload(1)]),
-        ],
-        { db: doDb("agg"), shard: [["tenant", payload("A")]] },
-      ),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(body).toEqual({ id: 1, name: "n", tenant: "A" });
-    expect(resolver.sqlStores.has('agg|["A"]')).toBe(true);
-  });
-});
-
-describe("executeSave KeyWrite", () => {
-  test("KV write records key, value, and metadata and attaches value at the result path", async () => {
-    const resolver = new MockResolver();
-    const plan = savePlan(
-      [saveSynthStep([], [["id", payload(7)]], true)],
-      [
-        keyWriteStep(
-          [field("profile")],
-          kvDb(),
-          [{ Literal: "profile:" }, { Value: resultRef([field("id")]) }],
-          { bio: "hi" },
-          { v: 3 },
-        ),
-      ],
-    );
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(body).toEqual({ id: 7, profile: { bio: "hi" } });
-    expect(resolver.keyStores.get("kv|[]")!.puts).toEqual([
-      { key: "profile:7", value: { bio: "hi" }, metadata: { v: 3 } },
-    ]);
-  });
-
-  test("R2-style write passes undefined metadata", async () => {
-    const resolver = new MockResolver();
-    const plan = savePlan([
-      keyWriteStep([field("blob")], r2Db(), [{ Literal: "blob:1" }], {
-        bytes: [1, 2],
-      }),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(body).toEqual({ blob: { bytes: [1, 2] } });
-    expect(resolver.keyStores.get("r2|[]")!.puts).toEqual([
-      { key: "blob:1", value: { bytes: [1, 2] }, metadata: undefined },
-    ]);
-  });
-
-  test("DO-KV write routes by its shard tuple", async () => {
-    const resolver = new MockResolver();
-    const plan = savePlan([
-      keyWriteStep([field("entry")], doDb("dokv"), [{ Literal: "entry:1" }], { n: 1 }, null, [
-        ["tenant", payload("B")],
-      ]),
-    ]);
-
-    await executeSaveOk(plan, resolver);
-
-    expect(resolver.keyStores.has('dokv|["B"]')).toBe(true);
-    expect(resolver.keyStores.get('dokv|["B"]')!.puts[0].key).toBe("entry:1");
-  });
-});
-
-describe("executeSave nested PathSegment attach", () => {
-  test("writes hydrated rows into nested arrays and objects", async () => {
-    const resolver = new MockResolver((database) =>
-      database.name === "root"
-        ? new MockSqlStore(undefined, () => [[], [{ id: 1 }]])
-        : new MockSqlStore(undefined, () => [[], [{ id: 10 }]]),
-    );
-    const plan = savePlan(
-      [
-        batchStep(
-          [],
-          [write("INSERT INTO root DEFAULT VALUES"), hydrate("SELECT * FROM root", [])],
-          { db: d1("root") },
-        ),
-      ],
-      [
-        batchStep(
-          [field("children"), index(0)],
-          [
-            write("INSERT INTO children DEFAULT VALUES"),
-            hydrate("SELECT * FROM children", [field("children"), index(0)]),
-          ],
-          { db: d1("children") },
-        ),
-      ],
-    );
-
-    const body = await executeSaveOk(plan, resolver);
-    expect(body).toEqual({ id: 1, children: [{ id: 10 }] });
-  });
-});
-
-describe("executeSave arg resolution", () => {
-  test("Payload literals and Result path-references both bind into statements", async () => {
-    const resolver = new MockResolver(
-      () =>
-        new MockSqlStore(undefined, () => [
-          [], // synthesize-less: first write
-          [{ dogId: 3, id: 9 }], // hydrate
-        ]),
-    );
-    const plan = savePlan(
-      // First stage: hydrate a "dog" body at Field("dog") holding an id.
-      [saveSynthStep([field("dog")], [["id", payload(3)]], true)],
-      // Second stage: a write binding a Payload literal and a Result reference to dog.id.
-      [
-        batchStep(
-          [],
-          [
-            write('INSERT INTO "Person" ("dogId", "id") VALUES (?1, ?2)', [
-              resultRef([field("dog"), field("id")]),
-              payload(9),
-            ]),
-            hydrate('SELECT * FROM "Person" WHERE "id" = ?1', [], [payload(9)]),
-          ],
-        ),
-      ],
-    );
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(resolver.sqlStores.get("db|[]")!.batches[0].statements[0]).toEqual({
-      sql: 'INSERT INTO "Person" ("dogId", "id") VALUES (?1, ?2)',
-      bindings: [3, 9], // dog.id resolved from body, then the literal payload
-    });
-    expect(body.dog).toEqual({ id: 3 });
-  });
-
-  test("a Result reference to a missing body value skips the batch, silently", async () => {
-    const resolver = new MockResolver();
-    const plan = savePlan([
-      batchStep([], [write("INSERT INTO M (x) VALUES (?1)", [resultRef([field("nope")])])]),
-    ]);
-
-    const res = await executeSave(plan, resolver);
-
-    expect(res.value).toBeNull();
-    expect(res.errors).toEqual([]);
-    expect(resolver.sqlStores.size).toBe(0);
-  });
-});
-
-describe("executeSave Synthesize merge", () => {
-  test("create=false merges fields into an existing body object", async () => {
-    const resolver = new MockResolver(() => new MockSqlStore(undefined, () => [[], [{ id: 1 }]]));
-    const plan = savePlan(
-      [batchStep([], [write("INSERT INTO M DEFAULT VALUES"), hydrate("SELECT * FROM M", [])])],
-      [saveSynthStep([], [["extra", payload("v")]], false)],
-    );
-
-    const body = await executeSaveOk(plan, resolver);
-    expect(body).toEqual({ id: 1, extra: "v" });
-  });
-
-  test("create=true with Many cardinality and no fields attaches an empty array", async () => {
-    const resolver = new MockResolver(() => new MockSqlStore(undefined, () => [[], [{ id: 1 }]]));
-    const plan = savePlan([
-      batchStep([], [write("INSERT INTO M DEFAULT VALUES"), hydrate("SELECT * FROM M", [])]),
-      saveSynthStep([field("children")], [], true, "Many"),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-    expect(body).toEqual({ id: 1, children: [] });
   });
 });
