@@ -4,16 +4,15 @@ import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
 import { Model, CidlType, Cidl, getNavigationCidlType } from "../cidl.js";
 import { CloesceError, CloesceResult, Either, InternalError, u8ToB64 } from "../common.js";
-import { DeepPartial, IncludeTree, KValue } from "../ui/backend.js";
+import { DeepPartial, IncludeTree } from "../ui/backend.js";
 import {
   executeSave,
   executeSelect,
   type KeyStore,
-  type KeyValueWrapper,
   type SqlStore,
   type StorageResolver,
-} from "./executor.js";
-import type { Database, SavePlan, SelectPlan } from "./plan.js";
+} from "./executor/index.js";
+import type { Database, SavePlan, SelectPlan } from "./executor/plan.js";
 
 type HydrateArgs = {
   idl: Cidl;
@@ -41,11 +40,10 @@ export class Orm {
   }
 
   /**
-   * Load a single `{@link Model}` (and its included relations) by its key params.
+   * Load a single `{@link Model}` and its included relations.
    *
-   * `params` supplies every primary/route key the select plan requires.
-   *
-   * A precompiled `plan` (from `cidl.json`) skips the WASM planning call when supplied.
+   * - `params` supplies every primary/route key the select plan requires.
+   * - A precompiled `plan` skips the WASM planning call when supplied.
    */
   async get<T extends object>(
     meta: Model,
@@ -60,10 +58,10 @@ export class Orm {
   }
 
   /**
-   * Load all matching `{@link Model}` rows (and included relations).
+   * Load all matching `{@link Model}` rows and included relations.
    *
    * - `params` carries the `limit` (and any shard/route keys) the list plan requires.
-   * - A precompiled `plan` (from `cidl.json`) skips the WASM planning call when supplied.
+   * - A precompiled `plan` skips the WASM planning call when supplied.
    */
   async list<T extends object>(
     meta: Model,
@@ -82,14 +80,10 @@ export class Orm {
    * Hydrate caller-supplied partial rows (and their included relations) into full
    * `{@link Model}` rows against the list plan.
    *
-   * - The seeded rows, and any seeded sub-paths, replace their plan steps instead of
-   *   being re-fetched; the plan still sources every step the seed omits.
-   * - Each result is shaped from the assembled body, not the raw `rows`, so stamps
-   *   and later-stage children are coerced.
+   * - `rows` are mutated in place and should not be reused.
    * - `params` carries any shard/route keys the skipped root step would have bound; a
    *   plain D1 model needs none.
-   * - A precompiled `plan` (from `cidl.json`) skips the WASM planning call.
-   * - Seeds are consumed (stamped and attached to in place); do not reuse a `rows` array.
+   * - A precompiled `plan` skips the WASM planning call.
    */
   async hydrateAll<T extends object>(
     meta: Model,
@@ -114,8 +108,7 @@ export class Orm {
   }
 
   /**
-   * Hydrate a single caller-supplied partial row. A thin wrapper over {@link hydrateAll}
-   * that returns the full `{@link Model}`, or `null` when the seed hydrates to nothing.
+   * Hydrate a single caller-supplied partial row. Thin wrapper over {@link hydrateAll}.
    */
   async hydrate<T extends object>(
     meta: Model,
@@ -128,11 +121,6 @@ export class Orm {
     return { value: res.value?.[0] ?? null, errors: res.errors };
   }
 
-  /**
-   * Plan (unless precompiled) and execute a select, shaping the hydrated body — which
-   * may be partial when the executor sunk step errors. Anything thrown here is generic.
-   * A `seed` pre-supplies the root (and optionally sub-paths), skipping those plan steps.
-   */
   private async runSelect<R>(
     meta: Model,
     op: "get" | "list",
@@ -144,13 +132,7 @@ export class Orm {
   ): Promise<CloesceResult<R>> {
     try {
       const selectPlan = plan ?? this.planSelect(meta, op, includeTree);
-      const res = await executeSelect(
-        selectPlan,
-        params,
-        this.storageResolver(),
-        this.keyWrapper(meta, includeTree),
-        seed,
-      );
+      const res = await executeSelect(selectPlan, params, this.storageResolver(), seed);
       return { value: shape(res.value), errors: res.errors };
     } catch (e) {
       return CloesceError.generic(e);
@@ -228,14 +210,16 @@ export class Orm {
     return {
       sql(database: Database, shard: unknown[]): SqlStore {
         if (database.kind === "DurableObject") {
-          return durableSqlStore(env, database, shard);
+          const stub = durableStub(env, database.name, shard);
+          return new DurableSqlStore(stub);
         }
         return new D1SqlStore(env[database.name]);
       },
       key(database: Database, shard: unknown[]): KeyStore {
         switch (database.kind) {
           case "DurableObject":
-            return durableKeyStore(env, database, shard);
+            const stub = durableStub(env, database.name, shard);
+            return new DurableKeyStore(stub);
           case "R2":
             return new R2KeyStore(env, database.name);
           default:
@@ -246,23 +230,7 @@ export class Orm {
   }
 
   /**
-   * A read from a `Key` step is wrapped to match the field's declared type: Workers KV
-   * fields become a {@link KValue}, DO-KV and R2 fields pass through raw (R2 already
-   * returns an `R2ObjectBody`).
-   */
-  private keyWrapper(_meta: Model, _tree: IncludeTree<any>): KeyValueWrapper {
-    return (database, _resultPath, raw, metadata) => {
-      if (database.kind === "Kv") {
-        // A Workers KV store returns `{ value, metadata }`; unwrap into a KValue.
-        const inner = (raw ?? {}) as { value?: unknown; metadata?: unknown };
-        return new KValue(inner.value ?? null, inner.metadata ?? metadata ?? null);
-      }
-      return raw ?? null;
-    };
-  }
-
-  /**
-   * Coerce a plan-produced body's scalar fields into their JS runtime types (Date, Uint8Array,
+   * Coerce a body's scalar fields into their JS runtime types (Date, Uint8Array,
    * boolean) recursively.
    */
   private coerce(meta: Model, body: any, includeTree: IncludeTree<any>): any {
@@ -290,7 +258,7 @@ class D1SqlStore implements SqlStore {
       .bind(...bindings.map(toSqlBind))
       .all();
     if (!res.success) {
-      throw new InternalError(`D1 query failed: ${JSON.stringify(res)}`);
+      throw new Error(`D1 query failed: ${JSON.stringify(res)}`);
     }
     return res.results as Record<string, unknown>[];
   }
@@ -304,15 +272,10 @@ class D1SqlStore implements SqlStore {
     const results = await this.db.batch(prepared);
     const failed = results.find((r) => !r.success);
     if (failed) {
-      throw new InternalError(`D1 batch failed: ${JSON.stringify(failed)}`);
+      throw new Error(`D1 batch failed: ${JSON.stringify(failed)}`);
     }
     return results.map((r) => (r.results ?? []) as Record<string, unknown>[]);
   }
-}
-
-function durableSqlStore(env: any, database: Database, shard: unknown[]): SqlStore {
-  const stub = durableStub(env, database.name, shard);
-  return new DurableSqlStore(stub);
 }
 
 class DurableSqlStore implements SqlStore {
@@ -333,8 +296,6 @@ class DurableSqlStore implements SqlStore {
 /**
  * @internal Runs an ordered SQL batch against a Durable Object's SQLite storage as a single
  * transaction, rolling back on the first failure. Returns each statement's rows.
- *
- * Exported for the generated DO subclass to expose as an RPC to the plan executor.
  */
 export function durableSqlBatch(
   storage: DurableStorage,
@@ -357,12 +318,16 @@ class WorkerKvStore implements KeyStore {
 
   async get(key: string): Promise<unknown> {
     // Read value + metadata so a KValue can carry both.
-    const { value, metadata } = await this.namespace.getWithMetadata(key, { type: "json" });
+    const { value, metadata } = await this.namespace.getWithMetadata(key, {
+      type: "json",
+    });
     return { value, metadata };
   }
 
   put(key: string, value: unknown, metadata?: unknown): Promise<void> {
-    return this.namespace.put(key, JSON.stringify(value), { metadata: metadata as any });
+    return this.namespace.put(key, JSON.stringify(value), {
+      metadata: metadata as any,
+    });
   }
 }
 
@@ -383,10 +348,6 @@ class R2KeyStore implements KeyStore {
   async put(key: string, value: unknown): Promise<void> {
     await this.bucket.put(key, value as any);
   }
-}
-
-function durableKeyStore(env: any, database: Database, shard: unknown[]): KeyStore {
-  return new DurableKeyStore(durableStub(env, database.name, shard));
 }
 
 class DurableKeyStore implements KeyStore {

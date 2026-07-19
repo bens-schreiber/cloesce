@@ -4,10 +4,9 @@ import {
   executeSave,
   MAX_BOUND_PARAMETERS,
   type KeyStore,
-  type KeyValueWrapper,
   type SqlStore,
   type StorageResolver,
-} from "../src/router/executor.js";
+} from "../src/router/executor/index.js";
 import type {
   Database,
   MapCardinality,
@@ -21,7 +20,7 @@ import type {
   SelectStep,
   SqlStatement,
   TemplateSegment,
-} from "../src/router/plan.js";
+} from "../src/router/executor/plan.js";
 import { KValue } from "../src/ui/backend.js";
 
 type QueryCall = { sql: string; bindings: unknown[] };
@@ -204,15 +203,6 @@ function sunkError(kind: string, message: RegExp) {
   });
 }
 
-const passthroughWrap: KeyValueWrapper = (_db, _path, raw) => raw ?? null;
-const kValueWrap: KeyValueWrapper = (database, _path, raw, metadata) => {
-  if (database.kind === "Kv") {
-    const inner = (raw ?? {}) as { value?: unknown; metadata?: unknown };
-    return new KValue(inner.value ?? null, inner.metadata ?? metadata ?? null);
-  }
-  return raw ?? null;
-};
-
 describe("executeSelect cardinality", () => {
   test("One cardinality maps the first row to a root object", async () => {
     const plan = selectPlan([
@@ -226,7 +216,7 @@ describe("executeSelect cardinality", () => {
         ]),
     );
 
-    const body = await executeSelectOk(plan, { id: 1 }, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, { id: 1 }, resolver);
 
     expect(body).toEqual({ id: 1, name: "a" });
     expect(resolver.sqlStores.get("db|[]")!.queries).toEqual([
@@ -236,7 +226,7 @@ describe("executeSelect cardinality", () => {
 
   test("One cardinality yields null when no rows come back", async () => {
     const plan = selectPlan([sqlStep([], "SELECT 1")]);
-    const body = await executeSelectOk(plan, {}, new MockResolver(), passthroughWrap);
+    const body = await executeSelectOk(plan, {}, new MockResolver());
     expect(body).toBeNull();
   });
 
@@ -245,7 +235,7 @@ describe("executeSelect cardinality", () => {
     const rows = [{ id: 1 }, { id: 2 }];
     const resolver = new MockResolver(() => new MockSqlStore(() => rows));
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, {}, resolver);
     expect(body).toEqual([{ id: 1 }, { id: 2 }]);
   });
 });
@@ -264,7 +254,12 @@ describe("executeSelect nested include joins", () => {
         : new MockSqlStore(() => children),
     );
     const plan = selectPlan(
-      [sqlStep([], "SELECT * FROM parents", { db: d1("parents"), mapping: many })],
+      [
+        sqlStep([], "SELECT * FROM parents", {
+          db: d1("parents"),
+          mapping: many,
+        }),
+      ],
       [
         sqlStep(["children"], 'SELECT * FROM children WHERE "parentId" IN (?1)', {
           db: d1("children"),
@@ -274,7 +269,7 @@ describe("executeSelect nested include joins", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, {}, resolver);
 
     expect(body).toEqual([
       {
@@ -305,8 +300,12 @@ describe("executeSelect nested include joins", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
-    expect(body).toEqual({ id: 1, ownerId: 7, owner: { id: 7, name: "owner" } });
+    const body = await executeSelectOk(plan, {}, resolver);
+    expect(body).toEqual({
+      id: 1,
+      ownerId: 7,
+      owner: { id: 7, name: "owner" },
+    });
   });
 });
 
@@ -334,11 +333,13 @@ describe("executeSelect spread IN expansion", () => {
       childPlan([spread("id")], 'SELECT * FROM children WHERE "parentId" IN (?1)'),
       {},
       resolver,
-      passthroughWrap,
     );
 
     expect(resolver.sqlStores.get("children|[]")!.queries).toEqual([
-      { sql: 'SELECT * FROM children WHERE "parentId" IN (?, ?, ?)', bindings: [1, 2, 3] },
+      {
+        sql: 'SELECT * FROM children WHERE "parentId" IN (?, ?, ?)',
+        bindings: [1, 2, 3],
+      },
     ]);
   });
 
@@ -355,7 +356,6 @@ describe("executeSelect spread IN expansion", () => {
       ),
       { kind: "active" },
       resolver,
-      passthroughWrap,
     );
 
     expect(resolver.sqlStores.get("children|[]")!.queries).toEqual([
@@ -377,7 +377,6 @@ describe("executeSelect spread IN expansion", () => {
       childPlan([spread("missing")], 'SELECT * FROM children WHERE "parentId" IN (?1)'),
       {},
       resolver,
-      passthroughWrap,
     );
 
     expect(body).toEqual([{ id: 1, children: [] }]);
@@ -395,10 +394,13 @@ describe("executeSelect spread IN expansion", () => {
       sqlStep([], "SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10", { args }),
     ]);
 
-    await executeSelectOk(plan, params, resolver, passthroughWrap);
+    await executeSelectOk(plan, params, resolver);
 
     expect(store.queries).toEqual([
-      { sql: "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?", bindings: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+      {
+        sql: "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?",
+        bindings: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      },
     ]);
   });
 });
@@ -418,7 +420,9 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
     );
 
   test("exactly at the limit issues a single query and no batch", async () => {
-    const parents = Array.from({ length: MAX_BOUND_PARAMETERS }, (_, i) => ({ id: i + 1 }));
+    const parents = Array.from({ length: MAX_BOUND_PARAMETERS }, (_, i) => ({
+      id: i + 1,
+    }));
     const childStore = new MockSqlStore(() => []);
     const resolver = new MockResolver((database) =>
       database.name === "root" ? new MockSqlStore(() => parents) : childStore,
@@ -428,7 +432,6 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
       chunkPlan([spread("id")], 'SELECT * FROM children WHERE "parentId" IN (?1)'),
       {},
       resolver,
-      passthroughWrap,
     );
 
     expect(childStore.queries.length).toBe(1);
@@ -444,7 +447,10 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
       () => [],
       (call) =>
         call.statements.map((s) =>
-          s.bindings.map((pid) => ({ id: 1000 + (pid as number), parentId: pid })),
+          s.bindings.map((pid) => ({
+            id: 1000 + (pid as number),
+            parentId: pid,
+          })),
         ),
     );
     const resolver = new MockResolver((database) =>
@@ -455,7 +461,6 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
       chunkPlan([spread("id")], 'SELECT * FROM children WHERE "parentId" IN (?1)'),
       {},
       resolver,
-      passthroughWrap,
     );
 
     // Exactly one batch, no single-query path.
@@ -492,7 +497,6 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
       ),
       { kind: "active" },
       resolver,
-      passthroughWrap,
     );
 
     const stmts = childStore.batches[0].statements;
@@ -508,7 +512,10 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
   test("multiple spreads chunk as a cross-product covering every pair", async () => {
     // Two spreads share the budget (50 each). 60 ids x 60 tags -> 2 x 2 = 4 chunk queries.
     const n = 60;
-    const parents = Array.from({ length: n }, (_, i) => ({ id: i + 1, tag: i + 1 }));
+    const parents = Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      tag: i + 1,
+    }));
     const childStore = new MockSqlStore(
       () => [],
       (call) => call.statements.map(() => []),
@@ -524,7 +531,6 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
       ),
       {},
       resolver,
-      passthroughWrap,
     );
 
     const stmts = childStore.batches[0].statements;
@@ -570,7 +576,7 @@ describe("executeSelect DO shard fan-out", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, {}, resolver);
 
     // Two distinct tenants -> two stubs hit (A deduped from two parents), rows shard-tagged.
     expect(resolver.sqlStores.has('notes|["A"]')).toBe(true);
@@ -598,7 +604,7 @@ describe("executeSelect Key steps", () => {
       [keyStep(["profile"], kvDb(), [{ Literal: "profile:" }, { Value: spread("id") }])],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, kValueWrap);
+    const body = await executeSelectOk(plan, {}, resolver);
 
     expect(body.profile).toBeInstanceOf(KValue);
     expect(body.profile.value).toEqual({ bio: "hi" });
@@ -617,7 +623,7 @@ describe("executeSelect Key steps", () => {
       [keyStep(["blob"], r2Db(), [{ Literal: "blob:" }, { Value: spread("id") }])],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, {}, resolver);
     expect(body.blob).toEqual({ bytes: [1, 2, 3] });
   });
 });
@@ -634,12 +640,7 @@ describe("executeSelect Synthesize steps", () => {
       ),
     ]);
 
-    const body = await executeSelectOk(
-      plan,
-      { id: 5, name: "z" },
-      new MockResolver(),
-      passthroughWrap,
-    );
+    const body = await executeSelectOk(plan, { id: 5, name: "z" }, new MockResolver());
     expect(body).toEqual({ id: 5, name: "z" });
   });
 
@@ -650,7 +651,7 @@ describe("executeSelect Synthesize steps", () => {
       [synthStep([], [["tag", param("tag")]], "Many")],
     );
 
-    const body = await executeSelectOk(plan, { tag: "t" }, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, { tag: "t" }, resolver);
     expect(body).toEqual([
       { id: 1, tag: "t" },
       { id: 2, tag: "t" },
@@ -672,7 +673,7 @@ describe("executeSelect Synthesize steps", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, { label: "L" }, resolver, passthroughWrap);
+    const body = await executeSelectOk(plan, { label: "L" }, resolver);
     expect(body).toEqual({ id: 1, ownerId: 7, owner: { id: 7, label: "L" } });
   });
 });
@@ -699,8 +700,12 @@ describe("executeSelect buffer merge + assemble ordering", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, { role: "admin" }, resolver, passthroughWrap);
-    expect(body).toEqual({ id: 1, ownerId: 7, owner: { id: 7, name: "o", role: "admin" } });
+    const body = await executeSelectOk(plan, { role: "admin" }, resolver);
+    expect(body).toEqual({
+      id: 1,
+      ownerId: 7,
+      owner: { id: 7, name: "o", role: "admin" },
+    });
   });
 
   test("assembles deepest paths first: a grandchild lands inside its child before the child attaches", async () => {
@@ -727,8 +732,11 @@ describe("executeSelect buffer merge + assemble ordering", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap);
-    expect(body).toEqual({ id: 1, b: { id: 10, aId: 1, c: { id: 100, bId: 10 } } });
+    const body = await executeSelectOk(plan, {}, resolver);
+    expect(body).toEqual({
+      id: 1,
+      b: { id: 10, aId: 1, c: { id: 100, bId: 10 } },
+    });
   });
 });
 
@@ -743,7 +751,7 @@ describe("executeSelect seek pagination", () => {
       }),
     ]);
 
-    await executeSelectOk(plan, { lastSeen_id: 5, limit: 20 }, resolver, passthroughWrap);
+    await executeSelectOk(plan, { lastSeen_id: 5, limit: 20 }, resolver);
 
     expect(store.queries).toEqual([
       {
@@ -793,19 +801,19 @@ describe("executeSelect stage/step parallelism", () => {
       [keyStep(["data"], kvDb("kv"), [{ Literal: "k/" }, { Value: spread("id") }])],
     );
 
-    const resultPromise = executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const resultPromise = executeSelectOk(plan, {}, resolver);
 
     for (let i = 0; i < 10 && maxConcurrent.count < 2; i++) {
       await Promise.resolve();
     }
     expect(maxConcurrent.count).toBe(2); // both parents' reads were in flight simultaneously
 
-    deferredByKey.get("k/1")!.resolve("A");
-    deferredByKey.get("k/2")!.resolve("B");
+    deferredByKey.get("k/1")!.resolve({ value: "A" });
+    deferredByKey.get("k/2")!.resolve({ value: "B" });
     const body = await resultPromise;
     expect(body).toEqual([
-      { id: 1, data: "A" },
-      { id: 2, data: "B" },
+      { id: 1, data: new KValue("A") },
+      { id: 2, data: new KValue("B") },
     ]);
   });
 
@@ -815,15 +823,15 @@ describe("executeSelect stage/step parallelism", () => {
     // stage — so the step-ordered sink must run the Sql attach before the Key read/attach.
     const resolver = new MockResolver(
       () => new MockSqlStore(() => [{ id: 7 }]),
-      () => new MockKeyStore(new Map([["k/7", "V"]])),
+      () => new MockKeyStore(new Map([["k/7", { value: "V" }]])),
     );
     const plan = selectPlan([
       sqlStep([], "SELECT * FROM M WHERE id = ?1", { args: [param("id")] }),
       keyStep(["data"], kvDb("kv"), [{ Literal: "k/" }, { Value: param("id") }]),
     ]);
 
-    const body = await executeSelectOk(plan, { id: 7 }, resolver, passthroughWrap);
-    expect(body).toEqual({ id: 7, data: "V" });
+    const body = await executeSelectOk(plan, { id: 7 }, resolver);
+    expect(body).toEqual({ id: 7, data: new KValue("V") });
   });
 
   test("a later stage's store call happens only after all of the prior stage's calls resolve", async () => {
@@ -864,7 +872,7 @@ describe("executeSelect stage/step parallelism", () => {
       ],
     );
 
-    const resultPromise = executeSelectOk(plan, {}, resolver, passthroughWrap);
+    const resultPromise = executeSelectOk(plan, {}, resolver);
 
     // Let stage 1's query start; stage 2 must not start until stage 1 resolves.
     await Promise.resolve();
@@ -883,7 +891,7 @@ describe("executeSelect error semantics", () => {
   test("a missing Param sinks a generic error and nulls the value", async () => {
     const plan = selectPlan([sqlStep([], "SELECT ?1", { args: [param("id")] })]);
 
-    const res = await executeSelect(plan, {}, new MockResolver(), passthroughWrap);
+    const res = await executeSelect(plan, {}, new MockResolver());
 
     expect(res.value).toBeNull();
     expect(res.errors).toEqual([sunkError("generic", /missing parameter "id"/)]);
@@ -928,7 +936,7 @@ describe("executeSelect error semantics", () => {
       ],
     );
 
-    const res = await executeSelect(plan, {}, resolver, passthroughWrap);
+    const res = await executeSelect(plan, {}, resolver);
 
     // The surviving steps' partial body comes back: failed Many steps degrade to [],
     // failed One steps leave their slot absent.
@@ -960,7 +968,6 @@ describe("seeded select", () => {
       plan,
       {}, // no lastSeen_id / limit supplied
       resolver,
-      passthroughWrap,
       [
         { id: 1, name: "a" },
         { id: 2, name: "b" },
@@ -1010,7 +1017,7 @@ describe("seeded select", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
+    const body = await executeSelectOk(plan, {}, resolver, [
       {
         id: 1,
         children: [
@@ -1021,7 +1028,10 @@ describe("seeded select", () => {
     ]);
 
     expect(grandStore.queries).toEqual([
-      { sql: 'SELECT * FROM notes WHERE "childId" IN (?, ?)', bindings: [10, 11] },
+      {
+        sql: 'SELECT * FROM notes WHERE "childId" IN (?, ?)',
+        bindings: [10, 11],
+      },
     ]);
     expect(body).toEqual([
       {
@@ -1058,9 +1068,7 @@ describe("seeded select", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
-      { id: 1, children: [] },
-    ]);
+    const body = await executeSelectOk(plan, {}, resolver, [{ id: 1, children: [] }]);
 
     expect(childStore.queries).toEqual([]);
     expect(grandStore.queries).toEqual([]);
@@ -1079,7 +1087,7 @@ describe("seeded select", () => {
       ],
     );
 
-    const res = await executeSelect(plan, {}, new MockResolver(), passthroughWrap, [
+    const res = await executeSelect(plan, {}, new MockResolver(), [
       { id: 1, children: [{ id: 10, parentId: 1 }] },
       { id: 2 }, // children absent here
     ]);
@@ -1107,9 +1115,7 @@ describe("seeded select", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [
-      { id: 1, ownerId: 7, owner: null },
-    ]);
+    const body = await executeSelectOk(plan, {}, resolver, [{ id: 1, ownerId: 7, owner: null }]);
 
     expect(ownerStore.queries).toEqual([]);
     expect(body).toEqual([{ id: 1, ownerId: 7, owner: null }]);
@@ -1138,10 +1144,7 @@ describe("seeded select", () => {
       }),
     ]);
 
-    const body = await executeSelectOk(plan, { tenantId: "A" }, resolver, passthroughWrap, [
-      { id: 1 },
-      { id: 2 },
-    ]);
+    const body = await executeSelectOk(plan, { tenantId: "A" }, resolver, [{ id: 1 }, { id: 2 }]);
 
     expect(resolver.sqlStores.has('notes|["A"]')).toBe(true);
     // Root rows carry the stamped shard field; the child routed to shard A and tagged rows.
@@ -1169,7 +1172,7 @@ describe("seeded select", () => {
       ],
     );
 
-    const body = await executeSelectOk(plan, {}, resolver, passthroughWrap, [{ name: "no-id" }]);
+    const body = await executeSelectOk(plan, {}, resolver, [{ name: "no-id" }]);
 
     expect(childStore.queries).toEqual([]);
     expect(body).toEqual([{ name: "no-id", children: [] }]);
@@ -1212,7 +1215,13 @@ function batchStep(
 ): SaveStep {
   return {
     result,
-    query: { SqlBatch: { database: opts.db ?? d1(), shard: opts.shard ?? [], statements } },
+    query: {
+      SqlBatch: {
+        database: opts.db ?? d1(),
+        shard: opts.shard ?? [],
+        statements,
+      },
+    },
   };
 }
 
@@ -1224,7 +1233,10 @@ function keyWriteStep(
   metadata: unknown | null = null,
   shard: [string, SaveArg][] = [],
 ): SaveStep {
-  return { result, query: { KeyWrite: { database, segments, value, metadata, shard } } };
+  return {
+    result,
+    query: { KeyWrite: { database, segments, value, metadata, shard } },
+  };
 }
 
 function saveSynthStep(
@@ -1305,14 +1317,14 @@ describe("executeSave SqlBatch", () => {
     expect(body).toEqual({ id: 42, name: "ed" });
   });
 
-  test("a Hydrate read-back with no row sinks an error", async () => {
+  test("a Hydrate read-back with no row attaches nothing, silently", async () => {
     const resolver = new MockResolver(() => new MockSqlStore(undefined, () => [[]]));
     const plan = savePlan([batchStep([], [hydrate("SELECT * FROM M", [])])]);
 
     const res = await executeSave(plan, resolver);
 
     expect(res.value).toBeNull();
-    expect(res.errors).toEqual([sunkError("generic", /returned no row/)]);
+    expect(res.errors).toEqual([]);
   });
 
   test("a batch failure sinks, and an independent later step still runs", async () => {
@@ -1326,7 +1338,11 @@ describe("executeSave SqlBatch", () => {
     );
     const plan = savePlan(
       [batchStep([], [write("INSERT INTO M DEFAULT VALUES")])],
-      [keyWriteStep([field("blob")], kvDb(), [{ Literal: "k/1" }], { ok: true })],
+      [
+        keyWriteStep([field("blob")], kvDb(), [{ Literal: "k/1" }], {
+          ok: true,
+        }),
+      ],
     );
 
     const res = await executeSave(plan, resolver);
@@ -1389,7 +1405,9 @@ describe("executeSave KeyWrite", () => {
   test("R2-style write passes undefined metadata", async () => {
     const resolver = new MockResolver();
     const plan = savePlan([
-      keyWriteStep([field("blob")], r2Db(), [{ Literal: "blob:1" }], { bytes: [1, 2] }),
+      keyWriteStep([field("blob")], r2Db(), [{ Literal: "blob:1" }], {
+        bytes: [1, 2],
+      }),
     ]);
 
     const body = await executeSaveOk(plan, resolver);
@@ -1483,7 +1501,7 @@ describe("executeSave arg resolution", () => {
     expect(body.dog).toEqual({ id: 3 });
   });
 
-  test("a Result reference to a missing body value sinks an error", async () => {
+  test("a Result reference to a missing body value skips the batch, silently", async () => {
     const resolver = new MockResolver();
     const plan = savePlan([
       batchStep([], [write("INSERT INTO M (x) VALUES (?1)", [resultRef([field("nope")])])]),
@@ -1492,7 +1510,8 @@ describe("executeSave arg resolution", () => {
     const res = await executeSave(plan, resolver);
 
     expect(res.value).toBeNull();
-    expect(res.errors).toEqual([sunkError("generic", /missing hydrated value/)]);
+    expect(res.errors).toEqual([]);
+    expect(resolver.sqlStores.size).toBe(0);
   });
 });
 

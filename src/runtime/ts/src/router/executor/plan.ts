@@ -2,10 +2,15 @@
  * @internal
  * TypeScript mirror of the Cloesce query plan IR (see `src/compiler/orm/src/query`).
  *
- * These types are the JSON shapes produced by the WASM `plan_select` / `plan_save`
- * entry points and consumed by the runtime {@link executor}.
+ * A plan is a sequence of stages:
+ * - Every step within a stage is independent
+ * - Each stage runs all of its steps concurrently.
+ * - The results produced by each step are sunk sequentially in step order.
+ * - A failed step does not halt the plan, but no-ops any dependent steps in later stages.
+ * - All failures are collected and surfaced in the final result.
  */
 
+//#region: Shared IR
 /** The backing store a plan {@link Database} handle points at. */
 export type DatabaseKind = "D1" | "DurableObject" | "Kv" | "R2";
 
@@ -15,13 +20,17 @@ export interface Database {
 }
 
 /**
- * A segment of a KV/R2 key template. A `Literal` is copied verbatim; a `Value`
- * carries an argument to interpolate.
+ * A segment of a KV/R2 key template.
+ *
+ * - `Literal` is copied verbatim
+ * - `Value` carries an argument to interpolate.
  */
 export type TemplateSegment<A> = { Literal: string } | { Value: A };
 
 export type MapCardinality = "One" | "Many";
+//#endregion: Shared IR
 
+//#region: Select IR
 export interface SelectPlan {
   stages: SelectStage[];
 }
@@ -72,7 +81,9 @@ export type Select =
         cardinality: MapCardinality;
       };
     };
+//#endregion: SelectIR
 
+//#region: Save IR
 export type PathSegment = { Field: string } | { Index: number };
 
 export interface SavePlan {
@@ -130,3 +141,4 @@ export type SaveQuery =
         cardinality: MapCardinality;
       };
     };
+//#endregion: Save IR
