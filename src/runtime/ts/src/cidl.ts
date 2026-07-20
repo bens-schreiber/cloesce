@@ -1,4 +1,8 @@
-/** NOTE: These definitions mirror the definitions in the Compiler */
+/**
+ * @internal
+ * TypeScript mirror of the Cloesce IDL (see `src/compiler/idl`).
+ */
+
 export type CrudKind = "Save" | "Get" | "List";
 
 export type CidlType =
@@ -48,14 +52,19 @@ export interface Column {
   composite_id: number | null;
 }
 
-export type NavigationFieldKind =
-  | { OneToOne: { fields: string[] } }
-  | { OneToMany: { columns: string[] } };
+export type NavigationCardinality = "One" | "Many";
+
+export interface NavigationKeyMapping {
+  local: string;
+  target: string;
+}
 
 export interface NavigationField {
   field: Field;
   model_reference: string;
-  kind: NavigationFieldKind;
+  target_backing?: ModelBacking | null;
+  cardinality: NavigationCardinality;
+  keys: NavigationKeyMapping[];
 }
 
 export interface KvField {
@@ -157,9 +166,6 @@ export interface DataSourceGetMethod {
 export interface DataSource {
   name: string;
   tree: IncludeTree;
-  include_query: string;
-  get_query: string;
-  list_query: string;
   get: DataSourceGetMethod;
   list: DataSourceMethod;
   save: DataSourceMethod;
@@ -183,7 +189,7 @@ export interface Cidl {
 
 /** @internal */
 export function getNavigationCidlType(nav: NavigationField): CidlType {
-  return typeof nav.kind === "object" && "OneToOne" in nav.kind
+  return nav.cardinality === "One"
     ? { Object: { name: nav.model_reference } }
     : { Array: { Object: { name: nav.model_reference } } };
 }

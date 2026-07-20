@@ -1,11 +1,11 @@
 [workspace]
 members = [
-  "src/compiler/cli",
   "src/compiler/idl",
   "src/compiler/frontend",
   "src/compiler/semantic",
-  "src/compiler/codegen",
   "src/compiler/compiler-test",
+  "src/compiler/cli",
+  "src/compiler/codegen",
   "src/compiler/migrations",
   "src/compiler/orm",
 ]

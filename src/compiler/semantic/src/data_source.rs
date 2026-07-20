@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use idl::{IncludeTree, Model, NavigationFieldKind};
+use idl::{IncludeTree, Model, NavigationCardinality};
 use indexmap::IndexMap;
 
 pub mod analysis {
@@ -252,10 +252,11 @@ pub mod analysis {
                     list,
                     get,
                     save,
-                    include_query: String::new(),
-                    get_query: String::new(),
-                    list_query: String::new(),
                     is_internal,
+                    get_plan: None,
+                    list_plan: None,
+                    get_explain: String::new(),
+                    list_explain: String::new(),
                 },
             ));
         }
@@ -319,18 +320,46 @@ pub mod expansion {
         DataSourceGetMethodParam, DataSourceMethod, DurableTarget, ModelBacking, Number,
         ValidatedField, Validator, model_bindings,
     };
-    use orm::select::SelectModel;
+
+    use orm::query::explain::explain_select;
+    use orm::query::select::planner::{SelectOperation, plan};
 
     use super::{HashSet, Model, include_dfs};
 
     #[derive(Default)]
     struct GeneratedDataSource<'src> {
-        include_query: String,
-        get_query: String,
-        list_query: String,
         get: Option<DataSourceGetMethod<'src>>,
         list: Option<DataSourceMethod<'src>>,
         save: Option<DataSourceMethod<'src>>,
+    }
+
+    /// Precompiled `get`/`list` [orm] select plans for a data source, and their
+    /// rendered `EXPLAIN`-style text.
+    ///
+    /// The plans borrow from the IDL, so they cannot be stored directly
+    /// (hence serialization to JSON); this also means the immutable borrow used to
+    /// build them must be dropped before the IDL can be mutated to store the results.
+    struct PrecompiledPlans {
+        get_plan: serde_json::Value,
+        list_plan: serde_json::Value,
+        get_explain: String,
+        list_explain: String,
+    }
+
+    fn precompile<'src>(
+        idl: &CloesceIdl<'src>,
+        model: &Model<'src>,
+        ds: &DataSource<'src>,
+    ) -> PrecompiledPlans {
+        let get = plan(SelectOperation::Get, model.name, idl, &ds.tree);
+        let list = plan(SelectOperation::List, model.name, idl, &ds.tree);
+
+        PrecompiledPlans {
+            get_explain: explain_select(SelectOperation::Get, model.name, &ds.tree, &get),
+            list_explain: explain_select(SelectOperation::List, model.name, &ds.tree, &list),
+            get_plan: serde_json::to_value(&get).expect("SelectPlan serializes"),
+            list_plan: serde_json::to_value(&list).expect("SelectPlan serializes"),
+        }
     }
 
     /// Adds a `Default` [DataSource] to every model that doesn't have one.
@@ -355,25 +384,31 @@ pub mod expansion {
                     list: DataSourceMethod::default(),
                     get: DataSourceGetMethod::default(),
                     save: DataSourceMethod::default(),
-                    include_query: String::new(),
-                    get_query: String::new(),
-                    list_query: String::new(),
                     is_internal: false,
+                    get_plan: None,
+                    list_plan: None,
+                    get_explain: String::new(),
+                    list_explain: String::new(),
                 },
             );
         }
 
-        let generated =
-            idl.models
-                .values()
-                .flat_map(|model| {
-                    model.data_sources.iter().map(|(ds_name, ds)| {
-                        (model.name, *ds_name, generate_source(idl, model, ds))
-                    })
+        let generated = idl
+            .models
+            .values()
+            .flat_map(|model| {
+                model.data_sources.iter().map(|(ds_name, ds)| {
+                    (
+                        model.name,
+                        *ds_name,
+                        generate_source(idl, model, ds),
+                        precompile(idl, model, ds),
+                    )
                 })
-                .collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
-        for (model_name, ds_name, generated) in generated {
+        for (model_name, ds_name, generated, plans) in generated {
             let Some(ds) = idl
                 .models
                 .get_mut(model_name)
@@ -381,10 +416,6 @@ pub mod expansion {
             else {
                 continue;
             };
-
-            ds.include_query = generated.include_query;
-            ds.get_query = generated.get_query;
-            ds.list_query = generated.list_query;
 
             // Only replace a verb the user did not declare as a stub.
             if let Some(get) = generated.get.filter(|_| !ds.get.is_stub) {
@@ -396,6 +427,11 @@ pub mod expansion {
             if let Some(save) = generated.save.filter(|_| !ds.save.is_stub) {
                 ds.save = save;
             }
+
+            ds.get_plan = Some(plans.get_plan);
+            ds.list_plan = Some(plans.list_plan);
+            ds.get_explain = plans.get_explain;
+            ds.list_explain = plans.list_explain;
         }
     }
 
@@ -460,9 +496,6 @@ pub mod expansion {
         let injected = model_bindings(idl, model, Some(&ds.tree));
 
         if model.uses_sqlite() {
-            let include_query =
-                SelectModel::query(model.name, None, Some(&ds.tree), idl).unwrap_or_default();
-
             let get_params = shard_fields
                 .iter()
                 .cloned()
@@ -474,9 +507,6 @@ pub mod expansion {
                 .collect::<Vec<_>>();
 
             return GeneratedDataSource {
-                get_query: build_get_query(model, &include_query),
-                list_query: build_list_query(model, &include_query),
-                include_query,
                 get: Some(DataSourceGetMethod {
                     parameters: get_params,
                     injected: injected.clone(),
@@ -536,55 +566,6 @@ pub mod expansion {
             ..GeneratedDataSource::default()
         }
     }
-
-    /// Basic primary key fetch SELECT, e.g. `{include_query} WHERE "Model"."pk" = ?1`.
-    fn build_get_query(model: &Model, include_query: &str) -> String {
-        let cols = model
-            .primary_columns
-            .iter()
-            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-            .collect::<Vec<_>>();
-        let placeholders = (1..=cols.len())
-            .map(|i| format!("?{i}"))
-            .collect::<Vec<_>>();
-
-        if cols.len() == 1 {
-            format!("{include_query} WHERE {} = {}", cols[0], placeholders[0])
-        } else {
-            format!(
-                "{include_query} WHERE ({}) = ({})",
-                cols.join(", "),
-                placeholders.join(", ")
-            )
-        }
-    }
-
-    /// Seek-pagination SELECT keyed off the primary key:
-    /// `{include_query} WHERE pk > ?1 ORDER BY pk ASC LIMIT ?N`.
-    fn build_list_query(model: &Model, include_query: &str) -> String {
-        let cols = model
-            .primary_columns
-            .iter()
-            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-            .collect::<Vec<_>>();
-        let placeholders = (1..=cols.len())
-            .map(|i| format!("?{i}"))
-            .collect::<Vec<_>>();
-        let limit = format!("?{}", cols.len() + 1);
-        let order = cols
-            .iter()
-            .map(|c| format!("{c} ASC"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let where_clause = if cols.len() == 1 {
-            format!("{} > {}", cols[0], placeholders[0])
-        } else {
-            format!("({}) > ({})", cols.join(", "), placeholders.join(", "))
-        };
-
-        format!("{include_query} WHERE {where_clause} ORDER BY {order} LIMIT {limit}")
-    }
 }
 
 pub fn include_dfs<'src>(
@@ -600,8 +581,8 @@ pub fn include_dfs<'src>(
 
     let model = models.get(current_model).unwrap();
     for nav in &model.navigation_fields {
-        match nav.kind {
-            NavigationFieldKind::OneToOne { .. } => {
+        match nav.cardinality {
+            NavigationCardinality::One => {
                 if nav.model_reference == current_model {
                     // Self-referencing 1:1. Include but don't recurse.
                     current_node
@@ -617,7 +598,7 @@ pub fn include_dfs<'src>(
                 let new_node = include_dfs(models, nav.model_reference, visited);
                 current_node.0.insert(nav.field.name.clone(), new_node);
             }
-            NavigationFieldKind::OneToMany { .. } => {
+            NavigationCardinality::Many => {
                 // Include the related model as a leaf, but don't recurse.
                 current_node
                     .0

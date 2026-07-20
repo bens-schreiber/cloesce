@@ -14,7 +14,7 @@ model WeatherReport for db {
         id: int
     }
     
-    nav Weather::weatherReportId {
+    many Weather::weatherReportId(id) {
         weatherEntries
     }
     
@@ -34,7 +34,7 @@ model Weather for db {
         weatherReportId
     }
 
-    nav WeatherReport::id(weatherReportId) {
+    one WeatherReport::id(weatherReportId) {
         weatherReport
     }
     

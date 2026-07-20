@@ -41,6 +41,32 @@ describe("POST and refresh A", () => {
   });
 });
 
+describe("Child-owned one nav with auto-increment parent PK", () => {
+  // B owns no FK to A; instead A.bId references B.id (child-owned `one A::bId(id)`).
+  // B.id is omitted so it auto-increments; A.bId must resolve from B's generated PK.
+  let saved: B;
+  it("$save B with nested A, no B.id", async () => {
+    const b = Object.assign(new B(), {
+      a: Object.assign(new A(), { id: 20 }),
+    });
+    const res = await B.$save(b);
+    expectHttpResult(res, "B.$save should be OK");
+    saved = res.data!;
+
+    expect(saved.id, "B got an auto-incremented id").toBeDefined();
+    expect(saved.a!.bId, `A.bId should equal B's generated id\n\n${JSON.stringify(res)}`).toBe(
+      saved.id,
+    );
+  });
+
+  it("readback via $get matches the saved FK", async () => {
+    const res = await B.$get(saved.id);
+    expectHttpResult(res, "B.$get should be OK");
+    expect(res.data!.id).toBe(saved.id);
+    expect(res.data!.a!.bId).toBe(saved.id);
+  });
+});
+
 describe("POST and refresh Person", () => {
   const person = Object.assign(new Person(), {
     id: 1,
@@ -70,11 +96,10 @@ describe("POST and refresh Student", () => {
     expectHttpResult(res, "Expected POST to work");
     expect(res.data!.courses.length).toBe(1);
 
-    // student -> courses (junction) -> course -> students (junction) -> student -> courses (junction)
     const joinRow = res.data!.courses[0];
     expect(joinRow.course!.id).toBe(500);
-    expect(joinRow.course!.students.length).toBe(1);
-    expect(joinRow.course!.students[0].student!.courses.length).toBe(1);
+    // Save responses are payload-shaped: `students` was sent empty, so it echoes [].
+    expect(joinRow.course!.students).toEqual([]);
   });
 
   it("none returns Student without Courses", async () => {

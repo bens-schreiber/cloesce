@@ -1,3 +1,27 @@
+# [0.6.0] - Unreleased
+
+### Added
+
+- Cloesce Query Planner
+- `cloesce explain` command to explain the query plan for a given query
+- `one` and `many` syntax
+- "spider initializer" syntax (`::{field(value), field2(value2)}`) for navigation properties
+- Allow `one` and `many` relationships between any two Models, regardless of their backing
+- `hydrate` and `hydrateAll` methods capable of loading any navigation property on any given Model seed
+
+### Changed
+
+- Removed `nav` syntax in favor of the new `one` and `many` syntax
+- Removed the old Cloesce ORM in favor of the new Cloesce Query Planner
+- Models no longer require unique indices for navigation properties
+- Models no longer require relationships to span one database or durable object
+- Durable Object KV can be used in any Model, not just those backed by that Durable Object
+- Self referential FKs are allowed
+- Route fields are allowed on any Model
+- All CRUD operations are always supported on all Models
+
+### Fixed
+
 # [0.5.2] - 6/21/2026
 
 ### Added

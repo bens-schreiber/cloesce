@@ -51,7 +51,7 @@ model R2Only {
         someData
     }
 
-    nav R2Sibling::siblingId(id) {
+    one R2Sibling::siblingId(id) {
         sibling
     }
 }

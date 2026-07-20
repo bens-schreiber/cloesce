@@ -8,7 +8,6 @@ askama = "0.15.6"
 indexmap = { workspace = true }
 json_comments = { workspace = true }
 migrations = { path = "../migrations" }
-orm = { path = "../orm" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlformat = { workspace = true }

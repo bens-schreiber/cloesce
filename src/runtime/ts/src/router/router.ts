@@ -14,34 +14,6 @@ import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
 
-export type DependencyKey = { tag: string };
-
-/**
- * Dependency injection container, mapping an object type name to an instance of that object.
- *
- * Comes with the Wrangler environment pre-injected
- */
-class DependencyContainer {
-  private container = new Map<string, any>();
-
-  set<T>(key: DependencyKey, instance: T) {
-    if (this.container.has(key.tag)) {
-      console.warn(
-        `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
-      );
-    }
-    this.container.set(key.tag, instance);
-  }
-
-  get<T>(key: DependencyKey): T | undefined {
-    return this.container.get(key.tag);
-  }
-
-  has(key: DependencyKey): boolean {
-    return this.container.has(key.tag);
-  }
-}
-
 /**
  * @internal
  * Singleton instance containing the CIDL and and wasm binary.
@@ -75,6 +47,34 @@ export class RuntimeContainer {
    */
   static dispose() {
     this.instance = undefined;
+  }
+}
+
+type DependencyKey = { tag: string };
+
+/**
+ * Dependency injection container, mapping an object type name to an instance of that object.
+ *
+ * Comes with the Wrangler environment pre-injected
+ */
+class DependencyContainer {
+  private container = new Map<string, any>();
+
+  set<T>(key: DependencyKey, instance: T) {
+    if (this.container.has(key.tag)) {
+      console.warn(
+        `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
+      );
+    }
+    this.container.set(key.tag, instance);
+  }
+
+  get<T>(key: DependencyKey): T | undefined {
+    return this.container.get(key.tag);
+  }
+
+  has(key: DependencyKey): boolean {
+    return this.container.has(key.tag);
   }
 }
 
@@ -447,8 +447,6 @@ async function validateRequest(
       idl: idl,
       includeTree: null,
       env,
-      durable: null,
-      promises: [],
     });
     params[p.name] = hydrated ?? validatedRaw;
   }

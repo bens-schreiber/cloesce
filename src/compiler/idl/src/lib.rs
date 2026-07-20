@@ -179,32 +179,23 @@ impl Hash for ValidatedField<'_> {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
-/// A relationship to another model
-#[derive(Deserialize, Serialize, Hash)]
-pub enum NavigationFieldKind<'src> {
-    OneToOne {
-        /// The fields on the current model that reference the other model's primary key.
-        ///
-        /// Multiple fields indicate a composite foreign key.
-        ///
-        /// No fields indicate a singleton.
-        #[serde(borrow)]
-        fields: Vec<&'src str>,
-    },
-    OneToMany {
-        /// The columns on the other model that reference the current model's primary key.
-        ///
-        /// Multiple columns indicate a composite foreign key.
-        #[serde(borrow)]
-        columns: Vec<&'src str>,
-    },
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
+pub enum NavigationCardinality {
+    One,
+    Many,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct NavigationKeyMapping<'src> {
+    #[serde(borrow)]
+    pub local: &'src str,
+
+    #[serde(borrow)]
+    pub target: &'src str,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct NavigationField<'src> {
-    #[serde(default)]
-    pub hash: u64,
-
     #[serde(borrow)]
     pub field: Field<'src>,
 
@@ -212,8 +203,15 @@ pub struct NavigationField<'src> {
     #[serde(borrow)]
     pub model_reference: &'src str,
 
+    /// The backing of the referenced model, when it has one.
     #[serde(borrow)]
-    pub kind: NavigationFieldKind<'src>,
+    pub target_backing: Option<ModelBacking<'src>>,
+
+    pub cardinality: NavigationCardinality,
+
+    /// The resolved discriminator pairs used to join this model to its target.
+    #[serde(borrow, default)]
+    pub keys: Vec<NavigationKeyMapping<'src>>,
 }
 
 #[derive(Deserialize, Serialize, Hash)]
@@ -318,18 +316,13 @@ pub struct DataSource<'src> {
     #[serde(borrow)]
     pub save: DataSourceMethod<'src>,
 
-    /// A raw SQL query generated from the WASM `select` method.
-    /// Empty if the data source is not backed by a SQL db
-    pub include_query: String,
-
-    /// Fetch by primary key based on [Self::include_query]
-    pub get_query: String,
-
-    /// Seek pagination query based on [Self::include_query]
-    pub list_query: String,
-
     /// True if the data source should not be exposed to the client
     pub is_internal: bool,
+
+    pub get_plan: Option<serde_json::Value>,
+    pub list_plan: Option<serde_json::Value>,
+    pub get_explain: String,
+    pub list_explain: String,
 }
 
 impl DataSource<'_> {
@@ -353,6 +346,11 @@ pub struct KvField<'src> {
     pub binding: &'src str,
 
     pub key_format: String,
+
+    /// When [Self::binding] is a Durable Object, the model's local fields that supply the
+    /// DO's shard discriminators, in shard-declaration order.
+    #[serde(borrow, default)]
+    pub shard_fields: Vec<&'src str>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -421,7 +419,7 @@ pub struct ApiMethod<'src> {
     pub durable_target: Option<DurableTarget<'src>>,
 }
 
-#[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Debug)]
 pub enum BackingKind {
     DurableObject,
     D1,
@@ -676,20 +674,6 @@ impl CloesceIdl<'_> {
                 model_h.write_u64(col_h);
             }
 
-            for nav in model.navigation_fields.iter_mut() {
-                let nav_h = {
-                    let mut h = FxHasher::default();
-                    h.write(b"ModelNavigationProperty");
-                    nav.model_reference.hash(&mut h);
-                    nav.field.hash(&mut h);
-                    nav.kind.hash(&mut h);
-                    h.finish()
-                };
-
-                nav.hash = nav_h;
-                model_h.write_u64(nav_h);
-            }
-
             let model_h_finished = model_h.finish();
             model.hash = model_h_finished;
             root_h.write_u64(model_h_finished);
@@ -713,20 +697,7 @@ pub fn model_bindings<'src>(
 ) -> Vec<&'src str> {
     let mut visited = HashSet::new();
     let mut bindings = BTreeSet::new();
-    let do_bindings = idl
-        .wrangler_env
-        .durable_bindings
-        .iter()
-        .map(|b| b.name)
-        .collect::<HashSet<_>>();
-    collect_model_bindings(
-        idl,
-        model,
-        include,
-        &mut visited,
-        &mut bindings,
-        &do_bindings,
-    );
+    collect_model_bindings(idl, model, include, &mut visited, &mut bindings);
     return bindings.into_iter().collect();
 
     // DFS
@@ -736,7 +707,6 @@ pub fn model_bindings<'src>(
         include: Option<&IncludeTree<'src>>,
         visited: &mut HashSet<&'src str>,
         bindings: &mut BTreeSet<&'src str>,
-        do_bindings: &HashSet<&'src str>,
     ) {
         if !visited.insert(model.name) {
             return;
@@ -744,18 +714,15 @@ pub fn model_bindings<'src>(
         let included = |name: &str| include.is_none_or(|t| t.0.contains_key(name));
 
         if let Some(b) = model.backing.as_ref() {
-            // Ignore Durable Object bindings as the context for them is injected separately
-            if !do_bindings.contains(b.binding) {
-                bindings.insert(b.binding);
-            }
+            bindings.insert(b.binding);
         }
 
         for kv in &model.kv_fields {
-            if included(kv.field.name.as_ref()) && !do_bindings.contains(kv.binding) {
-                // Again, ignore Durable Object bindings
+            if included(kv.field.name.as_ref()) {
                 bindings.insert(kv.binding);
             }
         }
+
         for r2 in &model.r2_fields {
             if included(r2.field.name.as_ref()) {
                 bindings.insert(r2.binding);
@@ -770,7 +737,7 @@ pub fn model_bindings<'src>(
                 None => None,
             };
             if let Some(referenced) = idl.models.get(nav.model_reference) {
-                collect_model_bindings(idl, referenced, subtree, visited, bindings, do_bindings);
+                collect_model_bindings(idl, referenced, subtree, visited, bindings);
             }
         }
     }

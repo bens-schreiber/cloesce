@@ -82,7 +82,7 @@ impl DisplayError for ParserError<'_, '_> {
             let (message, label_msg) = match error.reason() {
                 RichReason::ExpectedFound { expected, found } => {
                     let found_str = match found {
-                        Some(tok) => format!("found '{}'", &**tok),
+                        Some(tok) => format!("found '{}'", **tok),
                         None => "found end of input".to_string(),
                     };
                     let expected_str = if expected.is_empty() {

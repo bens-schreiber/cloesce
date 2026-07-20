@@ -26,14 +26,6 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.inject_type(self.idl, name)
     }
 
-    fn backing_binding(&self, model: &Model<'_>) -> String {
-        model
-            .backing
-            .as_ref()
-            .map(|b| b.binding.to_string())
-            .unwrap_or_default()
-    }
-
     fn env_durable_target_key(&self) -> &'static str {
         idl::ENV_DURABLE_TARGET_KEY
     }

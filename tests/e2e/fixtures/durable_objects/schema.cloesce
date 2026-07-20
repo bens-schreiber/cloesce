@@ -38,19 +38,22 @@ durable SubRedditDo {
 
 [crud get, save]
 model SubReddit for SubRedditDo(subId) {
-    kv SubRedditDo::metadata() {
+    kv SubRedditDo::{ metadata, id(subId) } {
         metadata
     }
 
     kv GlobalSubRedditMetadata::metadata(subId) {
         globalMetadata
     }
+
+    many Post::subId(subId) {
+        posts
+    }
 }
 
 api SubReddit {
     post newSubReddit() -> SubReddit
-
-    get feed(self, subId: int) -> array<Post>
+    get feed(self) -> array<Post>
 }
 
 [crud get, list, save]
@@ -64,7 +67,7 @@ model Post for SubRedditDo(subId) {
         content: string
     }
 
-    nav Comment::postId {
+    many Comment::{postId(id), subId(subId)} {
         comments
     }
 }

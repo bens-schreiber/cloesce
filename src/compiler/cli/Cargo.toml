@@ -11,6 +11,7 @@ dirs = "6.0.0"
 frontend = { path = "../frontend" }
 json_comments = { workspace = true }
 migrations = { path = "../migrations" }
+orm = { path = "../orm" }
 semantic = { path = "../semantic" }
 serde = { workspace = true }
 serde_json = { workspace = true }

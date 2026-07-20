@@ -1,0 +1,73 @@
+d1 {
+    db
+}
+
+// Each author's books live in their own Durable Object, sharded by the
+// author's D1 primary key.
+durable LibraryDo {
+    shard {
+        authorId: int
+    }
+}
+
+// A Worker KV namespace holding a blurb per book.
+kv Blurbs {
+    blurb(bookId: int) -> string {
+        "blurbs/{bookId}"
+    }
+}
+
+// D1-backed root whose `books` relationship crosses into a Durable Object.
+[crud get, save, list]
+model Author for db {
+    primary {
+        id: int
+    }
+
+    column {
+        name: string
+    }
+
+    // D1 -> DO (1:N): supplying only the shard discriminator selects every
+    // Book in this author's DO shard.
+    many Book::authorId(id) {
+        books
+    }
+}
+
+// Spans all three storage backends: D1 root -> DO children -> Worker KV leaf.
+source Deep for Author {
+    include {
+        books {
+            blurb
+        }
+    }
+}
+
+[crud get, save, list]
+model Book for LibraryDo(authorId) {
+    primary {
+        id: int
+    }
+
+    column {
+        title: string
+    }
+
+    // DO -> D1 (1:1): back-reference to the owning Author row.
+    one Author::id(authorId) {
+        author
+    }
+
+    kv Blurbs::blurb(id) {
+        blurb
+    }
+}
+
+// DO root reaching back out to D1 and Worker KV.
+source WithAuthor for Book {
+    include {
+        author
+        blurb
+    }
+}

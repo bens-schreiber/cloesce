@@ -15,18 +15,14 @@
 use idl::ValidatedField;
 use idl::{CloesceIdl, IncludeTree};
 use orm::OrmErrorKind;
-use orm::map::map_sql;
-use orm::select::SelectModel;
-use orm::upsert::UpsertModel;
+use orm::query::save;
+use orm::query::select;
+use orm::query::select::planner::SelectOperation;
 use orm::validate::validate_cidl_type;
 
-use serde_json::Map;
 use std::cell::RefCell;
 use std::slice;
 use std::str;
-
-type IncludeTreeJson = Map<String, serde_json::Value>;
-type D1Result = Vec<Map<String, serde_json::Value>>;
 
 fn serde_err(e: serde_json::Error) -> OrmErrorKind {
     OrmErrorKind::SerializeError {
@@ -99,183 +95,126 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Creates a series of insert, update and upsert statements, finally selecting the model.
+/// Reads a UTF-8 string from WASM memory.
 ///
-/// Requires a previous call to [set_ast_ptr].
+/// # Safety
+/// `ptr` must point to `len` bytes of valid UTF-8.
+unsafe fn read_str<'a>(ptr: *const u8, len: usize) -> &'a str {
+    unsafe { str::from_utf8(slice::from_raw_parts(ptr, len)).unwrap() }
+}
+
+/// Plans a select (get or list) operation, returning a `SelectPlan` as JSON for
+/// the runtime executor.
 ///
-/// Panics on any error.
+/// Requires a previous call to [set_idl_ptr].
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 ///
 /// # Safety
-/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
-/// model name, `new_model_ptr` must be a pointer to a UTF-8 encoded JSON string
-/// representing the new model, and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree.
+/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the model name,
+/// `operation_ptr` must be a pointer to a UTF-8 encoded string of either `get` or `list`,
+/// and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn upsert_model(
+pub unsafe extern "C" fn plan_select(
     // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // New Model
-    new_model_ptr: *const u8,
-    new_model_len: usize,
+    // Operation ("get" | "list")
+    operation_ptr: *const u8,
+    operation_len: usize,
 
     // Include Tree
     include_tree_ptr: *const u8,
     include_tree_len: usize,
 ) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let new_model_json =
-        unsafe { str::from_utf8(slice::from_raw_parts(new_model_ptr, new_model_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
+    let model_name = unsafe { read_str(model_name_ptr, model_name_len) };
+    let operation_raw = unsafe { read_str(operation_ptr, operation_len) };
+    let include_tree_json = unsafe { read_str(include_tree_ptr, include_tree_len) };
+
+    let operation = match operation_raw {
+        "get" => SelectOperation::Get,
+        "list" => SelectOperation::List,
+        other => {
+            yield_error(OrmErrorKind::SerializeError {
+                message: format!("Unknown select operation '{other}'"),
+            });
+            return 1;
+        }
     };
 
-    let new_model = match serde_json::from_str::<Map<String, serde_json::Value>>(new_model_json) {
-        Ok(new_model) => new_model,
+    let tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
+        Ok(tree) => tree.unwrap_or_default(),
         Err(e) => {
             yield_error(serde_err(e));
             return 1;
         }
     };
 
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(serde_err(e));
-            return 1;
-        }
-    };
+    let json = IDL.with(|idl| {
+        let idl = idl.borrow();
+        let plan = select::planner::plan(operation, model_name, &idl, &tree);
+        serde_json::to_string(&plan).unwrap()
+    });
 
-    let res =
-        IDL.with(|idl| UpsertModel::query(model_name, &idl.borrow(), new_model, include_tree));
-    match res {
-        Ok(res) => {
-            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
-            yield_result(bytes);
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
+    yield_result(json.into_bytes());
+    0
 }
 
-/// Creates a series of joins to select a model.
+/// Plans a save (upsert) operation from a payload, returning a `SavePlan` as JSON
+/// for the runtime executor.
 ///
-/// Requires a previous call to [set_ast_ptr].
-///
-/// Panics on any error.
+/// Requires a previous call to [set_idl_ptr].
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 ///
 /// # Safety
-/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
-/// model name, `from_ptr` must be a pointer to a UTF-8 encoded string representing the "from" clause,
-/// and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree.  
+/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the model name,
+/// `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree,
+/// and `payload_ptr` must be a pointer to a UTF-8 encoded JSON string representing the save payload.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn select_model(
+pub unsafe extern "C" fn plan_save(
     // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // From
-    from_ptr: *const u8,
-    from_len: usize,
-
     // Include Tree
     include_tree_ptr: *const u8,
     include_tree_len: usize,
+
+    // Payload
+    payload_ptr: *const u8,
+    payload_len: usize,
 ) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let from_raw = unsafe { str::from_utf8(slice::from_raw_parts(from_ptr, from_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
+    let model_name = unsafe { read_str(model_name_ptr, model_name_len) };
+    let include_tree_json = unsafe { read_str(include_tree_ptr, include_tree_len) };
+    let payload_json = unsafe { read_str(payload_ptr, payload_len) };
 
-    let from = serde_json::from_str::<Option<String>>(from_raw).unwrap();
-    let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
+    let tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
+        Ok(tree) => tree.unwrap_or_default(),
         Err(e) => {
             yield_error(serde_err(e));
             return 1;
         }
     };
 
-    let res =
-        IDL.with(|idl| SelectModel::query(model_name, from, include_tree.as_ref(), &idl.borrow()));
+    let payload = match serde_json::from_str::<serde_json::Value>(payload_json) {
+        Ok(payload) => payload,
+        Err(e) => {
+            yield_error(serde_err(e));
+            return 1;
+        }
+    };
+
+    let res = IDL.with(|idl| {
+        let idl = idl.borrow();
+        save::planner::plan(model_name, &idl, &tree, &payload)
+            .map(|plan| serde_json::to_string(&plan).unwrap())
+    });
+
     match res {
-        Ok(res) => {
-            let bytes = res.into_bytes();
-            yield_result(bytes);
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
-}
-
-/// Maps D1 results to a Cloesce model structure.
-///
-/// Requires a previous call to [set_ast_ptr].
-///
-/// Panics on any error.
-///
-/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
-///
-/// # Safety
-/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
-/// model name, `d1_results_ptr` must be a pointer to a UTF-8 encoded JSON string
-/// representing the D1 results and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn map(
-    // Model name
-    model_name_ptr: *const u8,
-    model_name_len: usize,
-
-    // D1 Results
-    d1_results_ptr: *const u8,
-    d1_results_len: usize,
-
-    // Include tree
-    include_tree_ptr: *const u8,
-    include_tree_len: usize,
-) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let d1_results_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(d1_results_ptr, d1_results_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
-
-    let d1_results = match serde_json::from_str::<D1Result>(d1_results_raw) {
-        Ok(res) => res,
-        Err(e) => {
-            yield_error(serde_err(e));
-            return 1;
-        }
-    };
-
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(serde_err(e));
-            return 1;
-        }
-    };
-
-    let res = IDL.with(|idl| map_sql(model_name, d1_results, include_tree, &idl.borrow()));
-    match res {
-        Ok(res) => {
-            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
-            yield_result(bytes);
+        Ok(json) => {
+            yield_result(json.into_bytes());
             0
         }
         Err(e) => {
@@ -287,7 +226,7 @@ pub unsafe extern "C" fn map(
 
 /// Validates a value against a ValidatedField
 ///
-/// Requires a previous call to [set_ast_ptr].
+/// Requires a previous call to [set_idl_ptr].
 ///
 /// Panics on any error.
 ///
@@ -306,14 +245,8 @@ pub unsafe extern "C" fn validate_type(
     value_ptr: *const u8,
     value_len: usize,
 ) -> i32 {
-    let validated_field_raw = unsafe {
-        str::from_utf8(slice::from_raw_parts(
-            validated_field_ptr,
-            validated_field_len,
-        ))
-        .unwrap()
-    };
-    let value_raw = unsafe { str::from_utf8(slice::from_raw_parts(value_ptr, value_len)).unwrap() };
+    let validated_field_raw = unsafe { read_str(validated_field_ptr, validated_field_len) };
+    let value_raw = unsafe { read_str(value_ptr, value_len) };
 
     let validated_field = match serde_json::from_str::<ValidatedField>(validated_field_raw) {
         Ok(res) => res,

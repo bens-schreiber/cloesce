@@ -34,7 +34,7 @@ async function home() {
     el(`<div>
         <div class="card">
             <h3>Create a subreddit</h3>
-            <input id="name" placeholder="name">
+            <input id="title" placeholder="title">
             <input id="desc" placeholder="description">
             <button id="create">Create</button>
         </div>
@@ -45,30 +45,35 @@ async function home() {
 
   app.querySelector<HTMLButtonElement>("#create")!.onclick = async () => {
     if (!need()) return;
-    const res = await SubReddit.create({ name: val("name"), description: val("desc") }, auth);
+    const res = await SubReddit.create(val("title"), val("desc"), auth);
     if (!res.ok) return alert(res.message);
-    location.hash = `#/r/${res.data!.subId}`;
+    location.hash = `#/r/${res.data!.id}`;
   };
 
-  // The global subreddit directory (a Worker KV index written on create).
+  // Subreddits are rows in D1, so the directory is just a paged `list` query.
   const subs = app.querySelector("#subs")!;
-  const dir = await SubReddit.list();
+  const dir = await SubReddit.$list(0, 100);
   const entries = dir.data ?? [];
   if (entries.length === 0) subs.append(el(`<p class="muted">None yet — create one above.</p>`));
   for (const s of entries) {
-    subs.append(el(`<div class="card"><a onclick="go('#/r/${s.subId}')">r/${s.name}</a></div>`));
+    subs.append(el(`<div class="card"><a onclick="go('#/r/${s.id}')">r/${s.title}</a></div>`));
   }
 }
 
-async function subreddit(id: string) {
-  const sub = await SubReddit.$get(id);
-  const meta = sub.data?.metadata ?? { name: id, description: "" };
-  const posts = await Post.$list(id, 0, 100);
+async function subreddit(id: number) {
+  const res = await SubReddit.$get(id);
+  if (!res.ok) return app.replaceChildren(el(`<p>Subreddit not found.</p>`));
+  const sub = res.data!;
+
+  // One call: the feed hydrates every post out of its own PostDo, each already
+  // carrying its metadata and comments.
+  const feed = await sub.feed(auth);
+  const posts = feed.data ?? [];
 
   app.replaceChildren(
     el(`<div>
-        <h3>r/${meta.name}</h3>
-        <p class="muted">${meta.description}</p>
+        <h3>r/${sub.title}</h3>
+        <p class="muted">${sub.description}</p>
         <div class="card">
             <input id="title" placeholder="post title">
             <textarea id="body" placeholder="text"></textarea>
@@ -80,39 +85,43 @@ async function subreddit(id: string) {
 
   app.querySelector<HTMLButtonElement>("#post")!.onclick = async () => {
     if (!need()) return;
-    const res = await Post.create(id, val("title"), val("body"), auth);
-    if (!res.ok) return alert(res.message);
+    const r = await Post.create(id, val("title"), val("body"), auth);
+    if (!r.ok) return alert(r.message);
     subreddit(id);
   };
 
   const list = app.querySelector("#posts")!;
-  for (const p of posts.data ?? []) {
+  for (const p of posts) {
     list.append(
       el(`<div class="card">
-            <a onclick="go('#/r/${id}/${p.id}')"><b>${p.title}</b></a>
-            <div class="muted">▲ ${p.upvotes} · u/${p.author}</div>
+            <a onclick="go('#/r/${id}/${p.doId}')"><b>${p.meta.title}</b></a>
+            <div class="muted">
+                ▲ ${p.meta.upvotes} · u/${p.meta.authorName} · ${p.comments.length} comments
+            </div>
         </div>`),
     );
   }
-  if ((posts.data ?? []).length === 0) list.append(el(`<p class="muted">No posts yet.</p>`));
+  if (posts.length === 0) list.append(el(`<p class="muted">No posts yet.</p>`));
 }
 
-async function postView(subId: string, postId: number) {
-  const res = await Post.$get(subId, postId);
+async function postView(subId: number, doId: number) {
+  // A Post is addressed by its own globally-unique doId, so reading it does not
+  // involve the subreddit at all.
+  const res = await Post.$get(doId);
   if (!res.ok) return app.replaceChildren(el(`<p>Post not found.</p>`));
   const post = res.data!;
   const sub = await SubReddit.$get(subId);
-  const subName = sub.data?.metadata?.name ?? subId;
+  const subTitle = sub.data?.title ?? String(subId);
 
   app.replaceChildren(
     el(`<div>
-        <a onclick="go('#/r/${subId}')">← back to r/${subName}</a>
+        <a onclick="go('#/r/${subId}')">← back to r/${subTitle}</a>
         <div class="card">
-            <h3>${post.title}</h3>
-            <p>${post.content}</p>
+            <h3>${post.meta.title}</h3>
+            <p>${post.meta.content}</p>
             <div class="muted">
-                <span class="vote" id="up">▲</span> ${post.upvotes}
-                <span class="vote" id="down">▼</span> · u/${post.author}
+                <span class="vote" id="up">▲</span> ${post.meta.upvotes}
+                <span class="vote" id="down">▼</span> · u/${post.meta.authorName}
             </div>
         </div>
         <div class="card">
@@ -126,25 +135,25 @@ async function postView(subId: string, postId: number) {
 
   const vote = async (delta: number) => {
     if (!need()) return;
-    const r = await post.vote(subId, delta, auth);
+    const r = await post.vote(delta, auth);
     if (!r.ok) return alert(r.message);
-    postView(subId, postId);
+    postView(subId, doId);
   };
   app.querySelector<HTMLElement>("#up")!.onclick = () => vote(1);
   app.querySelector<HTMLElement>("#down")!.onclick = () => vote(-1);
 
   app.querySelector<HTMLButtonElement>("#send")!.onclick = async () => {
     if (!need()) return;
-    const r = await Comment.create(subId, postId, val("comment"), auth);
+    const r = await Comment.create(doId, val("comment"), auth);
     if (!r.ok) return alert(r.message);
-    postView(subId, postId);
+    postView(subId, doId);
   };
 
   const comments = app.querySelector("#comments")!;
   for (const c of post.comments ?? []) {
     comments.append(
       el(`<div class="card">${c.content}
-            <div class="muted">▲ ${c.upvotes} · u/${c.author}</div></div>`),
+            <div class="muted">▲ ${c.upvotes} · u/${c.authorName}</div></div>`),
     );
   }
 }
@@ -168,8 +177,9 @@ function renderUserBar() {
       const res = await User.login(val("u"));
       if (!res.ok) return alert(res.message);
       localStorage.setItem("token", (token = res.data!.token));
-      localStorage.setItem("username", (username = res.data!.user.username));
+      localStorage.setItem("username", (username = res.data!.user.name));
       renderUserBar();
+      route();
     };
   }
 }
@@ -178,8 +188,8 @@ const val = (id: string) => (document.getElementById(id) as HTMLInputElement).va
 
 function route() {
   const [, kind, subId, postId] = location.hash.split("/"); // "#" , "r", <sub>, <post>
-  if (kind === "r" && postId) postView(subId, +postId);
-  else if (kind === "r") subreddit(subId);
+  if (kind === "r" && postId) postView(+subId, +postId);
+  else if (kind === "r") subreddit(+subId);
   else home();
 }
 

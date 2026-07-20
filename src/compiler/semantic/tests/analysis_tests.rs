@@ -2,7 +2,7 @@
 
 use compiler_test::lex_and_ast;
 use frontend::Ast;
-use idl::{CidlType, CloesceIdl, MediaType, NavigationFieldKind, Number, Validator};
+use idl::{BackingKind, CidlType, CloesceIdl, MediaType, NavigationCardinality, Number, Validator};
 use semantic::err::SemanticError;
 
 fn analyze<'src, 'p>(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>) {
@@ -100,7 +100,7 @@ fn wrangler_duplicate_symbol() {
 }
 
 #[test]
-fn d1_model_basic_errors() {
+fn d1_model_errors() {
     // Arrange
     let src = with_env(
         r#"
@@ -153,37 +153,38 @@ fn d1_model_column_fk_errors() {
                 id: int // duplicate symbol
             }
 
-            foreign (Post::invalid) {
+            foreign Post::invalid {
                 doesntExist
             }
 
-            foreign (User::id) {
-                shouldError
-            }
-
-            foreign (OtherD1Model::id) {
+            foreign OtherD1Model::id {
                 shouldAlsoError
             }
 
-            foreign (Post::id) {
+            foreign Post::id {
                 validForeignKey
             }
 
-            foreign (DoesNotExist::id) {
+            foreign DoesNotExist::id {
                 adjacentModelDoesNotExist
             }
 
-            foreign (Post::nonexistent) {
+            foreign Post::nonexistent {
                 adjacentFieldDoesNotExist
             }
 
-            foreign (Post::id, User::id) {
-                referencesMultipleAdjacentModels
-            }
-
-            foreign (Post::id, Post::id) {
+            foreign Post::{ id, id } {
                 inconsistentFieldAdjacency
             }
+
+            // nav target field `bogus` does not exist on Post
+            one Post::bogus(id) { byBadTarget }
+
+            // nav local field `ghost` does not exist on User
+            one Post::id(ghost) { byBadLocal }
+
+            // nav bare form omits the local field
+            one Post::id { byBareKey }
         }
 
         model Post for my_d1 {
@@ -204,7 +205,7 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 10);
+    assert_eq!(errors.len(), 11);
 
     let column = expect_err!(errors,
         SemanticError::NullablePrimaryKey { column } => column
@@ -216,26 +217,10 @@ fn d1_model_column_fk_errors() {
     );
     assert_eq!(second.name, "id");
 
-    let model = expect_err!(errors,
-        SemanticError::ForeignKeyReferencesSelf { model, .. } => model
-    );
-    assert_eq!(model.name, "User");
-
     let fk_model = expect_err!(errors,
         SemanticError::ForeignKeyReferencesDifferentDatabase { fk_model, .. } => fk_model.name
     );
     assert_eq!(fk_model, "OtherD1Model");
-
-    let inconsistent_model_adj = expect_err!(
-        errors,
-        SemanticError::InconsistentModelAdjacency {
-            first_model,
-            second_model,
-            ..
-        } => (first_model.name, second_model.name)
-    );
-    assert_eq!(inconsistent_model_adj.0, "Post");
-    assert_eq!(inconsistent_model_adj.1, "User");
 
     let inconsistent_field_adj = expect_err!(
         errors,
@@ -260,106 +245,26 @@ fn d1_model_column_fk_errors() {
         })
         .collect::<Vec<_>>();
     assert_eq!(does_not_exist.len(), 2);
-}
 
-#[test]
-fn d1_model_nav_errors() {
-    // Arrange
-    let src = r#"
-        d1 {
-            my_d1
-            other_d1
-        }
-
-        model User for my_d1 {
-            primary {
-                id: int
-                tenant: int
-            }
-
-            column {
-                horseId: int
-            }
-
-            nav (Post::id, User::id) {
-                inconsistentModelAdjacency
-            }
-
-            nav (DifferentDatabaseModel::id) {
-                invalidAdjModel
-            }
-
-            // 1:1 nav whose local key is not a foreign key to Post
-            nav Post::id(horseId) {
-                missingOneToOneFk
-            }
-
-            // 1:M nav with no foreign key on Post referencing User
-            nav Post::id {
-                missingOneToManyFk
-            }
-
-            // Mixes a 1:1 entry (with local key) and a 1:M entry (without)
-            nav (Post::id(horseId), Post::tenant) {
-                mixedAdjacency
-            }
-        }
-
-        model Post for my_d1 {
-            primary {
-                id: int
-                tenant: int
-            }
-        }
-
-        model DifferentDatabaseModel for other_d1 {
-            primary {
-                id: int
-            }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    let inconsistent_model_adj = expect_err!(
-        errors,
-        SemanticError::InconsistentModelAdjacency {
-            first_model,
-            second_model,
-            ..
-        } => (first_model.name, second_model.name)
-    );
-    assert_eq!(inconsistent_model_adj.0, "Post");
-    assert_eq!(inconsistent_model_adj.1, "User");
-
-    let nav_name = expect_err!(errors,
-        SemanticError::NavigationReferencesDifferentBacking { field, .. } => field.name
-    );
-    assert_eq!(nav_name, "invalidAdjModel");
-
-    let missing: Vec<&str> = errors
+    // A nav key must resolve its target field (on Post) and its local field (on User),
+    // and may not omit the local field with the bare `Target::field` form.
+    let unresolved_nav_fields = errors
         .iter()
         .filter_map(|e| match e {
-            SemanticError::NavigationMissingForeignKey { field, .. } => Some(field.name),
+            SemanticError::UnresolvedSymbol { symbol }
+                if symbol.name == "bogus" || symbol.name == "ghost" =>
+            {
+                Some(symbol.name)
+            }
             _ => None,
         })
-        .collect();
-    assert!(
-        missing.contains(&"missingOneToOneFk"),
-        "expected 1:1 nav error: {errors:#?}"
-    );
-    assert!(
-        missing.contains(&"missingOneToManyFk"),
-        "expected 1:M nav error: {errors:#?}"
-    );
+        .collect::<Vec<_>>();
+    assert_eq!(unresolved_nav_fields.len(), 2);
 
-    let mixed = expect_err!(errors,
-        SemanticError::NavigationMixedAdjacency { field } => field.name
+    let missing_local = expect_err!(errors,
+        SemanticError::RelationMissingLocalKey { target } => target.name
     );
-    assert_eq!(mixed, "mixedAdjacency");
+    assert_eq!(missing_local, "id");
 }
 
 #[test]
@@ -372,11 +277,11 @@ fn d1_model_nav_one_to_one() {
                 id: int
             }
 
-            foreign (Horse::id) {
+            foreign Horse::id {
                 horseId
             }
 
-            nav Horse::id(horseId) {
+            one Horse::id(horseId) {
                 horse
             }
         }
@@ -408,10 +313,11 @@ fn d1_model_nav_one_to_one() {
     assert!(person.navigation_fields.iter().any(|nav| {
         nav.field.name == "horse"
             && nav.model_reference == "Horse"
-            && matches!(&nav.kind, NavigationFieldKind::OneToOne { fields } if fields.len() == 1 && fields[0] == "horseId")
-            && nav.field.cidl_type == CidlType::Object {
-                name: "Horse"
-            }
+            && matches!(nav.cardinality, NavigationCardinality::One)
+            && nav.keys.len() == 1
+            && nav.keys[0].local == "horseId"
+            && nav.keys[0].target == "id"
+            && nav.field.cidl_type == CidlType::Object { name: "Horse" }
     }));
 }
 
@@ -423,7 +329,7 @@ fn d1_model_nav_one_to_many() {
         model Author for my_d1 {
             primary { id: int }
 
-            nav Post::authorId {
+            many Post::authorId(id) {
                 posts
             }
         }
@@ -431,7 +337,7 @@ fn d1_model_nav_one_to_many() {
         model Post for my_d1 {
             primary { id: int }
 
-            foreign (Author::id) {
+            foreign Author::id {
                 authorId
             }
         }
@@ -450,21 +356,19 @@ fn d1_model_nav_one_to_many() {
     let author_posts_nav = author.navigation_fields.first().unwrap();
     assert_eq!(author_posts_nav.field.name, "posts");
     assert_eq!(author_posts_nav.model_reference, "Post");
+    assert!(matches!(
+        author_posts_nav.cardinality,
+        NavigationCardinality::Many
+    ));
 
-    let NavigationFieldKind::OneToMany {
-        columns: author_posts_nav_columns,
-    } = &author_posts_nav.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(author_posts_nav_columns.len(), 1);
-    assert_eq!(author_posts_nav_columns[0], "authorId");
+    assert_eq!(author_posts_nav.keys.len(), 1);
+    assert_eq!(author_posts_nav.keys[0].local, "id");
+    assert_eq!(author_posts_nav.keys[0].target, "authorId");
 }
 
 #[test]
 fn route_model_valid() {
-    // Arrange: route fields, a KV field keyed on a route field, a composite 1:1 nav
-    // declared out of the target's route order, and a `get` keyed on route fields.
+    // Arrange
     let src = &with_env(
         r#"
         [crud get, save]
@@ -476,7 +380,7 @@ fn route_model_valid() {
 
             kv my_kv::cached(id) { cached }
 
-            nav (Dog::tenant(org), Dog::ownerId(id)) { dog }
+            one Dog::{ tenant(org), ownerId(id) } { dog }
         }
 
         model Dog {
@@ -504,19 +408,17 @@ fn route_model_valid() {
         .collect();
     assert_eq!(route_fields, vec!["id", "org"]);
 
-    // 1:1 nav columns are ordered to match Dog's route fields (ownerId, tenant).
+    // The 1:1 nav resolves each target discriminator to a local field, in source order.
     let dog_nav = person.navigation_fields.first().unwrap();
     assert_eq!(dog_nav.field.name, "dog");
     assert_eq!(dog_nav.model_reference, "Dog");
     assert_eq!(dog_nav.field.cidl_type, CidlType::Object { name: "Dog" });
-    let NavigationFieldKind::OneToOne { fields } = &dog_nav.kind else {
-        unreachable!()
-    };
-    assert_eq!(*fields, vec!["id", "org"]);
+    assert!(matches!(dog_nav.cardinality, NavigationCardinality::One));
+    let keys: Vec<(&str, &str)> = dog_nav.keys.iter().map(|k| (k.local, k.target)).collect();
+    assert_eq!(keys, vec![("org", "tenant"), ("id", "ownerId")]);
 
-    // The default data source has no SQL and is keyed on the route fields.
+    // The default data source is keyed on the route fields.
     let ds = person.default_data_source().unwrap();
-    assert!(ds.include_query.is_empty());
     let params: Vec<&str> = ds
         .get
         .parameters
@@ -541,7 +443,7 @@ fn d1_model_navigates_to_worker_model() {
                 org: string
             }
 
-            nav (Person::id(id), Person::tenant(org)) { person }
+            one Person::{ id(id), tenant(org) } { person }
         }
 
         model Person {
@@ -571,76 +473,17 @@ fn d1_model_navigates_to_worker_model() {
         person_nav.field.cidl_type,
         CidlType::Object { name: "Person" }
     );
+    assert!(matches!(person_nav.cardinality, NavigationCardinality::One));
 
-    let NavigationFieldKind::OneToOne { fields } = &person_nav.kind else {
-        unreachable!()
-    };
-    assert_eq!(*fields, vec!["org", "id"]);
-}
+    // Person is worker-backed, so its resolved target backing is None.
+    assert!(person_nav.target_backing.is_none());
 
-#[test]
-fn d1_model_route_navigation_errors() {
-    // Arrange
-    let src = &with_env(
-        r#"
-        model User for my_d1 {
-            primary {
-                id: int
-            }
-
-            nav Person::id { people }      // 1:M not allowed to a route model
-            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
-        }
-
-        model Person {
-            route { id: int }
-        }
-
-        model Partial {
-            route {
-                a: int
-                b: int
-            }
-        }
-        "#,
-    );
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (_result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(
-        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
-        2
-    );
-}
-
-#[test]
-fn keyless_nav_to_routed_model_is_invalid() {
-    let src = r#"
-    durable AppDo {
-        data() -> json { "data" }
-    }
-
-    model HasRoute for AppDo {
-        route { id: int }
-        kv AppDo::data() { data }
-    }
-
-    model App for AppDo {
-        kv AppDo::data() { data }
-        nav HasRoute { config }
-    }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (_result, errors) = analyze(&parse);
-
-    assert!(
-        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }) > 0,
-        "expected RouteNavigationInvalid error, got: {errors:#?}"
-    );
+    let keys: Vec<(&str, &str)> = person_nav
+        .keys
+        .iter()
+        .map(|k| (k.local, k.target))
+        .collect();
+    assert_eq!(keys, vec![("id", "id"), ("org", "tenant")]);
 }
 
 #[test]
@@ -669,7 +512,7 @@ fn keyless_singleton_nav() {
             settings
         }
 
-        nav AppConfig { appConfig }
+        one AppConfig { appConfig }
     }
     "#;
 
@@ -683,73 +526,8 @@ fn keyless_singleton_nav() {
     assert_eq!(nav.field.name, "appConfig");
     assert_eq!(nav.model_reference, "AppConfig");
     assert_eq!(nav.field.cidl_type, CidlType::Object { name: "AppConfig" });
-    assert!(
-        matches!(&nav.kind, NavigationFieldKind::OneToOne { fields } if fields.is_empty()),
-        "expected OneToOne with empty fields"
-    );
-}
-
-#[test]
-fn worker_model_errors() {
-    // Arrange
-    let src = &with_env(
-        r#"
-        [crud get, list]
-        model Worker {
-            route { id: int }
-
-            nav Stored::id(id) { stored }  // references a D1 model
-            nav Other::id { others }       // 1:M not allowed
-            nav Partial::a(id) { partial } // does not supply all of Partial's route fields
-        }
-
-        model HasBinding for my_d1 {
-            route { id: int }              // route block with a `for` binding
-        }
-
-        model HasColumn {
-            route { id: int }
-            column { name: string }        // route block with a SQL block
-        }
-
-        model Stored for my_d1 {
-            primary { id: int }
-        }
-
-        model Other {
-            route { id: int }
-        }
-
-        model Partial {
-            route {
-                a: int
-                b: int
-            }
-        }
-        "#,
-    );
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    expect_err!(
-        errors,
-        SemanticError::NavigationReferencesDifferentBacking { .. }
-    );
-    assert_eq!(
-        count_errs!(errors, SemanticError::RouteNavigationInvalid { .. }),
-        2 // 1:M nav, and the nav missing a target route field
-    );
-    assert_eq!(
-        count_errs!(errors, SemanticError::ModelMixesRoutesAndSql { .. }),
-        1
-    );
-    let crud = expect_err!(errors,
-        SemanticError::UnsupportedCrudOperation { crud, .. } => crud
-    );
-    assert!(matches!(crud.inner, idl::CrudKind::List)); // list needs SQL
+    assert!(matches!(nav.cardinality, NavigationCardinality::One));
+    assert!(nav.keys.is_empty(), "expected a discriminator-less nav");
 }
 
 #[test]
@@ -760,31 +538,31 @@ fn d1_model_cyclical_relationship_error() {
         model A for my_d1 {
             primary { id: int }
 
-            foreign (B::id) {
+            foreign B::id {
                 bId2
             }
 
-            nav B::id(bId2) { toB }
+            one B::id(bId2) { toB }
         }
 
         model B for my_d1 {
             primary { id: int }
 
-            foreign (C::id) {
+            foreign C::id {
                 cId
             }
 
-            nav C::id(cId) { toC }
+            one C::id(cId) { toC }
         }
 
         model C for my_d1 {
             primary { id: int }
 
-            foreign (A::id) {
+            foreign A::id {
                 aId
             }
 
-            nav A::id(aId) { toA }
+            one A::id(aId) { toA }
         }
         "#,
     );
@@ -813,31 +591,31 @@ fn d1_model_nullability_prevents_cycle() {
         model A for my_d1 {
             primary { id: int }
 
-            foreign (B::id) optional {
+            foreign B::id optional {
                 bId
             }
 
-            nav B::id(bId) { toB }
+            one B::id(bId) { toB }
         }
 
         model B for my_d1 {
             primary { id: int }
 
-            foreign (C::id) optional {
+            foreign C::id optional {
                 cId
             }
 
-            nav C::id(cId) { toC }
+            one C::id(cId) { toC }
         }
 
         model C for my_d1 {
             primary { id: int }
 
-            foreign (A::id) optional {
+            foreign A::id optional {
                 aId
             }
 
-            nav A::id(aId) { toA }
+            one A::id(aId) { toA }
         }
         "#,
     );
@@ -855,6 +633,20 @@ fn kv_r2_errors() {
     // Arrange
     let src = &with_env(
         r#"
+        durable MyDurable {
+            shard {
+                doId: string
+            }
+
+            value(key: string) -> string {
+                "value/{key}"
+            }
+
+            other(key: string) -> string {
+                "other/{key}"
+            }
+        }
+
         model Foo for my_d1 {
             primary { field: string }
 
@@ -863,21 +655,132 @@ fn kv_r2_errors() {
 
             // invalid binding type (my_kv is a KV, not R2)
             r2 my_kv::items(field) { obj }
+
+            // `bogus` is not a Workers KV shard (KV has none).
+            kv my_kv::{ items(field), bogus(field) } { strayKvArg }
+        }
+
+        model Bar {
+            route {
+                key: string
+                doId: string
+            }
+
+            // missing the `doId(doId)` shard discriminator.
+            kv MyDurable::value(key) { missingShard }
+
+            // no storage template referenced (only the shard discriminator).
+            kv MyDurable::doId(doId) { noTemplate }
+
+            // two storage templates referenced.
+            kv MyDurable::{ value(key), other(key), doId(doId) } { twoTemplates }
+
+            // `nope` is not a shard field of MyDurable.
+            kv MyDurable::{ value(key), doId(doId), nope(key) } { strayDoArg }
         }
         "#,
     );
     let parse = lex_and_ast(src);
 
     // Act
+    let (_, errors) = analyze(&parse);
+
+    // Assert
+    let unresolved: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::UnresolvedSymbol { symbol } => Some(symbol.name),
+            _ => None,
+        })
+        .collect();
+    for name in ["my_d1", "my_kv", "bogus", "nope"] {
+        assert!(
+            unresolved.contains(&name),
+            "expected '{name}' unresolved, got: {unresolved:?}"
+        );
+    }
+
+    let missing = expect_err!(errors,
+        SemanticError::RelationMissingDiscriminator { field, missing } => (field.name, *missing)
+    );
+    assert_eq!(missing, ("missingShard", "doId"));
+
+    let counts: Vec<(&str, usize)> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::KvTemplateCount { field, count } => Some((field.name, *count)),
+            _ => None,
+        })
+        .collect();
+    assert!(counts.contains(&("noTemplate", 0)), "got: {counts:?}");
+    assert!(counts.contains(&("twoTemplates", 2)), "got: {counts:?}");
+}
+
+#[test]
+fn nav_requires_every_target_route_field() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        durable SubRedditDo {
+            shard {
+                id: int
+            }
+        }
+
+        model Post for SubRedditDo(subId) {
+            primary { id: int }
+            column { title: string }
+
+            // `subId(subId)` supplies the shard route field: valid.
+            many Comment::{ postId(id), subId(subId) } { comments }
+
+            // No shard key at all.
+            many Comment::postId(id) { noShard }
+
+            // Both of the target's plain route fields supplied: valid.
+            one Ledger::{ region(title), owner(title) } { ledger }
+
+            // `owner` is not supplied.
+            one Ledger::region(title) { partialLedger }
+        }
+
+        model Comment for SubRedditDo(subId) {
+            primary { id: int }
+            foreign Post::id { postId }
+        }
+
+        model Ledger for my_d1 {
+            primary { lid: int }
+            route {
+                region: string
+                owner: string
+            }
+        }
+        "#,
+    );
+
+    let src = src.as_str();
+    let parse = lex_and_ast(src);
+
+    // Act
     let (result, errors) = analyze(&parse);
 
     // Assert
+    let missing: Vec<(&str, &str)> = errors
+        .iter()
+        .filter_map(|e| match e {
+            SemanticError::RelationMissingDiscriminator { field, missing } => {
+                Some((field.name, *missing))
+            }
+            _ => None,
+        })
+        .collect();
     assert_eq!(
-        count_errs!(errors, SemanticError::UnresolvedSymbol { .. }),
-        2,
-        "expected two unresolved symbol errors, got: {:#?}",
-        errors
+        missing,
+        vec![("noShard", "subId"), ("partialLedger", "owner"),],
+        "got errors: {errors:#?}"
     );
+    assert_eq!(errors.len(), 2, "unexpected errors: {errors:#?}");
 }
 
 #[test]
@@ -1228,7 +1131,7 @@ fn data_source_errors() {
                 avatar
             }
 
-            nav(Post::authorId) {
+            many Post::authorId(id) {
                 posts
             }
         }
@@ -1241,7 +1144,7 @@ fn data_source_errors() {
                 title: string
             }
 
-            foreign(User::id) {
+            foreign User::id {
                 authorId
             }
         }
@@ -1444,11 +1347,11 @@ fn fk_inherits_validators() {
         model Post for my_d1 {
             primary { id: int }
 
-            foreign (User::id) {
+            foreign User::id {
                 userId
             }
 
-            foreign (User::age) {
+            foreign User::age {
                 userAge
             }
         }
@@ -1891,11 +1794,11 @@ fn durable_backing_valid() {
         }
 
         model Leaderboard for LeaderboardDo(org) {
-            kv LeaderboardDo::topEntryCache {
+            kv LeaderboardDo::{ topEntryCache, tenantId(org) } {
                 top
             }
 
-            kv LeaderboardDo::tenantScoped(org) {
+            kv LeaderboardDo::{ tenantScoped(org), tenantId(org) } {
                 scoped
             }
         }
@@ -1973,12 +1876,6 @@ fn durable_backing_errors() {
             }
         }
 
-        durable OtherDo {
-            other() -> json {
-                "other"
-            }
-        }
-
         // Shard arg count mismatch: DO has one shard field, model supplies none.
         model MissingShard for LeaderboardDo {}
 
@@ -1986,13 +1883,6 @@ fn durable_backing_errors() {
         model ShardOnD1 for my_d1(tenantId) {
             primary {
                 id: int
-            }
-        }
-
-        // Uses a storage template of a DO that is not this model's backing.
-        model ForeignTemplate for LeaderboardDo(tenantId) {
-            kv OtherDo::other {
-                other
             }
         }
     "#;
@@ -2008,15 +1898,6 @@ fn durable_backing_errors() {
     assert_eq!(field.name, "LeaderboardDo");
     assert_eq!(*expected, 1);
     assert_eq!(*got, 0);
-
-    let unresolved = errors
-        .iter()
-        .filter_map(|e| match e {
-            SemanticError::UnresolvedSymbol { symbol } => Some(symbol.name),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert!(unresolved.contains(&"OtherDo"), "got: {unresolved:?}");
 
     let invalid_d1 = errors
         .iter()
@@ -2101,22 +1982,11 @@ fn route_model_durable_backing() {
 }
 
 #[test]
-fn route_model_durable_backing_errors() {
+fn route_shard_field_collision_errors() {
     let src = r#"
-        d1 {
-            my_d1
-        }
-
         durable LeaderboardDo {
             shard {
                 tenantId: int
-            }
-        }
-
-        // A route model cannot be backed by a D1 database.
-        model RouteD1 for my_d1 {
-            route {
-                id: int
             }
         }
 
@@ -2133,9 +2003,302 @@ fn route_model_durable_backing_errors() {
     let (_, errors) = analyze(&parse);
 
     // Assert
-    expect_err!(errors, SemanticError::ModelMixesRoutesAndSql { .. });
     let dup = expect_err!(errors,
         SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(dup.name, "tenantId");
+}
+
+// Comprehensive test for cross-database relationships
+#[test]
+fn proposal_relationship_matrix() {
+    let src = r#"
+        d1 {
+            db_a
+            db_b
+        }
+
+        durable DoA {
+            shard { tenantId: int }
+
+            cache(key: int) -> json {
+                "cache/{key}"
+            }
+        }
+
+        durable DoB {
+            shard { tenantId: int }
+        }
+
+        model Worker {
+            route {
+                routeId: int
+                tenantId: int
+            }
+
+            // Worker -> D1 (1:1)
+            one D1Primary::primaryId(routeId) { d1Backed }
+
+            // Worker -> D1 (1:N)
+            many D1Primary::primaryId(routeId) { d1BackedMany }
+
+            // DO KV from a worker reaching into a DO: shard supplied explicitly.
+            kv DoA::{ cache(routeId), tenantId(tenantId) } { workerCache }
+        }
+
+        model D1Primary for db_a {
+            primary {
+                primaryId: int
+                tenantId: int
+            }
+
+            column {
+                bId: int
+            }
+
+            // D1 -> Worker (1:1)
+            one Worker::{ routeId(primaryId), tenantId(tenantId) } { worker }
+
+            // D1 -> DO (1:1)
+            one DoBacked::{ tenantId(tenantId), routeId(primaryId) } { doBacked }
+
+            // D1 -> DO (1:N)
+            many DoBacked::{ tenantId(tenantId), routeId(primaryId) } { doBackedMany }
+
+            // D1 -> D1 across databases (1:1)
+            one D1Other::otherId(bId) { d1Other }
+
+            // Unindexed target 1:1
+            one Unindexed { unindexed }
+
+            // Discriminator-less 1:N
+            many AllPosts { allPosts }
+        }
+
+        model D1Other for db_b {
+            primary {
+                otherId: int
+            }
+        }
+
+        model DoBacked for DoA(tenantId) {
+            route {
+                routeId: int
+            }
+
+            // DO -> D1 (1:1)
+            one D1Other::otherId(routeId) { d1Other }
+
+            // DO A -> DO B (1:1
+            one DoBackedB::{ tenantId(tenantId), routeId(routeId) } { doBackedB }
+
+            // DO A -> DO B (1:N)
+            many DoBackedB::{ tenantId(tenantId), routeId(routeId) } { doBackedBMany }
+
+            // DO KV from a DO-backed model
+            kv DoA::{ cache(routeId), tenantId(tenantId) } { selfCache }
+        }
+
+        model DoBackedB for DoB(tenantId) {
+            route {
+                routeId: int
+            }
+        }
+
+        model Unindexed {}
+
+        model AllPosts for db_a {
+            primary {
+                id: int
+            }
+        }
+
+        model TenantUser for DoA(tenantId) {
+            primary {
+                id: int
+            }
+
+            // Only the DO shard discriminator is supplied, so the target is all posts for that tenant.
+            many TenantPost::tenantId(tenantId) { posts }
+        }
+
+        model TenantPost for DoA(tenantId) {
+            primary {
+                id: int
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    // Resolves a navigation by field name on a model.
+    let nav = |model: &str, field: &str| {
+        result
+            .models
+            .get(model)
+            .unwrap_or_else(|| panic!("model {model}"))
+            .navigation_fields
+            .iter()
+            .find(|n| n.field.name == field)
+            .unwrap_or_else(|| panic!("nav {model}.{field}"))
+    };
+
+    // Asserts a nav's cardinality, target model, target backing kind, and resolved keys.
+    let check = |model: &str,
+                 field: &str,
+                 cardinality: NavigationCardinality,
+                 target: &str,
+                 backing: Option<BackingKind>,
+                 keys: &[(&str, &str)]| {
+        let n = nav(model, field);
+        assert_eq!(n.cardinality, cardinality, "{model}.{field} cardinality");
+        assert_eq!(n.model_reference, target, "{model}.{field} target");
+        assert_eq!(
+            n.target_backing.as_ref().map(|b| b.kind.clone()),
+            backing,
+            "{model}.{field} backing"
+        );
+        let got: Vec<(&str, &str)> = n.keys.iter().map(|k| (k.local, k.target)).collect();
+        assert_eq!(got, keys, "{model}.{field} keys");
+
+        // `one` is a single object, `many` is an array of it.
+        match n.cardinality {
+            NavigationCardinality::One => {
+                assert_eq!(n.field.cidl_type, CidlType::Object { name: target });
+            }
+            NavigationCardinality::Many => {
+                assert_eq!(
+                    n.field.cidl_type,
+                    CidlType::Array(Box::new(CidlType::Object { name: target }))
+                );
+            }
+        }
+    };
+
+    use NavigationCardinality::{Many, One};
+
+    // Worker -> D1
+    check(
+        "Worker",
+        "d1Backed",
+        One,
+        "D1Primary",
+        Some(BackingKind::D1),
+        &[("routeId", "primaryId")],
+    );
+    check(
+        "Worker",
+        "d1BackedMany",
+        Many,
+        "D1Primary",
+        Some(BackingKind::D1),
+        &[("routeId", "primaryId")],
+    );
+
+    // D1 -> Worker / DO / D1
+    check(
+        "D1Primary",
+        "worker",
+        One,
+        "Worker",
+        None,
+        &[("primaryId", "routeId"), ("tenantId", "tenantId")],
+    );
+    check(
+        "D1Primary",
+        "doBacked",
+        One,
+        "DoBacked",
+        Some(BackingKind::DurableObject),
+        &[("tenantId", "tenantId"), ("primaryId", "routeId")],
+    );
+    check(
+        "D1Primary",
+        "doBackedMany",
+        Many,
+        "DoBacked",
+        Some(BackingKind::DurableObject),
+        &[("tenantId", "tenantId"), ("primaryId", "routeId")],
+    );
+    check(
+        "D1Primary",
+        "d1Other",
+        One,
+        "D1Other",
+        Some(BackingKind::D1),
+        &[("bId", "otherId")],
+    );
+    check("D1Primary", "unindexed", One, "Unindexed", None, &[]);
+    check(
+        "D1Primary",
+        "allPosts",
+        Many,
+        "AllPosts",
+        Some(BackingKind::D1),
+        &[],
+    );
+
+    // DO -> D1 / DO
+    check(
+        "DoBacked",
+        "d1Other",
+        One,
+        "D1Other",
+        Some(BackingKind::D1),
+        &[("routeId", "otherId")],
+    );
+    check(
+        "DoBacked",
+        "doBackedB",
+        One,
+        "DoBackedB",
+        Some(BackingKind::DurableObject),
+        &[("tenantId", "tenantId"), ("routeId", "routeId")],
+    );
+    check(
+        "DoBacked",
+        "doBackedBMany",
+        Many,
+        "DoBackedB",
+        Some(BackingKind::DurableObject),
+        &[("tenantId", "tenantId"), ("routeId", "routeId")],
+    );
+
+    // Shard-only `many`: only the shard discriminator is supplied.
+    check(
+        "TenantUser",
+        "posts",
+        Many,
+        "TenantPost",
+        Some(BackingKind::DurableObject),
+        &[("tenantId", "tenantId")],
+    );
+
+    // DO KV resolves both from a DO-backed model and from a worker reaching into the DO.
+    // Either way the shard discriminator is supplied explicitly.
+    let kv_field = |model: &str, field: &str| {
+        result
+            .models
+            .get(model)
+            .unwrap()
+            .kv_fields
+            .iter()
+            .find(|kv| kv.field.name == field)
+            .unwrap_or_else(|| panic!("kv {model}.{field}"))
+    };
+
+    let do_kv = kv_field("DoBacked", "selfCache");
+    assert_eq!(do_kv.binding, "DoA");
+    assert_eq!(do_kv.key_format, "cache/{routeId}");
+    assert_eq!(do_kv.shard_fields, vec!["tenantId"]);
+
+    let worker_kv = kv_field("Worker", "workerCache");
+    assert_eq!(worker_kv.binding, "DoA");
+    assert_eq!(worker_kv.key_format, "cache/{routeId}");
+    assert_eq!(worker_kv.shard_fields, vec!["tenantId"]);
 }

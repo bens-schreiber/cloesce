@@ -21,6 +21,13 @@ pub trait LanguageTypeMapper {
     /// Converts an [IncludeTree] to a string representation in the target language
     fn include_tree(&self, tree: &IncludeTree) -> String;
 
+    /// Converts a precompiled query plan to a literal expression in the target language.
+    fn query_plan(&self, plan: Option<&serde_json::Value>) -> String;
+
+    /// Renders `text` as the body lines of a doc comment, each prefixed with `indent`
+    /// and safe against terminating the comment early.
+    fn doc_block(&self, text: &str, indent: &str) -> String;
+
     fn escape_string(&self, s: &str) -> String;
 }
 
@@ -113,6 +120,18 @@ impl LanguageTypeMapper for TypeScriptMapper {
 
     fn include_tree(&self, tree: &IncludeTree) -> String {
         serde_json::to_string(&tree).unwrap()
+    }
+
+    fn query_plan(&self, plan: Option<&serde_json::Value>) -> String {
+        plan.map_or_else(|| "null".to_string(), |p| serde_json::to_string(p).unwrap())
+    }
+
+    fn doc_block(&self, text: &str, indent: &str) -> String {
+        text.replace("*/", "*\\/")
+            .lines()
+            .map(|line| format!("{indent}* {line}").trim_end().to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn escape_string(&self, s: &str) -> String {

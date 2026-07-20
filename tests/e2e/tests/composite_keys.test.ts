@@ -258,28 +258,12 @@ describe("Student Enrollment", () => {
         id: 10,
         name: "Jack",
         favoriteColor: "Yellow",
-        studentCourses: [
-          {
-            studentId: 10,
-            studentName: "Jack",
-            courseId: 10,
-            student: undefined,
-            course: undefined,
-          },
-        ],
+        studentCourses: [],
       },
       course: {
         id: 10,
         title: "History",
-        studentCourses: [
-          {
-            studentId: 10,
-            studentName: "Jack",
-            courseId: 10,
-            student: undefined,
-            course: undefined,
-          },
-        ],
+        studentCourses: [],
       },
     });
   });

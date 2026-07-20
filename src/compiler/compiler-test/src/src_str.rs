@@ -99,7 +99,7 @@ model HasOneToOne for db {
         basicModelId
     }
 
-    nav BasicModel::id(basicModelId) { oneToOneNav }
+    one BasicModel::id(basicModelId) { oneToOneNav }
 }
 
 model OneToManyModel for db {
@@ -107,7 +107,7 @@ model OneToManyModel for db {
         id: int
     }
 
-    nav BasicModel::fk_to_model {
+    many BasicModel::fk_to_model(id) {
         oneToManyNav
     }
 }
@@ -239,7 +239,7 @@ model ModelWithCustomDs for db {
         oneToManyId
     }
 
-    nav OneToManyModel::id(oneToManyId) { oneToManyModel }
+    one OneToManyModel::id(oneToManyId) { oneToManyModel }
 }
 
 source Custom for ModelWithCustomDs {
@@ -268,7 +268,7 @@ model RouteOwner {
         metadata
     }
 
-    nav RouteCar::ownerId(ownerId) { car }
+    one RouteCar::ownerId(ownerId) { car }
 }
 
 model RouteCar {
@@ -297,7 +297,7 @@ api BasicService {
 
 [crud get, save]
 model Leaderboard for LeaderboardDo(tenantId) {
-    kv LeaderboardDo::topEntryCache {
+    kv LeaderboardDo::{ topEntryCache, tenantId(tenantId) } {
         topEntries
     }
 }
@@ -319,7 +319,7 @@ model LeaderboardEntry for LeaderboardDo(tenantId) {
         score: int
     }
 
-    kv LeaderboardDo::topEntryCache {
+    kv LeaderboardDo::{ topEntryCache, tenantId(tenantId) } {
         topEntries
     }
 }

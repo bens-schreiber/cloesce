@@ -17,11 +17,11 @@ use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
-    D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock,
-    ForeignBlock, InjectBlock, InjectEntry, Keyword, KvBindingBlock, KvBindingTemplate,
-    KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock, ParsedIncludeTree,
-    PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind,
-    Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
+    Cardinality, D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock,
+    DurableShardBlock, ForeignBlock, InjectBlock, InjectEntry, Keyword, KvBindingBlock,
+    KvBindingTemplate, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    NavigationKey, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate,
+    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
 };
 
 /// Formats an [Ast] into a string, preserving comments and blank lines.
@@ -556,18 +556,24 @@ impl<'src> ToDoc<'src> for SqlBlockKind<'src> {
 
 impl<'src> ToDoc<'src> for ForeignBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let adjs = comma_separated(&self.adj, |adj| {
-            let left = ctx.sym_doc(&adj.0, 0, true);
-            let right = ctx.sym_doc(&adj.1, 0, true);
-            left.then(Doc::text("::")).then(right)
-        });
-
-        let refs = if self.adj.len() > 1 {
-            Doc::text(" (").then(adjs).then(Doc::text(")"))
-        } else {
-            Doc::text(" ").then(adjs)
+        let model = ctx.sym_doc(&self.model, 0, true);
+        let reference = match self.targets.as_slice() {
+            [target] => model
+                .then(Doc::text("::"))
+                .then(ctx.sym_doc(target, 0, true)),
+            targets => {
+                // Spider form: `Model::{ target1, target2, ... }`
+                let entries = comma_separated(targets, |t| ctx.sym_doc(t, 0, true));
+                model
+                    .then(Doc::text("::{ "))
+                    .then(entries)
+                    .then(Doc::text(" }"))
+            }
         };
-        let doc = Doc::kw(Keyword::Foreign).then(refs);
+
+        let doc = Doc::kw(Keyword::Foreign)
+            .then(Doc::text(" "))
+            .then(reference);
         let optional = if self.is_optional {
             Doc::text(" ").then(Doc::kw(Keyword::Optional))
         } else {
@@ -585,43 +591,77 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
 
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let entries = comma_separated(&self.adj, |adj| {
-            let mut d = ctx.sym_doc(&adj.model, 0, true);
-            if let Some(field) = &adj.field {
-                d = d.then(Doc::text("::")).then(ctx.sym_doc(field, 0, true));
-            }
-            if let Some(local) = &adj.local_key {
+        let key_doc = |key: &'src NavigationKey<'src>| {
+            let mut d = ctx.sym_doc(&key.target, 0, true);
+            if let Some(local) = &key.local {
                 d = d
                     .then(Doc::text("("))
                     .then(ctx.sym_doc(local, 0, true))
                     .then(Doc::text(")"));
             }
             d
-        });
-
-        // Single relationships omit the outer parens; composite ones use them.
-        let refs = if self.adj.len() > 1 {
-            Doc::text(" (").then(entries).then(Doc::text(")"))
-        } else {
-            Doc::text(" ").then(entries)
         };
 
-        Doc::kw(Keyword::Nav)
-            .then(refs)
-            .then(ctx.block(ctx.sym_doc(&self.nav.inner, 2, false), 2))
+        let cardinality = match self.cardinality {
+            Cardinality::One => Keyword::One,
+            Cardinality::Many => Keyword::Many,
+        };
+        let mut doc =
+            Doc::kw(cardinality)
+                .then(Doc::text(" "))
+                .then(ctx.sym_doc(&self.model, 0, true));
+
+        match self.keys.as_slice() {
+            [] => {
+                // No keys, just the model name
+            }
+            [key] => {
+                // `Model::target(local)`.
+                doc = doc.then(Doc::text("::")).then(key_doc(key));
+            }
+            keys => {
+                // `Model::{ t1(l1), t2(l2) }`.
+                let entries = comma_separated(keys, key_doc);
+                doc = doc
+                    .then(Doc::text("::{ "))
+                    .then(entries)
+                    .then(Doc::text(" }"));
+            }
+        }
+
+        doc.then(ctx.block(ctx.sym_doc(&self.field.inner, 2, false), 2))
     }
 }
 
 impl<'src> ToDoc<'src> for KvFieldBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        let arg_doc = |arg: &'src KvFieldArgument<'src>| {
+            let mut d = ctx.sym_doc(&arg.target, 0, true);
+            if !arg.local.is_empty() {
+                let locals = comma_separated(&arg.local, |sym| ctx.sym_doc(sym, 0, true));
+                d = d.then(Doc::text("(")).then(locals).then(Doc::text(")"));
+            }
+            d
+        };
+
+        let binding = ctx.sym_doc(&self.binding, 0, true);
+
+        // A single arg renders directly (`Binding::target(args)`); multiple use
+        // the spider form (`Binding::{ template(args), shardField(local) }`).
+        let reference = match self.args.as_slice() {
+            [arg] => binding.then(Doc::text("::")).then(arg_doc(arg)),
+            args => {
+                let entries = comma_separated(args, arg_doc);
+                binding
+                    .then(Doc::text("::{ "))
+                    .then(entries)
+                    .then(Doc::text(" }"))
+            }
+        };
+
         Doc::kw(Keyword::Kv)
             .then(Doc::text(" "))
-            .then(binding_ref_doc(
-                ctx,
-                &self.binding,
-                &self.binding_template,
-                &self.args,
-            ))
+            .then(reference)
             .then(ctx.block(ctx.sym_doc(&self.field, 2, false), 2))
     }
 }
@@ -930,19 +970,27 @@ fn comma_separated<'src, T, F: FnMut(&'src T) -> Doc<'src>>(
     doc
 }
 
+/// `template` or `template(arg1, arg2, ...)`.
+fn template_call_doc<'src>(
+    ctx: &FmtCtx<'src>,
+    binding_template: &'src Symbol<'src>,
+    args: &'src [Symbol<'src>],
+) -> Doc<'src> {
+    let mut doc = ctx.sym_doc(binding_template, 0, true);
+    if !args.is_empty() {
+        let args = comma_separated(args, |sym| ctx.sym_doc(sym, 0, true));
+        doc = doc.then(Doc::text("(")).then(args).then(Doc::text(")"));
+    }
+    doc
+}
+
 fn binding_ref_doc<'src>(
     ctx: &FmtCtx<'src>,
     binding: &'src Symbol<'src>,
     binding_template: &'src Symbol<'src>,
     args: &'src [Symbol<'src>],
 ) -> Doc<'src> {
-    let mut doc = ctx
-        .sym_doc(binding, 0, true)
+    ctx.sym_doc(binding, 0, true)
         .then(Doc::text("::"))
-        .then(ctx.sym_doc(binding_template, 0, true));
-    if !args.is_empty() {
-        let args = comma_separated(args, |sym| ctx.sym_doc(sym, 0, true));
-        doc = doc.then(Doc::text("(")).then(args).then(Doc::text(")"));
-    }
-    doc
+        .then(template_call_doc(ctx, binding_template, args))
 }

@@ -1,0 +1,89 @@
+{
+  "hash": 11842886356438950275,
+  "models": {
+    "SubReddit": {
+      "hash": 15125336246236485789,
+      "name": "SubReddit",
+      "backing": {
+        "binding": "SubRedditDb",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 16671312646982238929,
+          "field": {
+            "name": "title",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 17301296087702549672,
+          "field": {
+            "name": "description",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    },
+    "SubRedditPost": {
+      "hash": 692549536176019821,
+      "name": "SubRedditPost",
+      "backing": {
+        "binding": "SubRedditDb",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 11210204011404722018,
+          "field": {
+            "name": "postId",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 14595591548189747742,
+          "field": {
+            "name": "subRedditId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "SubReddit",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    }
+  }
+}

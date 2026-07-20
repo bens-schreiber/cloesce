@@ -1,20 +1,19 @@
 use crate::{
-    LocalSymbolKind, SymbolTable, ensure,
+    LocalSymbolKind, SymbolTable,
     err::{BatchResult, ErrorSink, SemanticError},
     is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
-    ForeignBlock, KvFieldBlock, ModelBlock, ModelBlockKind, NavAdj, R2FieldBlock, SpdSlice,
-    SqlBlockKind, Symbol, Tag,
+    Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind,
+    NavigationBlock, R2FieldBlock, SpdSlice, SqlBlockKind, Symbol, Tag,
 };
 use idl::{
-    BackingKind, BindingTemplate, CidlType, Column, CrudKind, Field, ForeignKeyReference, KvField,
-    Model, ModelBacking, NavigationField, NavigationFieldKind, R2Field, ValidatedField,
-    WranglerEnv,
+    BackingKind, BindingTemplate, CidlType, Column, Field, ForeignKeyReference, KvField, Model,
+    ModelBacking, NavigationCardinality, NavigationField, NavigationKeyMapping, R2Field,
+    ValidatedField, WranglerEnv,
 };
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::{collections::BTreeMap, ops::Not};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 pub struct ModelAnalysis<'src, 'p, 'sem> {
     env: &'sem WranglerEnv<'src>,
@@ -63,18 +62,6 @@ impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
             let Some(mut model) = builder.build(&mut self, table) else {
                 continue;
             };
-
-            // `list` needs a SQL store
-            for crud in &cruds {
-                ensure!(
-                    !matches!(crud.inner, CrudKind::List) || model.uses_sqlite(),
-                    self.sink,
-                    SemanticError::UnsupportedCrudOperation {
-                        model: &model_block.symbol,
-                        crud,
-                    }
-                );
-            }
 
             model.cruds = cruds.into_iter().map(|c| c.inner.clone()).collect();
             models.insert(model.name, model);
@@ -154,12 +141,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             )
         });
 
-        let has_route_blocks = self
-            .model
-            .blocks
-            .inners()
-            .any(|b| matches!(b, ModelBlockKind::Route(_)));
-
         let binding = self.model.database_binding.as_ref();
         if binding.is_none() && has_sql_blocks {
             // A model with SQL blocks must specify a database binding
@@ -201,12 +182,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         );
         let needs_pk = has_sql_blocks || is_d1_backed;
 
-        if has_route_blocks && needs_pk {
-            ma.sink
-                .push(SemanticError::ModelMixesRoutesAndSql { model: self.symbol });
-            return None;
-        }
-
         for block in self.model.blocks.inners() {
             match block {
                 ModelBlockKind::Column(symbols) => {
@@ -229,13 +204,9 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                         }
                     }
                 }
-                ModelBlockKind::Navigation(navigation_block) => self.nav(
-                    ma,
-                    binding,
-                    &navigation_block.adj,
-                    &navigation_block.nav.inner,
-                    table,
-                ),
+                ModelBlockKind::Navigation(navigation_block) => {
+                    self.nav(ma, navigation_block, table)
+                }
                 ModelBlockKind::Route(symbols) => {
                     for symbol in symbols {
                         self.route_field(ma, symbol);
@@ -250,7 +221,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         for block in self.model.blocks.inners() {
             match block {
                 ModelBlockKind::Unique(fields) => self.unique_constraint(ma, fields),
-                ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv, binding),
+                ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv),
                 ModelBlockKind::R2(r2) => self.r2_field(ma, table, r2),
                 _ => {}
             }
@@ -445,21 +416,13 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         is_primary: bool,
     ) {
         // Check that the adjacent model exists
-        let adj_model_sym = &fk.adj.first().unwrap().0;
+        let adj_model_sym = &fk.model;
         let Some(adj_model_block) = table.models.get(adj_model_sym.name) else {
             ma.sink.push(SemanticError::UnresolvedSymbol {
                 symbol: adj_model_sym,
             });
             return;
         };
-
-        if adj_model_sym.name == self.name {
-            ma.sink.push(SemanticError::ForeignKeyReferencesSelf {
-                model: self.symbol,
-                foreign_key: adj_model_sym,
-            });
-            return;
-        }
 
         // Must belong to the same database
         let adj_binding = adj_model_block.database_binding.as_ref();
@@ -473,28 +436,17 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         }
 
-        // All adj entries must reference the same model
-        if let Some((inconsistent_model, _)) =
-            fk.adj.iter().find(|(m, _)| m.name != adj_model_sym.name)
-        {
-            ma.sink.push(SemanticError::InconsistentModelAdjacency {
-                first_model: adj_model_sym,
-                second_model: inconsistent_model,
-            });
-            return;
-        }
-
-        // Number of adj references must match number of local fields
-        if fk.adj.len() != fk.fields.len() {
+        // Number of target references must match number of local fields
+        if fk.targets.len() != fk.fields.len() {
             ma.sink.push(SemanticError::ForeignKeyInconsistentFieldAdj {
-                span: fk.adj.first().unwrap().0.span,
-                adj_count: fk.adj.len(),
+                span: adj_model_sym.span,
+                adj_count: fk.targets.len(),
                 field_count: fk.fields.len(),
             });
             return;
         }
 
-        let composite_id = if fk.adj.len() > 1 {
+        let composite_id = if fk.targets.len() > 1 {
             let id = self.composite_seed;
             self.composite_seed += 1;
             Some(id)
@@ -502,7 +454,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             None
         };
 
-        for (field, (_, adj_field_sym)) in fk.fields.iter().zip(&fk.adj) {
+        for (field, adj_field_sym) in fk.fields.iter().zip(&fk.targets) {
             if is_primary && fk.is_optional {
                 ma.sink
                     .push(SemanticError::NullablePrimaryKey { column: field });
@@ -570,249 +522,136 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
     fn nav(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
-        binding: Option<&'p Symbol<'src>>,
-        adj: &'p [NavAdj<'src>],
-        field: &'p Symbol<'src>,
+        nav: &'p NavigationBlock<'src>,
         table: &SymbolTable<'src, 'p>,
     ) {
-        // 1:1 and 1:M entries cannot mix.
-        let keyed = adj.first().map(|a| a.local_key.is_some()).unwrap_or(false);
-        if adj.iter().any(|a| a.local_key.is_some() != keyed) {
+        let field = &nav.field.inner;
+
+        let Some(target_block) = table.models.get(nav.model.name) else {
             ma.sink
-                .push(SemanticError::NavigationMixedAdjacency { field });
+                .push(SemanticError::UnresolvedSymbol { symbol: &nav.model });
             return;
-        }
+        };
 
-        // Validate all referenced fields exist on the same adj model.
-        let mut referenced_field_names = Vec::new();
-        let adj_model_sym = &adj.first().unwrap().model;
-        for entry in adj {
-            if entry.model.name != adj_model_sym.name {
-                ma.sink.push(SemanticError::InconsistentModelAdjacency {
-                    first_model: adj_model_sym,
-                    second_model: &entry.model,
+        let target_backing = self.resolve_target_backing(table, target_block);
+
+        // Each key maps a discriminator on the target to a local field on this model.
+        let mut keys = Vec::with_capacity(nav.keys.len());
+        for key in &nav.keys {
+            let Some(target_field) = table.local.get(&LocalSymbolKind::ModelField {
+                model: nav.model.name,
+                name: key.target.name,
+            }) else {
+                ma.sink.push(SemanticError::UnresolvedSymbol {
+                    symbol: &key.target,
                 });
-                return;
-            }
-
-            let Some(entry_field) = entry.field.as_ref() else {
                 continue;
             };
-            if table.local.contains_key(&LocalSymbolKind::ModelField {
-                model: adj_model_sym.name,
-                name: entry_field.name,
-            }) {
-                referenced_field_names.push(entry_field.name);
+
+            let Some(local) = key.local.as_ref() else {
+                ma.sink.push(SemanticError::RelationMissingLocalKey {
+                    target: &key.target,
+                });
                 continue;
-            }
-
-            ma.sink.push(SemanticError::UnresolvedSymbol {
-                symbol: entry_field,
-            });
-            return;
-        }
-
-        let adj_model_block = table.models.get(adj.first().unwrap().model.name).unwrap();
-
-        // If a model has no primary key columns, it cannot be the target of a SQL-backed navigation,
-        // and must be worker backed.
-        let adj_is_worker_backed = adj_model_block
-            .blocks
-            .inners()
-            .any(|b| matches!(b, ModelBlockKind::Primary(_)))
-            .not();
-        if adj_is_worker_backed {
-            let target_route_fields = adj_model_block.blocks.inners().find_map(|b| match b {
-                ModelBlockKind::Route(symbols) => Some(symbols),
-                _ => None,
-            });
-
-            if !keyed {
-                if target_route_fields.map(|r| !r.is_empty()).unwrap_or(false) {
-                    ma.sink.push(SemanticError::RouteNavigationInvalid {
-                        field,
-                        reason: "route navigations must be 1:1; declare the local key, e.g. `nav T::f(localKey)`",
-                    });
-                    return;
-                }
-                // Keyless singleton: target has no primary key and no route fields.
-                self.navigation_fields.push(NavigationField {
-                    hash: 0,
-                    field: Field {
-                        name: field.name.into(),
-                        cidl_type: CidlType::Object {
-                            name: adj_model_block.symbol.name,
-                        },
-                    },
-                    model_reference: adj_model_block.symbol.name,
-                    kind: NavigationFieldKind::OneToOne { fields: vec![] },
-                });
-                return;
-            }
-
-            // Each adj entry maps a target route field to one of this model's local fields.
-            for entry in adj {
-                let local_key = entry.local_key.as_ref().unwrap();
-                let entry_field = entry.field.as_ref().unwrap();
-
-                let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
-                    model: self.name,
-                    name: local_key.name,
-                }) else {
-                    ma.sink
-                        .push(SemanticError::UnresolvedSymbol { symbol: local_key });
-                    return;
-                };
-                let adj_field = table
-                    .local
-                    .get(&LocalSymbolKind::ModelField {
-                        model: adj_model_block.symbol.name,
-                        name: entry_field.name,
-                    })
-                    .unwrap();
-
-                if local_field.cidl_type != adj_field.cidl_type {
-                    ma.sink.push(SemanticError::RouteNavigationInvalid {
-                    field,
-                    reason: "local route field type does not match the referenced route field type",
-                });
-                    return;
-                }
-            }
-
-            // The target must have all of its route fields supplied
-            let mut fields = Vec::new();
-            for route_field in target_route_fields.into_iter().flatten() {
-                let Some(entry) = adj
-                    .iter()
-                    .find(|a| a.field.as_ref().map(|f| f.name) == Some(route_field.name))
-                else {
-                    ma.sink.push(SemanticError::RouteNavigationInvalid {
-                        field,
-                        reason: "a route navigation must supply every route field of the target model",
-                    });
-                    return;
-                };
-                fields.push(entry.local_key.as_ref().unwrap().name);
-            }
-
-            self.navigation_fields.push(NavigationField {
-                hash: 0,
-                field: Field {
-                    name: field.name.into(),
-                    cidl_type: CidlType::Object {
-                        name: adj_model_block.symbol.name,
-                    },
-                },
-                model_reference: adj_model_block.symbol.name,
-                kind: NavigationFieldKind::OneToOne { fields },
-            });
-            return;
-        }
-
-        // Otherwise, the adjacent model is D1 backed, and navigations to it must
-        // reference the same D1 binding
-        let adj_binding = adj_model_block.database_binding.as_ref().map(|s| s.name);
-        if adj_binding != binding.map(|s| s.name) {
-            ma.sink
-                .push(SemanticError::NavigationReferencesDifferentBacking { field });
-            return;
-        }
-
-        // A nav is 1:1 iff it carries local keys
-        if keyed {
-            let local_keys = adj
-                .iter()
-                .map(|a| a.local_key.as_ref().unwrap())
-                .collect::<Vec<_>>();
-
-            let foreign_key = self.model.foreign_blocks().find(|fb| {
-                let references_adj_model = fb
-                    .adj
-                    .first()
-                    .map(|(m, _)| m.name == adj_model_block.symbol.name)
-                    .unwrap_or(false);
-
-                let adj_fields_match = fb.adj.len() == adj.len()
-                    && fb.adj.iter().zip(adj).all(|((_, fb_field), nav)| {
-                        fb_field.name == nav.field.as_ref().unwrap().name
-                    });
-
-                let local_keys_match = fb.fields.len() == local_keys.len()
-                    && fb
-                        .fields
-                        .iter()
-                        .zip(&local_keys)
-                        .all(|(fk_local, declared)| fk_local.name == declared.name);
-
-                references_adj_model && adj_fields_match && local_keys_match
-            });
-
-            let Some(foreign_key) = foreign_key else {
-                ma.sink.push(SemanticError::NavigationMissingForeignKey {
-                    field,
-                    model_reference: adj_model_block.symbol.name,
-                });
-                return;
+            };
+            let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
+                model: self.name,
+                name: local.name,
+            }) else {
+                ma.sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: local });
+                continue;
             };
 
-            self.navigation_fields.push(NavigationField {
-                hash: 0,
-                field: Field {
-                    name: field.name.into(),
-                    cidl_type: CidlType::Object {
-                        name: adj_model_block.symbol.name,
-                    },
-                },
-                model_reference: adj_model_block.symbol.name,
-                kind: NavigationFieldKind::OneToOne {
-                    fields: foreign_key.fields.iter().map(|f| f.name).collect(),
-                },
+            // A foreign-key local/target column carries no declared type here (it inherits
+            // one from its referenced column later), so only compare concretely-typed sides.
+            //
+            // TODO: An error can slip by if the local or target is an FK, should try to fix.
+            let both_resolved = !matches!(local_field.cidl_type, CidlType::Void)
+                && !matches!(target_field.cidl_type, CidlType::Void);
+            if both_resolved && local_field.cidl_type != target_field.cidl_type {
+                ma.sink.push(SemanticError::ArgTypeMismatch {
+                    field: &key.target,
+                    arg: local,
+                });
+            }
+
+            keys.push(NavigationKeyMapping {
+                local: local.name,
+                target: key.target.name,
             });
-            return;
         }
 
-        // For 1:M: check if `model` has a FK pointing to `name` whose local fields match
-        // adj field names
-        let matching_fk_by_local_fields = adj_model_block
-            .foreign_blocks()
-            .find(|fb| {
-                let references_model = fb
-                    .adj
-                    .first()
-                    .map(|(m, _)| m.name == self.name)
-                    .unwrap_or(false);
+        // Every route field of the target must be supplied as a key so the target's
+        // state can be constructed. Durable Object shard fields are coerced into route fields,
+        // so they are also required to be supplied as keys.
+        let shard_fields = target_block.shard_args.as_deref().unwrap_or_default();
+        let route_fields = target_block.blocks.inners().flat_map(|b| match b {
+            ModelBlockKind::Route(symbols) => symbols.as_slice(),
+            _ => &[],
+        });
 
-                let local_fields_match = fb.fields.len() == adj.len()
-                    && fb.fields.iter().zip(adj).all(|(local_field, nav)| {
-                        local_field.name == nav.field.as_ref().unwrap().name
-                    });
-
-                references_model && local_fields_match
-            })
-            .is_none();
-
-        if matching_fk_by_local_fields {
-            ma.sink.push(SemanticError::NavigationMissingForeignKey {
-                field,
-                model_reference: adj_model_block.symbol.name,
-            });
-            return;
+        for route in shard_fields.iter().chain(route_fields) {
+            if !nav.keys.iter().any(|k| k.target.name == route.name) {
+                ma.sink.push(SemanticError::RelationMissingDiscriminator {
+                    field,
+                    missing: route.name,
+                });
+            }
         }
+
+        let object = CidlType::Object {
+            name: target_block.symbol.name,
+        };
+        let (cidl_type, cardinality) = match nav.cardinality {
+            Cardinality::One => (object, NavigationCardinality::One),
+            Cardinality::Many => (
+                CidlType::Array(Box::new(object)),
+                NavigationCardinality::Many,
+            ),
+        };
 
         self.navigation_fields.push(NavigationField {
-            hash: 0,
             field: Field {
                 name: field.name.into(),
-                cidl_type: CidlType::Array(Box::new(CidlType::Object {
-                    name: adj_model_block.symbol.name,
-                })),
+                cidl_type,
             },
-            model_reference: adj_model_block.symbol.name,
-            kind: NavigationFieldKind::OneToMany {
-                columns: referenced_field_names,
-            },
+            model_reference: target_block.symbol.name,
+            target_backing,
+            cardinality,
+            keys,
         });
+    }
+
+    /// Resolves the [ModelBacking] of a navigation target from its AST, without
+    /// requiring the target [Model] to have been built yet. Returns `None` for a
+    /// worker-backed (binding-less) target.
+    fn resolve_target_backing(
+        &self,
+        table: &SymbolTable<'src, 'p>,
+        target: &'p ModelBlock<'src>,
+    ) -> Option<ModelBacking<'src>> {
+        let binding = target.database_binding.as_ref()?;
+
+        if let Some(durable) = table.durable_bindings.get(binding.name) {
+            let fields = durable
+                .shard_blocks
+                .inners()
+                .flat_map(|s| &s.fields)
+                .map(|f| f.name)
+                .collect();
+            return Some(ModelBacking {
+                binding: binding.name,
+                fields,
+                kind: BackingKind::DurableObject,
+            });
+        }
+
+        Some(ModelBacking {
+            binding: binding.name,
+            fields: Vec::new(),
+            kind: BackingKind::D1,
+        })
     }
 
     // NOTE: Ran after all columns are processed
@@ -857,7 +696,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,
         table: &SymbolTable<'src, 'p>,
         kv: &'p KvFieldBlock<'src>,
-        binding: Option<&'p Symbol<'src>>,
     ) {
         if !table.kv_bindings.contains_key(kv.binding.name)
             && !table.durable_bindings.contains_key(kv.binding.name)
@@ -885,19 +723,25 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         let templates = match (kv_templates, durable_kv_templates) {
             (Some(kv), _) => kv,
-            (_, Some(durable)) => {
-                if binding.map(|b| b.name) != Some(kv.binding.name) {
-                    ma.sink.push(SemanticError::UnresolvedSymbol {
-                        symbol: &kv.binding,
-                    });
-                    return;
-                }
-                durable
-            }
+            (_, Some(durable)) => durable,
             (None, None) => {
                 // The binding is invalid but the error has already been sunk during env validation
                 return;
             }
+        };
+
+        let (template_args, shard_args): (Vec<_>, Vec<_>) = kv
+            .args
+            .iter()
+            .partition(|arg| templates.iter().any(|t| t.field.name == arg.target.name));
+
+        // Exactly one storage template must be referenced
+        let [template_arg] = template_args.as_slice() else {
+            ma.sink.push(SemanticError::KvTemplateCount {
+                field: &kv.field,
+                count: template_args.len(),
+            });
+            return;
         };
 
         let Some((template, key_format)) = self.resolve_binding_ref(
@@ -905,12 +749,16 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             table,
             templates,
             &kv.binding,
-            &kv.binding_template,
-            &kv.args,
+            &template_arg.target,
+            &template_arg.local,
             &kv.field,
         ) else {
             return;
         };
+
+        // Any non-template arg must be a shard argument
+        let shard_fields =
+            self.resolve_kv_shard_args(ma, table, &kv.binding, &shard_args, &kv.field);
 
         self.kv_fields.push(KvField {
             field: ValidatedField {
@@ -920,7 +768,84 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             },
             binding: kv.binding.name,
             key_format,
+            shard_fields,
         });
+    }
+
+    /// Validates the non-template args of a KV reference as shard discriminators.
+    ///
+    /// For a Durable Object binding, every shard field must be supplied exactly once, each
+    /// mapped to a single local field of the same type; the resolved local field names are
+    /// returned in shard-declaration order. Any supplied arg whose `target` is not a shard
+    /// field of the binding is unresolved — this also rejects every stray arg on a Workers
+    /// KV binding, which has no shards.
+    fn resolve_kv_shard_args(
+        &self,
+        ma: &mut ModelAnalysis<'src, 'p, 'sem>,
+        table: &SymbolTable<'src, 'p>,
+        binding: &'p Symbol<'src>,
+        shard_args: &[&'p KvFieldArgument<'src>],
+        field: &'p Symbol<'src>,
+    ) -> Vec<&'src str> {
+        let shard_fields: Vec<_> = table
+            .durable_bindings
+            .get(binding.name)
+            .map(|d| d.shard_blocks.inners().flat_map(|s| &s.fields).collect())
+            .unwrap_or_default();
+
+        // Every supplied arg must name a real shard field of the binding.
+        for arg in shard_args {
+            if !shard_fields.iter().any(|s| s.name == arg.target.name) {
+                ma.sink.push(SemanticError::UnresolvedSymbol {
+                    symbol: &arg.target,
+                });
+            }
+        }
+
+        let mut locals = Vec::new();
+        for shard in shard_fields {
+            let Some(arg) = shard_args.iter().find(|a| a.target.name == shard.name) else {
+                ma.sink.push(SemanticError::RelationMissingDiscriminator {
+                    field,
+                    missing: shard.name,
+                });
+                continue;
+            };
+
+            // `shardField(local)` supplies exactly one local field for the shard.
+            let [local] = arg.local.as_slice() else {
+                ma.sink.push(SemanticError::ArgCountMismatch {
+                    field: &arg.target,
+                    expected: 1,
+                    got: arg.local.len(),
+                });
+                continue;
+            };
+
+            let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
+                model: self.name,
+                name: local.name,
+            }) else {
+                ma.sink
+                    .push(SemanticError::UnresolvedSymbol { symbol: local });
+                continue;
+            };
+
+            // A shard field's local supplier may be a route field (no declared type here),
+            // so only compare concretely-typed sides.
+            let both_resolved = !matches!(local_field.cidl_type, CidlType::Void)
+                && !matches!(shard.cidl_type, CidlType::Void);
+            if both_resolved && local_field.cidl_type != shard.cidl_type {
+                ma.sink.push(SemanticError::ArgTypeMismatch {
+                    field: &arg.target,
+                    arg: local,
+                });
+            }
+
+            locals.push(local.name);
+        }
+
+        locals
     }
 
     /// NOTE: Ran after all columns are processed

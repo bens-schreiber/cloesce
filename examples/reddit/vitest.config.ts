@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { fileURLToPath } from "url";
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -17,4 +17,9 @@ export default defineConfig({
       wrangler: { configPath: "./wrangler.jsonc" },
     }),
   ],
+  test: {
+    provide: {
+      migrations: await readD1Migrations("./migrations/SubRedditDb"),
+    },
+  },
 });

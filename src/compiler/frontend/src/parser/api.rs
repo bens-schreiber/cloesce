@@ -30,6 +30,7 @@ pub fn api_block<'tokens, 'src: 'tokens>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map(|(symbol, methods)| AstBlockKind::Api(ApiBlock { symbol, methods }))
+        .boxed()
 }
 
 fn method<'tokens, 'src: 'tokens>() -> impl Parser<
@@ -88,4 +89,5 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
                 parameters,
             },
         )
+        .boxed()
 }

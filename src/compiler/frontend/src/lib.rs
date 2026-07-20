@@ -42,7 +42,8 @@ macro_rules! contextual_keywords {
 
 contextual_keywords! {
     // Block declaration / infix
-    Nav => "nav",
+    One => "one",
+    Many => "many",
     Foreign => "foreign",
     Primary => "primary",
     Optional => "optional",
@@ -283,8 +284,6 @@ pub enum ApiBlockMethodParamKind<'src> {
 pub struct DataSourceBlockMethod<'src> {
     pub method: Symbol<'src>,
     pub parameters: Vec<Symbol<'src>>,
-    /// Always empty after proposal 7; retained until semantic crate drops it.
-    pub raw_sql: &'src str,
 }
 
 pub struct ParsedIncludeTree<'src>(
@@ -307,38 +306,43 @@ pub struct DataSourceBlock<'src> {
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
 }
 
-pub struct NavAdj<'src> {
-    /// `AdjModel` in `AdjModel::field`
-    pub model: Symbol<'src>,
+/// The explicit cardinality of a relationship, as stated by the `one` or `many`
+/// keyword that opens a [NavigationBlock].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cardinality {
+    One,
+    Many,
+}
 
-    /// `field` in `AdjModel::field`.
-    pub field: Option<Symbol<'src>>,
+pub struct NavigationKey<'src> {
+    /// The discriminator field on the target model (its `route`/`primary` field).
+    pub target: Symbol<'src>,
 
-    /// The local FK column on the current model: the `(localKey)` part.
-    /// `Some` => 1:1 entry, `None` => 1:M entry.
-    pub local_key: Option<Symbol<'src>>,
+    /// The local field on the current model that supplies the target's discriminator,
+    /// if any. If `None`, the relationship is discriminator-less.
+    pub local: Option<Symbol<'src>>,
 }
 
 pub struct NavigationBlock<'src> {
-    pub adj: Vec<NavAdj<'src>>,
+    /// `One | Many`, from the opening keyword.
+    pub cardinality: Cardinality,
 
-    // nav X::y { navName }
-    pub nav: Spd<Symbol<'src>>,
-}
+    /// The target model, e.g. `Model` in `one Model::... { field }`.
+    pub model: Symbol<'src>,
 
-impl<'src> NavigationBlock<'src> {
-    /// 1:1 iff it carries local keys
-    pub fn is_one_to_one(&self) -> bool {
-        self.adj
-            .first()
-            .map(|a| a.local_key.is_some())
-            .unwrap_or(false)
-    }
+    /// The discriminator key pairs.
+    pub keys: Vec<NavigationKey<'src>>,
+
+    /// The result field name declared in `{ ... }`.
+    pub field: Spd<Symbol<'src>>,
 }
 
 pub struct ForeignBlock<'src> {
-    // foreign(AdjModel::field1, AdjModel::field2, ...)
-    pub adj: Vec<(Symbol<'src>, Symbol<'src>)>,
+    /// The referenced model, e.g. `AdjModel` in `foreign AdjModel::field { ... }`.
+    pub model: Symbol<'src>,
+
+    /// The referenced fields on `model`.
+    pub targets: Vec<Symbol<'src>>,
 
     // { currentModelField1, currentModelField2, ... }
     pub fields: Vec<Symbol<'src>>,
@@ -346,15 +350,22 @@ pub struct ForeignBlock<'src> {
     pub is_optional: bool,
 }
 
+pub struct KvFieldArgument<'src> {
+    /// A reference to either a binding template of the KV Namespace
+    /// or a Durable Object shard iff the KV Field references a DO binding.
+    pub target: Symbol<'src>,
+
+    /// - If 1 => `target(local)`
+    /// - If >1 => `target(local1, local2, ...)`
+    pub local: Vec<Symbol<'src>>,
+}
+
 pub struct KvFieldBlock<'src> {
     /// The KV binding name (e.g. `UserMetadata`)
     pub binding: Symbol<'src>,
 
-    /// The field on the KV binding being referenced
-    pub binding_template: Symbol<'src>,
-
     /// The model fields to be passed as arguments to the binding's field
-    pub args: Vec<Symbol<'src>>,
+    pub args: Vec<KvFieldArgument<'src>>,
 
     /// The local field on the model representing this binding field
     pub field: Symbol<'src>,
@@ -397,7 +408,7 @@ impl<'src> ModelBlockKind<'src> {
             ModelBlockKind::Column(symbols) => symbols.iter().collect(),
             ModelBlockKind::Route(symbols) => symbols.iter().collect(),
             ModelBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
-            ModelBlockKind::Navigation(nav_block) => vec![&nav_block.nav.inner],
+            ModelBlockKind::Navigation(navigation_block) => vec![&navigation_block.field.inner],
             ModelBlockKind::Kv(kv_block) => vec![&kv_block.field],
             ModelBlockKind::R2(r2_block) => vec![&r2_block.field],
             ModelBlockKind::Primary(blocks) => blocks

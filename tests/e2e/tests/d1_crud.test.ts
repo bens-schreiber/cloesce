@@ -91,10 +91,6 @@ describe("Parent with children", () => {
     expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual({
       id: 1,
       favoriteChildId: 1,
-      favoriteChild: {
-        id: 1,
-        parentId: 1,
-      },
       children: [
         { id: 1, parentId: 1 },
         { id: 2, parentId: 1 },
@@ -108,13 +104,31 @@ describe("Parent with children", () => {
   it("$get", async () => {
     const res = await Parent.$get_WithChildren(model.id);
     expectHttpResult(res, "$get should be OK");
-    expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual(model);
+    expect(res.data, `Data should be equal\n\n${JSON.stringify(res)}`).toEqual({
+      id: 1,
+      favoriteChildId: 1,
+      favoriteChild: { id: 1, parentId: 1 },
+      children: [
+        { id: 1, parentId: 1 },
+        { id: 2, parentId: 1 },
+        { id: 3, parentId: 1 },
+      ],
+    });
   });
 
   it("$list", async () => {
     const res = await Parent.$list_WithChildren(0, 100);
     expectHttpResult(res, "$list should be OK");
     expect(res.data!.length).toEqual(1);
-    expect(res.data![0], `Data should be equal\n\n${JSON.stringify(res)}`).toEqual(model);
+    expect(res.data![0], `Data should be equal\n\n${JSON.stringify(res)}`).toEqual({
+      id: 1,
+      favoriteChildId: 1,
+      favoriteChild: { id: 1, parentId: 1 },
+      children: [
+        { id: 1, parentId: 1 },
+        { id: 2, parentId: 1 },
+        { id: 3, parentId: 1 },
+      ],
+    });
   });
 });

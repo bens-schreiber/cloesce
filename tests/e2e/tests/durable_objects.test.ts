@@ -181,7 +181,7 @@ describe("Injected Durable Object instance method (feed)", () => {
     const sub = await SubReddit.$get(1);
     expectHttpResult(sub, "$get should be OK");
 
-    const feed = await sub.data!.feed(1);
+    const feed = await sub.data!.feed();
     expectHttpResult(feed, "feed should be OK");
     expect(feed.data!.length).toBeGreaterThanOrEqual(1);
     expect(feed.data!.every((p) => p instanceof Post)).toBe(true);

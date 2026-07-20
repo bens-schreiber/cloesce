@@ -6,9 +6,10 @@ edition = "2024"
 ariadne = { workspace = true }
 idl = { path = "../idl" }
 frontend = { path = "../frontend" }
+orm = { path = "../orm" }
 indexmap = { workspace = true }
 regex-lite = { workspace = true }
-orm = { path = "../orm" }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }

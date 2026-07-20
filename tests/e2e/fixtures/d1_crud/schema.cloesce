@@ -27,11 +27,11 @@ model Parent for db {
         favoriteChildId
     }
 
-    nav Child::id(favoriteChildId) {
+    one Child::id(favoriteChildId) {
         favoriteChild
     }
 
-    nav Child::parentId {
+    many Child::parentId(id) {
         children
     }
 }
@@ -52,7 +52,7 @@ model Child for db {
         parentId
     }
 
-    nav Parent::id(parentId) {
+    one Parent::id(parentId) {
         parent
     }
 }

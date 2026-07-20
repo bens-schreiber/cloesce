@@ -47,7 +47,6 @@ fn as_migration(idl: CloesceIdl) -> MigrationsIdl {
                 }),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
-                navigation_fields: model.navigation_fields,
             };
             (name.to_string(), m)
         })
@@ -179,11 +178,11 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
                     id: int
                 }
 
-                foreign(Dog::id) {
+                foreign Dog::id {
                     dogId
                 }
 
-                nav Dog::id(dogId) { dog }
+                one Dog::id(dogId) { dog }
             }
         "#,
         );
@@ -235,7 +234,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                nav(Person::bossId) {
+                many Person::bossId(id) {
                     persons
                 }
             }
@@ -245,15 +244,15 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                foreign(Boss::id) {
+                foreign Boss::id {
                     bossId
                 }
 
-                nav(Dog::personId) {
+                many Dog::personId(id) {
                     dogs
                 }
 
-                nav(Cat::personId) {
+                many Cat::personId(id) {
                     cats
                 }
             }
@@ -263,7 +262,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                foreign(Person::id) {
+                foreign Person::id {
                     personId
                 }
             }
@@ -273,7 +272,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     id: int
                 }
 
-                foreign(Person::id) {
+                foreign Person::id {
                     personId
                 }
             }
@@ -473,7 +472,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     favorite_color: string
                 }
 
-                foreign(Dog::id) {
+                foreign Dog::id {
                     dog_id
                 }
             }
@@ -649,7 +648,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                     id: int
                 }
 
-                foreign(User::id) {
+                foreign User::id {
                     userId
                 }
             }
@@ -685,7 +684,7 @@ async fn migrate_with_rename(db: SqlitePool) {
                 id: int
             }
 
-            foreign(AppUser::id) {
+            foreign AppUser::id {
                 userId
             }
         }
@@ -733,7 +732,7 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
                 id: int
             }
 
-            foreign(Parent::orgId, Parent::userId) {
+            foreign Parent::{orgId, userId} {
                 orgId
                 userId
             }

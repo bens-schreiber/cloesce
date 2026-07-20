@@ -199,6 +199,7 @@ enum Command {
     Compile(CompileArgs),
     Migrate(MigrateArgs),
     Fmt(FormatArgs),
+    Explain(ExplainArgs),
     Version,
 }
 
@@ -207,6 +208,31 @@ struct CompileArgs {
     /// Directory to compile. Defaults to the current directory.
     #[arg(default_value = ".")]
     dir: PathBuf,
+}
+
+#[derive(Args)]
+struct ExplainArgs {
+    /// Name of the model owning the data source.
+    model: String,
+
+    /// Name of the data source on the model.
+    data_source: String,
+    operation: ExplainOperation,
+
+    #[arg(long, default_value = ".")]
+    dir: PathBuf,
+
+    /// JSON payload file, required when explaining `save`.
+    #[arg(long)]
+    payload: Option<PathBuf>,
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+#[value(rename_all = "lowercase")]
+enum ExplainOperation {
+    Get,
+    List,
+    Save,
 }
 
 #[derive(Args)]
@@ -297,6 +323,20 @@ fn main() {
 
                 let elapsed = start_time.elapsed();
                 tracing::info!("Formatting completed in {:.2?}", elapsed);
+                Ok(())
+            }
+            Command::Explain(args) => {
+                let root = if args.dir.is_absolute() {
+                    args.dir.clone()
+                } else {
+                    root.join(&args.dir)
+                };
+                let config = CloesceConfig::load(&root, cli.env)?;
+                let sources = config.collect_sources(&root);
+                explain::explain(args, sources)?;
+
+                let elapsed = start_time.elapsed();
+                tracing::info!("Explain completed in {:.2?}", elapsed);
                 Ok(())
             }
             Command::Version => {
@@ -518,6 +558,116 @@ mod compile {
             })?;
             tracing::info!("Generated client code at {}", client_path.display());
         }
+
+        Ok(())
+    }
+}
+
+mod explain {
+    use frontend::{lexer, parser};
+    use orm::query::explain::explain_save;
+    use orm::query::save::planner as save_planner;
+
+    use super::*;
+
+    pub fn explain(args: ExplainArgs, target_paths: Vec<PathBuf>) -> Result<(), String> {
+        if target_paths.is_empty() {
+            return Err("No cloesce source files found".into());
+        }
+
+        let payload = match (args.operation, &args.payload) {
+            (ExplainOperation::Save, None) => {
+                return Err("explain save requires --payload <file.json>".into());
+            }
+            (ExplainOperation::Save, Some(path)) => {
+                let contents = std::fs::read_to_string(path).map_err(|e| {
+                    format!("Failed to read payload file {}: {}", path.display(), e)
+                })?;
+                let value: serde_json::Value = serde_json::from_str(&contents).map_err(|e| {
+                    format!("Failed to parse payload file {}: {}", path.display(), e)
+                })?;
+                Some(value)
+            }
+            (_, _) => None,
+        };
+
+        // Lexing
+        let sources = target_paths
+            .into_iter()
+            .map(|p| {
+                let src = std::fs::read_to_string(&p)
+                    .map_err(|e| format!("Failed to read source file {}: {}", p.display(), e))?;
+
+                Ok((src, p))
+            })
+            .collect::<Result<Vec<(String, PathBuf)>, String>>()
+            .map_err(|e| {
+                tracing::error!("{}", e);
+                "Failed to read source files".to_string()
+            })?;
+
+        let (lex_results, file_table) = lexer::lex(sources.iter().map(|(src, path)| LexTarget {
+            src: src.as_str(),
+            path: path.clone(),
+        }))
+        .unwrap_or_else(|(errors, file_table)| {
+            errors.display_error(&file_table);
+            std::process::exit(1);
+        });
+
+        // Parsing
+        let ast = parser::parse(&lex_results, &file_table).unwrap_or_else(|err| {
+            err.display_error(&file_table);
+            std::process::exit(1);
+        });
+
+        // Semantic
+        let idl = match semantic::analyze(&ast) {
+            Ok(idl) => idl,
+            Err(errors) => {
+                for error in errors {
+                    error.display_error(&file_table);
+                }
+                return Err("semantic analysis failed".into());
+            }
+        };
+
+        let model = idl.models.get(args.model.as_str()).ok_or_else(|| {
+            let available = idl.models.keys().copied().collect::<Vec<_>>().join(", ");
+            format!(
+                "No model named '{}' found. Available models: {}",
+                args.model, available
+            )
+        })?;
+
+        let data_source = model
+            .data_sources
+            .get(args.data_source.as_str())
+            .ok_or_else(|| {
+                let available = model
+                    .data_sources
+                    .keys()
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "No data source named '{}' found on model '{}'. Available data sources: {}",
+                    args.data_source, args.model, available
+                )
+            })?;
+
+        let text = match args.operation {
+            ExplainOperation::Get => data_source.get_explain.clone(),
+            ExplainOperation::List => data_source.list_explain.clone(),
+            ExplainOperation::Save => {
+                let payload = payload.expect("checked above");
+                let plan = save_planner::plan(model.name, &idl, &data_source.tree, &payload)
+                    .map_err(|e| format!("Failed to plan save: {e}"))?;
+                explain_save(model.name, &data_source.tree, &plan)
+            }
+        };
+
+        println!("{text}");
 
         Ok(())
     }

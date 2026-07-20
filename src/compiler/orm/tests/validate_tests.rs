@@ -358,7 +358,7 @@ fn objects_partials() {
                     name: string
                 }
 
-                nav(Rider::horseId) {
+                many Rider::horseId(id) {
                     riders
                 }
             }
@@ -368,7 +368,7 @@ fn objects_partials() {
                     id: int
                 }
 
-                foreign(Horse::id) {
+                foreign Horse::id {
                     horseId
                 }
 
@@ -433,7 +433,7 @@ fn one_to_many_nav_person_dogs() {
         model Person for db {
             primary { id: int }
 
-            nav (Dog::personId) {
+            many Dog::personId(id) {
                 dogs
             }
         }
@@ -442,11 +442,11 @@ fn one_to_many_nav_person_dogs() {
         model Dog for db {
             primary { id: int }
 
-            foreign (Person::id) {
+            foreign Person::id {
                 personId
             }
 
-            nav Person::id(personId) { person }
+            one Person::id(personId) { person }
         }
         "#,
     );

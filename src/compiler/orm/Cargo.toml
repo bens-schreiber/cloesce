@@ -7,12 +7,12 @@ idl = { path = "../idl" }
 base64 = "0.22"
 frontend = { path = "../frontend" }
 regex-lite = { workspace = true }
-sea-query = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
+insta = { workspace = true }
 migrations = { path = "../migrations" }
 sqlx = { workspace = true }
 

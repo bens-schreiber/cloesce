@@ -260,7 +260,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
@@ -281,7 +281,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
@@ -304,7 +304,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
@@ -329,7 +329,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {});
+    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
@@ -362,7 +362,14 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, { name: "ben" }, { DB_1: db });
+    const res = await _cloesceInternal.methodDispatch(
+      {},
+      di,
+      route,
+      { name: "ben" },
+      { DB_1: db },
+      undefined,
+    );
 
     // Assert
     expect(res.status).toBe(200);
