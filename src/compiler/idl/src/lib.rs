@@ -196,9 +196,6 @@ pub struct NavigationKeyMapping<'src> {
 
 #[derive(Deserialize, Serialize)]
 pub struct NavigationField<'src> {
-    #[serde(default)]
-    pub hash: u64,
-
     #[serde(borrow)]
     pub field: Field<'src>,
 
@@ -721,7 +718,9 @@ pub fn model_bindings<'src>(
         }
 
         for kv in &model.kv_fields {
-            bindings.insert(kv.binding);
+            if included(kv.field.name.as_ref()) {
+                bindings.insert(kv.binding);
+            }
         }
 
         for r2 in &model.r2_fields {

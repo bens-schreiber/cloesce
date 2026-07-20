@@ -28,6 +28,7 @@ import {
   spread,
   sqlStep,
   synthStep,
+  tuple,
   type RawArg,
 } from "./common/select.js";
 
@@ -574,6 +575,89 @@ describe("executeSelect spread chunking (MAX_BOUND_PARAMETERS)", () => {
     }
     expect(idsSeen.size).toBe(n);
     expect(tagsSeen.size).toBe(n);
+  });
+});
+
+describe("executeSelect composite tuple-spread IN", () => {
+  /** A Many root plus a child whose nav spreads a (a, b) row-value tuple. */
+  const tuplePlan = (childSql: string) =>
+    selectPlan(
+      [sqlStep([], "SELECT * FROM root", { db: d1("root"), mapping: many })],
+      [
+        sqlStep(["children"], childSql, {
+          db: d1("children"),
+          args: [tuple(spread("a"), spread("b"))],
+          mapping: mapping("Many", [
+            { parent_key: "a", child_key: "a" },
+            { parent_key: "b", child_key: "b" },
+          ]),
+        }),
+      ],
+    );
+
+  test("binds N deduped tuples, not the N x M cross product of the columns", async () => {
+    // Three parents over two distinct (a, b) pairs: (1,10), (2,20), (1,10) again.
+    // Per-column dedupe would yield a={1,2} x b={10,20} = 4 rows (cross product);
+    // the row-value form must bind exactly the 2 real pairs.
+    const parents = [
+      { a: 1, b: 10 },
+      { a: 2, b: 20 },
+      { a: 1, b: 10 },
+    ];
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : new MockSqlStore(() => []),
+    );
+
+    await executeSelectOk(
+      tuplePlan('SELECT * FROM children WHERE ("a", "b") IN (VALUES ?1)'),
+      {},
+      resolver,
+    );
+
+    expect(resolver.sqlStores.get("children|[]")!.queries).toEqual([
+      {
+        sql: 'SELECT * FROM children WHERE ("a", "b") IN (VALUES (?, ?), (?, ?))',
+        bindings: [1, 10, 2, 20],
+      },
+    ]);
+  });
+
+  test("width-2 tuples chunk at 50 elements per statement near the 100-param cap", async () => {
+    // 60 distinct (a, b) pairs -> 120 params -> chunks of 50 + 10 tuples (100 + 20 params).
+    const n = 60;
+    const parents = Array.from({ length: n }, (_, i) => ({ a: i + 1, b: 1000 + i }));
+    const childStore = new MockSqlStore(
+      () => [],
+      (call) => call.statements.map(() => []),
+    );
+    const resolver = new MockResolver((database) =>
+      database.name === "root" ? new MockSqlStore(() => parents) : childStore,
+    );
+
+    await executeSelectOk(
+      tuplePlan('SELECT * FROM children WHERE ("a", "b") IN (VALUES ?1)'),
+      {},
+      resolver,
+    );
+
+    const stmts = childStore.batches[0].statements;
+    expect(stmts.length).toBe(2); // ceil(60 / 50)
+    // Each statement's bindings are whole (a, b) pairs and stay within the cap.
+    for (const s of stmts) {
+      expect(s.bindings.length % 2).toBe(0);
+      expect(s.bindings.length).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS);
+    }
+    expect(stmts[0].bindings.length).toBe(100); // 50 tuples x 2
+    expect(stmts[1].bindings.length).toBe(20); // 10 tuples x 2
+    // A tuple's two values stay adjacent and the union covers every pair exactly once.
+    const pairs = new Set<string>();
+    for (const s of stmts) {
+      for (let i = 0; i < s.bindings.length; i += 2) {
+        pairs.add(JSON.stringify([s.bindings[i], s.bindings[i + 1]]));
+      }
+    }
+    expect(pairs.size).toBe(n);
+    expect(parents.every((p) => pairs.has(JSON.stringify([p.a, p.b])))).toBe(true);
   });
 });
 

@@ -53,10 +53,7 @@ export type SelectArg = { Param: string } | { Field: { table: number; field: str
 
 export type SqlSegment = { Literal: string } | { Bind: number };
 
-export interface SqlArgument {
-  value: SelectArg;
-  spread: boolean;
-}
+export type SqlArgument = { Scalar: SelectArg } | { Spread: SelectArg } | { Tuple: SelectArg[] };
 
 export interface JoinKeys {
   parent_key: string;

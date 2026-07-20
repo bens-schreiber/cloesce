@@ -181,16 +181,13 @@ impl<'src> Planner<'src> {
                 shard: Vec::new(),
             };
             self.write_keys(model, obj, tree, &instance)?;
-            self.visit_children(model, obj, tree, &instance, true)?;
+            self.visit_children(model, obj, tree, &instance)?;
 
             return Ok(instance);
         }
 
-        // 1:1 navs first: this row may hold their FK, so the child is written before the row
-        // resolves its local key.
-        //
-        // The child's ctx carries every nav key local already known without this row's write
-        // (payload values, route params), so a child keyed by them resolves immediately.
+        // If a parent owns a 1:1 nav, this row may hold the FK, so the child is written before
+        // the row resolves its local key.
         let mut nav_fks = parent.bindings;
         let one_navs = model
             .navigation_fields
@@ -200,6 +197,10 @@ impl<'src> Planner<'src> {
             let Some((subtree, child_payload, target)) = self.nav_parts(nav, obj, tree) else {
                 continue;
             };
+            if !parent_owns_one(nav, target, model) {
+                // Child-owned, handled in `visit_children`.
+                continue;
+            }
 
             let ctx = self.child_ctx(nav, obj, &[]);
             let mut child_path = path.clone();
@@ -444,32 +445,32 @@ impl<'src> Planner<'src> {
         // KV / R2 writes
         self.write_keys(model, obj, tree, &instance)?;
 
-        // Many navs; don't include 1:1 navs because Self::visit already handled them.
-        self.visit_children(model, obj, tree, &instance, false)?;
+        // Many navs, plus child-owned 1:1 navs
+        self.visit_children(model, obj, tree, &instance)?;
 
         Ok(instance)
     }
 
     /// Recurse the navs that are written after `instance`
     /// - `Many` navs per array element
-    /// - when `include_ones`, 1:1 navs too
+    /// - child owned 1:1 navs
     fn visit_children(
         &mut self,
         model: &'src Model<'src>,
         obj: PayloadSubObject<'src>,
         tree: &IncludeTree<'src>,
         instance: &Instance<'src>,
-        include_ones: bool,
     ) -> Result<()> {
         for nav in &model.navigation_fields {
             let one = matches!(nav.cardinality, NavigationCardinality::One);
-            if one && !include_ones {
-                continue;
-            }
 
             let Some((subtree, payload, target)) = self.nav_parts(nav, obj, tree) else {
                 continue;
             };
+            if one && parent_owns_one(nav, target, model) {
+                // Parent-owned, already written before this row in `visit`.
+                continue;
+            }
             let ctx = self.child_ctx(nav, obj, &instance.pks);
 
             let mut nav_path = instance.path.clone();
@@ -707,10 +708,9 @@ impl<'src> Planner<'src> {
             .filter_map(|k| {
                 let source = if let Some((_, src)) = pks.iter().find(|(name, _)| *name == k.local) {
                     src.clone()
-                } else if let Some(v) = obj.and_then(|o| o.get(k.local)) {
-                    PkSource::Payload(v)
                 } else {
-                    return None;
+                    let v = obj.and_then(|o| o.get(k.local))?;
+                    PkSource::Payload(v)
                 };
                 Some((k.target, source))
             })
@@ -931,7 +931,7 @@ impl<'src> RowSql<'_, 'src> {
                 .cols
                 .iter()
                 .filter(|c| !c.is_pk && !matches!(c.value, FinalValue::Skip))
-                .map(|c| format!("{0} = \"excluded\".{0}", quote(c.name)))
+                .map(|c| format!("{0} = excluded.{0}", quote(c.name)))
                 .collect::<Vec<_>>();
 
             if all_pks_resolved && !pk_names.is_empty() && !updates.is_empty() {
@@ -1019,6 +1019,25 @@ impl<'src> RowSql<'_, 'src> {
             result: path.to_vec(),
         }
     }
+}
+
+/// Which side of a `one` nav owns the foreign key (`target_model` is the child model).
+///
+/// - Parent owned: some nav keys `target` is a PK of the child. Write the child first.
+/// - Child owned: no nav keys `target` is a PK of the child. Write the parent first.
+/// - Mixed: some nav keys `target` is a PK of the child, some not. This is treated as parent-owned.
+fn parent_owns_one(nav: &idl::NavigationField, target_model: &Model, parent_model: &Model) -> bool {
+    if parent_model.backing.is_none() {
+        // A backingless parent has no row to hold a FK, so the child must be written first.
+        return false;
+    }
+
+    nav.keys.iter().any(|k| {
+        target_model
+            .primary_columns
+            .iter()
+            .any(|pk| pk.field.name.as_ref() == k.target)
+    })
 }
 
 fn template_segments<'src>(

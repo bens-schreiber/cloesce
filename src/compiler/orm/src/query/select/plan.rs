@@ -70,7 +70,7 @@ pub enum Select<'src> {
     ///
     /// For example:
     /// - sql => `SELECT * FROM users WHERE id = ` `Bind(0)` ` AND name = ` `Bind(1)`
-    /// - arguments => `vec![SqlArgument { Param("id"), .. }, SqlArgument { Param("name"), .. }]`
+    /// - arguments => `vec![SqlArgument::Scalar(Param("id")), SqlArgument::Scalar(Param("name"))]`
     Sql {
         database: Database<'src>,
         sql: Vec<SqlSegment>,
@@ -177,27 +177,33 @@ pub enum SqlSegment {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SqlArgument<'src> {
-    pub value: SelectArg<'src>,
+pub enum SqlArgument<'src> {
+    /// A single-value binding, rendered as one `?`.
+    Scalar(SelectArg<'src>),
 
-    /// Expand to a `(?, ?, ...)` list instead of a single `?`, for use in `IN` clauses.
-    pub spread: bool,
+    /// A binding that spreads its distinct values into a `(?, ?, ...)` list,
+    /// for use in a scalar `IN` clause.
+    Spread(SelectArg<'src>),
+
+    /// A group of args spread together as row-value tuples, deduped on the whole
+    /// tuple and rendered as `(?, ?), (?, ?), ...`, for use in a composite
+    /// `(a, b) IN (VALUES ...)` clause. The tuple width is the group's length.
+    Tuple(Vec<SelectArg<'src>>),
 }
 
 impl<'src> SqlArgument<'src> {
     /// A single-value binding.
     pub fn scalar(value: SelectArg<'src>) -> Self {
-        Self {
-            value,
-            spread: false,
-        }
+        Self::Scalar(value)
     }
 
     /// A binding that spreads its distinct values.
     pub fn spread(value: SelectArg<'src>) -> Self {
-        Self {
-            value,
-            spread: true,
-        }
+        Self::Spread(value)
+    }
+
+    /// A group of args spread together as row-value tuples.
+    pub fn tuple(values: Vec<SelectArg<'src>>) -> Self {
+        Self::Tuple(values)
     }
 }

@@ -260,16 +260,13 @@ class Executor {
     },
   ): Promise<Record<string, unknown>[]> {
     const shardArgs = q.shard.map(([, a]) => arg(a));
-    const spreads = q.arguments.map((sa) => sa.spread);
+    const specs = argSpecs(q.arguments, shardArgs.length);
 
-    // One deduped tuple per distinct (shard values..., argument values...) combination,
+    // One deduped tuple per distinct (shard values..., argument columns...) combination,
     // resolved together in a single owner-table pass. Params bind their constant value; a
     // tuple with any missing value is dropped, so a spread over zero parent values selects
     // nothing.
-    const combined = this.body.tuples(
-      [...shardArgs, ...q.arguments.map((sa) => arg(sa.value))],
-      step.table,
-    );
+    const combined = this.body.tuples([...shardArgs, ...specs.flatMap((s) => s.args)], step.table);
 
     const shardLen = q.shard.length;
 
@@ -290,16 +287,20 @@ class Executor {
       [...groups.values()].map(async (tuples) => {
         const shardTuple = tuples[0].slice(0, shardLen);
 
-        // Within this shard each argument dedupes its own column: a spread keeps every value,
-        // a non-spread argument must resolve to exactly one.
-        const values = q.arguments.map((_, i) => {
-          const column = distinct(tuples.map((t) => t[shardLen + i]));
-          if (!spreads[i] && column.length > 1) {
+        // Within this shard each argument dedupes its own element(s):
+        // - spread keeps every distinct value
+        // - tuple keeps every distinct row-value tuple
+        // - scalar must resolve to exactly one value
+        const values = specs.map((spec) => {
+          const elements = distinctTuples(
+            tuples.map((t) => t.slice(spec.offset, spec.offset + spec.width)),
+          );
+          if (spec.kind === "scalar" && elements.length > 1) {
             throw new InternalError(
-              `select step for table ${step.table} binds a non-spread argument resolving to ${column.length} distinct values`,
+              `select step for table ${step.table} binds a non-spread argument resolving to ${elements.length} distinct values`,
             );
           }
-          return column;
+          return elements;
         });
 
         if (values.some((v) => v.length === 0)) {
@@ -307,7 +308,7 @@ class Executor {
           return [];
         }
 
-        const statements = chunkStatements(q.sql, spreads, values);
+        const statements = chunkStatements(q.sql, specs, values);
         const store = this.storage.sql(q.database, shardTuple);
         const results =
           statements.length === 1
@@ -761,32 +762,66 @@ function keyArgs(shard: [string, SelectArg][], segments: TemplateSegment<SelectA
   return [...shard.map(([, a]) => a), ...templateArgs(segments)].map(arg);
 }
 
+interface ArgSpec {
+  kind: "scalar" | "spread" | "tuple";
+  width: number;
+  args: Arg[];
+  offset: number;
+}
+
+/** Flatten each {@link SqlArgument} into an {@link ArgSpec}, tracking its column offset. */
+function argSpecs(args: SqlArgument[], base: number): ArgSpec[] {
+  const specs: ArgSpec[] = [];
+  let offset = base;
+  for (const a of args) {
+    const [kind, inner] =
+      "Scalar" in a
+        ? (["scalar", [a.Scalar]] as const)
+        : "Spread" in a
+          ? (["spread", [a.Spread]] as const)
+          : (["tuple", a.Tuple] as const);
+    const argList = inner.map(arg);
+    specs.push({ kind, width: argList.length, args: argList, offset });
+    offset += argList.length;
+  }
+  return specs;
+}
+
 /**
  * Render a SQL statement's segments into concrete `(sql, bindings)` chunks. Every chunk
- * stays within {@link MAX_BOUND_PARAMETERS}: fixed args are re-bound in each, and spread
- * values split the remaining budget evenly. Multiple spreads chunk as a cross product so
- * every value combination is covered exactly once.
+ * stays within {@link MAX_BOUND_PARAMETERS}.
+ * - fixed (scalar) args are re-bound in each
+ * - spreadable args (scalar-spread and tuple) split the remaining budget evenly
+ * - Multiple spreadable args chunk as a cross product so every combination is covered exactly once.
  *
- * A {@link SqlSegment.Bind} renders as one `?` per bound value; a spread argument expands
- * to its chunk's `?, ?, ...` list.
+ * A {@link SqlSegment.Bind} renders its argument's chunk
+ * - scalar/spread as a `?, ?, ...` list (one `?` per value)
+ * - width-`W` tuple as a `(?, ...W), (?, ...W), ...` list (one parenthesized group per element)
+ * - tuple element consumes `W` bound parameters, so its per-chunk element budget is `floor(budget / W)`.
  *
  * For example, `SELECT * FROM t WHERE a IN (Bind 0) AND b IN (Bind 1)`
  * with arg 0 spread over `[1, 2...100]` and arg 1 spread over `[101, 102, 103]` produces:
  * ```
- * { sql: "... a IN (?, ?, ... 50) AND b IN (?, ?, ?)", bindings: [1..50, 101, 102, 103] }
- * { sql: "... a IN (?, ?, ... 50) AND b IN (?, ?, ?)", bindings: [51..100, 101, 102, 103] }
+ * { sql: "... (a, b) IN ((?, ?), (?, ?), ...)", bindings: [1..50, 101, 102, 103] }
+ * { sql: "... (a, b) IN ((?, ?), (?, ?), ...)", bindings: [51..100, 101, 102, 103] }
  * ```
  */
 function chunkStatements(
   sql: SqlSegment[],
-  spreads: boolean[],
-  values: unknown[][],
+  specs: ArgSpec[],
+  values: unknown[][][],
 ): { sql: string; bindings: unknown[] }[] {
-  const fixedCount = spreads.filter((s) => !s).length;
-  const spreadCount = spreads.length - fixedCount;
-  const size = Math.max(1, Math.floor((MAX_BOUND_PARAMETERS - fixedCount) / (spreadCount || 1)));
+  // Scalars re-bind one param per chunk; each spreadable arg divides the remaining budget.
+  const fixedCount = specs.filter((s) => s.kind === "scalar").length;
+  const spreadCount = specs.length - fixedCount;
+  const budget = Math.max(1, Math.floor((MAX_BOUND_PARAMETERS - fixedCount) / (spreadCount || 1)));
 
-  const perArgChunks = values.map((vals, i) => (spreads[i] ? chunk(vals, size) : [vals]));
+  // Chunk each spreadable arg by its per-element param cost; a scalar stays whole.
+  const perArgChunks = values.map((elements, i) =>
+    specs[i].kind === "scalar"
+      ? [elements]
+      : chunk(elements, Math.max(1, Math.floor(budget / specs[i].width))),
+  );
 
   // Each chunk is a cross prod of the per-arg chunks.
   return cartesian(perArgChunks).map((chunks) => render(sql, chunks));
@@ -794,7 +829,7 @@ function chunkStatements(
   /** Join segments into SQL, binding each `Bind` to its argument's chunk (in `?` order). */
   function render(
     segments: SqlSegment[],
-    chunks: unknown[][],
+    chunks: unknown[][][],
   ): { sql: string; bindings: unknown[] } {
     const bindings: unknown[] = [];
     const text = segments
@@ -802,9 +837,15 @@ function chunkStatements(
         if ("Literal" in seg) {
           return seg.Literal;
         }
-        const vals = chunks[seg.Bind];
-        bindings.push(...vals);
-        return Array(vals.length).fill("?").join(", ");
+        const elements = chunks[seg.Bind];
+        const tuple = specs[seg.Bind].kind === "tuple";
+        return elements
+          .map((element) => {
+            bindings.push(...element);
+            const holes = Array(element.length).fill("?").join(", ");
+            return tuple ? `(${holes})` : holes;
+          })
+          .join(", ");
       })
       .join("");
     return { sql: text, bindings };
@@ -818,10 +859,13 @@ function chunkStatements(
   }
 }
 
-/** Order-preserving distinct over raw scalar identity. */
-function distinct(values: unknown[]): unknown[] {
-  const seen = new Set<unknown>();
-  return values.filter((v) => (seen.has(v) ? false : (seen.add(v), true)));
+/** Order-preserving distinct over whole-tuple (JSON) identity. */
+function distinctTuples(tuples: unknown[][]): unknown[][] {
+  const seen = new Set<string>();
+  return tuples.filter((t) => {
+    const key = JSON.stringify(t);
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
 }
 
 function arg(raw: SelectArg): Arg {
@@ -845,7 +889,11 @@ function bucketParents(
 ): (row: Record<string, unknown>) => number[] {
   const push = <K>(buckets: Map<K, number[]>, k: K, i: number) => {
     const bucket = buckets.get(k);
-    bucket ? bucket.push(i) : buckets.set(k, [i]);
+    if (bucket) {
+      bucket.push(i);
+    } else {
+      buckets.set(k, [i]);
+    }
   };
 
   if (join.length === 1) {

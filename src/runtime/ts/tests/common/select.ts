@@ -7,6 +7,7 @@ import type {
   Select,
   SelectArg,
   SelectPlan,
+  SqlArgument,
   SqlSegment,
   TableDef,
   TemplateSegment,
@@ -22,7 +23,11 @@ export function mapping(cardinality: MapCardinality, join: Mapping["join"] = [])
   };
 }
 
-export type RawArg = { Param: string } | { Field: string[] } | { ScalarField: string[] };
+export type RawArg =
+  | { Param: string }
+  | { Field: string[] }
+  | { ScalarField: string[] }
+  | { Tuple: RawArg[] };
 export function param(name: string): RawArg {
   return { Param: name };
 }
@@ -31,6 +36,10 @@ export function spread(...path: string[]): RawArg {
 }
 export function scalarField(...path: string[]): RawArg {
   return { ScalarField: path };
+}
+
+export function tuple(...args: RawArg[]): RawArg {
+  return { Tuple: args };
 }
 
 export type RawQuery =
@@ -101,8 +110,18 @@ export function selectPlan(...stages: RawStep[][]): SelectPlan {
     if ("Param" in a) {
       return { Param: a.Param };
     }
+    if ("Tuple" in a) {
+      throw new Error("a Tuple arg is only valid as a SQL argument");
+    }
     const path = "Field" in a ? a.Field : a.ScalarField;
     return { Field: { table: tableOf(path.slice(0, -1)), field: path[path.length - 1] } };
+  };
+  const resolveSqlArg = (a: RawArg): SqlArgument => {
+    if ("Tuple" in a) {
+      return { Tuple: a.Tuple.map(resolveArg) };
+    }
+    // A spread `Field` arg drives an `IN` list; a `Param` or `ScalarField` binds one value.
+    return "Field" in a ? { Spread: resolveArg(a) } : { Scalar: resolveArg(a) };
   };
   const resolvePairs = (pairs: [string, RawArg][]): [string, SelectArg][] =>
     pairs.map(([f, a]) => [f, resolveArg(a)]);
@@ -113,7 +132,7 @@ export function selectPlan(...stages: RawStep[][]): SelectPlan {
         Sql: {
           database: q.Sql.database,
           sql: sqlSegments(q.Sql.sql),
-          arguments: q.Sql.arguments.map((a) => ({ value: resolveArg(a), spread: "Field" in a })),
+          arguments: q.Sql.arguments.map(resolveSqlArg),
           mapping: q.Sql.mapping,
           shard: resolvePairs(q.Sql.shard),
           route_fields: resolvePairs(q.Sql.route_fields),

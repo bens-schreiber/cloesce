@@ -371,10 +371,10 @@ mod select {
                     let _ = write!(head, "\n{}", join_clause(&mapping.join));
                 }
                 if !shard.is_empty() {
-                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, &arg).trim_start());
+                    let _ = write!(head, "\n{}", fmt::shard_clause(shard, arg).trim_start());
                 }
                 if !route_fields.is_empty() {
-                    let _ = write!(head, "\n{}", attach_clause(route_fields, &arg));
+                    let _ = write!(head, "\n{}", attach_clause(route_fields, arg));
                 }
                 Node::leaf(head)
             }
@@ -385,13 +385,13 @@ mod select {
             } => Node::leaf(format!(
                 "READ {} KEY {} INTO `{}`{}",
                 fmt::database(db),
-                fmt::key_template(key, &arg),
+                fmt::key_template(key, arg),
                 str_path(&path),
-                fmt::shard_clause(shard, &arg)
+                fmt::shard_clause(shard, arg)
             )),
             Select::Synthesize { fields, .. } => Node {
                 text: format!("SYNTHESIZE INTO `{}`", str_path(&path)),
-                children: fmt::synth_fields(fields, &arg),
+                children: fmt::synth_fields(fields, arg),
             },
         }
     }

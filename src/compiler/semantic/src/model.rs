@@ -612,7 +612,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         };
 
         self.navigation_fields.push(NavigationField {
-            hash: 0,
             field: Field {
                 name: field.name.into(),
                 cidl_type,

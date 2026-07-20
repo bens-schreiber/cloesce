@@ -3,9 +3,44 @@ mod common;
 use common::setup::{MockStorage, tree};
 use compiler_test::src_to_idl;
 use idl::CloesceIdl;
-use orm::query::select::{plan::SelectPlan, planner::SelectOperation};
+use orm::query::select::{
+    plan::{Select, SelectPlan, SqlArgument, SqlSegment},
+    planner::SelectOperation,
+};
 
 use serde_json::{Value, json};
+
+/// Find the SQL step hydrating the nav `field`, returning its `(sql, arguments)`.
+fn sql_step<'p>(
+    plan: &'p SelectPlan<'p>,
+    field: &str,
+) -> (&'p [SqlSegment], &'p [SqlArgument<'p>]) {
+    let table = plan
+        .tables
+        .iter()
+        .position(|t| t.parent.as_ref().is_some_and(|p| p.field == field))
+        .expect("nav table to exist");
+    plan.stages
+        .iter()
+        .flat_map(|s| &s.steps)
+        .find_map(|step| match &step.query {
+            Select::Sql { sql, arguments, .. } if step.table == table => {
+                Some((sql.as_slice(), arguments.as_slice()))
+            }
+            _ => None,
+        })
+        .expect("nav sql step to exist")
+}
+
+/// Concatenate a statement's literal segments (binds render as `<?>`).
+fn sql_literals(sql: &[SqlSegment]) -> String {
+    sql.iter()
+        .map(|seg| match seg {
+            SqlSegment::Literal(text) => text.as_str(),
+            SqlSegment::Bind(_) => "<?>",
+        })
+        .collect()
+}
 
 async fn seed(
     idl: &CloesceIdl<'_>,
@@ -846,6 +881,95 @@ async fn composite_pk_spider_nav() {
         plan.stages.len(),
         1,
         "`lines` relies on `Order::region` and `Order::num` which are given"
+    );
+}
+
+#[sqlx::test]
+async fn composite_fk_nav_emits_row_value_in() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Student for db {
+            primary {
+                id: int
+                name: string
+            }
+            many StudentCourse::{studentId(id), studentName(name)} { enrollments }
+        }
+
+        model StudentCourse for db {
+            primary { id: int }
+            column { studentId: int }
+            column { studentName: string }
+            one Student::{id(studentId), name(studentName)} { student }
+        }
+        "#,
+    );
+
+    // Act
+    let plan = orm::query::select::planner::plan(
+        SelectOperation::List,
+        "StudentCourse",
+        &idl,
+        &tree(json!({ "student": {} })),
+    );
+
+    // Assert
+    let (sql, arguments) = sql_step(&plan, "student");
+    let literal = sql_literals(sql);
+    assert!(
+        literal.contains(r#"("id", "name") IN (VALUES "#),
+        "composite nav should emit a row-value `(...) IN (VALUES ...)`, got: {literal}"
+    );
+    assert!(
+        !literal.contains(r#""id" IN ("#) && !literal.contains(r#""name" IN ("#),
+        "composite nav must not emit per-column scalar `IN`s, got: {literal}"
+    );
+    assert!(
+        matches!(arguments, [SqlArgument::Tuple(group)] if group.len() == 2),
+        "composite nav should bind a single width-2 tuple argument, got: {arguments:?}"
+    );
+}
+
+#[sqlx::test]
+async fn single_key_nav_keeps_scalar_in() {
+    // Arrange: a single-key FK nav should be untouched by the composite change.
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Owner for db {
+            primary { id: int }
+            many Pet::ownerId(id) { pets }
+        }
+
+        model Pet for db {
+            primary { id: int }
+            column { ownerId: int }
+        }
+        "#,
+    );
+
+    // Act
+    let plan = orm::query::select::planner::plan(
+        SelectOperation::List,
+        "Owner",
+        &idl,
+        &tree(json!({ "pets": {} })),
+    );
+
+    // Assert: the single-key nav keeps the scalar `"ownerId" IN (...)` form and a Spread arg.
+    let (sql, arguments) = sql_step(&plan, "pets");
+    let literal = sql_literals(sql);
+    assert!(
+        literal.contains(r#""ownerId" IN ("#) && !literal.contains("VALUES"),
+        "single-key nav should keep the scalar `IN` form, got: {literal}"
+    );
+    assert!(
+        matches!(arguments, [SqlArgument::Spread(_)]),
+        "single-key nav should bind one spread argument, got: {arguments:?}"
     );
 }
 

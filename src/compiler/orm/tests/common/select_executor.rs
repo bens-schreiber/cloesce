@@ -123,29 +123,49 @@ impl<'p> Context<'p> {
         shard: &[(&'p str, SelectArg<'p>)],
         route_fields: &[(&'p str, SelectArg<'p>)],
     ) -> Vec<JsonValue> {
-        // Each argument contributes its bound values: a spread expands to its distinct
-        // values, a non-spread argument binds exactly one. A spread over zero parent
-        // values selects nothing.
-        let values = arguments
+        let rows = arguments
             .iter()
-            .map(|a| match a.spread {
-                true => self.spread(&a.value),
-                false => vec![self.single(&a.value)],
+            .map(|a| match a {
+                SqlArgument::Scalar(value) => vec![vec![self.single(value)]],
+                SqlArgument::Spread(value) => {
+                    self.spread(value).into_iter().map(|v| vec![v]).collect()
+                }
+                SqlArgument::Tuple(group) => {
+                    let refs = group.iter().collect::<Vec<_>>();
+                    self.tuples(&refs)
+                }
             })
             .collect::<Vec<_>>();
-        if values.iter().any(Vec::is_empty) {
+        if rows.iter().any(Vec::is_empty) {
             return Vec::new();
         }
 
+        // A scalar/spread renders as `?N, ?N, ...` (one slot per row); a tuple renders as
+        // `(?N, ?N), (?N, ?N), ...` (one parenthesized group per row).
         let mut slots = 1..;
-        let expansions = values
+        let expansions = arguments
             .iter()
-            .map(|group| {
-                let slots = slots.by_ref().take(group.len()).map(|i| format!("?{i}"));
-                slots.collect::<Vec<_>>().join(", ")
+            .zip(&rows)
+            .map(|(a, arg_rows)| {
+                let tuple = matches!(a, SqlArgument::Tuple(_));
+                arg_rows
+                    .iter()
+                    .map(|row| {
+                        let group = row
+                            .iter()
+                            .map(|_| format!("?{}", slots.next().unwrap()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        match tuple {
+                            true => format!("({group})"),
+                            false => group,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
             })
             .collect::<Vec<_>>();
-        let binds = values.into_iter().flatten().collect::<Vec<_>>();
+        let binds = rows.into_iter().flatten().flatten().collect::<Vec<_>>();
         let sql = build_sql(sql, &expansions);
 
         // Param route fields are constant across shards; `Field` route fields

@@ -178,7 +178,7 @@ async fn save_one_to_one_same_db() {
     assert_eq!(stmts.len(), 6);
     assert_eq!(
         write_sql(&stmts[2]),
-        r#"INSERT INTO "Person" ("dogId", "id") VALUES ((SELECT json_extract("primary_key", '$.id') FROM "$cloesce_tmp" WHERE "path" = 'dog'), ?1) ON CONFLICT ("id") DO UPDATE SET "dogId" = "excluded"."dogId""#,
+        r#"INSERT INTO "Person" ("dogId", "id") VALUES ((SELECT json_extract("primary_key", '$.id') FROM "$cloesce_tmp" WHERE "path" = 'dog'), ?1) ON CONFLICT ("id") DO UPDATE SET "dogId" = excluded."dogId""#,
         "person's dogId is the dog's generated id (target column `id`) via the in-batch tmp subquery"
     );
 
@@ -270,7 +270,7 @@ async fn save_composite_pk() {
     assert_eq!(stmts.len(), 2, "insert + hydrate, no tmp");
     assert_eq!(
         write_sql(&stmts[0]),
-        r#"INSERT INTO "Enrollment" ("grade", "studentId", "courseId") VALUES (?1, ?2, ?3) ON CONFLICT ("studentId", "courseId") DO UPDATE SET "grade" = "excluded"."grade""#
+        r#"INSERT INTO "Enrollment" ("grade", "studentId", "courseId") VALUES (?1, ?2, ?3) ON CONFLICT ("studentId", "courseId") DO UPDATE SET "grade" = excluded."grade""#
     );
     assert_eq!(body, json!({ "studentId": 1, "courseId": 2, "grade": "A" }));
 }
@@ -1337,6 +1337,61 @@ async fn save_reversed_one_nav() {
         body,
         json!({ "id": 1, "pet": { "id": 10, "ownerId": 1 } }),
         "the pet's `ownerId` FK is filled from the owner's provided PK"
+    );
+}
+
+#[sqlx::test]
+async fn save_reversed_one_nav_auto_increment_parent() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Owner for db {
+            primary { id: int }
+            one Pet::ownerId(id) { pet }
+        }
+
+        model Pet for db {
+            primary { id: int }
+            column { ownerId: int }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (plan, body) = save_ok(
+        &idl,
+        "Owner",
+        json!({ "pet": {} }),
+        json!({ "pet": { "id": 10 } }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    let stmts = batches(&plan, 0, 0);
+    assert_eq!(
+        write_sql(&stmts[0]),
+        r#"INSERT INTO "Owner" DEFAULT VALUES"#,
+        "the owner row is written first (auto-increment PK)"
+    );
+    assert_eq!(
+        write_sql(&stmts[1]),
+        r#"INSERT OR REPLACE INTO "$cloesce_tmp" ("path", "primary_key") VALUES ('', json_object('id', last_insert_rowid()))"#,
+        "the owner's generated PK is captured to the tmp table"
+    );
+    assert_eq!(
+        write_sql(&stmts[2]),
+        r#"INSERT INTO "Pet" ("ownerId", "id") VALUES ((SELECT json_extract("primary_key", '$.id') FROM "$cloesce_tmp" WHERE "path" = ''), ?1) ON CONFLICT ("id") DO UPDATE SET "ownerId" = excluded."ownerId""#,
+        "the pet's ownerId FK is finalized from the owner's generated PK, in the same batch",
+    );
+
+    assert_eq!(
+        body,
+        json!({ "id": 1, "pet": { "id": 10, "ownerId": 1 } }),
+        "the pet's `ownerId` FK is filled from the owner's generated PK"
     );
 }
 

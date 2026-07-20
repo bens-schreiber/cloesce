@@ -395,29 +395,43 @@ fn select_navs<'src>(
             .map(|k| (k.target, params.arg(parent_table, k.local)))
             .collect();
 
-        // Remaining (non-shard, non-route) keys become `target IN (?N)` predicates.
+        // Remaining (non-shard, non-route) keys drive the nav's `IN` predicate.
         let sql_keys = nav
             .keys
             .iter()
             .filter(|k| !is_shard(k.target) && !is_route(k.target))
             .collect::<Vec<_>>();
-        let predicates = sql_keys
-            .iter()
-            .enumerate()
-            .map(|(i, k)| {
-                vec![
-                    SqlSegment::Literal(format!("\"{}\" IN (", k.target)),
-                    SqlSegment::Bind(i),
-                    SqlSegment::Literal(")".into()),
-                ]
-            })
-            .collect::<Vec<_>>();
 
-        // Each nav predicate spreads the distinct parent values into an `IN (?, ?, ...)` list.
-        let arguments = sql_keys
-            .iter()
-            .map(|k| SqlArgument::spread(params.arg(parent_table, k.local)))
-            .collect();
+        // - A single key spreads its distinct values into a scalar `"a" IN (?, ?, ...)`
+        // - multiple keys spread together as row-value tuples in `("a", "b") IN (VALUES (?, ?), ...)`
+        let (predicates, arguments) = if let [k] = sql_keys.as_slice() {
+            let predicate = vec![
+                SqlSegment::Literal(format!("\"{}\" IN (", k.target)),
+                SqlSegment::Bind(0),
+                SqlSegment::Literal(")".into()),
+            ];
+            let arguments = vec![SqlArgument::spread(params.arg(parent_table, k.local))];
+            (vec![predicate], arguments)
+        } else if sql_keys.is_empty() {
+            (vec![], vec![])
+        } else {
+            let cols = sql_keys
+                .iter()
+                .map(|k| format!("\"{}\"", k.target))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let predicate = vec![
+                SqlSegment::Literal(format!("({cols}) IN (VALUES ")),
+                SqlSegment::Bind(0),
+                SqlSegment::Literal(")".into()),
+            ];
+            let group = sql_keys
+                .iter()
+                .map(|k| params.arg(parent_table, k.local))
+                .collect();
+            let arguments = vec![SqlArgument::tuple(group)];
+            (vec![predicate], arguments)
+        };
 
         let join = nav
             .keys
