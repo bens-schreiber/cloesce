@@ -1,24 +1,27 @@
-import * as clo from "@cloesce/backend.js";
-import { HttpResult } from "cloesce";
+import { type Api, HttpResult } from "@cloesce/backend.js";
 import { auth } from "./auth.js";
-import { User } from "./user.js";
 
-export const SubReddit = clo.SubReddit.impl({
+export default {
   async create(env, title, description) {
     const username = auth(env);
-    if (username instanceof HttpResult) return username;
+    if (username instanceof HttpResult) {
+      return username;
+    }
 
-    const sub = await this.Default.save(env, { title, description, posts: [] });
-    const id = sub.data!.id;
+    const sub = await env.subRedditDb.subReddit.save({ title, description, posts: [] });
+    if (!sub.ok) {
+      return sub;
+    }
 
-    await User.Default.save(env, username, { authoredSubReddits: [{ subRedditId: id }] });
+    await env.userDo.user.save(username, {
+      authoredSubReddits: [{ subRedditId: sub.data!.id }],
+    });
 
-    return { id, title, description, lastPostId: 0, posts: [] };
+    return sub.data!;
   },
 
   async feed(self, env) {
-    // Hydrate all posts on this subreddit
-    const hydrated = await this.Orm.hydrate(env, self, {
+    const full = await env.subRedditDb.subReddit.load(self, {
       posts: {
         post: {
           meta: {},
@@ -26,6 +29,6 @@ export const SubReddit = clo.SubReddit.impl({
         },
       },
     });
-    return hydrated.value?.posts.map((p) => p.post) ?? [];
+    return full.data?.posts.map((p) => p.post) ?? [];
   },
-});
+} satisfies Api.SubReddit.Of;

@@ -1,8 +1,8 @@
 import { HttpResult } from "cloesce";
-import * as clo from "./backend.js";
+import { createApp, Worker, Validator, type Api, type CfEnv } from "./backend.js";
 
-export const Validator = clo.Validator.impl({
-  someMethod(self, id, name): HttpResult<void> {
+const validator: Api.Validator.Of = {
+  someMethod(_self, id, name) {
     if (id >= 100) {
       return HttpResult.fail(500, "ID must be less than 100");
     }
@@ -13,12 +13,10 @@ export const Validator = clo.Validator.impl({
 
     return HttpResult.ok(200);
   },
-});
+};
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(Validator);
-    return await app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker).register(Validator, validator).run(request);
   },
 };

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { beforeAll, inject } from "vitest";
 import * as clo from "../.cloesce/backend.js";
+import * as api from "@api/main.js";
 
 declare module "vitest" {
   interface ProvidedContext {
@@ -15,14 +16,12 @@ declare global {
   }
 }
 
+export const app = api.app(env);
+
 beforeAll(async () => {
   const migrations = inject("migrations");
   await applyD1Migrations(env.db, migrations);
-  await clo.cloesce(env).forceLoad();
+  await app.forceLoad();
 });
-
-export function upgraded() {
-  return clo.upgradeEnv(env);
-}
 
 export { env };

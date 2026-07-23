@@ -1,11 +1,11 @@
-import * as clo from "@cloesce/backend.js";
+import { Api, CfEnv, createApp, Worker, Weather, WeatherReport } from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
 
-export const WeatherReport = clo.WeatherReport.impl({});
+const weatherReport: Api.WeatherReport.Of = {};
 
-export const Weather = clo.Weather.impl({
+const weather: Api.Weather.Of = {
   async uploadPhoto(self, env, stream) {
-    await env.Bucket.photos.put(self.id, stream);
+    await env.bucket.photos.put(self.id, stream);
   },
 
   downloadPhoto(self) {
@@ -14,7 +14,7 @@ export const Weather = clo.Weather.impl({
     }
     return HttpResult.ok(200, self.photo.body);
   },
-});
+};
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -22,16 +22,18 @@ const cors = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+// Exported for use in tests.
+export const app = (env: CfEnv) => {
+  return createApp(env, Worker).register(Weather, weather).register(WeatherReport, weatherReport);
+};
+
 export default {
-  async fetch(request: Request, env: clo.Env): Promise<Response> {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: cors });
     }
 
-    const app = clo.cloesce(env);
-    app.register(Weather, WeatherReport);
-
-    const result = await app.run(request);
+    const result = await app(env).run(request);
 
     for (const [key, value] of Object.entries(cors)) {
       result.headers.set(key, value);

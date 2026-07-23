@@ -1,16 +1,17 @@
 import { describe, test, expect } from "vitest";
-import { Weather, WeatherReport } from "@api/main.js";
-import { upgraded } from "./setup.js";
+import { app } from "./setup.js";
 
-// This does not use any client stubs; it interacts directly with the bound D1/R2 instances.
+// This test does not use any client stubs, but instead directly calls
+// backend methods.
 describe("Cloudflare Workers Integration Tests", () => {
   test("Download a thumbnail", async () => {
     // Arrange
-    const env = upgraded();
+    const env = app.env;
+    const weather = env.db.weather;
     const testData = "test-data";
 
     const report = (
-      await WeatherReport.Orm.save(env, {
+      await env.db.weatherReport.save({
         title: "Test Report",
         description: "This is a test weather report.",
         weatherEntries: [
@@ -22,13 +23,13 @@ describe("Cloudflare Workers Integration Tests", () => {
           },
         ],
       })
-    ).value!;
+    ).data!;
 
-    await Weather.uploadPhoto(report.weatherEntries[0], env, testData as any);
+    await weather.uploadPhoto(report.weatherEntries[0], testData as any);
 
     // Act
-    const weatherEntries = (await Weather.Default.list(env, 0, 100)).data!;
-    const photo = Weather.downloadPhoto(weatherEntries[0]);
+    const weatherEntries = (await weather.list(0, 100)).data!;
+    const photo = await weather.downloadPhoto(weatherEntries[0]);
 
     // Assert
     expect(photo.ok).toBe(true);

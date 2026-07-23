@@ -1,20 +1,17 @@
-import { cloesce, Dog, CfEnv } from "./backend.js";
-import { HttpResult, DeepPartial } from "cloesce";
+import { createApp, Worker, Dog, type Api, type CfEnv } from "./backend.js";
 
-export const DogImpl = Dog.impl({
-  async create(env: CfEnv, dog: DeepPartial<Dog.Self>): Promise<Dog.Self> {
-    return (await this.Orm.save(env, dog)).value!;
+const dog: Api.Dog.Of = {
+  create(env, model) {
+    return env.db.dog.save(model);
   },
 
-  getPartialSelf(self: Dog.Self) {
-    return HttpResult.ok<DeepPartial<Dog.Self>>(200, { name: self.name });
+  getPartialSelf(self) {
+    return { name: self.name };
   },
-});
+};
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(DogImpl);
-    return await app.run(request);
+    return createApp(env, Worker).register(Dog, dog).run(request);
   },
 };

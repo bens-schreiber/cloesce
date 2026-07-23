@@ -1,14 +1,11 @@
-use idl::{CidlType, CloesceIdl, IncludeTree, MediaType};
+use idl::{CidlType, MediaType};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
-    fn cidl_type(&self, ty: &CidlType, idl: &CloesceIdl) -> String;
+    fn cidl_type(&self, ty: &CidlType) -> String;
 
     /// Maps a [MediaType] to a type in the target language
     fn media_type(&self, ty: &MediaType) -> String;
-
-    /// The type an injected `name` resolves to in a method's `env`.
-    fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String;
 
     /// Converts a format string to the target languages string interpolation syntax,
     /// using the provided parameter names to identify placeholders.
@@ -17,12 +14,6 @@ pub trait LanguageTypeMapper {
         format: &str,
         param_names: impl Iterator<Item = &'src str>,
     ) -> String;
-
-    /// Converts an [IncludeTree] to a string representation in the target language
-    fn include_tree(&self, tree: &IncludeTree) -> String;
-
-    /// Converts a precompiled query plan to a literal expression in the target language.
-    fn query_plan(&self, plan: Option<&serde_json::Value>) -> String;
 
     /// Renders `text` as the body lines of a doc comment, each prefixed with `indent`
     /// and safe against terminating the comment early.
@@ -51,21 +42,9 @@ impl TypeScriptMapper {
             kind: TypeScriptMapperKind::ClientApi,
         }
     }
-
-    fn namespace(&self, idl: &CloesceIdl, name: &str) -> String {
-        if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
-            return name.to_string();
-        }
-
-        if idl.models.contains_key(name) {
-            format!("{name}.Self")
-        } else {
-            name.to_string()
-        }
-    }
 }
 impl LanguageTypeMapper for TypeScriptMapper {
-    fn cidl_type(&self, ty: &CidlType, idl: &CloesceIdl) -> String {
+    fn cidl_type(&self, ty: &CidlType) -> String {
         match ty {
             CidlType::Json => "unknown".to_string(),
             CidlType::Int | CidlType::Real => "number".to_string(),
@@ -73,18 +52,18 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::Boolean => "boolean".to_string(),
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
-            CidlType::Object { name, .. } => self.namespace(idl, name),
-            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner, idl)),
-            CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner, idl)),
+            CidlType::Object { name, .. } => name.to_string(),
+            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner)),
+            CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner)),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {
-                format!("DeepPartial<{}>", self.namespace(idl, object_name))
+                format!("DeepPartial<{}>", object_name)
             }
             CidlType::Stream => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "ReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
-            CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner, idl)),
+            CidlType::KvObject(inner) => format!("KValue<{}>", self.cidl_type(inner)),
             CidlType::R2Object => match self.kind {
                 TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
                 TypeScriptMapperKind::ClientApi => "R2Object".to_string(),
@@ -99,14 +78,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn inject_type(&self, idl: &CloesceIdl, name: &str) -> String {
-        if idl.injects.contains(&name) {
-            name.to_string()
-        } else {
-            format!("Env.{name}")
-        }
-    }
-
     fn interpolate_format<'src>(
         &self,
         format: &str,
@@ -116,14 +87,6 @@ impl LanguageTypeMapper for TypeScriptMapper {
             acc.replace(&format!("{{{name}}}"), &format!("${{{name}}}"))
         });
         format!("`{result}`")
-    }
-
-    fn include_tree(&self, tree: &IncludeTree) -> String {
-        serde_json::to_string(&tree).unwrap()
-    }
-
-    fn query_plan(&self, plan: Option<&serde_json::Value>) -> String {
-        plan.map_or_else(|| "null".to_string(), |p| serde_json::to_string(p).unwrap())
     }
 
     fn doc_block(&self, text: &str, indent: &str) -> String {

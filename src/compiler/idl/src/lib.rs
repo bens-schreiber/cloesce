@@ -304,7 +304,7 @@ pub struct DataSource<'src> {
     #[serde(borrow)]
     pub name: &'src str,
 
-    #[serde(skip)]
+    #[serde(borrow)]
     pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
@@ -349,7 +349,7 @@ pub struct KvField<'src> {
 
     /// When [Self::binding] is a Durable Object, the model's local fields that supply the
     /// DO's shard discriminators, in shard-declaration order.
-    #[serde(borrow, default)]
+    #[serde(borrow)]
     pub shard_fields: Vec<&'src str>,
 }
 
@@ -466,7 +466,7 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub navigation_fields: Vec<NavigationField<'src>>,
 
-    #[serde(borrow, default)]
+    #[serde(borrow)]
     pub route_fields: Vec<ValidatedField<'src>>,
 
     #[serde(borrow)]
@@ -590,7 +590,7 @@ pub struct WranglerEnv<'src> {
     #[serde(borrow)]
     pub r2_bindings: Vec<Binding<'src>>,
 
-    #[serde(borrow, default)]
+    #[serde(borrow)]
     pub durable_bindings: Vec<DurableBinding<'src>>,
 
     #[serde(borrow)]

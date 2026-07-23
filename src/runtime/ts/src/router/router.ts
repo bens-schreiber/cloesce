@@ -1,23 +1,16 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import {
-  Cidl,
-  Model,
-  ApiMethod,
-  DataSource,
-  DurableTarget,
-  Field,
-  ENV_DURABLE_TARGET_KEY,
-} from "../cidl.js";
+import { Cidl, Model, ApiMethod, DataSource, Field, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
+import { sourceStore } from "../app/store.js";
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
 
 /**
  * @internal
  * Singleton instance containing the CIDL and and wasm binary.
- * These values are guaranteed to never change throughout a workers lifetime.
+ * These values are guaranteed to never change throughout a Workers lifetime.
  */
 export class RuntimeContainer {
   private static instance: RuntimeContainer | undefined;
@@ -50,39 +43,11 @@ export class RuntimeContainer {
   }
 }
 
-type DependencyKey = { tag: string };
-
-/**
- * Dependency injection container, mapping an object type name to an instance of that object.
- *
- * Comes with the Wrangler environment pre-injected
- */
-class DependencyContainer {
-  private container = new Map<string, any>();
-
-  set<T>(key: DependencyKey, instance: T) {
-    if (this.container.has(key.tag)) {
-      console.warn(
-        `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
-      );
-    }
-    this.container.set(key.tag, instance);
-  }
-
-  get<T>(key: DependencyKey): T | undefined {
-    return this.container.get(key.tag);
-  }
-
-  has(key: DependencyKey): boolean {
-    return this.container.has(key.tag);
-  }
-}
-
 /**
  * Given a request, this represents a map of each body / url  param name to
  * its actual value. Unknown, as the a request can be anything.
  */
-type RequestParamMap = Record<string, unknown>;
+type RequestParams = Record<string, unknown>;
 
 /**
  * States in which the router may exit.
@@ -102,141 +67,114 @@ enum RouterError {
   UncaughtException,
 }
 
-export class CloesceApp {
-  /**
-   * @internal
-   */
-  public constructor(
-    private readonly idl: Cidl,
-    private readonly workerUrl: string,
-    private readonly env: any,
-    private readonly durableContext: unknown | undefined,
-  ) {}
+/**
+ * @internal
+ * Runs the Cloesce router pipeline for one request: route match, validation,
+ * self hydration, and method dispatch.
+ *
+ * @param registry Maps a model name to its registered implementation module
+ *   (route consts + custom / override data-source consts).
+ */
+export async function router(
+  request: Request,
+  idl: Cidl,
+  workerUrl: string,
+  env: any,
+  registry: Map<string, any>,
+  durableContext: unknown,
+): Promise<Response> {
+  await RuntimeContainer.init(idl);
 
-  /**
-   * Maps a model name to its registered namespace object: API method impls,
-   * data source impls (under their DS name), and injected dependencies all live here.
-   */
-  private modelRegistry: Map<string, unknown> = new Map();
+  try {
+    const result = await route(request, idl, workerUrl, env, registry, durableContext);
 
-  /**
-   * Register a model namespace (produced by `Model.impl({...})`) or an injected
-   * dependency with the router, making API methods, data source stubs, and
-   * injections available for routing.
-   */
-  public register(...models: Array<{ readonly tag: string }>): this {
-    for (const model of models) {
-      this.modelRegistry.set(model.tag, model);
-    }
-    return this;
-  }
-
-  private async router(
-    request: Request,
-    di: DependencyContainer,
-    workerUrl: string,
-  ): Promise<HttpResult<unknown> | Response> {
-    const { wasm } = RuntimeContainer.get();
-
-    // Inject all injectables
-    for (const inject of this.idl.injects) {
-      if (this.modelRegistry.has(inject)) {
-        di.set({ tag: inject }, this.modelRegistry.get(inject) ?? undefined);
-      }
-    }
-
-    // Route match
-    const routeRes = matchRoute(request, this.idl, workerUrl, this.modelRegistry);
-    if (routeRes.isLeft()) {
-      return routeRes.value;
-    }
-    const route = routeRes.unwrap();
-    const forwardRequest = route.forward ? request.clone() : undefined;
-
-    // Request validation
-    const validation = await validateRequest(request, wasm, this.idl, this.env, route);
-    if (validation.isLeft()) {
-      return validation.value;
-    }
-    const params = validation.unwrap();
-
-    // Forwarding
-    if (forwardRequest) {
-      return await forward(route, this.env, params, forwardRequest);
-    }
-
-    // Hydration
-    const hydrated = await hydrate(this.modelRegistry, di, route, this.env, this.durableContext);
-    if (hydrated?.isLeft()) {
-      return hydrated.value;
-    }
-
-    // Method dispatch
-    return await methodDispatch(
-      hydrated?.unwrap(),
-      di,
-      route,
-      params,
-      this.env,
-      this.durableContext,
-    );
-  }
-
-  /**
-   * Runs the Cloesce Router, handling dependency injection, routing, validation,
-   * hydration, and method dispatch.
-   *
-   * @returns A Response object representing the result of the request.
-   */
-  public async run(request: Request): Promise<Response> {
-    await RuntimeContainer.init(this.idl);
-    const di = new DependencyContainer();
-
-    try {
-      const result = await this.router(request, di, this.workerUrl);
-
+    if (result instanceof Response) {
       // A forwarded Durable Object response is passed through unchanged.
-      if (result instanceof Response) {
-        return result;
-      }
-
-      // Log any 500 errors
-      if (result.status === 500) {
-        console.error("A caught error occurred in the Cloesce Router: ", result.message);
-      }
-
-      return result.toResponse();
-    } catch (e: any) {
-      let debug: any;
-      if (e instanceof Error) {
-        debug = {
-          name: e.name,
-          message: e.message,
-          stack: e.stack,
-          cause: (e as any).cause,
-        };
-      } else {
-        debug = {
-          name: "NonErrorThrown",
-          message: typeof e === "string" ? e : JSON.stringify(e),
-          stack: undefined,
-        };
-      }
-
-      const res = HttpResult.fail(500, JSON.stringify(debug));
-      console.error("An uncaught error occurred in the Cloesce Router: ", debug);
-      return res.toResponse();
+      return result;
     }
+
+    if (result.status === 500) {
+      console.error("A caught error occurred in the Cloesce Router: ", result.message);
+    }
+
+    return result.toResponse();
+  } catch (e: any) {
+    let debug: any;
+    if (e instanceof Error) {
+      debug = {
+        name: e.name,
+        message: e.message,
+        stack: e.stack,
+        cause: (e as any).cause,
+      };
+    } else {
+      debug = {
+        name: "NonErrorThrown",
+        message: typeof e === "string" ? e : JSON.stringify(e),
+        stack: undefined,
+      };
+    }
+
+    const res = HttpResult.fail(500, JSON.stringify(debug));
+    console.error("An uncaught error occurred in the Cloesce Router: ", debug);
+    return res.toResponse();
+  }
+}
+
+async function route(
+  request: Request,
+  idl: Cidl,
+  workerUrl: string,
+  env: any,
+  registry: Map<string, any>,
+  durableContext: unknown,
+): Promise<HttpResult<unknown> | Response> {
+  const { wasm } = RuntimeContainer.get();
+
+  const routeRes = matchRoute(request, idl, workerUrl);
+  if (routeRes.isLeft()) {
+    return routeRes.value;
+  }
+  const route = routeRes.unwrap();
+
+  route.impl = resolveImpl(route, env, registry) ?? undefined;
+  if (!route.impl && !route.forward) {
+    return HttpResult.fail(501, "Not implemented");
   }
 
-  /**
-   * Forces the Cloesce WASM module to initialize, instead of doing so lazily on the first request.
-   *
-   * Useful for tests that do not directly call `run`.
-   */
-  public async forceLoad() {
-    await RuntimeContainer.init(this.idl);
+  const forwardRequest = route.forward ? request.clone() : undefined;
+
+  const validation = await validateRequest(request, wasm, idl, env, route);
+  if (validation.isLeft()) {
+    return validation.value;
   }
+  const params = validation.unwrap();
+
+  if (forwardRequest) {
+    return await forward(route, env, params, forwardRequest);
+  }
+
+  const hydrated = await hydrateSelf(route, env);
+  if (hydrated?.isLeft()) {
+    return hydrated.value;
+  }
+
+  return await methodDispatch(route.impl!, hydrated?.unwrap(), route, params, env, durableContext);
+}
+
+/**
+ * Resolve the implementation for a route: a `$`-prefixed CRUD route dispatches to the
+ * model's env store; any other route is a plain exported const in the registered module.
+ */
+function resolveImpl(
+  route: MatchedRoute,
+  env: any,
+  registry: Map<string, any>,
+): ApiImplementation | undefined {
+  if (route.method.name.startsWith("$")) {
+    return crudRoute(route.model, route.method, env) ?? undefined;
+  }
+  return registry.get(route.model.name)?.[route.method.name];
 }
 
 /** @internal */
@@ -248,7 +186,7 @@ export type MatchedRoute = {
   method: ApiMethod;
   getParamValues: Record<string, unknown>;
   forward: boolean;
-  impl: ApiImplementation;
+  impl?: ApiImplementation;
   dataSource?: DataSource;
   model: Model;
 };
@@ -260,7 +198,6 @@ function matchRoute(
   request: Request,
   idl: Cidl,
   workerUrl: string,
-  registry: Map<string, any>,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
@@ -269,7 +206,6 @@ function matchRoute(
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (c: RouterError) => exit(404, c, "Unknown route");
-  const notImplemented = () => exit(501, RouterError.NotImplemented, "Not implemented");
 
   for (const p of prefix) {
     if (parts.shift() !== p) return notFound(RouterError.UnknownPrefix);
@@ -323,21 +259,11 @@ function matchRoute(
   const hasDurableTarget = method.durable_target != null;
   const forward = forwardedHeader === null && hasDurableTarget;
 
-  const modelImpls = registry.get(model.name);
-  const impl =
-    modelImpls?.[method.name] ??
-    (crudRoute(model, method, modelImpls) as ApiImplementation | undefined);
-  if (!impl && !forward) {
-    // The impl does not exist and it cannot be forwarded.
-    return notImplemented();
-  }
-
   if (method.is_static) {
     return Either.right({
       namespace,
       method,
       forward,
-      impl,
       getParamValues: {},
       model,
     });
@@ -353,7 +279,6 @@ function matchRoute(
     namespace,
     method,
     forward,
-    impl,
     getParamValues,
     dataSource,
     model,
@@ -371,7 +296,7 @@ async function validateRequest(
   idl: Cidl,
   env: any,
   route: MatchedRoute,
-): Promise<Either<HttpResult, RequestParamMap>> {
+): Promise<Either<HttpResult, RequestParams>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (c: RouterError, reason: string) =>
     exit(400, c, `Invalid Request: ${reason}`);
@@ -397,12 +322,12 @@ async function validateRequest(
 
   // Extract all method parameters from the body.
   const url = new URL(request.url);
-  let params: RequestParamMap = Object.fromEntries(url.searchParams.entries());
+  let params: RequestParams = Object.fromEntries(url.searchParams.entries());
   if (route.method.http_verb !== "Get") {
     try {
       switch (route.method.parameters_media) {
         case "Json": {
-          const body = await request.json<RequestParamMap>();
+          const body = await request.json<RequestParams>();
           params = { ...params, ...body };
           break;
         }
@@ -499,35 +424,21 @@ async function forward(
 }
 
 /**
- * Hydrates a model instance for method dispatch.
- * @returns 500 or the hydrated instance
+ * Loads `self` for an instance route from the model's env store (default or `[source X]`
+ * source), returning the hydrated value for method dispatch.
+ * @returns 404/500/501 on the left, or the hydrated instance on the right.
  */
-async function hydrate(
-  registry: Map<string, any>,
-  di: DependencyContainer,
-  route: MatchedRoute,
-  env: any,
-  durableContext: unknown,
-): Promise<Either<HttpResult, any>> {
+async function hydrateSelf(route: MatchedRoute, env: any): Promise<Either<HttpResult, any>> {
   if (route.method.is_static) {
     // No hydration necessary
     return Either.right(null);
   }
 
-  const meta = route.model!;
+  const meta = route.model;
   const dsName = route.method.data_source ?? "Default";
-  const dataSource: DataSource = meta.data_sources[dsName];
-
-  const hydrationFailed = (e: any) =>
-    exit(
-      500,
-      RouterError.InvalidDatabaseQuery,
-      `Error in hydration query: ${e instanceof Error ? e.message : String(e)}`,
-    );
-
-  const dsNamespace = registry.get(meta.name)?.[dsName];
-  const stub = dsNamespace?.get;
-  if (typeof stub !== "function") {
+  const store = sourceStore(env, meta, dsName);
+  const getVerb = store?.get;
+  if (typeof getVerb !== "function") {
     return exit(
       501,
       RouterError.NotImplemented,
@@ -535,62 +446,44 @@ async function hydrate(
     );
   }
 
+  const notFound = () =>
+    exit(
+      404,
+      RouterError.ModelNotFound,
+      `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
+    );
+
   try {
-    // [injected, ...get params]
-    const args = [];
-    if (dataSource.get.injected.length > 0 || dataSource.get.durable_target != null) {
-      const injectedArgsRes = resolveInjectedArgs(
-        di,
-        env,
-        dataSource.get.injected,
-        dataSource.get.durable_target,
-        durableContext,
-      );
+    const ds = meta.data_sources[dsName];
+    const args = ds.get.parameters.map((p) => route.getParamValues[p.parameter.name]);
+    const result = await getVerb(...args);
 
-      if (injectedArgsRes.isLeft()) {
-        return Either.left(injectedArgsRes.unwrapLeft());
-      }
-
-      args.push(injectedArgsRes.unwrap());
-    }
-    for (const param of dataSource.get.parameters) {
-      args.push(route.getParamValues[param.parameter.name]);
-    }
-
-    const result = await stub.apply(dsNamespace, args);
     if (result instanceof HttpResult) {
       if (!result.ok) return Either.left(result);
-      if (result.data === null || result.data === undefined) {
-        return exit(
-          404,
-          RouterError.ModelNotFound,
-          `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
-        );
-      }
+      if (result.data === null || result.data === undefined) return notFound();
       return Either.right(result.data);
     }
 
-    if (result === null || result === undefined) {
-      return exit(
-        404,
-        RouterError.ModelNotFound,
-        `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
-      );
-    }
-
+    if (result === null || result === undefined) return notFound();
     return Either.right(result);
   } catch (e) {
-    return hydrationFailed(JSON.stringify(e));
+    return exit(
+      500,
+      RouterError.InvalidDatabaseQuery,
+      `Error in hydration query: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 
 /**
- * Calls a method on a model given a list of parameters.
+ * Calls a route implementation with the conventional argument order:
+ * `(self?, env?, ...params)`. `self` is present for instance routes; the full upgraded
+ * `env` is present whenever the route injects a binding or runs in a Durable Object.
  * @returns 500 on an uncaught client error, 200 with a result body on success
  */
 async function methodDispatch(
+  impl: ApiImplementation,
   obj: any,
-  di: DependencyContainer,
   route: MatchedRoute,
   params: Record<string, unknown>,
   env: any,
@@ -598,20 +491,15 @@ async function methodDispatch(
 ): Promise<HttpResult<unknown>> {
   const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
-  if (route.method.injected.length > 0 || route.method.durable_target != null) {
-    const injectedArgsRes = resolveInjectedArgs(
-      di,
-      env,
-      route.method.injected,
-      route.method.durable_target,
-      durableContext,
-    );
-
-    if (injectedArgsRes.isLeft()) {
-      return injectedArgsRes.unwrapLeft();
+  // CRUD (`$verb`) routes dispatch to an env-bound store verb that closes over `env`;
+  // they never receive `env` as an argument even though the schema records their bindings.
+  const isCrud = route.method.name.startsWith("$");
+  if (!isCrud && (route.method.injected.length > 0 || route.method.durable_target != null)) {
+    // A durable route runs inside its DO; surface that context under the well-known key.
+    if (route.method.durable_target != null) {
+      env[ENV_DURABLE_TARGET_KEY] = durableContext;
     }
-
-    paramArray.push(injectedArgsRes.unwrap());
+    paramArray.push(env);
   }
 
   for (const param of route.method.parameters) {
@@ -624,7 +512,7 @@ async function methodDispatch(
   };
 
   try {
-    const res = await route.impl(...paramArray);
+    const res = await impl(...paramArray);
     return wrapResult(res);
   } catch (e) {
     // Error state: Client code threw an uncaught exception.
@@ -646,40 +534,6 @@ function exit(
 }
 
 /**
- * Finds an injected dependency from the DI container.
- * @returns The injected dependency, or undefined if not found.
- */
-function resolveInjectedArgs(
-  di: DependencyContainer,
-  env: any,
-  injectedNames: string[],
-  durableTarget: DurableTarget | null | undefined,
-  durableContext: unknown,
-): Either<HttpResult, Record<string, unknown>> {
-  const injected: Record<string, unknown> = {};
-
-  // Methods with a Durable Object target run inside that DO's context, which is
-  // surfaced to the handler under the well-known `ctx` key.
-  if (durableTarget != null) {
-    injected[ENV_DURABLE_TARGET_KEY] = durableContext;
-  }
-
-  for (const name of injectedNames) {
-    if (di.has({ tag: name })) {
-      injected[name] = di.get({ tag: name });
-      continue;
-    }
-
-    injected[name] = env?.[name];
-    if (injected[name] === undefined) {
-      return exit(501, RouterError.NotImplemented, `Missing injected dependency: ${name}`);
-    }
-  }
-
-  return Either.right(injected);
-}
-
-/**
  * @internal
  * Exported for testing purposes only.
  */
@@ -689,5 +543,4 @@ export const _cloesceInternal = {
   methodDispatch,
   RuntimeContainer,
   RouterError,
-  DependencyContainer,
 };

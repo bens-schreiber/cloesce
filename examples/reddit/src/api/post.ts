@@ -1,81 +1,65 @@
 import * as clo from "@cloesce/backend.js";
 import { DurableObject } from "cloudflare:workers";
-import { CloesceApp, HttpResult } from "cloesce";
+import { HttpResult } from "cloesce";
 import postDoInitial from "../../migrations/PostDo/1784326759_Initial.js";
-import { auth, AuthUser } from "./auth.js";
-import { SubReddit } from "./sub.js";
-import { User } from "./user.js";
+import { auth, authFromRequest } from "./auth.js";
 
-export class PostDo extends DurableObject<clo.CfEnv> {
-  private app: CloesceApp;
-  private sessions: clo.Env.Sessions;
-
-  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
-    super(ctx, env);
-    this.sessions = clo.upgradeEnv(env).Sessions;
-    this.app = clo.cloesce(env, this, [postDoInitial]);
-    this.app.register(Post, Comment);
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    const authUser = await AuthUser.fromRequest(this.sessions, request);
-    this.app.register(authUser);
-
-    return await this.app.run(request);
-  }
-}
-
-export const Post = clo.Post.impl({
+export const post: clo.Api.Post.Of = {
   async create(env, subRedditId, title, content) {
     const username = auth(env);
-    if (username instanceof HttpResult) return username;
+    if (username instanceof HttpResult) {
+      return username;
+    }
 
-    if ((await SubReddit.Default.get(env, subRedditId)) === null) {
+    if (!(await env.subRedditDb.subReddit.get(subRedditId)).ok) {
       return HttpResult.fail(404, "No such subreddit.");
     }
 
     const doId = crypto.randomUUID();
-    const meta = { meta: { title, content, authorName: username, upvotes: 0 } };
+    const meta = { title, content, authorName: username, upvotes: 0 };
 
-    const savePost = this.Default.save(env, doId, meta);
-    const saveSubReddit = SubReddit.Default.save(env, {
+    const savePost = env.postDo.post.save(doId, { doId, meta });
+    const saveSubReddit = env.subRedditDb.subReddit.save({
       id: subRedditId,
       posts: [{ postId: doId, subRedditId }],
     });
-    const saveUser = User.Default.save(env, username, { authoredPosts: [{ postId: doId }] });
+    const saveUser = env.userDo.user.save(username, { authoredPosts: [{ postId: doId }] });
 
-    const res = await Promise.all([savePost, saveSubReddit, saveUser]);
-    const post = res[0].data!;
-
-    return post;
+    const [saved] = await Promise.all([savePost, saveSubReddit, saveUser]);
+    return saved.data!;
   },
 
   async vote(self, env, delta) {
     const username = auth(env);
-    if (username instanceof HttpResult) return username;
+    if (username instanceof HttpResult) {
+      return username;
+    }
 
     // A Post's upvotes live in its KV-backed meta, not in SQL.
     const clampDelta = delta >= 0 ? 1 : -1;
     const meta = { ...self.meta, upvotes: self.meta.upvotes + clampDelta };
-    env.PostDo.meta.put(env.ctx, meta);
-
-    return { ...self, meta };
+    return env.postDo.post.save(self.doId, { meta });
   },
-});
+};
 
-export const Comment = clo.Comment.impl({
+export const comment: clo.Api.Comment.Of = {
   async create(env, postId, content) {
     const username = auth(env);
-    if (username instanceof HttpResult) return username;
+    if (username instanceof HttpResult) {
+      return username;
+    }
 
-    const saved = await this.Default.save(env, postId, {
+    const saved = await env.postDo.comment.save(postId, {
       authorName: username,
       content,
       upvotes: 0,
     });
+    if (!saved.ok) {
+      return saved;
+    }
 
     const comment = saved.data!;
-    await User.Default.save(env, username, {
+    await env.userDo.user.save(username, {
       authoredComments: [{ postId, commentId: comment.id }],
     });
 
@@ -84,14 +68,29 @@ export const Comment = clo.Comment.impl({
 
   async vote(self, env, delta) {
     const username = auth(env);
-    if (username instanceof HttpResult) return username;
+    if (username instanceof HttpResult) {
+      return username;
+    }
 
     const clampDelta = delta >= 0 ? 1 : -1;
-    const res = await this.Default.save(env, self.doId, {
+    return env.postDo.comment.save(self.doId, {
       ...self,
       upvotes: self.upvotes + clampDelta,
     });
-
-    return res.data!;
   },
-});
+};
+
+export class PostDo extends DurableObject<clo.CfEnv> {
+  private base = clo
+    .createApp(this, clo.PostDoHost, [postDoInitial])
+    .register(clo.Post, post)
+    .register(clo.Comment, comment);
+
+  async fetch(request: Request): Promise<Response> {
+    const app = this.base.register(
+      clo.AuthUser,
+      await authFromRequest(this.base.env.sessions, request),
+    );
+    return app.run(request);
+  }
+}

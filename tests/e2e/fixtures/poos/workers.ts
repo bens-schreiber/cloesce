@@ -1,23 +1,21 @@
 import { HttpResult } from "cloesce";
-import { cloesce, CfEnv, PooAcceptYield } from "./backend.js";
+import { createApp, Worker, PooAcceptYield, type Api, type CfEnv } from "./backend.js";
 
-export const PooAcceptYieldImpl = PooAcceptYield.impl({
+const pooAcceptYield: Api.PooAcceptYield.Of = {
   acceptPoos() {
     return HttpResult.ok(200);
   },
 
   yieldPoo() {
-    return HttpResult.ok(200, {
+    return {
       a: { name: "name", major: "major" },
       b: [{ color: "color" }],
-    });
+    };
   },
-});
+};
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(PooAcceptYieldImpl);
-    return await app.run(request);
+    return createApp(env, Worker).register(PooAcceptYield, pooAcceptYield).run(request);
   },
 };

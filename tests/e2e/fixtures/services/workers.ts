@@ -1,23 +1,20 @@
-import { FooService, InjectedThing, cloesce, CfEnv } from "./backend.js";
+import { createApp, Worker, FooService, InjectedThing, type Api, type CfEnv } from "./backend.js";
 import { HttpResult } from "cloesce";
 
-export class InjectedThingImpl extends InjectedThing {
-  value: string = "injected value";
+declare module "./backend.js" {
+  interface InjectedThing {
+    value: string;
+  }
 }
 
-export const FooServiceImpl = FooService.impl({
-  method(env) {
-    const inj = env.InjectedThing as InjectedThingImpl;
-    const injVal = inj.value;
-    return HttpResult.ok(200, `foo's invocation; injected: ${injVal}`);
-  },
-});
+const method: Api.FooService.method = (env) =>
+  HttpResult.ok(200, `foo's invocation; injected: ${env.InjectedThing.value}`);
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(new InjectedThingImpl(), FooServiceImpl);
-
-    return await app.run(request);
+    return createApp(env, Worker)
+      .register(FooService, { method })
+      .register(InjectedThing, { value: "injected value" })
+      .run(request);
   },
 };

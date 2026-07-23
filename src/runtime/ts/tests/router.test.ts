@@ -2,9 +2,8 @@ import { describe, test, expect, vi } from "vitest";
 import { MatchedRoute, _cloesceInternal } from "../src/router/router";
 import { HttpResult } from "../src/ui/backend";
 import { ModelBuilder, createIdl } from "./builder";
-import { Model } from "../src/cidl";
 
-const { RouterError, DependencyContainer } = _cloesceInternal;
+const { RouterError } = _cloesceInternal;
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -14,18 +13,6 @@ function createRequest(url: string, method?: string, body?: any) {
 }
 
 const mockImpl = vi.fn();
-
-function createRegistry(...namespaces: Model[]) {
-  const map = new Map<string, any>();
-  for (const ns of namespaces) {
-    const methodMap: Record<string, any> = {};
-    for (const method of ns.apis) {
-      methodMap[method.name] = mockImpl;
-    }
-    map.set(ns.name, methodMap);
-  }
-  return map;
-}
 
 function extractErrorCode(str: string | undefined): number | null {
   const match = str?.match(/\(ErrorCode:\s*(\d+)\)/);
@@ -39,10 +26,9 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/does/not/match");
     const idl = createIdl();
-    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -54,10 +40,9 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
     const idl = createIdl();
-    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -71,10 +56,9 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().build()],
     });
-    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -88,10 +72,9 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Delete", [], "Void").build()],
     });
-    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -105,10 +88,9 @@ describe("Match Route", () => {
     const idl = createIdl({
       models: [ModelBuilder.model("Model").idPk().method("method", "Post", [], "Void").build()],
     });
-    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.unwrap()).toEqual({
@@ -117,7 +99,6 @@ describe("Match Route", () => {
       model: idl.models["Model"],
       namespace: "Model",
       forward: false,
-      impl: mockImpl,
     });
   });
 
@@ -133,17 +114,15 @@ describe("Match Route", () => {
           .build(),
       ],
     });
-    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
       getParamValues: { id: "0" },
       forward: false,
-      impl: mockImpl,
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
@@ -166,16 +145,14 @@ describe("Match Route", () => {
           .build(),
       ],
     });
-    const registry = createRegistry(idl.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, idl, api, registry);
+    const res = _cloesceInternal.matchRoute(request, idl, api);
 
     // Assert
     expect(res.unwrap()).toEqual({
       dataSource: idl.models["Model"].data_sources["ds"],
       forward: false,
-      impl: mockImpl,
       getParamValues: { orgId: "acme", userId: "user123" },
       model: idl.models["Model"],
       method: idl.models["Model"].apis.find((m) => m.name === "method"),
@@ -260,7 +237,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
+    const res = await _cloesceInternal.methodDispatch(route.impl!, {}, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
@@ -281,7 +258,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
+    const res = await _cloesceInternal.methodDispatch(route.impl!, {}, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
@@ -304,7 +281,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
+    const res = await _cloesceInternal.methodDispatch(route.impl!, {}, route, {}, {}, undefined);
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
@@ -329,19 +306,16 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, {} as any, route, {}, {}, undefined);
+    const res = await _cloesceInternal.methodDispatch(route.impl!, {}, route, {}, {}, undefined);
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
   });
 
-  test("passes bundled explicit injected values", async () => {
+  test("passes the full env to an injecting route", async () => {
     // Arrange
-    const di = new DependencyContainer();
-    const injectedObject = { tag: "YouTubeApi", key: "secret" };
-    const db = { prepare: vi.fn() };
-    di.set({ tag: "YouTubeApi" }, injectedObject);
+    const env = { DB_1: { prepare: vi.fn() }, YouTubeApi: { key: "secret" } };
 
     const model = ModelBuilder.model("Foo")
       .idPk()
@@ -363,17 +337,17 @@ describe("Method Dispatch", () => {
 
     // Act
     const res = await _cloesceInternal.methodDispatch(
+      impl,
       {},
-      di,
       route,
       { name: "ben" },
-      { DB_1: db },
+      env,
       undefined,
     );
 
     // Assert
     expect(res.status).toBe(200);
-    expect(impl).toHaveBeenCalledWith({ DB_1: db, YouTubeApi: injectedObject }, "ben");
+    expect(impl).toHaveBeenCalledWith(env, "ben");
   });
 });
 
@@ -399,40 +373,24 @@ describe("Forwarding", () => {
   test("no local impl is marked for forwarding", () => {
     // Arrange
     const idl = createDurableIdl();
-    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(createRequest(false), idl, api, registry);
+    const res = _cloesceInternal.matchRoute(createRequest(false), idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(false);
     expect(res.unwrap().forward).toBe(true);
   });
 
-  test("an already-forwarded request is not forwarded again and needs a local impl", () => {
+  test("an already-forwarded request is not forwarded again", () => {
     // Arrange
     const idl = createDurableIdl();
-    const registry = createRegistry(idl.models["Leaderboard"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(createRequest(true), idl, api, registry);
+    const res = _cloesceInternal.matchRoute(createRequest(true), idl, api);
 
     // Assert
     expect(res.isLeft()).toBe(false);
     expect(res.unwrap().forward).toBe(false);
-    expect(res.unwrap().impl).toBe(mockImpl);
-  });
-
-  test("an already-forwarded request with no impl => 501", () => {
-    // Arrange
-    const idl = createDurableIdl();
-    const registry = createRegistry();
-
-    // Act
-    const res = _cloesceInternal.matchRoute(createRequest(true), idl, api, registry);
-
-    // Assert
-    expect(res.isLeft()).toBe(true);
-    expect(res.unwrapLeft().status).toBe(501);
   });
 });

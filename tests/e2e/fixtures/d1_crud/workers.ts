@@ -1,9 +1,13 @@
-import { cloesce, CrudHaver, Parent, Child, CfEnv } from "./backend.js";
+import { createApp, Worker, CrudHaver, Parent, Child, type Api, type CfEnv } from "./backend.js";
+
+const notCrud: Api.CrudHaver.notCrud = () => {};
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(CrudHaver.impl({ notCrud() {} }), Parent.impl({}), Child.impl({}));
-    return await app.run(request);
+    return createApp(env, Worker)
+      .register(CrudHaver, { notCrud })
+      .register(Parent, {})
+      .register(Child, {})
+      .run(request);
   },
 };
