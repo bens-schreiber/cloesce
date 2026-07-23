@@ -11,7 +11,9 @@ use std::borrow::Cow;
 
 use serde::Serialize;
 
-use crate::query::{Database, TemplateSegment};
+use idl::TemplateSegment;
+
+use crate::query::Database;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct SelectPlan<'src> {

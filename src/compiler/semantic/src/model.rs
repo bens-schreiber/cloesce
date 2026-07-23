@@ -10,7 +10,7 @@ use frontend::{
 use idl::{
     BackingKind, BindingTemplate, CidlType, Column, Field, ForeignKeyReference, KvField, Model,
     ModelBacking, NavigationCardinality, NavigationField, NavigationKeyMapping, R2Field,
-    ValidatedField, WranglerEnv,
+    TemplateSegment, ValidatedField, WranglerEnv,
 };
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
@@ -757,7 +757,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         };
 
-        let Some((template, key_format)) = self.resolve_binding_ref(
+        let Some((template, segments)) = self.resolve_binding_ref(
             ma,
             table,
             templates,
@@ -780,7 +780,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 validators: template.field.validators.clone(),
             },
             binding: kv.binding.name,
-            key_format,
+            segments,
             shard_fields,
         });
     }
@@ -886,7 +886,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         };
 
-        let Some((template, key_format)) = self.resolve_binding_ref(
+        let Some((template, segments)) = self.resolve_binding_ref(
             ma,
             table,
             templates,
@@ -904,7 +904,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 cidl_type: template.field.cidl_type.clone(),
             },
             binding: r2.binding.name,
-            key_format,
+            segments,
         });
     }
 
@@ -927,7 +927,10 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         template_sym: &'p Symbol<'src>,
         args: &'p [Symbol<'src>],
         field: &'p Symbol<'src>,
-    ) -> Option<(&'sem BindingTemplate<'src>, String)> {
+    ) -> Option<(
+        &'sem BindingTemplate<'src>,
+        Vec<TemplateSegment<'src, &'src str>>,
+    )> {
         if !table.local.contains_key(&LocalSymbolKind::BindingTemplate {
             binding: binding_sym.name,
             name: template_sym.name,
@@ -956,7 +959,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         // Each arg must reference a field on this model of the same type as
         // the corresponding binding template param.
-        let mut key_format = wrangler_binding_template.key_format.to_string();
+        let mut param_to_arg: HashMap<&str, &'src str> = HashMap::new();
         for (arg, param) in args.iter().zip(&wrangler_binding_template.params) {
             if !table.local.contains_key(&LocalSymbolKind::ModelField {
                 model: self.name,
@@ -988,12 +991,22 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             // Inherit validators from the binding template param onto the model's field
             arg_field.validators.extend(param.validators.clone());
 
-            // Replace the `{param}` placeholder with `{arg}`
-            key_format =
-                key_format.replace(&format!("{{{}}}", param.name), &format!("{{{}}}", arg.name));
+            // Map the template's `{param}` placeholder to the model's `{arg}` field.
+            param_to_arg.insert(param.name.as_ref(), arg.name);
         }
 
-        Some((wrangler_binding_template, key_format))
+        // Rebuild the key segments with each template param swapped for the
+        // model field name that supplies it.
+        let segments = wrangler_binding_template
+            .segments
+            .iter()
+            .map(|segment| match segment {
+                TemplateSegment::Literal(text) => TemplateSegment::Literal(text.clone()),
+                TemplateSegment::Value(param) => TemplateSegment::Value(param_to_arg[param]),
+            })
+            .collect();
+
+        Some((wrangler_binding_template, segments))
     }
 }
 

@@ -56,7 +56,7 @@ fn kv_template<'tokens, 'src: 'tokens>()
         .then(just(Token::Arrow).ignore_then(cidl_type()))
         .then_ignore(just(Token::LBrace))
         .then(tagged_typed_symbol().repeated().collect::<Vec<_>>())
-        .then(select! { Token::StringLit(value) => value })
+        .then(select! { Token::StringLit(value) => value }.or_not())
         .then_ignore(just(Token::RBrace))
         .map_spanned(
             |((((tags, sym), cidl_type), params), key_format)| KvBindingTemplate {
@@ -111,7 +111,7 @@ pub fn r2_binding_block<'tokens, 'src: 'tokens>()
         .then(symbol())
         .then_ignore(just(Token::LBrace))
         .then(tagged_typed_symbol().repeated().collect::<Vec<_>>())
-        .then(select! { Token::StringLit(value) => value })
+        .then(select! { Token::StringLit(value) => value }.or_not())
         .then_ignore(just(Token::RBrace))
         .map_spanned(|(((tags, sym), params), key_format)| R2BindingTemplate {
             symbol: Symbol { tags, ..sym },

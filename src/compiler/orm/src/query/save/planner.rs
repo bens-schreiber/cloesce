@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationCardinality};
+use idl::{CidlType, CloesceIdl, IncludeTree, Model, NavigationCardinality, TemplateSegment};
 use serde_json::Value as JsonValue;
 
 use frontend::fmt_cidl_type;
@@ -9,7 +9,7 @@ use crate::query::save::plan::{
     PathSegment, SaveArg, SavePlan, SaveQuery, SaveStep, SqlStatement, TMP_TABLE,
 };
 use crate::query::select::plan::MapCardinality;
-use crate::query::{Database, DatabaseKind, TemplateSegment};
+use crate::query::{Database, DatabaseKind};
 use crate::validate::validate_cidl_type;
 use crate::{OrmErrorKind, Result, fail};
 
@@ -542,7 +542,7 @@ impl<'src> Planner<'src> {
                 continue;
             };
 
-            let (segments, delayed) = template_segments(&r2.key_format, obj, instance);
+            let (segments, delayed) = template_segments(&r2.segments, obj, instance);
             push(
                 stage_for(delayed),
                 name,
@@ -593,7 +593,7 @@ impl<'src> Planner<'src> {
                 (DatabaseKind::Kv, [].as_slice())
             };
 
-            let (segments, seg_delayed) = template_segments(&kv.key_format, obj, instance);
+            let (segments, seg_delayed) = template_segments(&kv.segments, obj, instance);
             let shard = shard_fields
                 .iter()
                 .map(|f| (*f, instance.save_arg(obj, f)))
@@ -1041,18 +1041,24 @@ fn parent_owns_one(nav: &idl::NavigationField, target_model: &Model, parent_mode
 }
 
 fn template_segments<'src>(
-    key: &'src str,
+    key: &'src [TemplateSegment<'src, &'src str>],
     obj: PayloadSubObject<'src>,
     instance: &Instance<'src>,
 ) -> (Vec<TemplateSegment<'src, SaveArg<'src>>>, bool) {
     let mut delayed = false;
-    let segments = TemplateSegment::parse(key, |placeholder| {
-        let arg = instance.save_arg(obj, placeholder);
-        if matches!(arg, SaveArg::Result(_)) {
-            delayed = true;
-        }
-        arg
-    });
+    let segments = key
+        .iter()
+        .map(|segment| match segment {
+            TemplateSegment::Literal(text) => TemplateSegment::Literal(text.clone()),
+            TemplateSegment::Value(placeholder) => {
+                let arg = instance.save_arg(obj, placeholder);
+                if matches!(arg, SaveArg::Result(_)) {
+                    delayed = true;
+                }
+                TemplateSegment::Value(arg)
+            }
+        })
+        .collect();
     (segments, delayed)
 }
 

@@ -1,4 +1,4 @@
-use idl::{CidlType, MediaType};
+use idl::{CidlType, MediaType, TemplateSegment};
 
 pub trait LanguageTypeMapper {
     /// Maps a [CidlType] to a type in the target language
@@ -7,13 +7,9 @@ pub trait LanguageTypeMapper {
     /// Maps a [MediaType] to a type in the target language
     fn media_type(&self, ty: &MediaType) -> String;
 
-    /// Converts a format string to the target languages string interpolation syntax,
-    /// using the provided parameter names to identify placeholders.
-    fn interpolate_format<'src>(
-        &self,
-        format: &str,
-        param_names: impl Iterator<Item = &'src str>,
-    ) -> String;
+    /// Renders key [TemplateSegment]s as a string in the target language's
+    /// interpolation syntax, with each `Value` placeholder interpolated by name.
+    fn interpolate_segments(&self, segments: &[TemplateSegment<&str>]) -> String;
 
     /// Renders `text` as the body lines of a doc comment, each prefixed with `indent`
     /// and safe against terminating the comment early.
@@ -78,15 +74,15 @@ impl LanguageTypeMapper for TypeScriptMapper {
         }
     }
 
-    fn interpolate_format<'src>(
-        &self,
-        format: &str,
-        param_names: impl Iterator<Item = &'src str>,
-    ) -> String {
-        let result = param_names.fold(format.to_string(), |acc, name| {
-            acc.replace(&format!("{{{name}}}"), &format!("${{{name}}}"))
-        });
-        format!("`{result}`")
+    fn interpolate_segments(&self, segments: &[TemplateSegment<&str>]) -> String {
+        let body = segments
+            .iter()
+            .map(|segment| match segment {
+                TemplateSegment::Literal(text) => self.escape_string(text.as_ref()),
+                TemplateSegment::Value(name) => format!("${{{name}}}"),
+            })
+            .collect::<String>();
+        format!("`{body}`")
     }
 
     fn doc_block(&self, text: &str, indent: &str) -> String {

@@ -64,23 +64,23 @@ function MyKvHelpers(namespace: KVNamespace) {
     return {
         someValue: {
             template: (id1: string, id2: number): string =>
-                `value/${id1}/${id2}`,
+                `someValue/id1/${id1}/id2/${id2}`,
             get: (id1: string, id2: number): Promise<unknown | null> =>
-                namespace.get(`value/${id1}/${id2}`) as any,
+                namespace.get(`someValue/id1/${id1}/id2/${id2}`) as any,
             put: (id1: string, id2: number, value: unknown): Promise<void> =>
-                namespace.put(`value/${id1}/${id2}`, value as any),
+                namespace.put(`someValue/id1/${id1}/id2/${id2}`, value as any),
             list: (options?: { limit?: number, cursor?: string }) =>
-                namespace.list({ ...options, prefix: `value/` }),
+                namespace.list({ ...options, prefix: `someValue/id1/` }),
         },
         streamValue: {
             template: (id1: string, id2: number): string =>
-                `stream/${id1}/${id2}`,
+                `streamValue/id1/${id1}/id2/${id2}`,
             get: (id1: string, id2: number): Promise<ReadableStream | null> =>
-                namespace.get(`stream/${id1}/${id2}`) as any,
+                namespace.get(`streamValue/id1/${id1}/id2/${id2}`) as any,
             put: (id1: string, id2: number, value: ReadableStream): Promise<void> =>
-                namespace.put(`stream/${id1}/${id2}`, value as any),
+                namespace.put(`streamValue/id1/${id1}/id2/${id2}`, value as any),
             list: (options?: { limit?: number, cursor?: string }) =>
-                namespace.list({ ...options, prefix: `stream/` }),
+                namespace.list({ ...options, prefix: `streamValue/id1/` }),
         },
     };
 }
@@ -89,33 +89,33 @@ function MyR2Helpers(bucket: R2Bucket) {
     return {
         fileData: {
             template: (id: string): string =>
-                `files/${id}`,
+                `fileData/id/${id}`,
             get: (id: string): Promise<R2ObjectBody | null> =>
-                bucket.get(`files/${id}`),
+                bucket.get(`fileData/id/${id}`),
             put: (id: string, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put(`files/${id}`, value),
+                bucket.put(`fileData/id/${id}`, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: `files/` }),
+                bucket.list({ ...options, prefix: `fileData/id/` }),
         },
         metadata: {
             template: (ownerId: string, modelYear: number): string =>
-                `meta/${ownerId}/${modelYear}`,
+                `metadata/ownerId/${ownerId}/modelYear/${modelYear}`,
             get: (ownerId: string, modelYear: number): Promise<R2ObjectBody | null> =>
-                bucket.get(`meta/${ownerId}/${modelYear}`),
+                bucket.get(`metadata/ownerId/${ownerId}/modelYear/${modelYear}`),
             put: (ownerId: string, modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put(`meta/${ownerId}/${modelYear}`, value),
+                bucket.put(`metadata/ownerId/${ownerId}/modelYear/${modelYear}`, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: `meta/` }),
+                bucket.list({ ...options, prefix: `metadata/ownerId/` }),
         },
         photoData: {
             template: (modelYear: number): string =>
-                `photos/${modelYear}`,
+                `photoData/modelYear/${modelYear}`,
             get: (modelYear: number): Promise<R2ObjectBody | null> =>
-                bucket.get(`photos/${modelYear}`),
+                bucket.get(`photoData/modelYear/${modelYear}`),
             put: (modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put(`photos/${modelYear}`, value),
+                bucket.put(`photoData/modelYear/${modelYear}`, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: `photos/` }),
+                bucket.list({ ...options, prefix: `photoData/modelYear/` }),
         },
         customDsData: {
             template: (id: number): string =>
@@ -179,11 +179,11 @@ function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
     function get_topEntryCache(...args: any[]): any {
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvGet" in args[0])) {
             const [ctx] = args;
-            const key = `top`;
+            const key = `topEntryCache`;
             return "storage" in ctx ? ctx.storage.kv.get(key) : ctx.__cloesceKvGet(key);
         }
         const [tenantId] = args;
-        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvGet(`top`);
+        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvGet(`topEntryCache`);
     }
 
     function put_topEntryCache(ctx: DurableObjectState | LeaderboardDo, value: unknown): void;
@@ -192,22 +192,22 @@ function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
         const value = args[args.length - 1];
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvPut" in args[0])) {
             const [ctx] = args;
-            const key = `top`;
+            const key = `topEntryCache`;
             return "storage" in ctx ? ctx.storage.kv.put(key, value) : ctx.__cloesceKvPut(key, value);
         }
         const [tenantId] = args;
-        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvPut(`top`, value);
+        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvPut(`topEntryCache`, value);
     }
     function get_topEntryCacheWithDate(ctx: DurableObjectState | LeaderboardDo, date: string): unknown | null | undefined;
     function get_topEntryCacheWithDate(tenantId: number, date: string): Promise<unknown | null>;
     function get_topEntryCacheWithDate(...args: any[]): any {
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvGet" in args[0])) {
             const [ctx, date] = args;
-            const key = `top/${date}`;
+            const key = `topEntryCacheWithDate/date/${date}`;
             return "storage" in ctx ? ctx.storage.kv.get(key) : ctx.__cloesceKvGet(key);
         }
         const [tenantId, date] = args;
-        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvGet(`top/${date}`);
+        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvGet(`topEntryCacheWithDate/date/${date}`);
     }
 
     function put_topEntryCacheWithDate(ctx: DurableObjectState | LeaderboardDo, date: string, value: unknown): void;
@@ -216,11 +216,11 @@ function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
         const value = args[args.length - 1];
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvPut" in args[0])) {
             const [ctx, date] = args;
-            const key = `top/${date}`;
+            const key = `topEntryCacheWithDate/date/${date}`;
             return "storage" in ctx ? ctx.storage.kv.put(key, value) : ctx.__cloesceKvPut(key, value);
         }
         const [tenantId, date] = args;
-        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvPut(`top/${date}`, value);
+        return (namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as any).__cloesceKvPut(`topEntryCacheWithDate/date/${date}`, value);
     }
     return {
         template: (tenantId: number): string =>
@@ -231,19 +231,19 @@ function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
             namespace.get(namespace.idFromName(`LeaderboardDo/${tenantId}`)) as DurableObjectStub & T,
         topEntryCache: {
             template: (): string =>
-                `top`,
+                `topEntryCache`,
             get: get_topEntryCache,
             put: put_topEntryCache,
             list: (ctx: DurableObjectState) =>
-                ctx.storage.kv.list({ prefix: `top` }),
+                ctx.storage.kv.list({ prefix: `topEntryCache` }),
         },
         topEntryCacheWithDate: {
             template: (date: string): string =>
-                `top/${date}`,
+                `topEntryCacheWithDate/date/${date}`,
             get: get_topEntryCacheWithDate,
             put: put_topEntryCacheWithDate,
             list: (ctx: DurableObjectState) =>
-                ctx.storage.kv.list({ prefix: `top/` }),
+                ctx.storage.kv.list({ prefix: `topEntryCacheWithDate/date/` }),
         },
     };
 }
@@ -542,7 +542,7 @@ export interface LeaderboardStore<E> {
          * STAGE 0
          * ├─ SYNTHESIZE INTO `result`
          * │  └─ `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "top" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -559,7 +559,7 @@ export interface LeaderboardStore<E> {
          * STAGE 0
          * ├─ SYNTHESIZE INTO `result`
          * │  └─ `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "top" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -623,7 +623,7 @@ export interface LeaderboardEntryStore<E> {
          * ├─ SEARCH `LeaderboardEntry` ON durable `LeaderboardDo` ONE
          * │     SHARD `tenantId` = `$tenantId`
          * │     ATTACH `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "top" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -641,7 +641,7 @@ export interface LeaderboardEntryStore<E> {
          * ├─ SEARCH `LeaderboardEntry` ON durable `LeaderboardDo` LIMIT `$limit` MANY
          * │     SHARD `tenantId` = `$tenantId`
          * │     ATTACH `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "top" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -778,8 +778,8 @@ export interface ModelWithKvStore<E> {
          *
          * STAGE 0
          * ├─ SEARCH `ModelWithKv` ON d1 `db` ONE
-         * ├─ READ kv `MyKv` KEY "value/{`$id1`}/{`$id2`}" INTO `someValue`
-         * └─ READ kv `MyKv` KEY "stream/{`$id1`}/{`$id2`}" INTO `streamValue`
+         * ├─ READ kv `MyKv` KEY "someValue/id1/{`$id1`}/id2/{`$id2`}" INTO `someValue`
+         * └─ READ kv `MyKv` KEY "streamValue/id1/{`$id1`}/id2/{`$id2`}" INTO `streamValue`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -798,8 +798,8 @@ export interface ModelWithKvStore<E> {
          * └─ SEARCH `ModelWithKv` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * ├─ READ kv `MyKv` KEY "value/{id1}/{id2}" INTO `someValue`
-         * └─ READ kv `MyKv` KEY "stream/{id1}/{id2}" INTO `streamValue`
+         * ├─ READ kv `MyKv` KEY "someValue/id1/{id1}/id2/{id2}" INTO `someValue`
+         * └─ READ kv `MyKv` KEY "streamValue/id1/{id1}/id2/{id2}" INTO `streamValue`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -867,7 +867,7 @@ export interface ModelWithR2Store<E> {
          *
          * STAGE 0
          * ├─ SEARCH `ModelWithR2` ON d1 `db` ONE
-         * └─ READ r2 `MyR2` KEY "files/{`$id`}" INTO `fileData`
+         * └─ READ r2 `MyR2` KEY "fileData/id/{`$id`}" INTO `fileData`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -885,7 +885,7 @@ export interface ModelWithR2Store<E> {
          * └─ SEARCH `ModelWithR2` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * └─ READ r2 `MyR2` KEY "files/{id}" INTO `fileData`
+         * └─ READ r2 `MyR2` KEY "fileData/id/{id}" INTO `fileData`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -1108,7 +1108,7 @@ export interface RouteOwnerStore<E> {
          * ├─ SYNTHESIZE INTO `result`
          * │  ├─ `ownerId` = `$ownerId`
          * │  └─ `modelYear` = `$modelYear`
-         * ├─ READ kv `MyKv` KEY "value/{`$ownerId`}/{`$modelYear`}" INTO `metadata`
+         * ├─ READ kv `MyKv` KEY "someValue/id1/{`$ownerId`}/id2/{`$modelYear`}" INTO `metadata`
          * └─ SYNTHESIZE INTO `car`
          *    └─ `ownerId` = `$ownerId`
          * ```
@@ -1129,7 +1129,7 @@ export interface RouteOwnerStore<E> {
          * ├─ SYNTHESIZE INTO `result`
          * │  ├─ `ownerId` = `$ownerId`
          * │  └─ `modelYear` = `$modelYear`
-         * ├─ READ kv `MyKv` KEY "value/{`$ownerId`}/{`$modelYear`}" INTO `metadata`
+         * ├─ READ kv `MyKv` KEY "someValue/id1/{`$ownerId`}/id2/{`$modelYear`}" INTO `metadata`
          * └─ SYNTHESIZE INTO `car`
          *    └─ `ownerId` = `$ownerId`
          * ```
@@ -1198,8 +1198,8 @@ export interface ToyotaPriusStore<E> {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` ONE
          *
          * STAGE 1
-         * ├─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
-         * └─ READ kv `MyKv` KEY "value/{ownerId}/{modelYear}" INTO `metadata`
+         * ├─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -1218,8 +1218,8 @@ export interface ToyotaPriusStore<E> {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * ├─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
-         * └─ READ kv `MyKv` KEY "value/{ownerId}/{modelYear}" INTO `metadata`
+         * ├─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -1287,7 +1287,7 @@ export interface ToyotaPriusWithKvSource {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` ONE
          *
          * STAGE 1
-         * └─ READ kv `MyKv` KEY "value/{ownerId}/{modelYear}" INTO `metadata`
+         * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -1305,7 +1305,7 @@ export interface ToyotaPriusWithKvSource {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * └─ READ kv `MyKv` KEY "value/{ownerId}/{modelYear}" INTO `metadata`
+         * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
@@ -1356,7 +1356,7 @@ export interface ToyotaPriusWithR2Source {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` ONE
          *
          * STAGE 1
-         * └─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
+         * └─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -1374,7 +1374,7 @@ export interface ToyotaPriusWithR2Source {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * └─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
+         * └─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */

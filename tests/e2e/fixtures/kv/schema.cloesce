@@ -8,9 +8,7 @@ kv namespace {
         "path/to/data/{id}"
     }
 
-    config -> json {
-        "config"
-    }
+    config -> json {}
 }
 
 kv otherNamespace {

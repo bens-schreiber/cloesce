@@ -120,9 +120,7 @@ fn generates_default_kv_wrangler_values() {
     // Arrange
     let src = r#"
         kv my_kv {
-            obj -> json {
-                "kvObj"
-            }
+            obj -> json {}
         }
     "#;
     let idl = src_to_idl(src);
@@ -161,15 +159,11 @@ fn generates_default_durable_object_wrangler_values() {
                 tenantId: int
             }
 
-            topEntryCache -> json {
-                "top"
-            }
+            topEntryCache -> json {}
         }
 
         durable GlobalDo {
-            config -> json {
-                "config"
-            }
+            config -> json {}
         }
     "#;
     let idl = src_to_idl(src);
@@ -387,7 +381,6 @@ fn env_generate_writes_into_env_block() {
         kv CACHE {
             entry -> json {
                 id: int
-                "cache/{id}"
             }
         }
 

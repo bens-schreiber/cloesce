@@ -2,11 +2,12 @@
 
 use std::collections::{HashMap, HashSet};
 
+use idl::TemplateSegment;
 use orm::query::select::plan::{
     JoinKeys, MapCardinality, Select, SelectArg, SelectPlan, SelectStep, SqlArgument, SqlSegment,
     TableDef,
 };
-use orm::query::{Database, DatabaseKind, TemplateSegment};
+use orm::query::{Database, DatabaseKind};
 use serde_json::{Map, Value as JsonValue, json};
 
 use crate::common::setup::MockStorage;
@@ -530,7 +531,7 @@ fn render_key(segments: &[TemplateSegment<'_, SelectArg<'_>>], values: &[JsonVal
     segments
         .iter()
         .map(|segment| match segment {
-            TemplateSegment::Literal(text) => (*text).to_string(),
+            TemplateSegment::Literal(text) => text.as_ref().to_string(),
             TemplateSegment::Value(_) => match values.next().expect("template value") {
                 JsonValue::String(s) => s.clone(),
                 other => other.to_string(),

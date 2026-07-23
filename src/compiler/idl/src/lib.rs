@@ -19,6 +19,47 @@ use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// A template for a KV/R2 key, e.g. `users/{user_id}` where
+/// `user_id` is a dynamic value and `users/` is a literal prefix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TemplateSegment<'src, V> {
+    /// Text between placeholders
+    #[serde(borrow)]
+    Literal(Cow<'src, str>),
+    Value(V),
+}
+
+impl<'src, V> TemplateSegment<'src, V> {
+    pub fn parse(
+        t: &'src str,
+        mut value: impl FnMut(&'src str) -> V,
+    ) -> Vec<TemplateSegment<'src, V>> {
+        let mut segments = Vec::new();
+        let mut rest = t;
+        while let Some(open) = rest.find('{') {
+            if open > 0 {
+                segments.push(TemplateSegment::Literal(Cow::Borrowed(&rest[..open])));
+            }
+            let close = rest[open..].find('}').expect("validated key template") + open;
+            let arg = &rest[open + 1..close];
+            segments.push(TemplateSegment::Value(value(arg)));
+            rest = &rest[close + 1..];
+        }
+        if !rest.is_empty() {
+            segments.push(TemplateSegment::Literal(Cow::Borrowed(rest)));
+        }
+        segments
+    }
+
+    /// The `list` prefix: the first segment's text if it is a `Literal`, else `""`.
+    pub fn leading_literal(segments: &[Self]) -> &str {
+        match segments.first() {
+            Some(Self::Literal(text)) => text.as_ref(),
+            _ => "",
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
     /// The absence of a value.
@@ -345,7 +386,7 @@ pub struct KvField<'src> {
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub key_format: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 
     /// When [Self::binding] is a Durable Object, the model's local fields that supply the
     /// DO's shard discriminators, in shard-declaration order.
@@ -362,7 +403,7 @@ pub struct R2Field<'src> {
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub key_format: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 }
 
 #[derive(Deserialize, Serialize, PartialEq)]
@@ -569,11 +610,7 @@ pub struct BindingTemplate<'src> {
     pub params: Vec<ValidatedField<'src>>,
 
     #[serde(borrow)]
-    pub key_format: &'src str,
-
-    /// Everything in `key_format` up to (not including) the first `{` placeholder.
-    /// Used both for `list` codegen and overlap detection.
-    pub prefix: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 }
 
 #[derive(Deserialize, Serialize)]

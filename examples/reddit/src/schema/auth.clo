@@ -8,7 +8,6 @@ inject {
 kv Sessions {
     session -> string {
         token: string
-        "sessions/{token}"
     }
 }
 
