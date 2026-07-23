@@ -260,6 +260,7 @@ export namespace Env {
 
 /** @internal */
 function upgradeBindings(env: CfEnv): void {
+    attachBinding(env, "db");
     attachBinding(env, "MyKv", MyKvHelpers(env.MyKv));
     attachBinding(env, "MyR2", MyR2Helpers(env.MyR2));
     attachBinding(env, "GlobalDo", GlobalDoHelpers(env.GlobalDo));
@@ -429,8 +430,8 @@ export interface GlobalSettingsStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.db.prepare(sql).bind(id).all<GlobalSettings>()).results;
-         * return env.db.globalSettings.hydrate(rows[0]);
+         * const rows = (await env.globalDo.prepare(sql).bind(id).all<GlobalSettings>()).results;
+         * return env.globalDo.globalSettings.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<GlobalSettings>): Promise<HttpResult<GlobalSettings>>;
@@ -451,7 +452,7 @@ export interface GlobalSettingsStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.globalSettings.load(row, { children: true });
+         * const full = await env.globalDo.globalSettings.load(row, { children: true });
          * ```
          */
         load(self: GlobalSettings, tree: IncludeTree<GlobalSettings>): Promise<HttpResult<GlobalSettings>>;
@@ -581,8 +582,8 @@ export interface LeaderboardStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.db.prepare(sql).bind(id).all<Leaderboard>()).results;
-         * return env.db.leaderboard.hydrate(rows[0]);
+         * const rows = (await env.leaderboardDo.prepare(sql).bind(id).all<Leaderboard>()).results;
+         * return env.leaderboardDo.leaderboard.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<Leaderboard>, tenantId: number): Promise<HttpResult<Leaderboard>>;
@@ -603,7 +604,7 @@ export interface LeaderboardStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.leaderboard.load(row, { children: true });
+         * const full = await env.leaderboardDo.leaderboard.load(row, { children: true });
          * ```
          */
         load(self: Leaderboard, tree: IncludeTree<Leaderboard>): Promise<HttpResult<Leaderboard>>;
@@ -663,8 +664,8 @@ export interface LeaderboardEntryStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.db.prepare(sql).bind(id).all<LeaderboardEntry>()).results;
-         * return env.db.leaderboardEntry.hydrate(rows[0]);
+         * const rows = (await env.leaderboardDo.prepare(sql).bind(id).all<LeaderboardEntry>()).results;
+         * return env.leaderboardDo.leaderboardEntry.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<LeaderboardEntry>, tenantId: number): Promise<HttpResult<LeaderboardEntry>>;
@@ -685,7 +686,7 @@ export interface LeaderboardEntryStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.leaderboardEntry.load(row, { children: true });
+         * const full = await env.leaderboardDo.leaderboardEntry.load(row, { children: true });
          * ```
          */
         load(self: LeaderboardEntry, tree: IncludeTree<LeaderboardEntry>): Promise<HttpResult<LeaderboardEntry>>;
@@ -1017,6 +1018,170 @@ export interface OneToManyModelStore<E> {
          * ```
          */
         load(self: OneToManyModel, tree: IncludeTree<OneToManyModel>): Promise<HttpResult<OneToManyModel>>;
+}
+export interface RouteCarStore<E> {
+        /**
+         * Load a single `RouteCar` by key.
+         *
+         * @remarks Runs this precompiled read plan:
+         * ```
+         * SELECT PLAN (GET) `RouteCar` · 1 stage · 1 step
+         *
+         * STAGE 0
+         * └─ SYNTHESIZE INTO `result`
+         *    └─ `ownerId` = `$ownerId`
+         * ```
+         * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
+         */
+        get(ownerId: string): Promise<HttpResult<RouteCar>>;
+        /**
+         * List `RouteCar` rows in key order (seek-paginated).
+         *
+         * @remarks Runs this precompiled read plan:
+         * ```
+         * SELECT PLAN (LIST) `RouteCar` · 1 stage · 1 step
+         *
+         * STAGE 0
+         * └─ SYNTHESIZE INTO `result`
+         *    └─ `ownerId` = `$ownerId`
+         * ```
+         * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
+         */
+        list(): Promise<HttpResult<RouteCar[]>>;
+        /**
+         * Insert or update a `RouteCar` and every included relation.
+         *
+         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
+         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * derived from the payload's shape at runtime.
+         * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
+         */
+        save(model: DeepPartial<RouteCar>): Promise<HttpResult<RouteCar>>;
+        /**
+         * Hydrate one pre-loaded ("seeded") `RouteCar` row against this source's include tree.
+         *
+         * @param row The seeded root row, mutated in place and consumed. Do not reuse it afterward.
+         * @remarks Any relation already present on `row` (even `[]`) is authoritative and its fetch is
+         * skipped; unseeded relations are fetched off the plan, so `row` must carry their join keys.
+         * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
+         * @example
+         * ```ts
+         * const rows = await fetchRowsSomehow();
+         * return env.RouteCar.hydrate(rows[0]);
+         * ```
+         */
+        hydrate(row: DeepPartial<RouteCar>, ownerId: string): Promise<HttpResult<RouteCar>>;
+        /**
+         * Hydrate many pre-loaded ("seeded") `RouteCar` rows against this source's include tree.
+         *
+         * As {@link hydrate}, but for a list-shaped source: `rows` become the complete root set (the
+         * root fetch is skipped) and are mutated in place and consumed.
+         * @returns An {@link HttpResult} with the hydrated rows, or `400` on validation errors.
+         */
+        hydrateAll(rows: DeepPartial<RouteCar>[], ownerId: string): Promise<HttpResult<RouteCar[]>>;
+        /**
+         * Fill relations onto a value you already hold, against an include `tree`, returning a
+         * hydrated copy. Pure data in, pure data out: `self` is neither consumed nor mutated.
+         *
+         * @param self The `RouteCar` value to hydrate.
+         * @param tree An {@link IncludeTree} of the relations to load; leaves are `true`.
+         * @returns An {@link HttpResult} with the hydrated copy.
+         * @example
+         * ```ts
+         * const full = await env.RouteCar.load(row, { children: true });
+         * ```
+         */
+        load(self: RouteCar, tree: IncludeTree<RouteCar>): Promise<HttpResult<RouteCar>>;
+}
+export interface RouteOwnerStore<E> {
+        /**
+         * Load a single `RouteOwner` by key.
+         *
+         * @remarks Runs this precompiled read plan:
+         * ```
+         * SELECT PLAN (GET) `RouteOwner` · 1 stage · 3 steps
+         * INCLUDE
+         * ├─ `car`
+         * └─ `metadata`
+         *
+         * STAGE 0
+         * ├─ SYNTHESIZE INTO `result`
+         * │  ├─ `ownerId` = `$ownerId`
+         * │  └─ `modelYear` = `$modelYear`
+         * ├─ READ kv `MyKv` KEY "value/{`$ownerId`}/{`$modelYear`}" INTO `metadata`
+         * └─ SYNTHESIZE INTO `car`
+         *    └─ `ownerId` = `$ownerId`
+         * ```
+         * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
+         */
+        get(ownerId: string, modelYear: number): Promise<HttpResult<RouteOwner>>;
+        /**
+         * List `RouteOwner` rows in key order (seek-paginated).
+         *
+         * @remarks Runs this precompiled read plan:
+         * ```
+         * SELECT PLAN (LIST) `RouteOwner` · 1 stage · 3 steps
+         * INCLUDE
+         * ├─ `car`
+         * └─ `metadata`
+         *
+         * STAGE 0
+         * ├─ SYNTHESIZE INTO `result`
+         * │  ├─ `ownerId` = `$ownerId`
+         * │  └─ `modelYear` = `$modelYear`
+         * ├─ READ kv `MyKv` KEY "value/{`$ownerId`}/{`$modelYear`}" INTO `metadata`
+         * └─ SYNTHESIZE INTO `car`
+         *    └─ `ownerId` = `$ownerId`
+         * ```
+         * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
+         */
+        list(): Promise<HttpResult<RouteOwner[]>>;
+        /**
+         * Insert or update a `RouteOwner` and every included relation.
+         *
+         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
+         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * derived from the payload's shape at runtime.
+         * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
+         */
+        save(model: DeepPartial<RouteOwner>): Promise<HttpResult<RouteOwner>>;
+        /**
+         * Hydrate one pre-loaded ("seeded") `RouteOwner` row against this source's include tree.
+         *
+         * @param row The seeded root row, mutated in place and consumed. Do not reuse it afterward.
+         * @remarks Any relation already present on `row` (even `[]`) is authoritative and its fetch is
+         * skipped; unseeded relations are fetched off the plan, so `row` must carry their join keys.
+         * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
+         * @example
+         * ```ts
+         * const rows = await fetchRowsSomehow();
+         * return env.RouteOwner.hydrate(rows[0]);
+         * ```
+         */
+        hydrate(row: DeepPartial<RouteOwner>, ownerId: string, modelYear: number): Promise<HttpResult<RouteOwner>>;
+        /**
+         * Hydrate many pre-loaded ("seeded") `RouteOwner` rows against this source's include tree.
+         *
+         * As {@link hydrate}, but for a list-shaped source: `rows` become the complete root set (the
+         * root fetch is skipped) and are mutated in place and consumed.
+         * @returns An {@link HttpResult} with the hydrated rows, or `400` on validation errors.
+         */
+        hydrateAll(rows: DeepPartial<RouteOwner>[], ownerId: string, modelYear: number): Promise<HttpResult<RouteOwner[]>>;
+        /**
+         * Fill relations onto a value you already hold, against an include `tree`, returning a
+         * hydrated copy. Pure data in, pure data out: `self` is neither consumed nor mutated.
+         *
+         * @param self The `RouteOwner` value to hydrate.
+         * @param tree An {@link IncludeTree} of the relations to load; leaves are `true`.
+         * @returns An {@link HttpResult} with the hydrated copy.
+         * @example
+         * ```ts
+         * const full = await env.RouteOwner.load(row, { children: true });
+         * ```
+         */
+        load(self: RouteOwner, tree: IncludeTree<RouteOwner>): Promise<HttpResult<RouteOwner>>;
+        /** API route `RouteOwner.instanceMethod`. */
+        instanceMethod: (self: RouteOwner, input: string) => Promise<HttpResult<string>>;
 }
 export interface ToyotaPriusStore<E> {
         /**
@@ -1730,36 +1895,42 @@ export type Db_db<E> = Env.db & {
 };
 export type Kv_MyKv<E> = Env.MyKv & {
 };
-export type R2b_MyR2<E> = Env.MyR2 & {
+export type R2_MyR2<E> = Env.MyR2 & {
 };
 export type Do_GlobalDo<E> = Env.GlobalDo & {
-    globalSettings: Needs<E, "GlobalDo", GlobalSettingsStore<E>>;
+    globalSettings: Needs<E, "globalDo", GlobalSettingsStore<E>>;
 };
 export type Do_LeaderboardDo<E> = Env.LeaderboardDo & {
-    leaderboard: Needs<E, "LeaderboardDo", LeaderboardStore<E>>;
-    leaderboardEntry: Needs<E, "LeaderboardDo", LeaderboardEntryStore<E>>;
+    leaderboard: Needs<E, "leaderboardDo", LeaderboardStore<E>>;
+    leaderboardEntry: Needs<E, "leaderboardDo", LeaderboardEntryStore<E>>;
 };
 
 /**
  * The fully-upgraded Cloesce environment. Contains:
- * - every binding and injectable
- * - each binding carrying its model stores 
+ * - every binding (camelCased, e.g. `env.subRedditDb`) and injectable
+ * - each binding carrying its model stores
+ * - each unbacked model's store, directly (e.g. `env.Foo` for a model with no D1/DO binding)
+ *
+ * Bindings are reached only under their camelCased name; the raw `wrangler.toml` (capitalized)
+ * keys are omitted from `CfEnv` here, leaving Cloesce's own vars/injectables intact.
  */
-export interface FullEnv extends CfEnv {
+export type FullEnv = Omit<CfEnv, never | "db" | "MyKv" | "MyR2" | "GlobalDo" | "LeaderboardDo"> & {
+    RouteCar: RouteCarStore<FullEnv>;
+    RouteOwner: RouteOwnerStore<FullEnv>;
     db: Db_db<FullEnv>;
-    MyKv: Env.MyKv;
-    MyR2: Env.MyR2;
-    GlobalDo: Do_GlobalDo<FullEnv>;
-    LeaderboardDo: Do_LeaderboardDo<FullEnv>;
+    myKv: Env.MyKv;
+    myR2: Env.MyR2;
+    globalDo: Do_GlobalDo<FullEnv>;
+    leaderboardDo: Do_LeaderboardDo<FullEnv>;
     YouTubeApi: YouTubeApi;
-}
+};
 
 export namespace Env {
     export interface BasicServiceTopScores {
-        LeaderboardDo: Do_LeaderboardDo<BasicServiceTopScores>;
+        leaderboardDo: Do_LeaderboardDo<BasicServiceTopScores>;
     }
     export interface BasicServiceGlobalConfig {
-        GlobalDo: Do_GlobalDo<BasicServiceGlobalConfig>;
+        globalDo: Do_GlobalDo<BasicServiceGlobalConfig>;
     }
     export interface ModelWithCompositePkInstanceMethod {
         db: Db_db<ModelWithCompositePkInstanceMethod>;

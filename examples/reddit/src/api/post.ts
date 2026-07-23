@@ -11,19 +11,19 @@ export const post: clo.Api.Post.Of = {
       return username;
     }
 
-    if (!(await env.SubRedditDb.subReddit.get(subRedditId)).ok) {
+    if (!(await env.subRedditDb.subReddit.get(subRedditId)).ok) {
       return HttpResult.fail(404, "No such subreddit.");
     }
 
     const doId = crypto.randomUUID();
     const meta = { title, content, authorName: username, upvotes: 0 };
 
-    const savePost = env.PostDo.post.save(doId, { doId, meta });
-    const saveSubReddit = env.SubRedditDb.subReddit.save({
+    const savePost = env.postDo.post.save(doId, { doId, meta });
+    const saveSubReddit = env.subRedditDb.subReddit.save({
       id: subRedditId,
       posts: [{ postId: doId, subRedditId }],
     });
-    const saveUser = env.UserDo.user.save(username, { authoredPosts: [{ postId: doId }] });
+    const saveUser = env.userDo.user.save(username, { authoredPosts: [{ postId: doId }] });
 
     const [saved] = await Promise.all([savePost, saveSubReddit, saveUser]);
     return saved.data!;
@@ -38,7 +38,7 @@ export const post: clo.Api.Post.Of = {
     // A Post's upvotes live in its KV-backed meta, not in SQL.
     const clampDelta = delta >= 0 ? 1 : -1;
     const meta = { ...self.meta, upvotes: self.meta.upvotes + clampDelta };
-    return env.PostDo.post.save(self.doId, { meta });
+    return env.postDo.post.save(self.doId, { meta });
   },
 };
 
@@ -49,7 +49,7 @@ export const comment: clo.Api.Comment.Of = {
       return username;
     }
 
-    const saved = await env.PostDo.comment.save(postId, {
+    const saved = await env.postDo.comment.save(postId, {
       authorName: username,
       content,
       upvotes: 0,
@@ -59,7 +59,7 @@ export const comment: clo.Api.Comment.Of = {
     }
 
     const comment = saved.data!;
-    await env.UserDo.user.save(username, {
+    await env.userDo.user.save(username, {
       authoredComments: [{ postId, commentId: comment.id }],
     });
 
@@ -73,7 +73,7 @@ export const comment: clo.Api.Comment.Of = {
     }
 
     const clampDelta = delta >= 0 ? 1 : -1;
-    return env.PostDo.comment.save(self.doId, {
+    return env.postDo.comment.save(self.doId, {
       ...self,
       upvotes: self.upvotes + clampDelta,
     });
@@ -89,7 +89,7 @@ export class PostDo extends DurableObject<clo.CfEnv> {
   async fetch(request: Request): Promise<Response> {
     const app = this.base.register(
       clo.AuthUser,
-      await authFromRequest(this.base.env.Sessions, request),
+      await authFromRequest(this.base.env.sessions, request),
     );
     return app.run(request);
   }

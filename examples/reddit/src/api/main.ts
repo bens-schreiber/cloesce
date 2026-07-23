@@ -35,7 +35,7 @@ export default {
     const builder = app(env);
     const withAuth = builder.register(
       clo.AuthUser,
-      await authFromRequest(builder.env.Sessions, request),
+      await authFromRequest(builder.env.sessions, request),
     );
     const res = await withAuth.run(request);
 

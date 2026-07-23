@@ -40,13 +40,13 @@ const subReddit: Api.SubReddit.Of = {
 
 const custom: Api.Post.Custom = {
   get(env, id, subId) {
-    return env.SubRedditDo.post.get(subId, id);
+    return env.subRedditDo.post.get(subId, id);
   },
   list(env, subId) {
-    return env.SubRedditDo.post.list(subId, 0, 100);
+    return env.subRedditDo.post.list(subId, 0, 100);
   },
   save(env, post, subId) {
-    return env.SubRedditDo.post.save(subId, post);
+    return env.subRedditDo.post.save(subId, post);
   },
 };
 

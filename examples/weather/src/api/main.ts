@@ -5,7 +5,7 @@ const weatherReport: Api.WeatherReport.Of = {};
 
 const weather: Api.Weather.Of = {
   async uploadPhoto(self, env, stream) {
-    await env.Bucket.photos.put(self.id, stream);
+    await env.bucket.photos.put(self.id, stream);
   },
 
   downloadPhoto(self) {

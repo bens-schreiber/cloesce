@@ -11,8 +11,8 @@ import { CloesceError, CloesceResult, InternalError } from "../common.js";
  */
 export type Registry = Map<string, any>;
 
-function storeKey(modelName: string): string {
-  return modelName.length === 0 ? modelName : modelName[0].toLowerCase() + modelName.slice(1);
+function storeKey(name: string): string {
+  return name.length === 0 ? name : name[0].toLowerCase() + name.slice(1);
 }
 
 /**
@@ -42,11 +42,12 @@ export function overlayTraps(fallback: any): ProxyHandler<any> {
 
 /**
  * @internal
- * Upgrade a raw Cloudflare binding in place with Cloesce's field helpers, reached under its
- * declared name (e.g. `env.SubRedditDb`).
+ * Upgrade a raw Cloudflare binding with Cloesce's field helpers and expose it under its
+ * camelCased name (e.g. `env.subRedditDb`).
  *
- * Binding is assigned in place so it stays a real `D1Database` / `KVNamespace` / ... that native
- * host APIs accept. Model stores are added later by {@link attachStores}.
+ * Helpers are assigned onto the raw binding in place so it stays a real `D1Database` /
+ * `KVNamespace` / ... that native host APIs accept and every handle forwards them. The
+ * camelCased handle is what callers use; model stores are added later by {@link attachStores}.
  */
 export function attachBinding(env: any, rawName: string, helpers: object = {}): void {
   const raw = env[rawName];
@@ -54,19 +55,21 @@ export function attachBinding(env: any, rawName: string, helpers: object = {}): 
     return;
   }
   Object.assign(raw, helpers);
+  bindingHandle(env, rawName);
 }
 
 /** Return the handle for a binding on `env`. */
-function ownBindingHandle(env: any, binding: string): any {
-  if (Object.prototype.hasOwnProperty.call(env, binding)) {
-    return env[binding];
+function bindingHandle(env: any, binding: string): any {
+  const key = storeKey(binding);
+  if (Object.prototype.hasOwnProperty.call(env, key)) {
+    return env[key];
   }
   const raw = env[binding];
   if (raw == null) {
     return undefined;
   }
   const handle = new Proxy({}, overlayTraps(raw));
-  Object.defineProperty(env, binding, { value: handle, enumerable: true, configurable: true });
+  Object.defineProperty(env, key, { value: handle, enumerable: true, configurable: true });
   return handle;
 }
 
@@ -297,7 +300,7 @@ export function attachStores(env: any, cidl: Cidl, registry: Registry): void {
 
     const binding = model.backing?.binding;
     if (binding) {
-      const handle = ownBindingHandle(env, binding);
+      const handle = bindingHandle(env, binding);
       if (handle != null) {
         handle[storeKey(model.name)] = store;
       }

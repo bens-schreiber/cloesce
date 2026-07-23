@@ -8,9 +8,9 @@ export const user: clo.Api.User.Of = {
   async login(env, username) {
     // Logging in just claims a username
     const token = newToken();
-    await env.Sessions.session.put(token, username);
+    await env.sessions.session.put(token, username);
 
-    const found = await env.UserDo.user.get(username);
+    const found = await env.userDo.user.get(username);
     const user = found.data ?? {
       name: username,
       authoredSubReddits: [],
@@ -22,11 +22,11 @@ export const user: clo.Api.User.Of = {
   },
 
   async uploadAvatar(self, env, image) {
-    await env.Avatar.avatar.put(self.name, image);
+    await env.avatar.avatar.put(self.name, image);
   },
 
   async downloadAvatar(self, env) {
-    const object = await env.Avatar.avatar.get(self.name);
+    const object = await env.avatar.avatar.get(self.name);
     return object ? HttpResult.ok(200, object.body) : HttpResult.fail(404, "No avatar set.");
   },
 };

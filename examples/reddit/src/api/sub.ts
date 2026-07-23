@@ -8,12 +8,12 @@ export default {
       return username;
     }
 
-    const sub = await env.SubRedditDb.subReddit.save({ title, description, posts: [] });
+    const sub = await env.subRedditDb.subReddit.save({ title, description, posts: [] });
     if (!sub.ok) {
       return sub;
     }
 
-    await env.UserDo.user.save(username, {
+    await env.userDo.user.save(username, {
       authoredSubReddits: [{ subRedditId: sub.data!.id }],
     });
 
@@ -21,7 +21,7 @@ export default {
   },
 
   async feed(self, env) {
-    const full = await env.SubRedditDb.subReddit.load(self, {
+    const full = await env.subRedditDb.subReddit.load(self, {
       posts: {
         post: {
           meta: {},

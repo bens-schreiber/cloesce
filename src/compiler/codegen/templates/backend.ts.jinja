@@ -76,8 +76,8 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @example
          * ```ts
 {%- if let Some(binding) = model_binding(model) %}
-         * const rows = (await env.{{ binding }}.prepare(sql).bind(id).all<{{ model.name }}>()).results;
-         * return env.{{ binding }}.{{ store_key(model.name) }}.hydrate(rows[0]);
+         * const rows = (await env.{{ store_key(binding) }}.prepare(sql).bind(id).all<{{ model.name }}>()).results;
+         * return env.{{ store_key(binding) }}.{{ store_key(model.name) }}.hydrate(rows[0]);
 {%- else %}
          * const rows = await fetchRowsSomehow();
          * return env.{{ model.name }}.hydrate(rows[0]);
@@ -104,7 +104,7 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @example
          * ```ts
 {%- if let Some(binding) = model_binding(model) %}
-         * const full = await env.{{ binding }}.{{ store_key(model.name) }}.load(row, { children: true });
+         * const full = await env.{{ store_key(binding) }}.{{ store_key(model.name) }}.load(row, { children: true });
 {%- else %}
          * const full = await env.{{ model.name }}.load(row, { children: true });
 {%- endif %}
@@ -126,7 +126,7 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 {%- endmacro -%}
 
 {%- macro route_needs(api) -%}
-{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{{ b }}"{% endfor -%}
+{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{% if is_injectable(b) %}{{ b }}{% else %}{{ store_key(b) }}{% endif %}"{% endfor -%}
 {%- endmacro -%}
 
 /**
@@ -275,6 +275,9 @@ export namespace Env {
 
 /** @internal */
 function upgradeBindings(env: CfEnv): void {
+{%- for b in &idl.wrangler_env.d1_bindings %}
+    attachBinding(env, "{{ b }}");
+{%- endfor %}
 {%- for b in &idl.wrangler_env.kv_bindings %}
     attachBinding(env, "{{ b.name }}", {{ b.name }}Helpers(env.{{ b.name }}));
 {%- endfor %}
@@ -358,74 +361,81 @@ export interface {{ model.name }}{{ ds.name }}Source {
 {%- for binding in &idl.wrangler_env.d1_bindings %}
 export type Db_{{ binding }}<E> = Env.{{ binding }} & {
 {%- for m in binding_models(binding) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ binding }}", {{ m.name }}Store<E>>;
+    {{ store_key(m.name) }}: Needs<E, "{{ store_key(binding) }}", {{ m.name }}Store<E>>;
 {%- endfor %}
 };
 {%- endfor %}
 {%- for b in &idl.wrangler_env.kv_bindings %}
 export type Kv_{{ b.name }}<E> = Env.{{ b.name }} & {
 {%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ b.name }}", {{ m.name }}Store<E>>;
+    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
 {%- endfor %}
 };
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
-export type R2b_{{ b.name }}<E> = Env.{{ b.name }} & {
+export type R2_{{ b.name }}<E> = Env.{{ b.name }} & {
 {%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ b.name }}", {{ m.name }}Store<E>>;
+    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
 {%- endfor %}
 };
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
 export type Do_{{ b.name }}<E> = Env.{{ b.name }} & {
 {%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ b.name }}", {{ m.name }}Store<E>>;
+    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
 {%- endfor %}
 };
 {%- endfor %}
 
 /**
  * The fully-upgraded Cloesce environment. Contains:
- * - every binding and injectable
+ * - every binding (camelCased, e.g. `env.subRedditDb`) and injectable
  * - each binding carrying its model stores
  * - each unbacked model's store, directly (e.g. `env.Foo` for a model with no D1/DO binding)
+ *
+ * Bindings are reached only under their camelCased name; the raw `wrangler.toml` (capitalized)
+ * keys are omitted from `CfEnv` here, leaving Cloesce's own vars/injectables intact.
  */
-export interface FullEnv extends CfEnv {
+export type FullEnv = Omit<CfEnv, never
+{%- for binding in &idl.wrangler_env.d1_bindings %} | "{{ binding }}"{%- endfor %}
+{%- for b in &idl.wrangler_env.kv_bindings %} | "{{ b.name }}"{%- endfor %}
+{%- for b in &idl.wrangler_env.r2_bindings %} | "{{ b.name }}"{%- endfor %}
+{%- for b in &idl.wrangler_env.durable_bindings %} | "{{ b.name }}"{%- endfor %}> & {
 {%- for model in unbacked_models_with_store() %}
     {{ model.name }}: {{ model.name }}Store<FullEnv>;
 {%- endfor %}
 {%- for binding in &idl.wrangler_env.d1_bindings %}
 {%- if binding_hosts_models(binding) %}
-    {{ binding }}: Db_{{ binding }}<FullEnv>;
+    {{ store_key(binding) }}: Db_{{ binding }}<FullEnv>;
 {%- else %}
-    {{ binding }}: Env.{{ binding }};
+    {{ store_key(binding) }}: Env.{{ binding }};
 {%- endif %}
 {%- endfor %}
 {%- for b in &idl.wrangler_env.kv_bindings %}
 {%- if binding_hosts_models(b.name) %}
-    {{ b.name }}: Kv_{{ b.name }}<FullEnv>;
+    {{ store_key(b.name) }}: Kv_{{ b.name }}<FullEnv>;
 {%- else %}
-    {{ b.name }}: Env.{{ b.name }};
+    {{ store_key(b.name) }}: Env.{{ b.name }};
 {%- endif %}
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
 {%- if binding_hosts_models(b.name) %}
-    {{ b.name }}: R2b_{{ b.name }}<FullEnv>;
+    {{ store_key(b.name) }}: R2_{{ b.name }}<FullEnv>;
 {%- else %}
-    {{ b.name }}: Env.{{ b.name }};
+    {{ store_key(b.name) }}: Env.{{ b.name }};
 {%- endif %}
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
 {%- if binding_hosts_models(b.name) %}
-    {{ b.name }}: Do_{{ b.name }}<FullEnv>;
+    {{ store_key(b.name) }}: Do_{{ b.name }}<FullEnv>;
 {%- else %}
-    {{ b.name }}: Env.{{ b.name }};
+    {{ store_key(b.name) }}: Env.{{ b.name }};
 {%- endif %}
 {%- endfor %}
 {%- for inject in &idl.injects %}
     {{ inject }}: {{ inject }};
 {%- endfor %}
-}
+};
 
 export namespace Env {
 {%- for (_key, model) in &idl.models %}
@@ -436,7 +446,7 @@ export namespace Env {
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
 {%- else %}
-        {{ b }}: {{ binding_prefix(b) }}_{{ b }}<{{ route_env_name(model, api) }}>;
+        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ route_env_name(model, api) }}>;
 {%- endif %}
 {%- endfor %}
     }
@@ -449,7 +459,7 @@ export namespace Env {
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
 {%- else %}
-        {{ b }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Get>;
+        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Get>;
 {%- endif %}
 {%- endfor %}
     }
@@ -460,7 +470,7 @@ export namespace Env {
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
 {%- else %}
-        {{ b }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}List>;
+        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}List>;
 {%- endif %}
 {%- endfor %}
     }
@@ -471,7 +481,7 @@ export namespace Env {
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
 {%- else %}
-        {{ b }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Save>;
+        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Save>;
 {%- endif %}
 {%- endfor %}
     }
