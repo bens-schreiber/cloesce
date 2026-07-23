@@ -1,34 +1,29 @@
 import {
-  cloesce,
-  CfEnv,
+  createApp,
+  Worker,
   ModelWithKv,
   KVOnly,
   KVSibling,
   AppConfig,
   KVOnlyWithSingleton,
+  type Api,
+  type CfEnv,
 } from "./backend.js";
 
-const ModelWithKvImpl = ModelWithKv.impl({
+const modelWithKv: Api.ModelWithKv.Of = {
   acceptKvObject(item) {
     return item;
   },
-});
-
-const KVOnlyImpl = KVOnly.impl({});
-const KVSiblingImpl = KVSibling.impl({});
-const AppConfigImpl = AppConfig.impl({});
-const KVOnlyWithSingletonImpl = KVOnlyWithSingleton.impl({});
+};
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(
-      ModelWithKvImpl,
-      KVOnlyImpl,
-      KVSiblingImpl,
-      AppConfigImpl,
-      KVOnlyWithSingletonImpl,
-    );
-    return await app.run(request);
+    return createApp(env, Worker)
+      .register(ModelWithKv, modelWithKv)
+      .register(KVOnly, {})
+      .register(KVSibling, {})
+      .register(AppConfig, {})
+      .register(KVOnlyWithSingleton, {})
+      .run(request);
   },
 };

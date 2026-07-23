@@ -1,30 +1,16 @@
 import { DurableObject } from "cloudflare:workers";
-import { DurableObjectState } from "@cloudflare/workers-types";
-import { CloesceApp } from "cloesce";
-import * as clo from "./backend.js";
+import { createApp, Worker, LibraryDoHost, Author, Book, type CfEnv } from "./backend.js";
 import libraryDoInitial from "./migrations/LibraryDo/Initial.js";
 
-const Author = clo.Author.impl({});
-const Book = clo.Book.impl({});
-
-export class LibraryDo extends DurableObject<clo.CfEnv> {
-  private app: CloesceApp;
-
-  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
-    super(ctx, env);
-    this.app = clo.cloesce(env, this, [libraryDoInitial]);
-    this.app.register(Book);
-  }
-
+export class LibraryDo extends DurableObject<CfEnv> {
+  private base = createApp(this, LibraryDoHost, [libraryDoInitial]).register(Book, {});
   async fetch(request: Request): Promise<Response> {
-    return await this.app.run(request);
+    return this.base.run(request);
   }
 }
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(Author, Book);
-    return await app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker).register(Author, {}).register(Book, {}).run(request);
   },
 };

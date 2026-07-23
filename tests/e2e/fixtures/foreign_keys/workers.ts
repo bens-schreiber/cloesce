@@ -1,48 +1,62 @@
-import * as clo from "./backend.js";
+import {
+  createApp,
+  Worker,
+  A,
+  B,
+  Course,
+  Person,
+  Student,
+  Dog,
+  CourseStudent,
+  type Api,
+  type CfEnv,
+} from "./backend.js";
 
-const A = clo.A.impl({
-  async create(e, a) {
-    return (await this.Orm.save(e, a)).value!;
+const a: Api.A.Of = {
+  create(env, model) {
+    return env.db.a.save(model);
   },
   withoutB(self) {
     return self;
   },
-});
+};
 
-const B = clo.B.impl({
+const b: Api.B.Of = {
   testMethod() {},
-});
+};
 
-const Person = clo.Person.impl({
-  async create(e, person) {
-    return (await this.Default.save(e, person)) as any;
+const person: Api.Person.Of = {
+  create(env, model) {
+    return env.db.person.save(model);
   },
-
   withoutDogs(self) {
     return self;
   },
-});
+};
 
-const Dog = clo.Dog.impl({
+const dog: Api.Dog.Of = {
   testMethod() {},
-});
+};
 
-const Student = clo.Student.impl({
-  async create(e, student) {
-    return (await this.WithCoursesStudentsCourses.save(e, student)) as any;
+const student: Api.Student.Of = {
+  create(env, model) {
+    return env.db.student.withCoursesStudentsCourses.save(model);
   },
   none(self) {
     return self;
   },
-});
-
-const Course = clo.Course.impl({});
+};
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(A, B, Person, Dog, Student, Course);
-
-    return await app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker)
+      .register(A, a)
+      .register(B, b)
+      .register(Person, person)
+      .register(Dog, dog)
+      .register(Student, student)
+      .register(Course, {})
+      .register(CourseStudent, {})
+      .run(request);
   },
 };

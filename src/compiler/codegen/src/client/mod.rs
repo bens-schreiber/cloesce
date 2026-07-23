@@ -35,11 +35,11 @@ struct ClientTemplate<'src> {
 
 impl ClientTemplate<'_> {
     fn map_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(ty, self.idl)
+        self.mapper.cidl_type(ty)
     }
 
     fn map_root_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(ty.root_type(), self.idl)
+        self.mapper.cidl_type(ty.root_type())
     }
 
     fn map_media(&self, ty: &MediaType) -> String {
@@ -55,7 +55,7 @@ impl ClientTemplate<'_> {
                 name: nav.model_reference,
             }),
         };
-        self.mapper.cidl_type(&cidl_type, self.idl)
+        self.mapper.cidl_type(&cidl_type)
     }
 
     fn is_kv_object(&self, ty: &CidlType<'_>) -> bool {

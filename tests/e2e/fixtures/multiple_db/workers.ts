@@ -1,9 +1,7 @@
-import { cloesce, DB1Model, DB2Model, CfEnv } from "./backend.js";
+import { createApp, Worker, DB1Model, DB2Model, type CfEnv } from "./backend.js";
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = cloesce(env);
-    app.register(DB1Model.impl({}), DB2Model.impl({}));
-    return await app.run(request);
+    return createApp(env, Worker).register(DB1Model, {}).register(DB2Model, {}).run(request);
   },
 };

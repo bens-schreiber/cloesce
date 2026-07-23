@@ -1,8 +1,8 @@
 import { HttpResult } from "cloesce";
-import * as clo from "./backend.js";
+import { createApp, Worker, BlobService, BlobHaver, type Api, type CfEnv } from "./backend.js";
 
-const BlobService = clo.BlobService.impl({
-  incrementBlob(blob: Uint8Array) {
+const blobService: Api.BlobService.Of = {
+  incrementBlob(blob) {
     if (!(blob instanceof Uint8Array)) {
       throw new Error(`Received blob was not an instance of uint8array: ${JSON.stringify(blob)}`);
     }
@@ -13,25 +13,22 @@ const BlobService = clo.BlobService.impl({
       blob.map((b) => b + 1),
     );
   },
-});
+};
 
-const BlobHaver = clo.BlobHaver.impl({
+const blobHaver: Api.BlobHaver.Of = {
   // Returns a stream of its own blob1 column
-  yieldStream(self: clo.BlobHaver.Self): HttpResult<ReadableStream> {
+  yieldStream(self) {
     const blob1 = self.blob1;
-    return HttpResult.ok(
-      200,
-      new ReadableStream({
-        start(controller) {
-          controller.enqueue(blob1);
-          controller.close();
-        },
-      }) as any,
-    );
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(blob1);
+        controller.close();
+      },
+    });
   },
 
-  getBlob1(self: clo.BlobHaver.Self) {
-    return HttpResult.ok(200, self.blob1);
+  getBlob1(self) {
+    return self.blob1;
   },
 
   // Accepts some stream and validates that it sent [1, 2, 3, 4, 5]
@@ -53,13 +50,13 @@ const BlobHaver = clo.BlobHaver.impl({
 
     return HttpResult.ok(200);
   },
-});
+};
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(BlobService, BlobHaver);
-
-    return app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker)
+      .register(BlobService, blobService)
+      .register(BlobHaver, blobHaver)
+      .run(request);
   },
 };

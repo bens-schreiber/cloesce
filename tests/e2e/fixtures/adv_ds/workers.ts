@@ -1,7 +1,16 @@
-import * as clo from "./backend.js";
+import {
+  createApp,
+  Worker,
+  Hamburger,
+  Topping,
+  HamburgerTopping,
+  DefaultOverride,
+  type Api,
+  type CfEnv,
+} from "./backend.js";
 import { HttpResult } from "cloesce";
 
-const NoLettuce = clo.Hamburger.NoLettuce.impl({
+const noLettuce: Api.Hamburger.NoLettuce = {
   async get(env, id) {
     const burger = await env.db
       .prepare(`SELECT "id", "name" FROM "Hamburger" WHERE "id" = ?1`)
@@ -21,11 +30,12 @@ const NoLettuce = clo.Hamburger.NoLettuce.impl({
         .bind(id)
         .all()
     ).results;
-    return await this.hydrate(env, { ...burger, toppings } as never);
-  },
-});
 
-const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
+    return env.db.hamburger.noLettuce.hydrate({ ...burger, toppings });
+  },
+};
+
+const onlyBacon: Api.Hamburger.OnlyBacon = {
   async get(env, id) {
     const burger = await env.db
       .prepare(`SELECT "id", "name" FROM "Hamburger" WHERE "id" = ?1`)
@@ -45,11 +55,11 @@ const OnlyBacon = clo.Hamburger.OnlyBacon.impl({
         .bind(id)
         .all()
     ).results;
-    return await this.hydrate(env, { ...burger, toppings });
+    return env.db.hamburger.onlyBacon.hydrate({ ...burger, toppings });
   },
-});
+};
 
-const BurgersWithLettuceOrdered = clo.Hamburger.BurgersWithLettuceOrdered.impl({
+const burgersWithLettuceOrdered: Api.Hamburger.BurgersWithLettuceOrdered = {
   async list(env, lastId, limit) {
     const rows = (
       await env.db
@@ -64,11 +74,11 @@ const BurgersWithLettuceOrdered = clo.Hamburger.BurgersWithLettuceOrdered.impl({
         .bind(lastId, limit)
         .all()
     ).results;
-    return await this.hydrateAll(env, rows);
+    return env.db.hamburger.burgersWithLettuceOrdered.hydrateAll(rows);
   },
-});
+};
 
-const Hamburger = clo.Hamburger.impl({
+const hamburger: Api.Hamburger.Of = {
   noLettuceToppings(self) {
     return self.toppings.map((t) => t.topping);
   },
@@ -77,30 +87,29 @@ const Hamburger = clo.Hamburger.impl({
     return self.toppings.map((t) => t.topping);
   },
 
-  BurgersWithLettuceOrdered,
-  NoLettuce,
-  OnlyBacon,
-});
+  BurgersWithLettuceOrdered: burgersWithLettuceOrdered,
+  NoLettuce: noLettuce,
+  OnlyBacon: onlyBacon,
+};
 
-const Topping = clo.Topping.impl({});
-
-const Default = clo.DefaultOverride.Default.impl({
-  get() {
-    return { id: Number.MAX_VALUE };
+const defaultOverride: Api.DefaultOverride.Of = {
+  Default: {
+    get() {
+      return HttpResult.ok(200, { id: Number.MAX_VALUE });
+    },
+    list() {
+      return HttpResult.ok(200, [{ id: Number.MAX_VALUE }]);
+    },
   },
-  list() {
-    return [{ id: Number.MAX_VALUE }];
-  },
-});
-
-const DefaultOverride = clo.DefaultOverride.impl({
-  Default,
-});
+};
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(Hamburger, Topping, DefaultOverride);
-    return app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker)
+      .register(Hamburger, hamburger)
+      .register(Topping, {})
+      .register(HamburgerTopping, {})
+      .register(DefaultOverride, defaultOverride)
+      .run(request);
   },
 };

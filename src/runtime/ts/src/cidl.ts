@@ -170,6 +170,8 @@ export interface DataSource {
   list: DataSourceMethod;
   save: DataSourceMethod;
   is_internal: boolean;
+  get_plan?: unknown;
+  list_plan?: unknown;
 }
 
 export interface WranglerEnv {

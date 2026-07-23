@@ -19,6 +19,7 @@
 - Self referential FKs are allowed
 - Route fields are allowed on any Model
 - All CRUD operations are always supported on all Models
+- Reworked the backend API surface significantly (removed `impl` blocks, expanded on the upgraded `env` to include "Model Stores").
 
 ### Fixed
 

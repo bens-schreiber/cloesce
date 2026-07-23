@@ -34,6 +34,7 @@ type DurableStorage = {
   transactionSync?<T>(closure: () => T): T;
 };
 
+/** @internal */
 export class Orm {
   private constructor(private env: any) {}
 

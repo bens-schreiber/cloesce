@@ -1,87 +1,84 @@
 import { DurableObject } from "cloudflare:workers";
-import { DurableObjectState } from "@cloudflare/workers-types";
-import { CloesceApp } from "cloesce";
-import * as clo from "./backend.js";
+import {
+  createApp,
+  Worker,
+  GlobalDoHost,
+  SubRedditDoHost,
+  Global,
+  SubReddit,
+  Post,
+  Comment,
+  type Api,
+  type CfEnv,
+  KValue,
+} from "./backend.js";
 import globalDoInitial from "./migrations/GlobalDo/Initial.js";
 import subRedditDoInitial from "./migrations/SubRedditDo/Initial.js";
 
-const Global = clo.Global.impl({
+const global: Api.Global.Of = {
   newGlobal() {
-    return { metadata: "default" } as clo.Global.Self;
+    return { metadata: "default" } as Global;
   },
-
   getMetadata(self) {
     return self.metadata;
   },
-});
+};
 
-const SubReddit = clo.SubReddit.impl({
+const subReddit: Api.SubReddit.Of = {
   newSubReddit() {
-    // mock, return a default
     return {
       subId: 0,
       metadata: "default",
-      globalMetadata: { raw: "default" },
-    } as clo.SubReddit.Self;
+      globalMetadata: new KValue({ raw: "default" }),
+      posts: [],
+    } as SubReddit;
   },
-
   async feed(self) {
     return self.posts;
   },
-});
+};
 
-const PostCustomDs = clo.Post.Custom.impl({
-  async get(env, id, subId) {
-    return await Post.Default.get(env, subId, id);
+const custom: Api.Post.Custom = {
+  get(env, id, subId) {
+    return env.SubRedditDo.post.get(subId, id);
   },
-
-  async list(env, subId) {
-    return await Post.Default.list(env, subId, 0, 100);
+  list(env, subId) {
+    return env.SubRedditDo.post.list(subId, 0, 100);
   },
-
-  async save(env, post, subId) {
-    return await Post.Default.save(env, subId, post);
+  save(env, post, subId) {
+    return env.SubRedditDo.post.save(subId, post);
   },
-});
+};
 
-const Post = clo.Post.impl({
-  Custom: PostCustomDs,
-});
+const post: Api.Post.Of = {
+  Custom: custom,
+};
 
-const Comment = clo.Comment.impl({});
-
-export class GlobalDo extends DurableObject<clo.CfEnv> {
-  private app: CloesceApp;
-
-  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
-    super(ctx, env);
-    this.app = clo.cloesce(env, this, [globalDoInitial]);
-    this.app.register(Global);
-  }
+export class GlobalDo extends DurableObject<CfEnv> {
+  private app = createApp(this, GlobalDoHost, [globalDoInitial]).register(Global, global);
 
   async fetch(request: Request): Promise<Response> {
-    return await this.app.run(request);
+    return this.app.run(request);
   }
 }
 
-export class SubRedditDo extends DurableObject<clo.CfEnv> {
-  private app: CloesceApp;
-
-  constructor(ctx: DurableObjectState, env: clo.CfEnv) {
-    super(ctx, env);
-    this.app = clo.cloesce(env, this, [subRedditDoInitial]);
-    this.app.register(SubReddit, Post, Comment);
-  }
-
+export class SubRedditDo extends DurableObject<CfEnv> {
+  private base = createApp(this, SubRedditDoHost, [subRedditDoInitial])
+    .register(SubReddit, subReddit)
+    .register(Post, post)
+    .register(Comment, {});
   async fetch(request: Request): Promise<Response> {
-    return await this.app.run(request);
+    return this.base.run(request);
   }
 }
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(Global, SubReddit, Post, Comment);
-    return await app.run(request);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env, Worker)
+      .register(Global, global)
+      .register(SubReddit, subReddit)
+      .register(Post, post)
+      .register(Comment, {})
+      .run(request);
   },
 };

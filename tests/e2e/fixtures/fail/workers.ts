@@ -1,6 +1,6 @@
-import * as clo from "./backend.js";
+import { createApp, Worker, FailModel, type Api, type CfEnv } from "./backend.js";
 
-export const FailModel = clo.FailModel.impl({
+const failModel: Api.FailModel.Of = {
   throwingMethod() {
     throw new Error("intentional failure from throwingMethod");
   },
@@ -8,15 +8,15 @@ export const FailModel = clo.FailModel.impl({
   numericValidators() {},
 
   stringValidators() {},
-});
+};
 
 export default {
-  async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
-    const app = clo.cloesce(env);
-    app.register(FailModel);
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    // NOTE: UnregisteredService is intentionally NOT registered, to exercise the
+    // NotImplemented (501) router branch
+    const app = createApp(env, Worker).register(FailModel, failModel);
 
-    // NOTE: UnregisteredService is intentionally NOT registered, to exercise
-    // the NotImplemented (501) router branch.
-    return await app.run(request);
+    // @ts-expect-error
+    return (app as { run(request: Request): Promise<Response> }).run(request);
   },
 };
