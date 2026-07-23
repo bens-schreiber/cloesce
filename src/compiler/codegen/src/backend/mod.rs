@@ -103,6 +103,27 @@ impl<'src> BackendTemplate<'src> {
             .collect()
     }
 
+    /// True if the model has a store to expose (a data source, from SQL columns, a KV/R2 field,
+    /// or otherwise). Mirrors the runtime's `attachStores` skip condition.
+    fn model_has_store(&self, model: &Model<'src>) -> bool {
+        !model.data_sources.is_empty()
+    }
+
+    /// The binding name a backed model's store is reached under (`env.<binding>.<model>`), if any.
+    fn model_binding<'a>(&self, model: &'a Model<'src>) -> Option<&'a str> {
+        model.backing.as_ref().map(|b| b.binding)
+    }
+
+    /// Models with a store but no D1/DO binding, in schema order. These are exposed directly at
+    /// `env.<Model>` instead of nested under a binding handle.
+    fn unbacked_models_with_store(&self) -> Vec<&Model<'src>> {
+        self.idl
+            .models
+            .values()
+            .filter(|m| m.backing.is_none() && self.model_has_store(m))
+            .collect()
+    }
+
     /// User-authored routes (excludes generated `$crud` methods).
     fn user_routes<'a>(&self, model: &'a Model<'src>) -> Vec<&'a ApiMethod<'src>> {
         model

@@ -261,6 +261,8 @@ const STORE_REGISTRY_KEY = "__cloesceStores";
  * - Each store is recorded in `env.__cloesceStores` so `self` hydration and CRUD dispatch can
  *   find it.
  * - Models backed by a D1/DO binding are exposed at the user-facing `env.<binding>.<model>`.
+ * - Models with a data source but no binding (KV/R2-only, or route-only with API routes) are
+ *   exposed directly at `env.<model>` instead.
  * - Verbs and routes are env-bound (they close over `env`), so callers never re-pass `env`.
  */
 export function attachStores(env: any, cidl: Cidl, registry: Registry): void {
@@ -299,6 +301,8 @@ export function attachStores(env: any, cidl: Cidl, registry: Registry): void {
       if (handle != null) {
         handle[storeKey(model.name)] = store;
       }
+    } else {
+      env[model.name] = store;
     }
   }
 }

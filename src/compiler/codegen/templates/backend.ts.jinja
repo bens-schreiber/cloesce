@@ -75,8 +75,13 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.db.prepare(sql).bind(id).all<{{ model.name }}>()).results;
-         * return env.db.{{ store_key(model.name) }}.hydrate(rows[0]);
+{%- if let Some(binding) = model_binding(model) %}
+         * const rows = (await env.{{ binding }}.prepare(sql).bind(id).all<{{ model.name }}>()).results;
+         * return env.{{ binding }}.{{ store_key(model.name) }}.hydrate(rows[0]);
+{%- else %}
+         * const rows = await fetchRowsSomehow();
+         * return env.{{ model.name }}.hydrate(rows[0]);
+{%- endif %}
          * ```
          */
         hydrate(row: DeepPartial<{{ model.name }}>{{ route_field_extra(model) }}): Promise<HttpResult<{{ model.name }}>>;
@@ -98,7 +103,11 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.{{ store_key(model.name) }}.load(row, { children: true });
+{%- if let Some(binding) = model_binding(model) %}
+         * const full = await env.{{ binding }}.{{ store_key(model.name) }}.load(row, { children: true });
+{%- else %}
+         * const full = await env.{{ model.name }}.load(row, { children: true });
+{%- endif %}
          * ```
          */
         load(self: {{ model.name }}, tree: IncludeTree<{{ model.name }}>): Promise<HttpResult<{{ model.name }}>>;
@@ -316,7 +325,7 @@ export const {{ inject }}: InjectableTag<"{{ inject }}", {{ inject }}> = injecta
 {%- endfor %}
 
 {%- for (_key, model) in &idl.models %}
-{%- if model.backing.is_some() %}
+{%- if model.backing.is_some() || model_has_store(model) %}
 export interface {{ model.name }}Store<E> {
 {%- for ds in model.data_sources.values() %}
 {%- if ds.name == "Default" %}
@@ -378,9 +387,13 @@ export type Do_{{ b.name }}<E> = Env.{{ b.name }} & {
 /**
  * The fully-upgraded Cloesce environment. Contains:
  * - every binding and injectable
- * - each binding carrying its model stores 
+ * - each binding carrying its model stores
+ * - each unbacked model's store, directly (e.g. `env.Foo` for a model with no D1/DO binding)
  */
 export interface FullEnv extends CfEnv {
+{%- for model in unbacked_models_with_store() %}
+    {{ model.name }}: {{ model.name }}Store<FullEnv>;
+{%- endfor %}
 {%- for binding in &idl.wrangler_env.d1_bindings %}
 {%- if binding_hosts_models(binding) %}
     {{ binding }}: Db_{{ binding }}<FullEnv>;
