@@ -19,47 +19,6 @@ use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// A template for a KV/R2 key, e.g. `users/{user_id}` where
-/// `user_id` is a dynamic value and `users/` is a literal prefix.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TemplateSegment<'src, V> {
-    /// Text between placeholders
-    #[serde(borrow)]
-    Literal(Cow<'src, str>),
-    Value(V),
-}
-
-impl<'src, V> TemplateSegment<'src, V> {
-    pub fn parse(
-        t: &'src str,
-        mut value: impl FnMut(&'src str) -> V,
-    ) -> Vec<TemplateSegment<'src, V>> {
-        let mut segments = Vec::new();
-        let mut rest = t;
-        while let Some(open) = rest.find('{') {
-            if open > 0 {
-                segments.push(TemplateSegment::Literal(Cow::Borrowed(&rest[..open])));
-            }
-            let close = rest[open..].find('}').expect("validated key template") + open;
-            let arg = &rest[open + 1..close];
-            segments.push(TemplateSegment::Value(value(arg)));
-            rest = &rest[close + 1..];
-        }
-        if !rest.is_empty() {
-            segments.push(TemplateSegment::Literal(Cow::Borrowed(rest)));
-        }
-        segments
-    }
-
-    /// The `list` prefix: the first segment's text if it is a `Literal`, else `""`.
-    pub fn leading_literal(segments: &[Self]) -> &str {
-        match segments.first() {
-            Some(Self::Literal(text)) => text.as_ref(),
-            _ => "",
-        }
-    }
-}
-
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Hash, Clone, Default)]
 pub enum CidlType<'src> {
     /// The absence of a value.
@@ -370,6 +329,26 @@ impl DataSource<'_> {
     /// True if any of get/list/save was user-declared as a stub (must be implemented).
     pub fn has_stubs(&self) -> bool {
         self.get.is_stub || self.list.is_stub || self.save.is_stub
+    }
+}
+
+/// A template for a KV/R2 key, e.g. `users/{user_id}` where
+/// `user_id` is a dynamic value and `users/` is a literal prefix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TemplateSegment<'src, V> {
+    /// Text between placeholders
+    #[serde(borrow)]
+    Literal(Cow<'src, str>),
+    Value(V),
+}
+
+impl<'src, V> TemplateSegment<'src, V> {
+    /// The `list` prefix: the first segment's text if it is a `Literal`, else `""`.
+    pub fn leading_literal(segments: &[Self]) -> &str {
+        match segments.first() {
+            Some(Self::Literal(text)) => text.as_ref(),
+            _ => "",
+        }
     }
 }
 

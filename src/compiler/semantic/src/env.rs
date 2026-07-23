@@ -169,52 +169,56 @@ fn validate_key_format<'src, 'p>(
     key_format: &'src str,
     params: &'p [Symbol<'src>],
     sink: &mut ErrorSink<'src, 'p>,
-) -> bool {
-    let vars = match extract_braced(key_format) {
+) -> Option<Vec<TemplateSegment<'src, &'src str>>> {
+    let segs = match parse_template(key_format) {
         Ok(v) => v,
         Err(reason) => {
             sink.push(SemanticError::TemplateInvalidFormat { field, reason });
-            return false;
+            return None;
         }
     };
 
-    for var in vars {
-        if !params.iter().any(|p| p.name == var) {
+    for seg in &segs {
+        let TemplateSegment::Value(name) = seg else {
+            continue;
+        };
+
+        if !params.iter().any(|p| p.name == *name) {
             sink.push(SemanticError::TemplateUnknownVariable {
                 field,
-                variable: var,
+                variable: name,
             });
-            return false;
+            return None;
         }
     }
 
-    true
-}
+    return Some(segs);
 
-/// Extracts braced variables from a format string.
-/// e.g. "users/{userId}/posts/{postId}" => ["userId", "postId"].
-///
-/// Returns an error string if the format string is invalid (e.g. nested or
-/// unclosed braces).
-fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
-    let mut out = Vec::new();
-    let mut current = None;
-    for (i, c) in s.char_indices() {
-        match (current.is_some(), c) {
-            (false, '{') => current = Some(i + 1),
-            (true, '{') => return Err("nested brace in key".to_string()),
-            (true, '}') => {
-                let start_idx = current.take().unwrap();
-                out.push(&s[start_idx..i]);
+    /// Extracts braced variables from a format string.
+    /// e.g. "users/{userId}/posts/{postId}" => ["userId", "postId"].
+    ///
+    /// Returns an error string if the format string is invalid (e.g. nested or
+    /// unclosed braces).
+    fn parse_template<'src>(s: &'src str) -> Result<Vec<TemplateSegment<'src, &'src str>>, String> {
+        let mut out = Vec::new();
+        let mut current = None;
+        for (i, c) in s.char_indices() {
+            match (current.is_some(), c) {
+                (false, '{') => current = Some(i + 1),
+                (true, '{') => return Err("nested brace in key".to_string()),
+                (true, '}') => {
+                    let start_idx = current.take().unwrap();
+                    out.push(TemplateSegment::Value(&s[start_idx..i]));
+                }
+                (true, _) => {}
+                _ => {}
             }
-            (true, _) => {}
-            _ => {}
         }
+        if current.is_some() {
+            return Err("unclosed brace in key".to_string());
+        }
+        Ok(out)
     }
-    if current.is_some() {
-        return Err("unclosed brace in key".to_string());
-    }
-    Ok(out)
 }
 
 fn validate_symbol<'src, 'p>(
@@ -253,15 +257,11 @@ fn key_segments<'src, 'p>(
     params: &'p [Symbol<'src>],
     sink: &mut ErrorSink<'src, 'p>,
 ) -> Option<Vec<TemplateSegment<'src, &'src str>>> {
-    match key_format {
-        Some(fmt) => {
-            if !validate_key_format(symbol, fmt, params, sink) {
-                return None;
-            }
-            Some(TemplateSegment::parse(fmt, |name| name))
-        }
-        None => Some(default_segments(symbol.name, params)),
+    if let Some(fmt) = key_format {
+        return validate_key_format(symbol, fmt, params, sink);
     }
+
+    Some(default_segments(symbol.name, params))
 }
 
 /// Builds the default key for a body-less template: `name` for zero params, else
