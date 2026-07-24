@@ -48,4 +48,22 @@ describe("HeaderService", () => {
     const body = await res.json();
     expect(body).toEqual("vox:machina");
   });
+
+  it("round-trips a header-only POST through the generated client", async () => {
+    const res = await HeaderService.ping("vox");
+    expectHttpResult(res, "Expected header-only POST to round-trip");
+    expect(res.data).toEqual("pong:vox");
+  });
+
+  it("accepts a header-only POST with no request body", async () => {
+    // No body at all: the router must not demand one when every param is header-sourced.
+    const res = await fetch(`${workersUrl}/HeaderService/ping`, {
+      method: "POST",
+      headers: { "X-Tenant": "vox" },
+    });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body).toEqual("pong:vox");
+  });
 });

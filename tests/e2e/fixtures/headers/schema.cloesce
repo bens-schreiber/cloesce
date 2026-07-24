@@ -16,4 +16,11 @@ api HeaderService {
         [header]
         X_Count: int
     }
+
+    // POST whose only params are headers: there is no request body at all. Proves
+    // the router doesn't demand a body when every param is header-sourced.
+    post ping -> string {
+        [header]
+        X_Tenant: string
+    }
 }

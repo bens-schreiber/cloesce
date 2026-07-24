@@ -323,7 +323,14 @@ async function validateRequest(
   // Extract all parameters
   const url = new URL(request.url);
   let params: RequestParams = Object.fromEntries(url.searchParams.entries());
-  if (route.method.http_verb !== "Get") {
+
+  // A JSON body is only present when at least one parameter is Body-sourced.
+  const hasBodyParams = requiredParams.some((p) => p.source === "Body");
+
+  if (
+    route.method.http_verb !== "Get" &&
+    (hasBodyParams || route.method.parameters_media === "Octet")
+  ) {
     try {
       switch (route.method.parameters_media) {
         case "Json": {
