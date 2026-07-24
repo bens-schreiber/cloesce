@@ -198,7 +198,10 @@ describe("Request Validation", () => {
   test("Request Missing JSON Body => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const model = ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build();
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method("method", "Post", [{ name: "payload", cidl_type: "String", source: "Body" }], "Void")
+      .build();
 
     const route: MatchedRoute = {
       namespace: "Foo",
