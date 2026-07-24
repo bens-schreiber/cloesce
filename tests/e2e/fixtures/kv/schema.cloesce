@@ -3,17 +3,19 @@ d1 {
 }
 
 kv namespace {
-    data(id: int) -> json {
+    data -> json {
+        id: int
         "path/to/data/{id}"
     }
 
-    config() -> json {
+    config -> json {
         "config"
     }
 }
 
 kv otherNamespace {
-    otherData(id: int) -> string {
+    otherData -> string {
+        id: int
         "path/to/other/{id}"
     }
 }
@@ -23,7 +25,7 @@ model ModelWithKv for db {
     primary {
         id: int
     }
-    
+
     kv namespace::data(id) {
         someData
     }
@@ -39,7 +41,9 @@ model ModelWithKv for db {
 }
 
 api ModelWithKv {
-    post acceptKvObject(item: kvobject<json>) -> kvobject<json>
+    post acceptKvObject -> kvobject<json> {
+        item: kvobject<json>
+    }
 }
 
 [crud get, save]
@@ -68,7 +72,7 @@ model KVSibling {
 }
 
 model AppConfig {
-    kv namespace::config() {
+    kv namespace::config {
         config
     }
 }

@@ -12,7 +12,8 @@ durable LibraryDo {
 
 // A Worker KV namespace holding a blurb per book.
 kv Blurbs {
-    blurb(bookId: int) -> string {
+    blurb -> string {
+        bookId: int
         "blurbs/{bookId}"
     }
 }

@@ -7,7 +7,7 @@ model Dog for db {
     primary {
         id: int
     }
-    
+
     column {
         name: string
         age: int
@@ -15,8 +15,11 @@ model Dog for db {
 }
 
 api Dog {
-    [inject db]
-    post create(dog: partial<Dog>) -> Dog
-    
-    get getPartialSelf(self) -> partial<Dog>
+    post create -> Dog {
+        dog: partial<Dog>
+
+        inject { db }
+    }
+
+    self get getPartialSelf -> partial<Dog> {}
 }

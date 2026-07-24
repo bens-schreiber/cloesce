@@ -1,26 +1,27 @@
 // #region: Global
 durable GlobalDo {
-    metadata() -> json {
+    metadata -> json {
         "metadata"
     }
 }
 
 model Global for GlobalDo {
-    kv GlobalDo::metadata() {
+    kv GlobalDo::metadata {
         metadata
     }
 }
 
 api Global {
-    post newGlobal() -> Global
+    post newGlobal -> Global {}
 
-    get getMetadata(self) -> json
+    self get getMetadata -> json {}
 }
 // #endregion
 
 // #region: CRUD and Custom Data Sources
 kv GlobalSubRedditMetadata {
-    metadata(subId: int) -> json {
+    metadata -> json {
+        subId: int
         "metadata/{subId}"
     }
 }
@@ -31,7 +32,7 @@ durable SubRedditDo {
         id: int
     }
 
-    metadata() -> json {
+    metadata -> json {
         "metadata"
     }
 }
@@ -52,8 +53,8 @@ model SubReddit for SubRedditDo(subId) {
 }
 
 api SubReddit {
-    post newSubReddit() -> SubReddit
-    get feed(self) -> array<Post>
+    post newSubReddit -> SubReddit {}
+    self get feed -> array<Post> {}
 }
 
 [crud get, list, save]
@@ -75,14 +76,22 @@ model Post for SubRedditDo(subId) {
 source Custom for Post {
     include {}
 
-    [inject SubRedditDo]
-    get(id: int, subId: int)
+    get {
+        id: int
+        subId: int
+        inject { SubRedditDo }
+    }
 
-    [inject SubRedditDo]
-    list(subId: int)
+    list {
+        subId: int
+        inject { SubRedditDo }
+    }
 
-    [inject SubRedditDo]
-    save(post: partial<Post>, subId: int)
+    save {
+        post: partial<Post>
+        subId: int
+        inject { SubRedditDo }
+    }
 }
 
 [crud get, list, save]

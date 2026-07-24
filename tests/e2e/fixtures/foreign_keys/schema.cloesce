@@ -8,14 +8,14 @@ model B for db {
     primary {
         id: int
     }
-    
+
     one A::bId(id) {
         a
     }
 }
 
 api B {
-    post testMethod(self)
+    self post testMethod {}
 }
 
 [crud save, get]
@@ -23,8 +23,8 @@ model A for db{
     primary {
         id: int
     }
-    
-    foreign B::id optional  {
+
+    foreign B::id option {
         bId
     }
 
@@ -44,9 +44,12 @@ source WithoutB for A {
 }
 
 api A {
-    [inject db]
-    post create(a: A) -> A
-    get withoutB([source WithoutB] self) -> A
+    post create -> A {
+        a: A
+
+        inject { db }
+    }
+    self(WithoutB) get withoutB -> A {}
 }
 // #endregion
 // #region OneToMany
@@ -55,7 +58,7 @@ model Person for db {
     primary {
         id: int
     }
-    
+
     many Dog::personId(id) {
         dogs
     }
@@ -72,9 +75,12 @@ source WithoutDogs for Person {
 }
 
 api Person {
-    [inject db]
-    post create(person: partial<Person>) -> Person
-    get withoutDogs([source WithoutDogs] self) -> Person
+    post create -> Person {
+        person: partial<Person>
+
+        inject { db }
+    }
+    self(WithoutDogs) get withoutDogs -> Person {}
 }
 
 [crud save]
@@ -82,7 +88,7 @@ model Dog for db {
     primary {
         id: int
     }
-    
+
     foreign Person::id {
         personId
     }
@@ -93,7 +99,7 @@ model Dog for db {
 }
 
 api Dog {
-    post testMethod(self)
+    self post testMethod {}
 }
 // #endregion
 // #region ManyToMany
@@ -102,7 +108,7 @@ model Student for db {
     primary {
         id: int
     }
-    
+
     many CourseStudent::studentId(id) {
         courses
     }
@@ -127,9 +133,12 @@ source None for Student {
 }
 
 api Student {
-    [inject db]
-    post create(student: partial<Student>) -> Student
-    get none([source None] self) -> Student
+    post create -> Student {
+        student: partial<Student>
+
+        inject { db }
+    }
+    self(None) get none -> Student {}
 }
 
 [crud save]
@@ -137,7 +146,7 @@ model Course for db {
     primary {
         id: int
     }
-    
+
     many CourseStudent::courseId(id) {
         students
     }

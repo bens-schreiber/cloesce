@@ -14,46 +14,42 @@ model FailModel for db {
 }
 
 api FailModel {
-    post throwingMethod(self)
+    self post throwingMethod {}
 
-    post numericValidators(
-        self,
-
+    self post numericValidators {
         [gt 10]
-        gtField: int,
+        gtField: int
 
         [gte 10]
-        gteField: int,
+        gteField: int
 
         [lt 100]
-        ltField: int,
+        ltField: int
 
         [lte 100]
-        lteField: int,
+        lteField: int
 
         [step 5]
-        stepField: int,
-    )
+        stepField: int
+    }
 
-    post stringValidators(
-        self,
-
+    self post stringValidators {
         [len 4]
-        lenField: string,
+        lenField: string
 
         [minlen 3]
-        minLenField: string,
+        minLenField: string
 
         [maxlen 5]
-        maxLenField: string,
+        maxLenField: string
 
         [regex /^[a-z]+$/]
-        regexField: string,
-    )
+        regexField: string
+    }
 }
 
 model UnregisteredService {}
 
 api UnregisteredService {
-    get unregistered() -> string
+    get unregistered -> string {}
 }

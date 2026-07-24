@@ -3,11 +3,13 @@ d1 {
 }
 
 r2 bucket1 {
-    data(id: int) {
+    data {
+        id: int
         "path/to/data/{id}"
     }
 
-    otherData(id: int) {
+    otherData {
+        id: int
         "path/to/other/{id}"
     }
 }
@@ -18,12 +20,12 @@ model D1BackedModel for db {
     primary {
         id: int
     }
-    
+
     column {
         someColumn: real
         someOtherColumn: string
     }
-    
+
     r2 bucket1::data(id) {
         someData
     }
@@ -34,11 +36,17 @@ model D1BackedModel for db {
 }
 
 api D1BackedModel {
-    [inject bucket1]
-    put uploadData(self, data: stream)
+    self put uploadData {
+        data: stream
 
-    [inject bucket1]
-    put uploadOtherData(self, data: stream)
+        inject { bucket1 }
+    }
+
+    self put uploadOtherData {
+        data: stream
+
+        inject { bucket1 }
+    }
 }
 
 [crud get]
@@ -57,8 +65,11 @@ model R2Only {
 }
 
 api R2Only {
-    [inject bucket1]
-    put uploadData(self, data: stream)
+    self put uploadData {
+        data: stream
+
+        inject { bucket1 }
+    }
 }
 
 model R2Sibling {
@@ -72,6 +83,9 @@ model R2Sibling {
 }
 
 api R2Sibling {
-    [inject bucket1]
-    put uploadData(self, data: stream)
+    self put uploadData {
+        data: stream
+
+        inject { bucket1 }
+    }
 }

@@ -320,7 +320,7 @@ async function validateRequest(
 
   const requiredParams = route.method.parameters;
 
-  // Extract all method parameters from the body.
+  // Extract all parameters
   const url = new URL(request.url);
   let params: RequestParams = Object.fromEntries(url.searchParams.entries());
   if (route.method.http_verb !== "Get") {
@@ -335,10 +335,10 @@ async function validateRequest(
           // Octet streams are verified by Cloesce to have
           // one Stream type
           const streamParam = requiredParams.find(
-            (p) => typeof p.cidl_type === "string" && p.cidl_type === "Stream",
+            (p) => typeof p.field.cidl_type === "string" && p.field.cidl_type === "Stream",
           )!;
 
-          params[streamParam.name] = request.body;
+          params[streamParam.field.name] = request.body;
           break;
         }
         default: {
@@ -350,7 +350,15 @@ async function validateRequest(
     }
   }
 
-  if (!requiredParams.every((p) => p.name in params)) {
+  for (const p of requiredParams) {
+    if (p.source !== "Header") continue;
+    const raw = readHeader(request, p.field.name);
+    if (raw !== null) {
+      params[p.field.name] = raw;
+    }
+  }
+
+  if (!requiredParams.every((p) => p.field.name in params)) {
     return invalidRequest(
       RouterError.RequestBodyMissingParameters,
       "One or more required parameters are missing",
@@ -365,15 +373,15 @@ async function validateRequest(
 
   // Validate all parameters type.
   for (const p of requiredParams) {
-    const res = validateField(p, params[p.name]);
+    const res = validateField(p.field, params[p.field.name]);
     if (res.isLeft()) return Either.left(res.unwrapLeft());
     const validatedRaw = res.unwrap();
-    const hydrated = hydrateType(validatedRaw, p.cidl_type, {
+    const hydrated = hydrateType(validatedRaw, p.field.cidl_type, {
       idl: idl,
       includeTree: null,
       env,
     });
-    params[p.name] = hydrated ?? validatedRaw;
+    params[p.field.name] = hydrated ?? validatedRaw;
   }
 
   return Either.right(params);
@@ -395,6 +403,11 @@ async function validateRequest(
     }
     return Either.right(JSON.parse(validateRes.unwrap()));
   }
+}
+
+/** A header may come in the form `Header_Name` or `Header-Name`, matching either here. */
+function readHeader(request: Request, name: string): string | null {
+  return request.headers.get(name) ?? request.headers.get(name.replaceAll("_", "-"));
 }
 
 /**
@@ -503,7 +516,7 @@ async function methodDispatch(
   }
 
   for (const param of route.method.parameters) {
-    paramArray.push(params[param.name]);
+    paramArray.push(params[param.field.name]);
   }
 
   const wrapResult = (res: any): HttpResult => {

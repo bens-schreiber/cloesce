@@ -5,7 +5,7 @@ inject {
 model FooService {}
 
 api FooService {
-    [inject InjectedThing]
-    get method() -> string
+    get method -> string {
+        inject { InjectedThing }
+    }
 }
-
