@@ -6,7 +6,7 @@ pub mod analysis {
         err::{ErrorSink, SemanticError},
         resolve_cidl_type, resolve_inject, resolve_validator_tags,
     };
-    use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
+    use frontend::{ApiBlockMethod, SpdSlice, Tag};
     use idl::{ApiMethod, CidlType, HttpVerb, MediaType, Model, ValidatedField};
     use indexmap::IndexMap;
 
@@ -56,7 +56,7 @@ pub mod analysis {
             parameters(model.name, method, table, sink);
 
         let (injected, durable_target) =
-            resolve_inject(&method.symbol, &mut parameters, table, sink);
+            resolve_inject(&method.injects, &mut parameters, table, sink);
 
         let data_source = is_static
             .not()
@@ -74,7 +74,7 @@ pub mod analysis {
             };
 
             if ds_is_durable && durable_target.is_some() {
-                sink.push(SemanticError::ApiInjectsDurableWhenSelfInjectsDurable {
+                sink.push(SemanticError::ApiInjectsDurableWhenSourceInjectsDurable {
                     method: &method.symbol,
                 });
             }
@@ -144,47 +144,27 @@ pub mod analysis {
 
         let mut has_stream = false;
         let mut data_source: Option<&'src str> = None;
-        let mut is_static = true;
-        for param in method.parameters.inners() {
-            let param = match param {
-                ApiBlockMethodParamKind::SelfParam(self_sym) => {
-                    is_static = false;
+        let is_static = method.sources.is_empty();
+        for source in method.sources.inners() {
+            data_source = Some(source.source.name);
 
-                    // Validate tags
-                    for tag in &self_sym.tags {
-                        let Tag::Source { name } = &tag.inner else {
-                            sink.push(SemanticError::TagInvalidInContext {
-                                tag,
-                                symbol: self_sym,
-                            });
-                            continue;
-                        };
+            // Check that the data source exists on this namespace
+            let ds_exists = table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
+                model: model_name,
+                name: source.source.name,
+            });
 
-                        data_source = Some(name.inner);
-
-                        // Check that the data source exists on this namespace
-                        let ds_exists =
-                            table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
-                                model: model_name,
-                                name: name.inner,
-                            });
-
-                        ensure!(
-                            ds_exists,
-                            sink,
-                            SemanticError::ApiUnknownDataSourceReference {
-                                method: &method.symbol,
-                                data_source: name,
-                            }
-                        );
-                    }
-
-                    // No further validation is needed for `self`.
-                    continue;
+            ensure!(
+                ds_exists,
+                sink,
+                SemanticError::ApiUnknownDataSourceReference {
+                    method: &method.symbol,
+                    data_source: &source.source,
                 }
-                ApiBlockMethodParamKind::Param(symbol) => symbol,
-            };
+            );
+        }
 
+        for param in &method.parameters {
             // Validate tags
             for tag in &param.tags {
                 if !matches!(tag.inner, Tag::Validator { .. }) {
@@ -232,11 +212,7 @@ pub mod analysis {
                     );
 
                     has_stream = true;
-                    let required_params = method
-                        .parameters
-                        .inners()
-                        .filter(|p| matches!(p, ApiBlockMethodParamKind::Param(_)))
-                        .count();
+                    let required_params = method.parameters.len();
 
                     // Only one Stream parameter is allowed, and it must be the
                     // only non-injected parameter

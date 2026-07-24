@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// `foreign AdjModel::field [optional] { localField ... }`
-/// or `foreign AdjModel::{ field1, field2 } [optional] { localField ... }`.
+/// or `foreign AdjModel::{ field1, field2 } [option] { localField ... }`.
 fn foreign_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, ForeignBlock<'src>, Extra<'tokens, 'src>> {
     // `::field` (single) or `::{ field1, field2 }` (spider)
@@ -25,7 +25,7 @@ fn foreign_block<'tokens, 'src: 'tokens>()
     kw!(Foreign)
         .ignore_then(symbol())
         .then(targets)
-        .then(kw!(Optional).or_not())
+        .then(kw!(GOption).or_not())
         .then(
             symbol()
                 .repeated()

@@ -18,9 +18,10 @@
 //! Some errors may cause a certain structure to be escaped or treated as if it were not present, but will be reported in the final error list.
 
 use frontend::{
-    ApiBlock, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock,
-    DataSourceBlock, DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, ModelBlock,
-    PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, VarsBlock,
+    ApiBlock, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock, DataSourceBlock,
+    DurableBindingBlock, InjectBlock, InjectEntry, InjectInitializer, KvBindingBlock,
+    MethodInjectBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag,
+    VarBlock,
 };
 use idl::{CidlType, CloesceIdl, DurableTarget, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
@@ -206,7 +207,7 @@ struct SymbolTable<'src, 'p> {
     kv_bindings: BTreeMap<&'src str, &'p KvBindingBlock<'src>>,
     r2_bindings: BTreeMap<&'src str, &'p R2BindingBlock<'src>>,
     durable_bindings: BTreeMap<&'src str, &'p DurableBindingBlock<'src>>,
-    vars_blocks: Vec<&'p VarsBlock<'src>>,
+    vars_blocks: Vec<&'p VarBlock<'src>>,
     injects: Vec<&'p InjectBlock<'src>>,
     apis: Vec<&'p ApiBlock<'src>>,
     data_sources: Vec<&'p DataSourceBlock<'src>>,
@@ -305,19 +306,14 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                             },
                         );
 
-                        for param in method.parameters.inners() {
-                            let (symbol, name) = match param {
-                                ApiBlockMethodParamKind::SelfParam(symbol) => (symbol, "self"),
-                                ApiBlockMethodParamKind::Param(symbol) => (symbol, symbol.name),
-                            };
-
+                        for param in &method.parameters {
                             insert_local(
                                 sink,
-                                symbol,
+                                param,
                                 LocalSymbolKind::ApiMethodParam {
                                     namespace: api_block.symbol.name,
                                     method: method.symbol.name,
-                                    name,
+                                    name: param.name,
                                 },
                             );
                         }
@@ -455,7 +451,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         }
                     }
                 }
-                AstBlockKind::Vars(block) => {
+                AstBlockKind::Var(block) => {
                     st.vars_blocks.push(block);
                     for symbol in &block.vars {
                         insert_global(sink, symbol);
@@ -687,7 +683,7 @@ fn resolve_validator_tags<'src, 'p>(
 ///   an env var, or an `inject { ... }` block symbol.
 /// - A context entry (`Do(args)`) that resolves to a [DurableTarget].
 fn resolve_inject<'src, 'p>(
-    method: &'p Symbol<'src>,
+    inject_blocks: &'p [Spd<MethodInjectBlock<'src>>],
     parameters: &mut [ValidatedField<'src>],
     table: &SymbolTable<'src, 'p>,
     sink: &mut ErrorSink<'src, 'p>,
@@ -695,34 +691,25 @@ fn resolve_inject<'src, 'p>(
     let mut injected = Vec::new();
     let mut durable_target = None;
 
-    for tag in &method.tags {
-        let Tag::Inject { entries } = &tag.inner else {
-            sink.push(SemanticError::TagInvalidInContext {
-                tag,
-                symbol: method,
-            });
-            continue;
-        };
-
-        for entry in entries {
-            match entry {
-                InjectEntry::Context {
-                    symbol: binding,
-                    args,
-                } => {
-                    if durable_target.is_some() {
-                        sink.push(SemanticError::TagInvalidInContext {
-                            tag,
-                            symbol: method,
-                        });
-                        continue;
-                    }
-
-                    durable_target = resolve_durable_target(binding, args, parameters, table, sink);
+    for entry in inject_blocks
+        .iter()
+        .flat_map(|block| block.inner.entries.inners())
+    {
+        match entry {
+            InjectEntry::Context {
+                symbol: binding,
+                initializers,
+            } => {
+                if durable_target.is_some() {
+                    sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
+                    continue;
                 }
-                InjectEntry::Binding(binding) => {
-                    resolve_binding(binding, table, sink, &mut injected);
-                }
+
+                durable_target =
+                    resolve_durable_target(binding, initializers, parameters, table, sink);
+            }
+            InjectEntry::Binding(binding) => {
+                resolve_binding(binding, table, sink, &mut injected);
             }
         }
     }
@@ -768,11 +755,16 @@ fn resolve_inject<'src, 'p>(
 
     fn resolve_durable_target<'src, 'p>(
         binding: &'p Symbol<'src>,
-        args: &'p [Symbol<'src>],
+        initializers: &'p [InjectInitializer<'src>],
         parameters: &mut [ValidatedField<'src>],
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<DurableTarget<'src>> {
+        let args = initializers
+            .iter()
+            .flat_map(|i| i.arg.iter())
+            .collect::<Vec<_>>();
+
         let Some(durable) = table.durable_bindings.get(binding.name) else {
             sink.push(SemanticError::UnresolvedSymbol { symbol: binding });
             return None;
@@ -794,7 +786,7 @@ fn resolve_inject<'src, 'p>(
         }
 
         let mut shard_args = Vec::with_capacity(args.len());
-        for (arg, shard_field) in args.iter().zip(&shard_fields) {
+        for (arg, shard_field) in args.iter().copied().zip(shard_fields.iter().copied()) {
             let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
                 sink.push(SemanticError::UnresolvedSymbol { symbol: arg });
                 continue;

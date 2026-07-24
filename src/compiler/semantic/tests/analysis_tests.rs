@@ -1763,7 +1763,7 @@ fn instantiated_method_injecting_durable_conflicts() {
 
     // Assert
     let method = expect_err!(errors,
-        SemanticError::ApiInjectsDurableWhenSelfInjectsDurable { method } => method
+        SemanticError::ApiInjectsDurableWhenSourceInjectsDurable { method } => method
     );
     assert_eq!(method.name, "feed");
 }

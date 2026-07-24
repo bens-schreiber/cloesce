@@ -32,18 +32,20 @@ fn top_level_bindings() {
         }
 
         r2 Assets {
-            asset(id: int) {
+            asset {
+                id: int
                 "assets/{id}"
             }
         }
 
         kv Cache {
-            entry(id: string) -> json {
+            entry -> json {
+                id: string
                 "cache/{id}"
             }
         }
 
-        vars {
+        var {
             api_url: string
             max_retries: int
             threshold: real
@@ -103,12 +105,12 @@ fn top_level_bindings() {
     assert_eq!(entry.key_format, "cache/{id}");
     assert_eq!(entry.params.len(), 1);
 
-    // vars
+    // var
     let vars = ast
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            AstBlockKind::Vars(v) => Some(
+            AstBlockKind::Var(v) => Some(
                 v.vars
                     .iter()
                     .map(|s| (s.name, &s.cidl_type))
@@ -116,7 +118,7 @@ fn top_level_bindings() {
             ),
             _ => None,
         })
-        .expect("vars block to be present");
+        .expect("var block to be present");
 
     assert_eq!(
         vars,
@@ -143,17 +145,18 @@ fn durable_binding_block() {
                 region: string
             }
 
-            topEntryCache() -> json {
+            topEntryCache -> json {
                 "top"
             }
 
-            topEntryCacheWithDate(date: string) -> json {
+            topEntryCacheWithDate -> json {
+                date: string
                 "top/{date}"
             }
         }
 
         durable GlobalDo {
-            config() -> json {
+            config -> json {
                 "config"
             }
         }
@@ -441,14 +444,14 @@ fn api_block() {
         model AnotherService {}
 
         api MyAppService {
-            post createItem(
-                name: string,
+            post createItem -> string {
+                name: string
                 count: int
-            ) -> string
+            }
         }
 
         api MyAppService {
-            get listItems() -> array<string>
+            get listItems -> array<string> { }
         }
         "#,
     );
@@ -518,11 +521,17 @@ fn api_context_tag() {
         model Leaderboard {}
 
         api Leaderboard {
-            [inject LeaderboardDo(tenantId)]
-            get topScores(tenantId: int) -> array<string>
+            get topScores -> array<string> {
+                tenantId: int
 
-            [inject GlobalDo()]
-            get config() -> json
+                inject {
+                    LeaderboardDo::tenantId(tenantId)
+                }
+            }
+
+            get config -> json {
+                inject { GlobalDo::{} }
+            }
         }
         "#,
     );
@@ -544,18 +553,22 @@ fn api_context_tag() {
             .find(|m| m.inner.symbol.name == method)
             .unwrap();
         m.inner
-            .symbol
-            .tags
+            .injects
             .iter()
-            .find_map(|t| match &t.inner {
-                Tag::Inject { entries } => entries.iter().find_map(|entry| match entry {
-                    InjectEntry::Context { symbol, args } => Some((
-                        symbol.name.to_string(),
-                        args.iter().map(|a| a.name.to_string()).collect(),
-                    )),
-                    InjectEntry::Binding(_) => None,
-                }),
-                _ => None,
+            .flat_map(|blk| blk.inner.entries.iter())
+            .find_map(|entry| match &entry.inner {
+                InjectEntry::Context {
+                    symbol,
+                    initializers,
+                } => Some((
+                    symbol.name.to_string(),
+                    initializers
+                        .iter()
+                        .flat_map(|i| i.arg.iter())
+                        .map(|a| a.name.to_string())
+                        .collect(),
+                )),
+                InjectEntry::Binding(_) => None,
             })
             .expect("context entry")
     };
@@ -590,9 +603,9 @@ fn model_primary_unique_optional_foreign() {
 
             foreign Tag::id { tagId }
             foreign Org::id { orgId2 }
-            foreign Author::id optional { authorId }
+            foreign Author::id option {authorId }
             foreign Dept::id { deptId }
-            foreign Draft::id optional { draftId }
+            foreign Draft::id option {draftId }
 
             unique (a, b)
             unique (orgId2)
@@ -808,25 +821,29 @@ fn kv_r2_bindings_fields() {
     let ast = lex_and_ast(
         r#"
         kv NsA {
-            value(id: int) -> json {
+            value -> json {
+                id: int
                 "data/{id}"
             }
         }
 
         kv NsB {
-            page(cursor: string) -> json {
+            page -> json {
+                cursor: string
                 "list/{cursor}"
             }
         }
 
         r2 BucketA {
-            photo(id: int) {
+            photo {
+                id: int
                 "photos/{id}.jpg"
             }
         }
 
         r2 BucketB {
-            thumb(cursor: string) {
+            thumb {
+                cursor: string
                 "thumbs/{cursor}"
             }
         }
@@ -990,7 +1007,9 @@ fn kv_durable_spider_form() {
                 doId: string
             }
 
-            value(key1: string, key2: string) -> string {
+            value -> string {
+                key1: string
+                key2: string
                 "value/{key1}/{key2}"
             }
         }

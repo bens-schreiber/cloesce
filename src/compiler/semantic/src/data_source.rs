@@ -132,7 +132,7 @@ pub mod analysis {
                         .collect::<Vec<_>>();
 
                     let (injected, durable_target) =
-                        resolve_inject(&method.inner.method, &mut parameters, table, sink);
+                        resolve_inject(&method.inner.injects, &mut parameters, table, sink);
 
                     DataSourceMethod {
                         parameters,
@@ -182,7 +182,7 @@ pub mod analysis {
                         .unzip();
 
                     let (injected, durable_target) =
-                        resolve_inject(&method.inner.method, &mut fields, table, sink);
+                        resolve_inject(&method.inner.injects, &mut fields, table, sink);
 
                     let parameters = fields
                         .into_iter()
@@ -226,7 +226,7 @@ pub mod analysis {
                         .collect::<Vec<_>>();
 
                     let (injected, durable_target) =
-                        resolve_inject(&method.inner.method, &mut parameters, table, sink);
+                        resolve_inject(&method.inner.injects, &mut parameters, table, sink);
 
                     DataSourceMethod {
                         parameters,

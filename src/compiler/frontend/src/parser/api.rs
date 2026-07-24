@@ -3,20 +3,24 @@ use chumsky::prelude::*;
 use idl::HttpVerb;
 
 use crate::{
-    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, AstBlockKind, Symbol,
+    ApiBlock, ApiBlockMethod, AstBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, symbol, tagged_typed_symbol, tags},
+    parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, method_body, symbol},
 };
 
 /// ```cloesce
 /// api Namespace {
-///     http_verb methodName(ident1: cidl_type, ...) -> cidl_type
+///     http_verb methodName -> cidl_type {
+///         [tag]* ident: cidl_type
 ///
-///     http_verb methodName(
-///         [source MySource] self,
-///         ident2: cidl_type,
-///         ...
-///     ) -> cidl_type
+///         source { SourceName }
+///
+///         inject {
+///             ident1
+///             ident2::target(arg)
+///             ident3::{ target1(arg1), target2(arg2) }
+///         }
+///     }
 /// }
 /// ```
 pub fn api_block<'tokens, 'src: 'tokens>()
@@ -33,6 +37,19 @@ pub fn api_block<'tokens, 'src: 'tokens>()
         .boxed()
 }
 
+/// ```cloesce
+/// verb methodName -> returnType {
+///     [tag]* param: cidl_type
+///
+///     source { sourceName }
+///
+///     inject {
+///        ident1
+///        ident2::target(arg)
+///        ident3::{ target1(arg1), target2(arg2) }
+///     }
+/// }
+/// ```
 fn method<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     TokenInput<'tokens, 'src>,
@@ -47,46 +64,19 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
         kw!(Delete).to(HttpVerb::Delete),
     ));
 
-    // [tag]* self
-    let self_param = tags()
-        .then(just(Token::SelfToken).map_with(|_, e| e.span()))
-        .map(|(tag_list, span)| {
-            ApiBlockMethodParamKind::SelfParam(Symbol {
-                name: "self",
-                span,
-                tags: tag_list,
-                ..Default::default()
-            })
-        });
-
-    // self | tagged_symbol: cidl_type
-    let parameter = choice((
-        self_param,
-        tagged_typed_symbol().map(ApiBlockMethodParamKind::Param),
-    ))
-    .map_spanned(|p| p);
-
-    // [tags*] verb methodName(self, p1: type, ...) -> returnType { ... }
-    tags()
-        .then(verb)
-        .then(symbol())
-        .then(
-            parameter
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)),
-        )
+    verb.then(symbol())
         .then(just(Token::Arrow).ignore_then(cidl_type()).or_not())
+        .then(method_body(true))
         .map_spanned(
-            |((((tags, http_verb), symbol), parameters), return_type)| ApiBlockMethod {
+            |(((http_verb, symbol), return_type), (parameters, injects, sources))| ApiBlockMethod {
                 symbol: Symbol {
-                    tags,
                     cidl_type: return_type.unwrap_or_default(),
                     ..symbol
                 },
                 http_verb,
                 parameters,
+                injects,
+                sources,
             },
         )
         .boxed()

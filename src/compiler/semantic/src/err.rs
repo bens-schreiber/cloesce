@@ -150,7 +150,7 @@ pub enum SemanticError<'src, 'p> {
     /// An API method references a data source that does not exist on the model.
     ApiUnknownDataSourceReference {
         method: &'p Symbol<'src>,
-        data_source: &'p Spd<&'src str>,
+        data_source: &'p Symbol<'src>,
     },
 
     /// An API method has an invalid return type.
@@ -164,7 +164,7 @@ pub enum SemanticError<'src, 'p> {
         param: &'p Symbol<'src>,
     },
 
-    ApiInjectsDurableWhenSelfInjectsDurable {
+    ApiInjectsDurableWhenSourceInjectsDurable {
         method: &'p Symbol<'src>,
     },
 
@@ -651,13 +651,13 @@ fn display(
             report!(path.clone(), range.clone())
                 .with_message(format!(
                     "API method '{}' references unknown data source '{}'",
-                    method.name, data_source.inner
+                    method.name, data_source.name
                 ))
                 .with_label(
                     Label::new((path, range))
                         .with_message(format!(
                             "'{}' is not defined on the model",
-                            data_source.inner
+                            data_source.name
                         ))
                         .with_color(Color::Red),
                 )
@@ -694,7 +694,7 @@ fn display(
                         .with_color(Color::Yellow),
                 )
         }
-        SemanticError::ApiInjectsDurableWhenSelfInjectsDurable { method } => {
+        SemanticError::ApiInjectsDurableWhenSourceInjectsDurable { method } => {
             let (method_path, method_range) = span_parts(&method.span, file_table);
             report!(method_path.clone(), method_range.clone())
                 .with_message(format!(

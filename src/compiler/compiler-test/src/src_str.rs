@@ -6,29 +6,38 @@ d1 {
 }
 
 kv MyKv {
-    someValue(id1: string, id2: int) -> json {
+    someValue -> json {
+        id1: string
+        id2: int
         "value/{id1}/{id2}"
     }
 
-    streamValue(id1: string, id2: int) -> stream {
+    streamValue -> stream {
+        id1: string
+        id2: int
         "stream/{id1}/{id2}"
     }
 }
 
 r2 MyR2 {
-    fileData(id: string) {
+    fileData {
+        id: string
         "files/{id}"
     }
 
-    metadata(ownerId: string, modelYear: int) {
+    metadata {
+        ownerId: string
+        modelYear: int
         "meta/{ownerId}/{modelYear}"
     }
 
-    photoData(modelYear: int) {
+    photoData {
+        modelYear: int
         "photos/{modelYear}"
     }
 
-    customDsData(id: int) {
+    customDsData {
+        id: int
         "custom/{id}/data"
     }
 }
@@ -39,22 +48,23 @@ durable LeaderboardDo {
         tenantId: int
     }
 
-    topEntryCache() -> json {
+    topEntryCache -> json {
         "top"
     }
 
-    topEntryCacheWithDate(date: string) -> json {
+    topEntryCacheWithDate -> json {
+        date: string
         "top/{date}"
     }
 }
 
 durable GlobalDo {
-    config() -> json {
+    config -> json {
         "config"
     }
 }
 
-vars {
+var {
     // Comment again
     MY_VAR: string // More comments
 }
@@ -124,8 +134,11 @@ model ModelWithCompositePk for db {
 }
 
 api ModelWithCompositePk {
-    [inject db]
-    post instanceMethod(self, input: string) -> string
+    post instanceMethod -> string {
+        input: string
+
+        inject { db }
+    }
 }
 
 model ModelWithKv for db {
@@ -144,10 +157,19 @@ model ModelWithKv for db {
 }
 
 api ModelWithKv {
-    [inject db]
-    post instanceMethod(self, input: string) -> string
-    get staticMethod(input: int) -> int
-    post hasKvParamAndRes(self, input: kvobject<string>) -> kvobject<string>
+    post instanceMethod -> string {
+        input: string
+
+        inject { db }
+    }
+
+    get staticMethod -> int {
+        input: int
+    }
+
+    post hasKvParamAndRes -> kvobject<string> {
+        input: kvobject<string>
+    }
 }
 
 model ModelWithR2 for db {
@@ -161,7 +183,9 @@ model ModelWithR2 for db {
 }
 
 api ModelWithR2 {
-    post hasR2ParamAndRes(self, input: r2object) -> r2object
+    post hasR2ParamAndRes -> r2object {
+        input: r2object
+    }
 }
 
 model ToyotaPrius for db {
@@ -184,7 +208,9 @@ model ToyotaPrius for db {
 }
 
 api ToyotaPrius {
-    post instanceMethod(self, input: string) -> string
+    post instanceMethod -> string {
+        input: string
+    }
 }
 
 source WithKv for ToyotaPrius {
@@ -217,9 +243,15 @@ model ModelWithCruds for db {
 source ByName for ModelWithCruds {
     include {}
 
-    get([instance] name: string)
+    get {
+        [instance]
+        name: string
+    }
 
-    list(name: string, limit: int)
+    list {
+        name: string
+        limit: int
+    }
 }
 
 model ModelWithCustomDs for db {
@@ -250,11 +282,19 @@ source Custom for ModelWithCustomDs {
         data
     }
 
-    get([instance] id: int, externalParam: string)
+    get {
+        [instance]
+        id: int
+        externalParam: string
+    }
 }
 
 api ModelWithCustomDs {
-    post instanceMethod([source Custom] self, input: string) -> string
+    post instanceMethod -> string {
+        input: string
+
+        source { Custom }
+    }
 }
 
 [crud get, save]
@@ -278,21 +318,40 @@ model RouteCar {
 }
 
 api RouteOwner {
-    post instanceMethod(self, input: string) -> string
+    post instanceMethod -> string {
+        input: string
+    }
 }
 
 model BasicService {}
 api BasicService {
-    get downloadData() -> stream
-    post instanceMethod(input: int) -> int
-    get staticMethod(input: string) -> string
-    post uploadData(data: stream) -> bool
+    get downloadData -> stream {}
 
-    [inject LeaderboardDo(tenantId)]
-    get topScores(tenantId: int) -> json
+    post instanceMethod -> int {
+        input: int
+    }
 
-    [inject GlobalDo()]
-    get globalConfig() -> json
+    get staticMethod -> string {
+        input: string
+    }
+
+    post uploadData -> bool {
+        data: stream
+    }
+
+    get topScores -> json {
+        tenantId: int
+
+        inject {
+            LeaderboardDo::tenantId(tenantId)
+        }
+    }
+
+    get globalConfig -> json {
+        inject {
+            GlobalDo::{}
+        }
+    }
 }
 
 [crud get, save]
