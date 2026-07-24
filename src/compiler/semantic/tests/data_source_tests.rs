@@ -7,13 +7,15 @@ fn default_data_source_tree_includes_all_relationships() {
         d1 { db }
 
         kv kv_namespace {
-            userCache(id: int) -> json {
+            userCache -> json {
+                id: int
                 "{id}"
             }
         }
 
         r2 r2_namespace {
-            userDocuments(id: int) {
+            userDocuments {
+                id: int
                 "{id}"
             }
         }
@@ -206,7 +208,8 @@ fn default_data_source_present_on_every_d1_model() {
         d1 { db }
 
         kv my_kv {
-            cached(tag: string) -> json {
+            cached -> json {
+                tag: string
                 "{tag}"
             }
         }
@@ -479,13 +482,19 @@ fn custom_data_source_captures_stub_params_and_tags() {
         source ById for Item {
             include {}
 
-            get([instance] id: int)
+            get {
+                [instance]
+                id: int
+            }
         }
 
         source PaginatedSince for Item {
             include {}
 
-            list(lastId: int, limit: int)
+            list {
+                lastId: int
+                limit: int
+            }
         }
     "#,
     );
@@ -523,7 +532,9 @@ fn custom_data_source_save_stub() {
         source Audited for Item {
             include {}
 
-            save(item: partial<Item>)
+            save {
+                item: partial<Item>
+            }
         }
     "#,
     );
@@ -555,8 +566,10 @@ fn custom_data_source_inject_tag_is_captured() {
         source WithDb for Item {
             include {}
 
-            [inject db]
-            get(id: int)
+            get {
+                id: int
+                inject { db }
+            }
         }
     "#,
     );
@@ -589,9 +602,11 @@ fn api_method_defaults_to_default_data_source() {
         }
 
         api Item {
-            get fetch(self) -> Item
-            post fetchCustom([source Custom] self) -> Item
-            post create() -> Item
+            self get fetch -> Item {}
+
+            self(Custom) post fetchCustom -> Item {}
+
+            post create -> Item {}
         }
     "#,
     );
@@ -617,7 +632,7 @@ fn default_data_source_durable_sqlite() {
                 tenantId: int
             }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }

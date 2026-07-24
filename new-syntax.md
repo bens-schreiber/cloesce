@@ -49,15 +49,13 @@ source FooSource {
 }
 
 api Foo {
-    get someApi -> Bar {
+    self(FooSource) get someApi -> Bar {
         [gt 0]
         value: int
 
         [len 10]
         [header]
         Content_Type: string
-
-        source { FooSource }
 
         inject {
             MyInjectable
@@ -71,8 +69,12 @@ api Foo {
     - ex: `MyDurable::id(value)` or `MyDurable::{id1(value), id2(Content_Type)}`
     - An empty constructor can be specified with `MyDurable::{}`
 - `inject` tag removed
-- `source` tag removed
-- `self` keyword removed
+- `source` tag removed, along with the `source { ... }` block in API method bodies. Instance methods are now marked by a leading `self` receiver on the method header, before the http verb:
+    - `get someApi -> Bar` is a static method (no `self`).
+    - `self get someApi -> Bar` is an instance method bound to the `Default` source.
+    - `self(FooSource) get someApi -> Bar` is an instance method bound to the named source `FooSource`.
+    - Bare `self` is canonical for `self(Default)`; the formatter normalizes `self(Default)` to `self`.
+    - Any method-level tags precede `self`, e.g. `[tags] self(Src) get someApi -> Bar`.
 - Method signatures no longer accept parameters, instead they are defined in the body of the method.
 - A `header` tag is added to specify that a parameter is a header parameter.
     - Functions the same as any other parameter, but comes from the request headers instead of the body.

@@ -56,26 +56,23 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
-    // [tags]* name { param* source* inject* }
+    // [tags]* name { param* inject* }
     let stub = |name: &'static str, token: Token<'src>| {
         tags()
             .then(just(token).map_with(|_, e| e.span()))
-            .then(method_body(false))
-            .map_spanned(
-                move |((leading_tags, name_span), (parameters, injects, sources))| {
-                    DataSourceBlockMethod {
-                        method: Symbol {
-                            name,
-                            span: name_span,
-                            tags: leading_tags,
-                            ..Default::default()
-                        },
-                        parameters,
-                        injects,
-                        sources,
-                    }
-                },
-            )
+            .then(method_body())
+            .map_spanned(move |((leading_tags, name_span), (parameters, injects))| {
+                DataSourceBlockMethod {
+                    method: Symbol {
+                        name,
+                        span: name_span,
+                        tags: leading_tags,
+                        ..Default::default()
+                    },
+                    parameters,
+                    injects,
+                }
+            })
             .boxed()
     };
 

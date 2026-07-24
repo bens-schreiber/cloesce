@@ -62,9 +62,11 @@ export class BasicService {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/downloadData`
     );
+    const __$headers: Record<string, string> = {};
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -82,12 +84,13 @@ export class BasicService {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -101,15 +104,19 @@ export class BasicService {
   /** Call `BasicService.staticMethod` over HTTP. Static method. */
   static async staticMethod(
     input: string,
+    Authorization: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/staticMethod`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("input", String(input));
+    __$headers["Authorization"] = String(Authorization);
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -127,12 +134,13 @@ export class BasicService {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/uploadData`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["data"] = data;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
+      headers: { "Content-Type": "application/octet-stream", ...__$headers },
       body: requestBody(MediaType.Octet, __$payload),
     });
 
@@ -151,10 +159,12 @@ export class BasicService {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/topScores`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("tenantId", String(tenantId));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -171,9 +181,11 @@ export class BasicService {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/BasicService/globalConfig`
     );
+    const __$headers: Record<string, string> = {};
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -300,10 +312,12 @@ export class Leaderboard {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/Leaderboard/$get`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("tenantId", String(tenantId));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -322,13 +336,14 @@ export class Leaderboard {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/Leaderboard/$save`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["tenantId"] = tenantId;
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -384,11 +399,13 @@ export class LeaderboardEntry {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/LeaderboardEntry/$get`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("tenantId", String(tenantId));
     __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -408,12 +425,14 @@ export class LeaderboardEntry {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/LeaderboardEntry/$list`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("tenantId", String(tenantId));
     __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -432,13 +451,14 @@ export class LeaderboardEntry {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/LeaderboardEntry/$save`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["tenantId"] = tenantId;
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -495,12 +515,13 @@ export class ModelWithCompositePk {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCompositePk/${__$id}/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -558,12 +579,13 @@ export class ModelWithKv {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/${__$id}/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -582,10 +604,12 @@ export class ModelWithKv {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/staticMethod`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("input", String(input));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -607,12 +631,13 @@ export class ModelWithKv {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/${__$id}/hasKvParamAndRes`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -668,12 +693,13 @@ export class ModelWithR2 {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithR2/${__$id}/hasR2ParamAndRes`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -799,12 +825,13 @@ export class RouteOwner {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/RouteOwner/${__$id}/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -824,11 +851,13 @@ export class RouteOwner {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/RouteOwner/$get`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("ownerId", String(ownerId));
     __$baseUrl.searchParams.append("modelYear", String(modelYear));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -846,12 +875,13 @@ export class RouteOwner {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/RouteOwner/$save`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -911,12 +941,13 @@ export class ToyotaPrius {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ToyotaPrius/${__$id}/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -1010,12 +1041,13 @@ export class ModelWithCustomDs {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCustomDs/${__$id}/instanceMethod`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["input"] = input;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -1104,10 +1136,12 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get_ByName`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("name", String(name));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -1125,10 +1159,12 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("id", String(id));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -1146,12 +1182,13 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$save_ByName`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -1170,12 +1207,13 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$save`
     );
+    const __$headers: Record<string, string> = {};
     const __$payload: any = {};
     __$payload["model"] = model;
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...__$headers },
       body: requestBody(MediaType.Json, __$payload),
     });
 
@@ -1195,11 +1233,13 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list_ByName`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("name", String(name));
     __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(
@@ -1218,11 +1258,13 @@ export class ModelWithCruds {
     const __$baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
+    const __$headers: Record<string, string> = {};
     __$baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     __$baseUrl.searchParams.append("limit", String(limit));
 
     const __$res = await fetchImpl(__$baseUrl, {
       method: "GET",
+      headers: __$headers,
     });
 
     return await HttpResult.fromResponse(

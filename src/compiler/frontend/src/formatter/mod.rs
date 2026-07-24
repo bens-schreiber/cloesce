@@ -19,10 +19,9 @@ use crate::{
     ApiBlock, ApiBlockMethod, ArgumentLiteral, Ast, AstBlockKind, Cardinality, D1BindingBlock,
     DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock, ForeignBlock,
     InjectBlock, InjectEntry, InjectInitializer, Keyword, KvBindingBlock, KvBindingTemplate,
-    KvFieldArgument, KvFieldBlock, MethodInjectBlock, MethodSourceBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, NavigationKey, ParsedIncludeTree, PlainOldObjectBlock,
-    R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarBlock,
-    fmt_cidl_type, lexer::CommentMap,
+    KvFieldArgument, KvFieldBlock, MethodInjectBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    NavigationKey, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate,
+    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarBlock, fmt_cidl_type, lexer::CommentMap,
 };
 
 /// Formats an [Ast] into a string, preserving comments and blank lines.
@@ -681,12 +680,6 @@ impl<'src> ToDoc<'src> for ApiBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for MethodSourceBlock<'src> {
-    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        Doc::kw(Keyword::Source).then(ctx.block(ctx.sym_doc(&self.source, 3, false), 3))
-    }
-}
-
 impl<'src> ToDoc<'src> for MethodInjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         if self.entries.is_empty() {
@@ -730,15 +723,33 @@ impl<'src> ToDoc<'src> for InjectEntry<'src> {
 
 impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let signature = Doc::text(match &self.http_verb {
+        let verb = Doc::text(match &self.http_verb {
             HttpVerb::Get => Keyword::Get.as_str(),
             HttpVerb::Post => Keyword::Post.as_str(),
             HttpVerb::Put => Keyword::Put.as_str(),
             HttpVerb::Delete => Keyword::Delete.as_str(),
             HttpVerb::Patch => Keyword::Patch.as_str(),
-        })
-        .then(Doc::text(" "))
-        .then(Doc::text(self.symbol.name));
+        });
+
+        let source = match &self.source {
+            None => Doc::nil(),
+            Some(source) => {
+                let source = source.inner.source.as_ref().filter(|s| s.name != "Default");
+                let self_doc = match source {
+                    Some(source) => Doc::kw(Keyword::SelfKw)
+                        .then(Doc::text("("))
+                        .then(Doc::text(source.name))
+                        .then(Doc::text(")")),
+                    None => Doc::kw(Keyword::SelfKw),
+                };
+                self_doc.then(Doc::text(" "))
+            }
+        };
+
+        let signature = source
+            .then(verb)
+            .then(Doc::text(" "))
+            .then(Doc::text(self.symbol.name));
 
         let signature = if matches!(self.symbol.cidl_type, CidlType::Void) {
             signature
@@ -748,13 +759,7 @@ impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
                 .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
         };
 
-        signature.then(method_body_doc(
-            ctx,
-            &self.parameters,
-            &self.injects,
-            &self.sources,
-            2,
-        ))
+        signature.then(method_body_doc(ctx, &self.parameters, &self.injects, 2))
     }
 }
 
@@ -764,7 +769,6 @@ impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
             ctx,
             &self.parameters,
             &self.injects,
-            &self.sources,
             2,
         ))
     }
@@ -984,23 +988,19 @@ fn method_body_doc<'src>(
     ctx: &FmtCtx<'src>,
     params: &'src [Symbol<'src>],
     injects: &'src [Spd<MethodInjectBlock<'src>>],
-    sources: &'src [Spd<MethodSourceBlock<'src>>],
     depth: usize,
 ) -> Doc<'src> {
     enum Item<'a, 'src> {
         Param(&'a Symbol<'src>),
         Inject(&'a Spd<MethodInjectBlock<'src>>),
-        Source(&'a Spd<MethodSourceBlock<'src>>),
     }
 
     let mut items: Vec<Item<'src, 'src>> = Vec::new();
     items.extend(params.iter().map(Item::Param));
     items.extend(injects.iter().map(Item::Inject));
-    items.extend(sources.iter().map(Item::Source));
     items.sort_by_key(|item| match item {
         Item::Param(p) => p.span.start,
         Item::Inject(i) => i.span.start,
-        Item::Source(s) => s.span.start,
     });
 
     if items.is_empty() {
@@ -1012,7 +1012,6 @@ fn method_body_doc<'src>(
         inner = inner.then(match item {
             Item::Param(p) => ctx.sym_doc(p, depth, false),
             Item::Inject(i) => ctx.spd_doc(i, depth, false),
-            Item::Source(s) => ctx.spd_doc(s, depth, false),
         });
     }
     ctx.block(inner, depth)

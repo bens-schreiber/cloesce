@@ -385,12 +385,27 @@ pub struct DurableTarget<'src> {
     pub shard_args: Vec<Cow<'src, str>>,
 }
 
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ParamSource {
+    #[default]
+    Body,
+    Header,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ApiMethodParam<'src> {
+    #[serde(borrow)]
+    pub field: ValidatedField<'src>,
+
+    pub source: ParamSource,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct ApiMethod<'src> {
     #[serde(borrow)]
     pub name: Cow<'src, str>,
 
-    /// If true, the method is static (instantiated on a class, not an instance).
+    /// If true, the method is static.
     /// Static methods require no hydration or data source.
     pub is_static: bool,
 
@@ -409,7 +424,7 @@ pub struct ApiMethod<'src> {
     pub parameters_media: MediaType,
 
     #[serde(borrow)]
-    pub parameters: Vec<ValidatedField<'src>>,
+    pub parameters: Vec<ApiMethodParam<'src>>,
 
     #[serde(borrow)]
     pub injected: Vec<&'src str>,

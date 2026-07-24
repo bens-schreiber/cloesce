@@ -168,6 +168,25 @@ pub enum SemanticError<'src, 'p> {
         method: &'p Symbol<'src>,
     },
 
+    /// An `inject { ... }` block references more than one Durable Object context.
+    ApiMultipleDurableContexts {
+        context: &'p Symbol<'src>,
+    },
+
+    /// A durable context initializer names a shard field that the Durable Object
+    /// does not declare, e.g. `Do::notAShard(x)`.
+    DurableUnknownShardField {
+        binding: &'p Symbol<'src>,
+        target: &'p Symbol<'src>,
+    },
+
+    /// A durable context omits an initializer for one of the Durable Object's
+    /// declared shard fields.
+    DurableMissingShardField {
+        context: &'p Symbol<'src>,
+        missing: &'src str,
+    },
+
     ValidatorInvalidForType {
         validator: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
@@ -704,6 +723,50 @@ fn display(
                 .with_label(
                     Label::new((method_path, method_range))
                         .with_message("an instantiated method runs inside its data source's Durable Object; remove the explicit context injection")
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::ApiMultipleDurableContexts { context } => {
+            let (path, range) = span_parts(&context.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message("more than one Durable Object context injected")
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("a method may inject at most one Durable Object context")
+                        .with_color(Color::Red),
+                )
+        }
+        SemanticError::DurableUnknownShardField { binding, target } => {
+            let (b_path, b_range) = span_parts(&binding.span, file_table);
+            let (t_path, t_range) = span_parts(&target.span, file_table);
+            report!(t_path.clone(), t_range.clone())
+                .with_message(format!(
+                    "'{}' is not a shard field of Durable Object '{}'",
+                    target.name, binding.name
+                ))
+                .with_label(
+                    Label::new((t_path, t_range))
+                        .with_message("no such shard field on this Durable Object")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((b_path, b_range))
+                        .with_message(format!("Durable Object '{}' referenced here", binding.name))
+                        .with_color(Color::Yellow),
+                )
+        }
+        SemanticError::DurableMissingShardField { context, missing } => {
+            let (path, range) = span_parts(&context.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(format!(
+                    "Durable Object context '{}' is missing shard field '{missing}'",
+                    context.name
+                ))
+                .with_label(
+                    Label::new((path, range))
+                        .with_message(format!(
+                            "supply an initializer for '{missing}', e.g. `{missing}(arg)`"
+                        ))
                         .with_color(Color::Red),
                 )
         }

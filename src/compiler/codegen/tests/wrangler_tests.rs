@@ -33,7 +33,7 @@ fn generates_default_wrangler_value() {
     // Arrange
     let src = r#"
         d1 { db }
-        vars {
+        var {
             API_KEY: string
             TIMEOUT: int
             ENABLED: bool
@@ -120,7 +120,7 @@ fn generates_default_kv_wrangler_values() {
     // Arrange
     let src = r#"
         kv my_kv {
-            obj() -> json {
+            obj -> json {
                 "kvObj"
             }
         }
@@ -161,13 +161,13 @@ fn generates_default_durable_object_wrangler_values() {
                 tenantId: int
             }
 
-            topEntryCache() -> json {
+            topEntryCache -> json {
                 "top"
             }
         }
 
         durable GlobalDo {
-            config() -> json {
+            config -> json {
                 "config"
             }
         }
@@ -385,7 +385,8 @@ fn env_generate_writes_into_env_block() {
         d1 { DB }
 
         kv CACHE {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "cache/{id}"
             }
         }

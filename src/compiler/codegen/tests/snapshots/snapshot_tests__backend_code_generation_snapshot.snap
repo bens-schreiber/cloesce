@@ -1944,7 +1944,7 @@ export namespace Api {
     export namespace BasicService {
         export type downloadData = () => Awaitable<HttpResult<ReadableStream> | ReadableStream>;
         export type instanceMethod = (input: number) => Awaitable<HttpResult<number> | number>;
-        export type staticMethod = (input: string) => Awaitable<HttpResult<string> | string>;
+        export type staticMethod = (input: string, Authorization: string) => Awaitable<HttpResult<string> | string>;
         export type uploadData = (data: ReadableStream) => Awaitable<HttpResult<boolean> | boolean>;
         export type topScores = (env: Env.BasicServiceTopScores, tenantId: number) => Awaitable<HttpResult<unknown> | unknown>;
         export type globalConfig = (env: Env.BasicServiceGlobalConfig) => Awaitable<HttpResult<unknown> | unknown>;

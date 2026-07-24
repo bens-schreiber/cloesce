@@ -583,6 +583,56 @@ fn api_context_tag() {
 }
 
 #[test]
+fn api_self_receiver() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        model Item {}
+
+        api Item {
+            self(Custom) post named -> Item {}
+
+            self post defaulted -> Item {}
+
+            post staticMethod -> Item {}
+        }
+        "#,
+    );
+
+    // Assert
+    let api = ast
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::Api(a) if a.symbol.name == "Item" => Some(a),
+            _ => None,
+        })
+        .expect("Item api block");
+
+    let method = |name: &str| {
+        &api.methods
+            .iter()
+            .find(|m| m.inner.symbol.name == name)
+            .unwrap()
+            .inner
+    };
+
+    let named = method("named");
+    let source = named.source.as_ref().expect("named is an instance method");
+    assert_eq!(source.inner.source.as_ref().map(|s| s.name), Some("Custom"));
+
+    let defaulted = method("defaulted");
+    let source = defaulted
+        .source
+        .as_ref()
+        .expect("defaulted is an instance method");
+    assert!(source.inner.source.is_none());
+
+    // No `self` receiver: a static method.
+    assert!(method("staticMethod").source.is_none());
+}
+
+#[test]
 fn model_primary_unique_optional_foreign() {
     let ast = lex_and_ast(
         r#"

@@ -11,7 +11,7 @@ use idl::{CidlType, CrudKind};
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
     ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, InjectInitializer, Keyword,
-    MethodInjectBlock, MethodSourceBlock, PlainOldObjectBlock, Span, Spd, Symbol, Tag,
+    MethodInjectBlock, PlainOldObjectBlock, Span, Spd, Symbol, Tag,
 };
 
 pub type ParserError<'tokens, 'src> = Vec<Rich<'tokens, Token<'src>, Span>>;
@@ -220,8 +220,6 @@ fn tagged_typed_symbol<'tokens, 'src: 'tokens>()
 /// {
 ///     [tag]* param: cidl_type
 ///
-///     source { SourceName }
-///
 ///     inject {
 ///         ident1
 ///         ident2::target(arg)
@@ -229,32 +227,16 @@ fn tagged_typed_symbol<'tokens, 'src: 'tokens>()
 ///     }
 /// }
 /// ```
-///
-/// `allow_source` gates the `source { ... }` block: it is permitted on API
-/// methods (which bind to a data source) but not on data source methods
-/// themselves.
-fn method_body<'tokens, 'src: 'tokens>(
-    allow_source: bool,
-) -> impl Parser<
+fn method_body<'tokens, 'src: 'tokens>() -> impl Parser<
     'tokens,
     TokenInput<'tokens, 'src>,
-    (
-        Vec<Symbol<'src>>,
-        Vec<Spd<MethodInjectBlock<'src>>>,
-        Vec<Spd<MethodSourceBlock<'src>>>,
-    ),
+    (Vec<Symbol<'src>>, Vec<Spd<MethodInjectBlock<'src>>>),
     Extra<'tokens, 'src>,
 > {
     enum Item<'src> {
         Param(Symbol<'src>),
         Inject(Spd<MethodInjectBlock<'src>>),
-        Source(Spd<MethodSourceBlock<'src>>),
     }
-
-    // `source { SourceName }`
-    let source_block = kw!(Source)
-        .ignore_then(symbol().delimited_by(just(Token::LBrace), just(Token::RBrace)))
-        .map_spanned(|source| MethodSourceBlock { source });
 
     // `target(arg1, arg2, ...)`
     let initializer = || {
@@ -303,11 +285,7 @@ fn method_body<'tokens, 'src: 'tokens>(
 
     let inject = inject_block.map(Item::Inject).boxed();
     let param = tagged_typed_symbol().map(Item::Param).boxed();
-    let item = if allow_source {
-        choice((source_block.map(Item::Source).boxed(), inject, param)).boxed()
-    } else {
-        choice((inject, param)).boxed()
-    };
+    let item = choice((inject, param)).boxed();
 
     item.repeated()
         .collect::<Vec<_>>()
@@ -315,15 +293,13 @@ fn method_body<'tokens, 'src: 'tokens>(
         .map(|items| {
             let mut parameters = Vec::new();
             let mut injects = Vec::new();
-            let mut sources = Vec::new();
             for item in items {
                 match item {
                     Item::Param(p) => parameters.push(p),
                     Item::Inject(i) => injects.push(i),
-                    Item::Source(s) => sources.push(s),
                 }
             }
-            (parameters, injects, sources)
+            (parameters, injects)
         })
         .boxed()
 }

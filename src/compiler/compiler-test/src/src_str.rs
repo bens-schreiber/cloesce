@@ -134,7 +134,7 @@ model ModelWithCompositePk for db {
 }
 
 api ModelWithCompositePk {
-    post instanceMethod -> string {
+    self post instanceMethod -> string {
         input: string
 
         inject { db }
@@ -157,7 +157,7 @@ model ModelWithKv for db {
 }
 
 api ModelWithKv {
-    post instanceMethod -> string {
+    self post instanceMethod -> string {
         input: string
 
         inject { db }
@@ -167,7 +167,7 @@ api ModelWithKv {
         input: int
     }
 
-    post hasKvParamAndRes -> kvobject<string> {
+    self post hasKvParamAndRes -> kvobject<string> {
         input: kvobject<string>
     }
 }
@@ -183,7 +183,7 @@ model ModelWithR2 for db {
 }
 
 api ModelWithR2 {
-    post hasR2ParamAndRes -> r2object {
+    self post hasR2ParamAndRes -> r2object {
         input: r2object
     }
 }
@@ -208,7 +208,7 @@ model ToyotaPrius for db {
 }
 
 api ToyotaPrius {
-    post instanceMethod -> string {
+    self post instanceMethod -> string {
         input: string
     }
 }
@@ -290,10 +290,8 @@ source Custom for ModelWithCustomDs {
 }
 
 api ModelWithCustomDs {
-    post instanceMethod -> string {
+    self(Custom) post instanceMethod -> string {
         input: string
-
-        source { Custom }
     }
 }
 
@@ -318,7 +316,7 @@ model RouteCar {
 }
 
 api RouteOwner {
-    post instanceMethod -> string {
+    self post instanceMethod -> string {
         input: string
     }
 }
@@ -333,6 +331,9 @@ api BasicService {
 
     get staticMethod -> string {
         input: string
+
+        [header]
+        Authorization: string
     }
 
     post uploadData -> bool {

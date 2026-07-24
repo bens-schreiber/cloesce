@@ -3,17 +3,15 @@ use chumsky::prelude::*;
 use idl::HttpVerb;
 
 use crate::{
-    ApiBlock, ApiBlockMethod, AstBlockKind, Symbol,
+    ApiBlock, ApiBlockMethod, AstBlockKind, MethodSource, Symbol,
     lexer::Token,
     parser::{Extra, MapSpanned, TokenInput, cidl_type, kw, method_body, symbol},
 };
 
 /// ```cloesce
 /// api Namespace {
-///     http_verb methodName -> cidl_type {
+///     self(SourceName) http_verb methodName -> cidl_type {
 ///         [tag]* ident: cidl_type
-///
-///         source { SourceName }
 ///
 ///         inject {
 ///             ident1
@@ -38,10 +36,8 @@ pub fn api_block<'tokens, 'src: 'tokens>()
 }
 
 /// ```cloesce
-/// verb methodName -> returnType {
+/// self(sourceName) verb methodName -> returnType {
 ///     [tag]* param: cidl_type
-///
-///     source { sourceName }
 ///
 ///     inject {
 ///        ident1
@@ -64,19 +60,33 @@ fn method<'tokens, 'src: 'tokens>() -> impl Parser<
         kw!(Delete).to(HttpVerb::Delete),
     ));
 
-    verb.then(symbol())
+    // `self` | `self(SourceName)`
+    let source = kw!(SelfKw)
+        .ignore_then(
+            symbol()
+                .delimited_by(just(Token::LParen), just(Token::RParen))
+                .or_not(),
+        )
+        .map_spanned(|source| MethodSource { source });
+
+    source
+        .or_not()
+        .then(verb)
+        .then(symbol())
         .then(just(Token::Arrow).ignore_then(cidl_type()).or_not())
-        .then(method_body(true))
+        .then(method_body())
         .map_spanned(
-            |(((http_verb, symbol), return_type), (parameters, injects, sources))| ApiBlockMethod {
-                symbol: Symbol {
-                    cidl_type: return_type.unwrap_or_default(),
-                    ..symbol
-                },
-                http_verb,
-                parameters,
-                injects,
-                sources,
+            |((((source, http_verb), symbol), return_type), (parameters, injects))| {
+                ApiBlockMethod {
+                    symbol: Symbol {
+                        cidl_type: return_type.unwrap_or_default(),
+                        ..symbol
+                    },
+                    source,
+                    http_verb,
+                    parameters,
+                    injects,
+                }
             },
         )
         .boxed()

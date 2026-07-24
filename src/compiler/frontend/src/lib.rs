@@ -56,6 +56,7 @@ contextual_keywords! {
     Model => "model",
     Poo => "poo",
     Source => "source",
+    SelfKw => "self",
     Inject => "inject",
     Api => "api",
     Var => "var",
@@ -277,8 +278,8 @@ pub struct MethodInjectBlock<'src> {
     pub entries: Vec<Spd<InjectEntry<'src>>>,
 }
 
-pub struct MethodSourceBlock<'src> {
-    pub source: Symbol<'src>,
+pub struct MethodSource<'src> {
+    pub source: Option<Symbol<'src>>,
 }
 
 pub struct ApiBlockMethod<'src> {
@@ -287,17 +288,16 @@ pub struct ApiBlockMethod<'src> {
     /// The [CidlType] of this symbol represents the return type of the API method.
     pub symbol: Symbol<'src>,
 
+    pub source: Option<Spd<MethodSource<'src>>>,
     pub http_verb: HttpVerb,
     pub parameters: Vec<Symbol<'src>>,
     pub injects: Vec<Spd<MethodInjectBlock<'src>>>,
-    pub sources: Vec<Spd<MethodSourceBlock<'src>>>,
 }
 
 pub struct DataSourceBlockMethod<'src> {
     pub method: Symbol<'src>,
     pub parameters: Vec<Symbol<'src>>,
     pub injects: Vec<Spd<MethodInjectBlock<'src>>>,
-    pub sources: Vec<Spd<MethodSourceBlock<'src>>>,
 }
 
 pub struct ParsedIncludeTree<'src>(
