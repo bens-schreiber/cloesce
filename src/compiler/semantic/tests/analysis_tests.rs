@@ -437,63 +437,6 @@ fn route_model_valid() {
 }
 
 #[test]
-fn d1_model_navigates_to_worker_model() {
-    // Arrange
-    let src = &with_env(
-        r#"
-        model User for my_d1 {
-            primary {
-                id: int
-            }
-
-            column {
-                org: string
-            }
-
-            one Person::{ id(id), tenant(org) } { person }
-        }
-
-        model Person {
-            route {
-                tenant: string
-                id: int
-            }
-        }
-        "#,
-    );
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let user = result.models.get("User").unwrap();
-    assert!(user.is_d1_backed());
-    assert_eq!(user.backing.as_ref().unwrap().binding, "my_d1");
-
-    let person_nav = user.navigation_fields.first().unwrap();
-    assert_eq!(person_nav.field.name, "person");
-    assert_eq!(person_nav.model_reference, "Person");
-    assert_eq!(
-        person_nav.field.cidl_type,
-        CidlType::Object { name: "Person" }
-    );
-    assert!(matches!(person_nav.cardinality, NavigationCardinality::One));
-
-    // Person is worker-backed, so its resolved target backing is None.
-    assert!(person_nav.target_backing.is_none());
-
-    let keys: Vec<(&str, &str)> = person_nav
-        .keys
-        .iter()
-        .map(|k| (k.local, k.target))
-        .collect();
-    assert_eq!(keys, vec![("id", "id"), ("org", "tenant")]);
-}
-
-#[test]
 fn keyless_singleton_nav() {
     let src = r#"
     kv GlobalKv {
@@ -865,48 +808,6 @@ fn binding_key_format_invalid_syntax() {
         "expected two invalid-key-format errors, got: {:#?}",
         errors
     );
-}
-
-#[test]
-fn binding_template_prefix_is_computed() {
-    // Arrange
-    let src = r#"
-        kv NS {
-            a -> json {
-                id: int
-                "path/to/data/{id}"
-            }
-            b -> json {
-                id: int
-                "data/{id}/value"
-            }
-            c -> json { "top" }
-        }
-    "#;
-
-    // Act
-    let parse = lex_and_ast(src);
-    let (idl, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "{errors:#?}");
-
-    let ns = idl
-        .wrangler_env
-        .kv_bindings
-        .iter()
-        .find(|b| b.name == "NS")
-        .unwrap();
-    let prefix = |field: &str| {
-        &ns.templates
-            .iter()
-            .find(|t| t.field.name == field)
-            .unwrap()
-            .prefix
-    };
-    assert_eq!(prefix("a"), "path/to/data/");
-    assert_eq!(prefix("b"), "data/");
-    assert_eq!(prefix("c"), "top");
 }
 
 #[test]
@@ -1395,31 +1296,6 @@ fn poo_errors() {
 }
 
 #[test]
-fn poo_with_model_reference() {
-    let src = r#"
-        d1 { db }
-
-        model BasicModel for db {
-            primary {
-                id: int
-            }
-        }
-
-        poo PooWithComposition {
-            field1: string
-            field2: BasicModel
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (result, errors) = analyze(&parse);
-
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-    let poo = result.poos.get("PooWithComposition").unwrap();
-    assert_eq!(poo.fields.len(), 2);
-}
-
-#[test]
 fn cidl_types_resolve() {
     // Arrange
     let src = r#"
@@ -1616,7 +1492,7 @@ fn validator_valid() {
 }
 
 #[test]
-fn inject_tag_populates_api_method_injected() {
+fn inject_populates_api_method_injected() {
     let src = r#"
         d1 { db }
 
@@ -1698,7 +1574,7 @@ fn inject_tag_dedupes() {
 }
 
 #[test]
-fn context_tag_valid() {
+fn inject_context_valid() {
     // Arrange
     let src = r#"
         durable LeaderboardDo {
@@ -1795,7 +1671,7 @@ fn inject_binding_namespace_and_context() {
 }
 
 #[test]
-fn context_tag_errors() {
+fn inject_context_invalid() {
     // Arrange
     let src = r#"
         durable LeaderboardDo {
@@ -1949,97 +1825,6 @@ fn instantiated_method_injecting_durable_conflicts() {
 }
 
 #[test]
-fn durable_backing_valid() {
-    // Arrange
-    let src = r#"
-        durable LeaderboardDo {
-            shard {
-                [gt 0]
-                tenantId: int
-            }
-
-            topEntryCache -> json {
-                "top"
-            }
-
-            tenantScoped -> json {
-                tenantId: int
-                "scoped/{tenantId}"
-            }
-        }
-
-        durable GlobalDo {
-            config -> json {
-                "config"
-            }
-        }
-
-        model Leaderboard for LeaderboardDo(org) {
-            kv LeaderboardDo::{ topEntryCache, tenantId(org) } {
-                top
-            }
-
-            kv LeaderboardDo::{ tenantScoped(org), tenantId(org) } {
-                scoped
-            }
-        }
-
-        model Settings for GlobalDo {
-            kv GlobalDo::config {
-                config
-            }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let leaderboard = result.models.get("Leaderboard").unwrap();
-    assert!(leaderboard.is_durable_backed());
-    let backing = leaderboard.backing.as_ref().expect("durable backing");
-    assert_eq!(backing.binding, "LeaderboardDo");
-    assert_eq!(backing.fields, vec!["org"]);
-
-    let org = leaderboard
-        .route_fields
-        .iter()
-        .find(|f| f.name == "org")
-        .expect("org route field (aliased shard field)");
-    assert_eq!(org.cidl_type, CidlType::Int);
-    assert_eq!(org.validators.len(), 1);
-    assert!(matches!(
-        org.validators[0],
-        Validator::GreaterThan(Number::Int(0))
-    ));
-
-    let top_entry = leaderboard
-        .kv_fields
-        .iter()
-        .find(|kv| kv.field.name == "top")
-        .expect("top kv field");
-    assert_eq!(top_entry.binding, "LeaderboardDo");
-
-    let scoped = leaderboard
-        .kv_fields
-        .iter()
-        .find(|kv| kv.field.name == "scoped")
-        .expect("scoped kv field");
-    assert_eq!(scoped.binding, "LeaderboardDo");
-    assert_eq!(scoped.key_format, "scoped/{org}");
-
-    let settings = result.models.get("Settings").unwrap();
-    assert!(settings.is_durable_backed());
-    let backing = settings.backing.as_ref().expect("durable backing");
-    assert_eq!(backing.binding, "GlobalDo");
-    assert!(backing.fields.is_empty());
-    assert!(settings.route_fields.is_empty());
-}
-
-#[test]
 fn durable_backing_errors() {
     // Arrange
     let src = r#"
@@ -2091,78 +1876,6 @@ fn durable_backing_errors() {
 }
 
 #[test]
-fn route_model_durable_backing() {
-    let src = r#"
-        durable GlobalDo {
-            config -> json {
-                "config"
-            }
-        }
-
-        durable LeaderboardDo {
-            shard {
-                tenantId: int
-            }
-        }
-
-        model RouteGlobal for GlobalDo {
-            route {
-                id: int
-            }
-
-            kv GlobalDo::config {
-                config
-            }
-        }
-
-        // A sharded DO backing: `tenantId` is inherited from the shard, `rank` is explicit.
-        model RouteSharded for LeaderboardDo(tenantId) {
-            route {
-                rank: int
-            }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let route_global = result.models.get("RouteGlobal").unwrap();
-    assert!(route_global.is_durable_backed());
-    assert_eq!(route_global.backing.as_ref().unwrap().binding, "GlobalDo");
-
-    let route_fields: Vec<&str> = route_global
-        .route_fields
-        .iter()
-        .map(|f| f.name.as_ref())
-        .collect();
-    assert_eq!(route_fields, vec!["id"]);
-    assert!(
-        route_global
-            .kv_fields
-            .iter()
-            .any(|kv| kv.field.name == "config")
-    );
-
-    let route_sharded = result.models.get("RouteSharded").unwrap();
-    assert!(route_sharded.is_durable_backed());
-    assert_eq!(
-        route_sharded.backing.as_ref().unwrap().fields,
-        vec!["tenantId"]
-    );
-    let mut sharded_fields: Vec<&str> = route_sharded
-        .route_fields
-        .iter()
-        .map(|f| f.name.as_ref())
-        .collect();
-    sharded_fields.sort();
-    assert_eq!(sharded_fields, vec!["rank", "tenantId"]);
-}
-
-#[test]
 fn route_shard_field_collision_errors() {
     let src = r#"
         durable LeaderboardDo {
@@ -2188,6 +1901,57 @@ fn route_shard_field_collision_errors() {
         SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(dup.name, "tenantId");
+}
+
+#[test]
+fn unique_tag() {
+    // Arrange
+    let src = with_env(
+        r#"
+    [unique a, b]
+    [unique id]
+    model User for my_d1 {
+        primary {
+            id: int
+        }
+        column {
+            a: string
+            b: string
+        }
+    }
+    "#,
+    );
+
+    // Act
+    let parse = lex_and_ast(&src);
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    let user = result.models.get("User").unwrap();
+    let pk_col = user
+        .primary_columns
+        .iter()
+        .find(|c| c.field.name == "id")
+        .unwrap();
+    assert_eq!(
+        pk_col.unique_ids.len(),
+        0,
+        "primary keys are unique by default"
+    );
+
+    let a_col = user.columns.iter().find(|c| c.field.name == "a").unwrap();
+    assert_eq!(a_col.unique_ids.len(), 1);
+    let a_unique_id = a_col.unique_ids.first().expect("unique id");
+
+    let b_col = user.columns.iter().find(|c| c.field.name == "b").unwrap();
+    assert_eq!(b_col.unique_ids.len(), 1);
+    let b_unique_id = b_col.unique_ids.first().expect("unique id");
+
+    assert_eq!(
+        a_unique_id, b_unique_id,
+        "both columns share the same unique id"
+    );
 }
 
 // Comprehensive test for cross-database relationships

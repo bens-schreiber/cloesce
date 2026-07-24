@@ -46,7 +46,6 @@ contextual_keywords! {
     Many => "many",
     Foreign => "foreign",
     Primary => "primary",
-    Unique => "unique",
     Column => "column",
     Route => "route",
     For => "for",
@@ -82,6 +81,7 @@ contextual_keywords! {
     Internal => "internal",
     Instance => "instance",
     Header => "header",
+    Unique => "unique",
 
 
     // Validator tag (numeric)
@@ -224,6 +224,9 @@ pub enum Tag<'src> {
 
     /// [Keyword::Header]
     Header,
+
+    /// [Keyword::Unique]
+    Unique { fields: Vec<Symbol<'src>> },
 
     /// [Keyword::Instance]
     Instance,
@@ -418,7 +421,6 @@ pub enum ModelBlockKind<'src> {
     Column(Vec<Symbol<'src>>),
     Foreign(ForeignBlock<'src>),
     Primary(Vec<Spd<SqlBlockKind<'src>>>),
-    Unique(Vec<Symbol<'src>>),
     Navigation(NavigationBlock<'src>),
     Kv(KvFieldBlock<'src>),
     R2(R2FieldBlock<'src>),
@@ -442,7 +444,6 @@ impl<'src> ModelBlockKind<'src> {
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
                 .collect(),
-            ModelBlockKind::Unique(_) => vec![],
         }
     }
 }

@@ -166,11 +166,30 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|_| Tag::Instance);
 
-    choice((validator, crud_tag, internal_tag, header_tag, instance_tag))
-        .map_spanned(|tag| tag)
-        .repeated()
-        .collect::<Vec<_>>()
-        .boxed()
+    // [unique a1, a2, ...]
+    let unique_tag = just(Token::LBracket)
+        .then(kw!(Unique))
+        .ignore_then(
+            symbol()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(|fields| Tag::Unique { fields });
+
+    choice((
+        validator,
+        crud_tag,
+        internal_tag,
+        header_tag,
+        instance_tag,
+        unique_tag,
+    ))
+    .map_spanned(|tag| tag)
+    .repeated()
+    .collect::<Vec<_>>()
+    .boxed()
 }
 
 ///```cloesce

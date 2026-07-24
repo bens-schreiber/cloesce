@@ -150,17 +150,6 @@ pub fn model_block<'tokens, 'src: 'tokens>()
             .map(ModelBlockKind::Route),
     );
 
-    // `unique (field1, field2, ...)`
-    let unique_block = kw!(Unique).ignore_then(
-        symbol()
-            .separated_by(just(Token::Comma))
-            .at_least(1)
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LParen), just(Token::RParen))
-            .map(ModelBlockKind::Unique),
-    );
-
     // `one|many Model { ident }`                          (discriminator-less)
     // `one|many Model::target(local) { ident }`           (single direct)
     // `one|many Model::target { ident }`                  (shard-only shorthand)
@@ -222,7 +211,6 @@ pub fn model_block<'tokens, 'src: 'tokens>()
         navigation_block,
         primary_block,
         route_block,
-        unique_block,
     ))
     .boxed();
 

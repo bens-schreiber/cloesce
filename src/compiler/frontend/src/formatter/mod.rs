@@ -467,6 +467,10 @@ impl<'src> ToDoc<'src> for Tag<'src> {
             Tag::Instance => Doc::kw(Keyword::Instance),
             Tag::Header => Doc::kw(Keyword::Header),
 
+            Tag::Unique { fields: symbols } => Doc::kw(Keyword::Unique)
+                .then(Doc::text(" "))
+                .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
+
             Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
                 .then(Doc::text(" "))
                 .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
@@ -521,10 +525,6 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
             ModelBlockKind::Primary(blocks) => model_block(Keyword::Primary.as_str(), blocks, ctx),
-            ModelBlockKind::Unique(fields) => Doc::kw(Keyword::Unique)
-                .then(Doc::text(" ("))
-                .then(comma_separated(fields, |sym| ctx.sym_doc(sym, 0, true)))
-                .then(Doc::text(")")),
         }
     }
 }

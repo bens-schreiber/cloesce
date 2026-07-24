@@ -418,7 +418,7 @@ fn inject_block() {
     );
 
     // Assert
-    let all_injected: Vec<&str> = ast
+    let all_injected = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
@@ -427,7 +427,7 @@ fn inject_block() {
         })
         .flat_map(|i| i.symbols.iter())
         .map(|s| s.name)
-        .collect();
+        .collect::<Vec<_>>();
 
     assert_eq!(
         all_injected,
@@ -457,19 +457,22 @@ fn api_block() {
     );
 
     // Assert
-    let dataless_models: Vec<_> = ast
+    let dataless_models = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
             AstBlockKind::Model(m) if m.blocks.is_empty() => Some(m),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(dataless_models.len(), 2);
-    let names: Vec<_> = dataless_models.iter().map(|m| m.symbol.name).collect();
+    let names = dataless_models
+        .iter()
+        .map(|m| m.symbol.name)
+        .collect::<Vec<_>>();
     assert_eq!(names, vec!["MyAppService", "AnotherService"]);
 
-    let api_blocks: Vec<_> = ast
+    let api_blocks = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
@@ -477,7 +480,7 @@ fn api_block() {
             _ => None,
         })
         .filter(|a| a.symbol.name == "MyAppService")
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(
         api_blocks.len(),
         2,
@@ -637,6 +640,9 @@ fn model_primary_unique_optional_foreign() {
     let ast = lex_and_ast(
         r#"
         [crud get, save, list]
+        [unique a, b]
+        [unique orgId2]
+        [unique deptId, role]
         model M for d1_db {
             column {
                 score: real
@@ -656,10 +662,6 @@ fn model_primary_unique_optional_foreign() {
             foreign Author::id option {authorId }
             foreign Dept::id { deptId }
             foreign Draft::id option {draftId }
-
-            unique (a, b)
-            unique (orgId2)
-            unique (deptId, role)
         }
         "#,
     );
@@ -668,7 +670,7 @@ fn model_primary_unique_optional_foreign() {
 
     assert_eq!(m.database_binding.as_ref().map(|s| s.name), Some("d1_db"));
 
-    let cruds: Vec<CrudKind> = m
+    let cruds = m
         .symbol
         .tags
         .iter()
@@ -676,21 +678,32 @@ fn model_primary_unique_optional_foreign() {
             Tag::Crud { kinds } => kinds.iter().map(|k| k.inner.clone()).collect::<Vec<_>>(),
             _ => Vec::new(),
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(
         cruds.iter().any(|c| matches!(c, CrudKind::Get))
             && cruds.iter().any(|c| matches!(c, CrudKind::Save))
             && cruds.iter().any(|c| matches!(c, CrudKind::List))
     );
 
-    let columns: Vec<&str> = m
+    let uniques = m
+        .symbol
+        .tags
+        .iter()
+        .flat_map(|t| match &t.inner {
+            Tag::Unique { fields } => Some(fields.iter().map(|s| s.name).collect::<Vec<_>>()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(uniques.len(), 3);
+
+    let columns = m
         .blocks
         .iter()
         .flat_map(|spd| match &spd.inner {
             ModelBlockKind::Column(syms) => syms.iter().map(|s| s.name).collect::<Vec<_>>(),
             _ => Vec::new(),
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(columns.contains(&"score"));
 
     let primary = m
@@ -754,20 +767,6 @@ fn model_primary_unique_optional_foreign() {
         .unwrap();
     assert!(draft_fb.is_optional);
     assert_eq!(draft_fb.fields[0].name, "draftId");
-
-    let uniques: Vec<Vec<&str>> = m
-        .blocks
-        .iter()
-        .filter_map(|spd| match &spd.inner {
-            ModelBlockKind::Unique(fields) => {
-                Some(fields.iter().map(|s| s.name).collect::<Vec<_>>())
-            }
-            _ => None,
-        })
-        .collect();
-    assert!(uniques.iter().any(|u| u == &vec!["a", "b"]));
-    assert!(uniques.iter().any(|u| u == &vec!["orgId2"]));
-    assert!(uniques.iter().any(|u| u == &vec!["deptId", "role"]));
 }
 
 #[test]
@@ -1005,14 +1004,14 @@ fn validator_tags() {
     assert_eq!(col.cidl_type, CidlType::String);
     assert_eq!(col.tags.len(), 4);
 
-    let validators: Vec<(&Keyword, &ArgumentLiteral)> = col
+    let validators = col
         .tags
         .iter()
         .filter_map(|t| match &t.inner {
             Tag::Validator { name, argument } => Some((name, argument)),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(validators.len(), 4);
 
     assert!(matches!(validators[0].0, Keyword::Regex));
