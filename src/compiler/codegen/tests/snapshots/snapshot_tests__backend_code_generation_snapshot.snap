@@ -99,23 +99,23 @@ function MyR2Helpers(bucket: R2Bucket) {
         },
         metadata: {
             template: (ownerId: string, modelYear: number): string =>
-                `metadata/ownerId/${ownerId}/modelYear/${modelYear}`,
+                `meta/${ownerId}/${modelYear}`,
             get: (ownerId: string, modelYear: number): Promise<R2ObjectBody | null> =>
-                bucket.get(`metadata/ownerId/${ownerId}/modelYear/${modelYear}`),
+                bucket.get(`meta/${ownerId}/${modelYear}`),
             put: (ownerId: string, modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put(`metadata/ownerId/${ownerId}/modelYear/${modelYear}`, value),
+                bucket.put(`meta/${ownerId}/${modelYear}`, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: `metadata/ownerId/` }),
+                bucket.list({ ...options, prefix: `meta/` }),
         },
         photoData: {
             template: (modelYear: number): string =>
-                `photoData/modelYear/${modelYear}`,
+                `photos/${modelYear}`,
             get: (modelYear: number): Promise<R2ObjectBody | null> =>
-                bucket.get(`photoData/modelYear/${modelYear}`),
+                bucket.get(`photos/${modelYear}`),
             put: (modelYear: number, value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put(`photoData/modelYear/${modelYear}`, value),
+                bucket.put(`photos/${modelYear}`, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: `photoData/modelYear/` }),
+                bucket.list({ ...options, prefix: `photos/` }),
         },
         customDsData: {
             template: (id: number): string =>
@@ -1198,7 +1198,7 @@ export interface ToyotaPriusStore<E> {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` ONE
          *
          * STAGE 1
-         * ├─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * ├─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
          * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
@@ -1218,7 +1218,7 @@ export interface ToyotaPriusStore<E> {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * ├─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * ├─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
          * └─ READ kv `MyKv` KEY "someValue/id1/{ownerId}/id2/{modelYear}" INTO `metadata`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
@@ -1356,7 +1356,7 @@ export interface ToyotaPriusWithR2Source {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` ONE
          *
          * STAGE 1
-         * └─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * └─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
@@ -1374,7 +1374,7 @@ export interface ToyotaPriusWithR2Source {
          * └─ SEARCH `ToyotaPrius` ON d1 `db` LIMIT `$limit` MANY
          *
          * STAGE 1
-         * └─ READ r2 `MyR2` KEY "photoData/modelYear/{modelYear}" INTO `photoData`
+         * └─ READ r2 `MyR2` KEY "photos/{modelYear}" INTO `photoData`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */

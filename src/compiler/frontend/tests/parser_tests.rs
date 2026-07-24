@@ -205,7 +205,7 @@ fn durable_binding_block() {
 
     let cache_with_date = &leaderboard.templates[1].inner;
     assert_eq!(cache_with_date.symbol.name, "topEntryCacheWithDate");
-    assert_eq!(cache_with_date.key_format, Some("top/{date}"));
+    assert_eq!(cache_with_date.key_format, None);
     assert_eq!(cache_with_date.params.len(), 1);
     assert_eq!(cache_with_date.params[0].name, "date");
     assert_eq!(cache_with_date.params[0].cidl_type, CidlType::String);

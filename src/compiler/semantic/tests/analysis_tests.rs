@@ -868,11 +868,14 @@ fn binding_template_prefix_is_computed() {
 
 #[test]
 fn default_key_format_is_generated_for_body_less_templates() {
-    // Arrange: body-less templates auto-generate a default key from name + params.
+    // Arrange
     let src = r#"
         kv NS {
-            noParams() -> json
-            withParams(p1: string, p2: int) -> json
+            noParams -> json {}
+            withParams -> json {
+                p1: string
+                p2: int
+            }
         }
     "#;
 

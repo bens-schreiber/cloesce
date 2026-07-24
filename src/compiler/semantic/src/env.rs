@@ -194,28 +194,42 @@ fn validate_key_format<'src, 'p>(
 
     return Some(segs);
 
-    /// Extracts braced variables from a format string.
-    /// e.g. "users/{userId}/posts/{postId}" => ["userId", "postId"].
+    /// Splits a format string into literal text and braced variable segments.
+    /// e.g. "users/{userId}/posts/{postId}" =>
+    /// `[Literal("users/"), Value("userId"), Literal("/posts/"), Value("postId")]`.
     ///
     /// Returns an error string if the format string is invalid (e.g. nested or
     /// unclosed braces).
     fn parse_template<'src>(s: &'src str) -> Result<Vec<TemplateSegment<'src, &'src str>>, String> {
         let mut out = Vec::new();
+        // Byte index where the current literal run began.
+        let mut literal_start = 0;
+        // Byte index just after the opening `{` of an in-progress placeholder.
         let mut current = None;
         for (i, c) in s.char_indices() {
-            match (current.is_some(), c) {
-                (false, '{') => current = Some(i + 1),
-                (true, '{') => return Err("nested brace in key".to_string()),
-                (true, '}') => {
-                    let start_idx = current.take().unwrap();
-                    out.push(TemplateSegment::Value(&s[start_idx..i]));
+            match (current, c) {
+                (None, '{') => {
+                    if literal_start < i {
+                        out.push(TemplateSegment::Literal(Cow::Borrowed(
+                            &s[literal_start..i],
+                        )));
+                    }
+                    current = Some(i + 1);
                 }
-                (true, _) => {}
+                (Some(_), '{') => return Err("nested brace in key".to_string()),
+                (Some(start_idx), '}') => {
+                    out.push(TemplateSegment::Value(&s[start_idx..i]));
+                    current = None;
+                    literal_start = i + 1;
+                }
                 _ => {}
             }
         }
         if current.is_some() {
             return Err("unclosed brace in key".to_string());
+        }
+        if literal_start < s.len() {
+            out.push(TemplateSegment::Literal(Cow::Borrowed(&s[literal_start..])));
         }
         Ok(out)
     }
