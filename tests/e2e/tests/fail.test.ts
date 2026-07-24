@@ -99,7 +99,7 @@ describe("Cloesce Router fail cases", () => {
 
   describe("body validation", () => {
     it("RequestMissingBody: POST with no body -> 400", async () => {
-      const res = await fetch(`${BASE}/FailModel/${saved.id}/throwingMethod`, {
+      const res = await fetch(`${BASE}/FailModel/${saved.id}/numericValidators`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -107,7 +107,7 @@ describe("Cloesce Router fail cases", () => {
     });
 
     it("RequestMissingBody: POST with malformed JSON -> 400", async () => {
-      const res = await fetch(`${BASE}/FailModel/${saved.id}/throwingMethod`, {
+      const res = await fetch(`${BASE}/FailModel/${saved.id}/numericValidators`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{not json",
