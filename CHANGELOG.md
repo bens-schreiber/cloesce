@@ -8,6 +8,8 @@
 - "spider initializer" syntax (`::{field(value), field2(value2)}`) for navigation properties
 - Allow `one` and `many` relationships between any two Models, regardless of their backing
 - `hydrate` and `hydrateAll` methods capable of loading any navigation property on any given Model seed
+- `[header]` tag
+- `[unique]` tag
 
 ### Changed
 
@@ -20,6 +22,10 @@
 - Route fields are allowed on any Model
 - All CRUD operations are always supported on all Models
 - Reworked the backend API surface significantly (removed `impl` blocks, expanded on the upgraded `env` to include "Model Stores").
+- Removed the `unique` block in favor of the new `[unique]` tag
+- Removed the `inject` tag in favor of a new `inject` block under an API definition
+- Removed the `source` tag in favor of a new `self` syntax
+- Reworked parameter list syntax to use a more uniform bracketed syntax.
 
 ### Fixed
 
