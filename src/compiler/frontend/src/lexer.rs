@@ -1,9 +1,5 @@
 //! Converts source strings into a stream of tokens, emitting file and span information for each token.
 //!
-//! Each [Token] is either some kind of punctuation, a literal, or an identifier. The only reserved keywords in Cloesce
-//! are [Token::SelfToken], [Token::Ctx], and [Token::Env]. The `$` character is intentionally excluded from identifiers
-//! since it is used for  generated content in the codegen phase.
-//!
 //! All comments are extracted from the token stream and stored in a [CommentMap] such that the parser can be
 //! oblivious to them.
 //!
@@ -18,14 +14,6 @@ use std::path::PathBuf;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token<'src> {
-    // Reserved
-    #[token("self")]
-    SelfToken,
-    #[token("ctx")]
-    Ctx,
-    #[token("env")]
-    Env,
-
     // Punctuation
     #[token("{")]
     LBrace,

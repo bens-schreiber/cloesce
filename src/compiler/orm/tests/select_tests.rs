@@ -1038,7 +1038,8 @@ async fn r2_field_on_d1_root() {
         d1 { db }
 
         r2 Bucket {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{id}"
             }
         }
@@ -1093,7 +1094,8 @@ async fn r2_field_list_fanout() {
         d1 { db }
 
         r2 Bucket {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{id}"
             }
         }
@@ -1154,7 +1156,8 @@ async fn r2_field_not_included_is_absent() {
         d1 { db }
 
         r2 Bucket {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{id}"
             }
         }
@@ -1213,7 +1216,9 @@ async fn kv_field_on_d1_root() {
         d1 { db }
 
         kv Cache {
-            entry(region: string, id: int) -> json {
+            entry -> json {
+                region: string
+                id: int
                 "e/{region}/{id}"
             }
         }
@@ -1274,7 +1279,8 @@ async fn kv_field_list_fanout() {
         d1 { db }
 
         kv Cache {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "e/{id}"
             }
         }
@@ -1335,7 +1341,7 @@ async fn do_kv_field_on_do_sqlite_model() {
         durable BoardDo {
             shard { tenantId: int }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }
@@ -1392,13 +1398,14 @@ async fn route_param_key_fields_on_do_root() {
         durable BoardDo {
             shard { tenantId: int }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }
 
         r2 Bucket {
-            banner(tenantId: int) {
+            banner {
+                tenantId: int
                 "banner/{tenantId}"
             }
         }
@@ -1456,7 +1463,7 @@ async fn do_kv_fanout_from_d1_list() {
         durable BoardDo {
             shard { tenantId: int }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }
@@ -1524,7 +1531,7 @@ async fn shardless_do_kv() {
     let idl = src_to_idl(
         r#"
         durable GlobalDo {
-            config() -> json {
+            config -> json {
                 "config"
             }
         }
@@ -1581,7 +1588,9 @@ async fn r2_key_uses_do_root_route_field() {
         }
 
         r2 Bucket {
-            snapshot(tenantId: int, id: int) {
+            snapshot {
+                tenantId: int
+                id: int
                 "snap/{tenantId}/{id}"
             }
         }
@@ -1708,7 +1717,8 @@ async fn backingless_root_get() {
     let idl = src_to_idl(
         r#"
         kv Cache {
-            entry(ownerId: string) -> json {
+            entry -> json {
+                ownerId: string
                 "e/{ownerId}"
             }
         }
@@ -1763,7 +1773,7 @@ async fn kv_only_do_root_get() {
         durable BoardDo {
             shard { tenantId: int }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }
@@ -2047,7 +2057,9 @@ async fn kv_key_straddles_nav_inherited_and_local_fields() {
         }
 
         kv Cache {
-            entry(tenantId: int, itemId: int) -> json {
+            entry -> json {
+                tenantId: int
+                itemId: int
                 "e/{tenantId}/{itemId}"
             }
         }

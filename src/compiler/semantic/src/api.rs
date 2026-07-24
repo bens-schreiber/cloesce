@@ -6,8 +6,11 @@ pub mod analysis {
         err::{ErrorSink, SemanticError},
         resolve_cidl_type, resolve_inject, resolve_validator_tags,
     };
-    use frontend::{ApiBlockMethod, ApiBlockMethodParamKind, SpdSlice, Tag};
-    use idl::{ApiMethod, CidlType, HttpVerb, MediaType, Model, ValidatedField};
+    use frontend::{ApiBlockMethod, SpdSlice, Tag};
+    use idl::{
+        ApiMethod, ApiMethodParam, CidlType, DEFAULT_DATA_SOURCE_NAME, HttpVerb, MediaType, Model,
+        ParamSource, ValidatedField,
+    };
     use indexmap::IndexMap;
 
     /// Validates every API method, returning a list of Model namespaces and their associated API methods.
@@ -55,8 +58,14 @@ pub mod analysis {
         let (mut parameters, parameters_media, is_static, data_source_name) =
             parameters(model.name, method, table, sink);
 
-        let (injected, durable_target) =
-            resolve_inject(&method.symbol, &mut parameters, table, sink);
+        let mut fields = parameters
+            .iter()
+            .map(|p| p.field.clone())
+            .collect::<Vec<_>>();
+        let (injected, durable_target) = resolve_inject(&method.injects, &mut fields, table, sink);
+        for (param, field) in parameters.iter_mut().zip(fields) {
+            param.field = field;
+        }
 
         let data_source = is_static
             .not()
@@ -74,7 +83,7 @@ pub mod analysis {
             };
 
             if ds_is_durable && durable_target.is_some() {
-                sink.push(SemanticError::ApiInjectsDurableWhenSelfInjectsDurable {
+                sink.push(SemanticError::ApiInjectsDurableWhenSourceInjectsDurable {
                     method: &method.symbol,
                 });
             }
@@ -135,7 +144,7 @@ pub mod analysis {
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> (
-        Vec<ValidatedField<'src>>,
+        Vec<ApiMethodParam<'src>>,
         MediaType,
         bool,
         Option<&'src str>,
@@ -144,51 +153,45 @@ pub mod analysis {
 
         let mut has_stream = false;
         let mut data_source: Option<&'src str> = None;
-        let mut is_static = true;
-        for param in method.parameters.inners() {
-            let param = match param {
-                ApiBlockMethodParamKind::SelfParam(self_sym) => {
-                    is_static = false;
 
-                    // Validate tags
-                    for tag in &self_sym.tags {
-                        let Tag::Source { name } = &tag.inner else {
-                            sink.push(SemanticError::TagInvalidInContext {
-                                tag,
-                                symbol: self_sym,
-                            });
-                            continue;
-                        };
-
-                        data_source = Some(name.inner);
-
-                        // Check that the data source exists on this namespace
-                        let ds_exists =
-                            table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
-                                model: model_name,
-                                name: name.inner,
-                            });
-
-                        ensure!(
-                            ds_exists,
-                            sink,
-                            SemanticError::ApiUnknownDataSourceReference {
-                                method: &method.symbol,
-                                data_source: name,
-                            }
-                        );
-                    }
-
-                    // No further validation is needed for `self`.
-                    continue;
-                }
-                ApiBlockMethodParamKind::Param(symbol) => symbol,
+        let is_static = method.source.is_none();
+        if let Some(source) = &method.source {
+            let source_name = match &source.inner.source {
+                Some(s) => s.name,
+                None => DEFAULT_DATA_SOURCE_NAME,
             };
+            data_source = Some(source_name);
 
+            if let Some(named) = source
+                .inner
+                .source
+                .as_ref()
+                .filter(|s| s.name != DEFAULT_DATA_SOURCE_NAME)
+            {
+                let ds_exists = table.local.contains_key(&LocalSymbolKind::DataSourceDecl {
+                    model: model_name,
+                    name: named.name,
+                });
+
+                ensure!(
+                    ds_exists,
+                    sink,
+                    SemanticError::ApiUnknownDataSourceReference {
+                        method: &method.symbol,
+                        data_source: named,
+                    }
+                );
+            }
+        }
+
+        for param in &method.parameters {
             // Validate tags
+            let mut source = ParamSource::Body;
             for tag in &param.tags {
-                if !matches!(tag.inner, Tag::Validator { .. }) {
-                    sink.push(SemanticError::TagInvalidInContext { tag, symbol: param });
+                match &tag.inner {
+                    Tag::Validator { .. } => {}
+                    Tag::Header => source = ParamSource::Header,
+                    _ => sink.push(SemanticError::TagInvalidInContext { tag, symbol: param }),
                 }
             }
 
@@ -232,11 +235,7 @@ pub mod analysis {
                     );
 
                     has_stream = true;
-                    let required_params = method
-                        .parameters
-                        .inners()
-                        .filter(|p| matches!(p, ApiBlockMethodParamKind::Param(_)))
-                        .count();
+                    let required_params = method.parameters.len();
 
                     // Only one Stream parameter is allowed, and it must be the
                     // only non-injected parameter
@@ -258,10 +257,13 @@ pub mod analysis {
                 }
             };
 
-            params.push(ValidatedField {
-                name: param.name.into(),
-                cidl_type: resolved_type,
-                validators,
+            params.push(ApiMethodParam {
+                field: ValidatedField {
+                    name: param.name.into(),
+                    cidl_type: resolved_type,
+                    validators,
+                },
+                source,
             });
         }
 
@@ -279,7 +281,22 @@ pub mod analysis {
 }
 
 pub mod expansion {
-    use idl::{ApiMethod, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType, Model};
+    use idl::{
+        ApiMethod, ApiMethodParam, CidlType, CloesceIdl, CrudKind, DataSource, HttpVerb, MediaType,
+        Model, ParamSource, ValidatedField,
+    };
+
+    fn body_params<'src>(
+        fields: impl IntoIterator<Item = ValidatedField<'src>>,
+    ) -> Vec<ApiMethodParam<'src>> {
+        fields
+            .into_iter()
+            .map(|field| ApiMethodParam {
+                field,
+                source: ParamSource::Body,
+            })
+            .collect()
+    }
 
     /// Expands a [Model]'s [CrudKind]s into actual API methods on the model.
     ///
@@ -346,12 +363,7 @@ pub mod expansion {
                     return_type: CidlType::Object { name: model.name },
                     return_media: MediaType::Json,
                     parameters_media: MediaType::Json,
-                    parameters: ds
-                        .get
-                        .parameters
-                        .iter()
-                        .map(|p| p.parameter.clone())
-                        .collect(),
+                    parameters: body_params(ds.get.parameters.iter().map(|p| p.parameter.clone())),
                     injected: ds.get.injected.clone(),
                     durable_target: ds.get.durable_target.clone(),
                 })
@@ -365,7 +377,7 @@ pub mod expansion {
                     return_type: CidlType::array(CidlType::Object { name: model.name }),
                     return_media: MediaType::Json,
                     parameters_media: MediaType::Json,
-                    parameters: ds.list.parameters.clone(),
+                    parameters: body_params(ds.list.parameters.iter().cloned()),
                     injected: ds.list.injected.clone(),
                     durable_target: ds.list.durable_target.clone(),
                 })
@@ -379,7 +391,7 @@ pub mod expansion {
                     return_type: CidlType::Object { name: model.name },
                     return_media: MediaType::Json,
                     parameters_media: MediaType::Json,
-                    parameters: ds.save.parameters.clone(),
+                    parameters: body_params(ds.save.parameters.iter().cloned()),
                     injected: ds.save.injected.clone(),
                     durable_target: ds.save.durable_target.clone(),
                 })

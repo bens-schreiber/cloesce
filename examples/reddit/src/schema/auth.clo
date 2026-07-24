@@ -6,7 +6,8 @@ inject {
 
 // A key-value store that stores session tokens for Users
 kv Sessions {
-    session(token: string) -> string {
+    session -> string {
+        token: string
         "sessions/{token}"
     }
 }

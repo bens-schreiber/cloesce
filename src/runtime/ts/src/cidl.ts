@@ -92,6 +92,13 @@ export interface DurableTarget {
   shard_args: string[];
 }
 
+export type ParamSource = "Body" | "Header";
+
+export interface ApiMethodParam {
+  field: ValidatedField;
+  source: ParamSource;
+}
+
 export interface ApiMethod {
   name: string;
   is_static: boolean;
@@ -99,7 +106,7 @@ export interface ApiMethod {
   return_media: MediaType;
   return_type: CidlType;
   parameters_media: MediaType;
-  parameters: ValidatedField[];
+  parameters: ApiMethodParam[];
   data_source: string | null;
   injected: string[];
   durable_target?: DurableTarget | null;

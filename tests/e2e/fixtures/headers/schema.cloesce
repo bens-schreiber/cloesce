@@ -1,0 +1,26 @@
+model HeaderService {}
+
+api HeaderService {
+    // POST with a header param and a body param. The impl echoes both back so a
+    // test can prove the header value actually arrived over an HTTP header.
+    post echo -> string {
+        [header]
+        X_Tenant: string
+
+        payload: string
+    }
+
+    // GET proving headers apply regardless of verb, plus a typed (int) header to
+    // exercise string->int coercion of a header value.
+    get count -> int {
+        [header]
+        X_Count: int
+    }
+
+    // POST whose only params are headers: there is no request body at all. Proves
+    // the router doesn't demand a body when every param is header-sourced.
+    post ping -> string {
+        [header]
+        X_Tenant: string
+    }
+}

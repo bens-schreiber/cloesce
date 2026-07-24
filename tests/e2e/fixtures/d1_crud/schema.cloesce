@@ -7,14 +7,14 @@ model CrudHaver for db {
     primary {
         id: int
     }
-    
+
     column {
         name: string
     }
 }
 
 api CrudHaver {
-    post notCrud(self)
+    self post notCrud {}
 }
 
 [crud save, get, list]
@@ -22,8 +22,8 @@ model Parent for db {
     primary {
         id: int
     }
-    
-    foreign Child::id optional  {
+
+    foreign Child::id option {
         favoriteChildId
     }
 
@@ -47,7 +47,7 @@ model Child for db {
     primary {
         id: int
     }
-    
+
     foreign Parent::id {
         parentId
     }

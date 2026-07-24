@@ -117,12 +117,12 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 {%- macro route_sig(model, api) -%}
 {%- if !api.is_static -%}self: {{ model.name }}{%- endif -%}
 {%- if route_has_env(api) -%}{%- if !api.is_static -%}, {% endif -%}env: Env.{{ route_env_name(model, api) }}{%- endif -%}
-{%- for p in &api.parameters -%}{%- if !api.is_static || route_has_env(api) || !loop.first -%}, {% endif -%}{{ p.name }}: {{ map_type(&p.cidl_type) }}{%- endfor -%}
+{%- for p in &api.parameters -%}{%- if !api.is_static || route_has_env(api) || !loop.first -%}, {% endif -%}{{ p.field.name }}: {{ map_type(&p.field.cidl_type) }}{%- endfor -%}
 {%- endmacro -%}
 
 {%- macro store_route_sig(model, api) -%}
 {%- if !api.is_static -%}self: {{ model.name }}{%- endif -%}
-{%- for p in &api.parameters -%}{%- if !api.is_static || !loop.first -%}, {% endif -%}{{ p.name }}: {{ map_type(&p.cidl_type) }}{%- endfor -%}
+{%- for p in &api.parameters -%}{%- if !api.is_static || !loop.first -%}, {% endif -%}{{ p.field.name }}: {{ map_type(&p.field.cidl_type) }}{%- endfor -%}
 {%- endmacro -%}
 
 {%- macro route_needs(api) -%}

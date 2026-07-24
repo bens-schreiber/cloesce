@@ -2,7 +2,10 @@
 
 use compiler_test::lex_and_ast;
 use frontend::Ast;
-use idl::{BackingKind, CidlType, CloesceIdl, MediaType, NavigationCardinality, Number, Validator};
+use idl::{
+    BackingKind, CidlType, CloesceIdl, MediaType, NavigationCardinality, Number, ParamSource,
+    Validator,
+};
 use semantic::err::SemanticError;
 
 fn analyze<'src, 'p>(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError<'src, 'p>>) {
@@ -50,21 +53,25 @@ fn with_env(src: &str) -> String {
         }}
 
         kv my_kv {{
-            cached(id: int) -> json {{
+            cached -> json {{
+                id: int
                 "users/{{id}}"
             }}
 
-            items(field: string) -> json {{
+            items -> json {{
+                field: string
                 "items/{{field}}"
             }}
         }}
 
         r2 my_r2 {{
-            avatar(id: int) {{
+            avatar {{
+                id: int
                 "avatars/{{id}}"
             }}
 
-            obj(field: string) {{
+            obj {{
+                field: string
                 "assets/{{field}}"
             }}
         }}
@@ -430,85 +437,28 @@ fn route_model_valid() {
 }
 
 #[test]
-fn d1_model_navigates_to_worker_model() {
-    // Arrange
-    let src = &with_env(
-        r#"
-        model User for my_d1 {
-            primary {
-                id: int
-            }
-
-            column {
-                org: string
-            }
-
-            one Person::{ id(id), tenant(org) } { person }
-        }
-
-        model Person {
-            route {
-                tenant: string
-                id: int
-            }
-        }
-        "#,
-    );
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let user = result.models.get("User").unwrap();
-    assert!(user.is_d1_backed());
-    assert_eq!(user.backing.as_ref().unwrap().binding, "my_d1");
-
-    let person_nav = user.navigation_fields.first().unwrap();
-    assert_eq!(person_nav.field.name, "person");
-    assert_eq!(person_nav.model_reference, "Person");
-    assert_eq!(
-        person_nav.field.cidl_type,
-        CidlType::Object { name: "Person" }
-    );
-    assert!(matches!(person_nav.cardinality, NavigationCardinality::One));
-
-    // Person is worker-backed, so its resolved target backing is None.
-    assert!(person_nav.target_backing.is_none());
-
-    let keys: Vec<(&str, &str)> = person_nav
-        .keys
-        .iter()
-        .map(|k| (k.local, k.target))
-        .collect();
-    assert_eq!(keys, vec![("id", "id"), ("org", "tenant")]);
-}
-
-#[test]
 fn keyless_singleton_nav() {
     let src = r#"
     kv GlobalKv {
-        config() -> json {
+        config -> json {
             "config"
         }
     }
 
     durable AppDo {
-        settings() -> json {
+        settings -> json {
             "settings"
         }
     }
 
     model AppConfig for AppDo {
-        kv GlobalKv::config() {
+        kv GlobalKv::config {
             config
         }
     }
 
     model App for AppDo {
-        kv AppDo::settings() {
+        kv AppDo::settings {
             settings
         }
 
@@ -591,7 +541,7 @@ fn d1_model_nullability_prevents_cycle() {
         model A for my_d1 {
             primary { id: int }
 
-            foreign B::id optional {
+            foreign B::id option {
                 bId
             }
 
@@ -601,7 +551,7 @@ fn d1_model_nullability_prevents_cycle() {
         model B for my_d1 {
             primary { id: int }
 
-            foreign C::id optional {
+            foreign C::id option {
                 cId
             }
 
@@ -611,7 +561,7 @@ fn d1_model_nullability_prevents_cycle() {
         model C for my_d1 {
             primary { id: int }
 
-            foreign A::id optional {
+            foreign A::id option {
                 aId
             }
 
@@ -638,11 +588,13 @@ fn kv_r2_errors() {
                 doId: string
             }
 
-            value(key: string) -> string {
+            value -> string {
+                key: string
                 "value/{key}"
             }
 
-            other(key: string) -> string {
+            other -> string {
+                key: string
                 "other/{key}"
             }
         }
@@ -788,13 +740,15 @@ fn binding_key_format_unknown_param() {
     // Arrange
     let src = r#"
         kv UserMeta {
-            meta(id: int) -> json {
+            meta -> json {
+                id: int
                 "metadata/{id}/{bogus}"
             }
         }
 
         r2 UserAvatars {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{ghost}.jpg"
             }
         }
@@ -829,13 +783,15 @@ fn binding_key_format_invalid_syntax() {
     // Arrange
     let src = r#"
         kv NsA {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "entry/{id" // missing closing brace
             }
         }
 
         r2 NsB {
-            obj(id: int) {
+            obj {
+                id: int
                 "obj/{{id}" // nested braces not allowed
             }
         }
@@ -855,50 +811,20 @@ fn binding_key_format_invalid_syntax() {
 }
 
 #[test]
-fn binding_template_prefix_is_computed() {
-    // Arrange
-    let src = r#"
-        kv NS {
-            a(id: int) -> json { "path/to/data/{id}" }
-            b(id: int) -> json { "data/{id}/value" }
-            c() -> json { "top" }
-        }
-    "#;
-
-    // Act
-    let parse = lex_and_ast(src);
-    let (idl, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "{errors:#?}");
-
-    let ns = idl
-        .wrangler_env
-        .kv_bindings
-        .iter()
-        .find(|b| b.name == "NS")
-        .unwrap();
-    let prefix = |field: &str| {
-        &ns.templates
-            .iter()
-            .find(|t| t.field.name == field)
-            .unwrap()
-            .prefix
-    };
-    assert_eq!(prefix("a"), "path/to/data/");
-    assert_eq!(prefix("b"), "data/");
-    assert_eq!(prefix("c"), "top");
-}
-
-#[test]
 fn key_format_overlap_is_detected_and_scoped_per_namespace() {
     let src = r#"
         kv NS {
-            a(id: int) -> json { "foo/{id}" } // overlaps with b
-            b() -> json { "foo/bar" }
+            a -> json {
+                id: int
+                "foo/{id}" // overlaps with b
+            }
+            b -> json { "foo/bar" }
         }
         kv Other {
-            c(id: int) -> json { "foo/{id}" } // overlaps but diff NS
+            c -> json {
+                id: int
+                "foo/{id}" // overlaps but diff NS
+            }
         }
     "#;
 
@@ -929,13 +855,19 @@ fn kv_r2_templates_inherit_validators_update_key_format() {
 
         kv MyKv {
             [gt 10]
-            value([step 5] foo: int) -> int {
+            value -> int {
+                [step 5]
+                foo: int
                 "users/{foo}"
             }
         }
 
         r2 MyR2 {
-            obj([len 5] bar: string, [gt 0] baz: int) {
+            obj {
+                [len 5]
+                bar: string
+                [gt 0]
+                baz: int
                 "objects/{bar}/{baz}"
             }
         }
@@ -1029,22 +961,29 @@ fn api_errors() {
 
         // Invalid return type
         api User {
-            get badReturn() -> option<stream>
+            get badReturn -> option<stream> {}
         }
 
         // Object parameter on GET
         api User {
-            get badGetObj(u: User) -> string
+            get badGetObj -> string {
+                u: User
+            }
         }
 
         // R2Object parameter on GET
         api User {
-            get badGetR2(r: r2object) -> string
+            get badGetR2 -> string {
+                r: r2object
+            }
         }
 
         // Stream param with extra non-inject params (invalid)
         api User {
-            post badStream(s: stream, extra: string) -> stream
+            post badStream -> stream {
+                s: stream
+                extra: string
+            }
         }
     "#,
     );
@@ -1081,9 +1020,15 @@ fn api_sets_media_types() {
         }
 
         api User {
-            [inject my_d1]
-            post streamInputOutput(self, s: stream) -> stream
-            get jsonInputOutput(j: json) -> json
+            self post streamInputOutput -> stream {
+                s: stream
+
+                inject { my_d1 }
+            }
+
+            get jsonInputOutput -> json {
+                j: json
+            }
         }
     "#,
     );
@@ -1108,6 +1053,93 @@ fn api_sets_media_types() {
         .unwrap();
     assert!(matches!(json_method.return_media, MediaType::Json));
     assert!(matches!(json_method.parameters_media, MediaType::Json));
+}
+
+#[test]
+fn api_header_param_source() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+        }
+
+        api User {
+            post withHeader -> string {
+                [header]
+                Authorization: string
+
+                body: string
+            }
+        }
+    "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    let method = result
+        .models
+        .get("User")
+        .unwrap()
+        .apis
+        .iter()
+        .find(|m| m.name == "withHeader")
+        .unwrap();
+
+    let auth = method
+        .parameters
+        .iter()
+        .find(|p| p.field.name == "Authorization")
+        .unwrap();
+    assert_eq!(auth.source, ParamSource::Header);
+
+    let body = method
+        .parameters
+        .iter()
+        .find(|p| p.field.name == "body")
+        .unwrap();
+    assert_eq!(body.source, ParamSource::Body);
+}
+
+#[test]
+fn api_bare_self_defaults_to_default() {
+    // Arrange
+    let src = r#"
+        d1 { db }
+
+        model Item for db {
+            primary { id: int }
+        }
+
+        api Item {
+            self post edit -> Item {
+                input: string
+            }
+        }
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    let edit = result
+        .models
+        .get("Item")
+        .unwrap()
+        .apis
+        .iter()
+        .find(|m| m.name == "edit")
+        .unwrap();
+    assert!(!edit.is_static);
+    assert_eq!(edit.data_source, Some("Default"));
 }
 
 #[test]
@@ -1167,7 +1199,9 @@ fn data_source_errors() {
         // Invalid method param type (Object, not a sqlite type)
         source BadParamSource for User {
             include { posts }
-            get(u: User)
+            get {
+                u: User
+            }
         }
     "#,
     );
@@ -1262,31 +1296,6 @@ fn poo_errors() {
 }
 
 #[test]
-fn poo_with_model_reference() {
-    let src = r#"
-        d1 { db }
-
-        model BasicModel for db {
-            primary {
-                id: int
-            }
-        }
-
-        poo PooWithComposition {
-            field1: string
-            field2: BasicModel
-        }
-    "#;
-
-    let parse = lex_and_ast(src);
-    let (result, errors) = analyze(&parse);
-
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-    let poo = result.poos.get("PooWithComposition").unwrap();
-    assert_eq!(poo.fields.len(), 2);
-}
-
-#[test]
 fn cidl_types_resolve() {
     // Arrange
     let src = r#"
@@ -1303,8 +1312,12 @@ fn cidl_types_resolve() {
         }
 
         api User {
-            [inject my_d1]
-            post resolveAll(p: array<MyPoo>, u: User) -> string
+            self post resolveAll -> string {
+                p: array<MyPoo>
+                u: User
+
+                inject { my_d1 }
+            }
         }
     "#;
 
@@ -1316,7 +1329,11 @@ fn cidl_types_resolve() {
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
     let api = result.models.get("User").unwrap().apis.first().unwrap();
-    let param_types: Vec<_> = api.parameters.iter().map(|p| p.cidl_type.clone()).collect();
+    let param_types: Vec<_> = api
+        .parameters
+        .iter()
+        .map(|p| p.field.cidl_type.clone())
+        .collect();
     assert_eq!(
         param_types,
         vec![
@@ -1475,17 +1492,18 @@ fn validator_valid() {
 }
 
 #[test]
-fn inject_tag_populates_api_method_injected() {
+fn inject_populates_api_method_injected() {
     let src = r#"
         d1 { db }
 
         kv cache {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "entry/{id}"
             }
         }
 
-        vars { API_KEY: string }
+        var { API_KEY: string }
 
         inject { YouTubeApi }
 
@@ -1494,8 +1512,14 @@ fn inject_tag_populates_api_method_injected() {
         }
 
         api M {
-            [inject db, cache, API_KEY, YouTubeApi]
-            get all(self) -> string
+            self get all -> string {
+                inject {
+                    db
+                    cache
+                    API_KEY
+                    YouTubeApi
+                }
+            }
         }
     "#;
 
@@ -1512,7 +1536,6 @@ fn inject_tag_populates_api_method_injected() {
         .find(|a| a.name == "all")
         .unwrap();
     assert_eq!(api.injected, vec!["db", "cache", "API_KEY", "YouTubeApi"]);
-    // Explicit params remain empty (only `self`).
     assert!(api.parameters.is_empty());
 }
 
@@ -1526,8 +1549,12 @@ fn inject_tag_dedupes() {
         }
 
         api M {
-            [inject db, db]
-            get dup(self) -> string
+            self get dup -> string {
+                inject {
+                    db
+                    db
+                }
+            }
         }
     "#;
 
@@ -1547,7 +1574,7 @@ fn inject_tag_dedupes() {
 }
 
 #[test]
-fn context_tag_valid() {
+fn inject_context_valid() {
     // Arrange
     let src = r#"
         durable LeaderboardDo {
@@ -1562,11 +1589,19 @@ fn context_tag_valid() {
         model Leaderboard {}
 
         api Leaderboard {
-            [inject LeaderboardDo(tenantId)]
-            get topScores(tenantId: int) -> json
+            get topScores -> json {
+                tenantId: int
 
-            [inject GlobalDo()]
-            get config() -> json
+                inject {
+                    LeaderboardDo::tenantId(tenantId)
+                }
+            }
+
+            get config -> json {
+                inject {
+                    GlobalDo::{}
+                }
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1588,11 +1623,11 @@ fn context_tag_valid() {
     let tenant = top
         .parameters
         .iter()
-        .find(|p| p.name == "tenantId")
+        .find(|p| p.field.name == "tenantId")
         .unwrap();
-    assert_eq!(tenant.validators.len(), 1);
+    assert_eq!(tenant.field.validators.len(), 1);
     assert!(matches!(
-        tenant.validators[0],
+        tenant.field.validators[0],
         Validator::GreaterThan(Number::Int(0))
     ));
 
@@ -1611,8 +1646,12 @@ fn inject_binding_namespace_and_context() {
         model Global {}
 
         api Global {
-            [inject GlobalDo, GlobalDo()]
-            get config() -> json
+            get config -> json {
+                inject {
+                    GlobalDo
+                    GlobalDo::{}
+                }
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1632,7 +1671,7 @@ fn inject_binding_namespace_and_context() {
 }
 
 #[test]
-fn context_tag_errors() {
+fn inject_context_invalid() {
     // Arrange
     let src = r#"
         durable LeaderboardDo {
@@ -1646,21 +1685,33 @@ fn context_tag_errors() {
         model Leaderboard {}
 
         api Leaderboard {
-            [inject NotADo(tenantId)]           // unknown binding
-            get unknownBinding(tenantId: int) -> json
+            get unknownBinding -> json {
+                tenantId: int
+                inject { NotADo::tenantId(tenantId) }   // unknown binding
+            }
 
-            [inject LeaderboardDo()]            // missing shard arg
-            get argCount(tenantId: int) -> json
+            get missingShard -> json {
+                tenantId: int
+                inject { LeaderboardDo::{} }             // missing shard field
+            }
 
-            [inject LeaderboardDo(nope)]        // arg is not a param
-            get unknownParam(tenantId: int) -> json
+            get unknownParam -> json {
+                tenantId: int
+                inject { LeaderboardDo::tenantId(nope) } // arg is not a param
+            }
 
-            [inject LeaderboardDo(tenantId)]    // param type mismatch (string vs int)
-            get typeMismatch(tenantId: string) -> json
+            get typeMismatch -> json {
+                tenantId: string
+                inject { LeaderboardDo::tenantId(tenantId) } // type mismatch (string vs int)
+            }
 
-            [inject LeaderboardDo(tenantId)]    // multiple context entries
-            [inject GlobalDo()]
-            get multiple(tenantId: int) -> json
+            get multiple -> json {
+                tenantId: int
+                inject {
+                    LeaderboardDo::tenantId(tenantId)    // multiple context entries
+                    GlobalDo::{}
+                }
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1679,19 +1730,17 @@ fn context_tag_errors() {
     assert!(unresolved.contains(&"NotADo"), "got: {unresolved:?}");
     assert!(unresolved.contains(&"nope"), "got: {unresolved:?}");
 
-    let (field, expected, got) = expect_err!(errors,
-        SemanticError::ArgCountMismatch { field, expected, got } => (*field, expected, got)
+    let missing = expect_err!(errors,
+        SemanticError::DurableMissingShardField { context, missing } => (context.name, *missing)
     );
-    assert_eq!(field.name, "LeaderboardDo");
-    assert_eq!(*expected, 1);
-    assert_eq!(*got, 0);
+    assert_eq!(missing, ("LeaderboardDo", "tenantId"));
 
     let arg = expect_err!(errors,
         SemanticError::ArgTypeMismatch { arg, .. } => arg
     );
     assert_eq!(arg.name, "tenantId");
 
-    expect_err!(errors, SemanticError::TagInvalidInContext { .. });
+    expect_err!(errors, SemanticError::ApiMultipleDurableContexts { .. });
 }
 
 #[test]
@@ -1709,7 +1758,9 @@ fn instantiated_method_inherits_durable_target() {
         }
 
         api SubReddit {
-            get feed(self, subId: int) -> json
+            self get feed -> json {
+                subId: int
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1752,8 +1803,13 @@ fn instantiated_method_injecting_durable_conflicts() {
         }
 
         api SubReddit {
-            [inject SubRedditDo(subId)]
-            get feed(self, subId: int) -> json
+            self get feed -> json {
+                subId: int
+
+                inject {
+                    SubRedditDo::id(subId)
+                }
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1763,99 +1819,9 @@ fn instantiated_method_injecting_durable_conflicts() {
 
     // Assert
     let method = expect_err!(errors,
-        SemanticError::ApiInjectsDurableWhenSelfInjectsDurable { method } => method
+        SemanticError::ApiInjectsDurableWhenSourceInjectsDurable { method } => method
     );
     assert_eq!(method.name, "feed");
-}
-
-#[test]
-fn durable_backing_valid() {
-    // Arrange
-    let src = r#"
-        durable LeaderboardDo {
-            shard {
-                [gt 0]
-                tenantId: int
-            }
-
-            topEntryCache() -> json {
-                "top"
-            }
-
-            tenantScoped(tenantId: int) -> json {
-                "scoped/{tenantId}"
-            }
-        }
-
-        durable GlobalDo {
-            config() -> json {
-                "config"
-            }
-        }
-
-        model Leaderboard for LeaderboardDo(org) {
-            kv LeaderboardDo::{ topEntryCache, tenantId(org) } {
-                top
-            }
-
-            kv LeaderboardDo::{ tenantScoped(org), tenantId(org) } {
-                scoped
-            }
-        }
-
-        model Settings for GlobalDo {
-            kv GlobalDo::config {
-                config
-            }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let leaderboard = result.models.get("Leaderboard").unwrap();
-    assert!(leaderboard.is_durable_backed());
-    let backing = leaderboard.backing.as_ref().expect("durable backing");
-    assert_eq!(backing.binding, "LeaderboardDo");
-    assert_eq!(backing.fields, vec!["org"]);
-
-    let org = leaderboard
-        .route_fields
-        .iter()
-        .find(|f| f.name == "org")
-        .expect("org route field (aliased shard field)");
-    assert_eq!(org.cidl_type, CidlType::Int);
-    assert_eq!(org.validators.len(), 1);
-    assert!(matches!(
-        org.validators[0],
-        Validator::GreaterThan(Number::Int(0))
-    ));
-
-    let top_entry = leaderboard
-        .kv_fields
-        .iter()
-        .find(|kv| kv.field.name == "top")
-        .expect("top kv field");
-    assert_eq!(top_entry.binding, "LeaderboardDo");
-
-    let scoped = leaderboard
-        .kv_fields
-        .iter()
-        .find(|kv| kv.field.name == "scoped")
-        .expect("scoped kv field");
-    assert_eq!(scoped.binding, "LeaderboardDo");
-    assert_eq!(scoped.key_format, "scoped/{org}");
-
-    let settings = result.models.get("Settings").unwrap();
-    assert!(settings.is_durable_backed());
-    let backing = settings.backing.as_ref().expect("durable backing");
-    assert_eq!(backing.binding, "GlobalDo");
-    assert!(backing.fields.is_empty());
-    assert!(settings.route_fields.is_empty());
 }
 
 #[test]
@@ -1871,7 +1837,7 @@ fn durable_backing_errors() {
                 tenantId: int
             }
 
-            topEntryCache() -> json {
+            topEntryCache -> json {
                 "top"
             }
         }
@@ -1910,78 +1876,6 @@ fn durable_backing_errors() {
 }
 
 #[test]
-fn route_model_durable_backing() {
-    let src = r#"
-        durable GlobalDo {
-            config() -> json {
-                "config"
-            }
-        }
-
-        durable LeaderboardDo {
-            shard {
-                tenantId: int
-            }
-        }
-
-        model RouteGlobal for GlobalDo {
-            route {
-                id: int
-            }
-
-            kv GlobalDo::config {
-                config
-            }
-        }
-
-        // A sharded DO backing: `tenantId` is inherited from the shard, `rank` is explicit.
-        model RouteSharded for LeaderboardDo(tenantId) {
-            route {
-                rank: int
-            }
-        }
-    "#;
-    let parse = lex_and_ast(src);
-
-    // Act
-    let (result, errors) = analyze(&parse);
-
-    // Assert
-    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
-
-    let route_global = result.models.get("RouteGlobal").unwrap();
-    assert!(route_global.is_durable_backed());
-    assert_eq!(route_global.backing.as_ref().unwrap().binding, "GlobalDo");
-
-    let route_fields: Vec<&str> = route_global
-        .route_fields
-        .iter()
-        .map(|f| f.name.as_ref())
-        .collect();
-    assert_eq!(route_fields, vec!["id"]);
-    assert!(
-        route_global
-            .kv_fields
-            .iter()
-            .any(|kv| kv.field.name == "config")
-    );
-
-    let route_sharded = result.models.get("RouteSharded").unwrap();
-    assert!(route_sharded.is_durable_backed());
-    assert_eq!(
-        route_sharded.backing.as_ref().unwrap().fields,
-        vec!["tenantId"]
-    );
-    let mut sharded_fields: Vec<&str> = route_sharded
-        .route_fields
-        .iter()
-        .map(|f| f.name.as_ref())
-        .collect();
-    sharded_fields.sort();
-    assert_eq!(sharded_fields, vec!["rank", "tenantId"]);
-}
-
-#[test]
 fn route_shard_field_collision_errors() {
     let src = r#"
         durable LeaderboardDo {
@@ -2009,6 +1903,57 @@ fn route_shard_field_collision_errors() {
     assert_eq!(dup.name, "tenantId");
 }
 
+#[test]
+fn unique_tag() {
+    // Arrange
+    let src = with_env(
+        r#"
+    [unique a, b]
+    [unique id]
+    model User for my_d1 {
+        primary {
+            id: int
+        }
+        column {
+            a: string
+            b: string
+        }
+    }
+    "#,
+    );
+
+    // Act
+    let parse = lex_and_ast(&src);
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    let user = result.models.get("User").unwrap();
+    let pk_col = user
+        .primary_columns
+        .iter()
+        .find(|c| c.field.name == "id")
+        .unwrap();
+    assert_eq!(
+        pk_col.unique_ids.len(),
+        0,
+        "primary keys are unique by default"
+    );
+
+    let a_col = user.columns.iter().find(|c| c.field.name == "a").unwrap();
+    assert_eq!(a_col.unique_ids.len(), 1);
+    let a_unique_id = a_col.unique_ids.first().expect("unique id");
+
+    let b_col = user.columns.iter().find(|c| c.field.name == "b").unwrap();
+    assert_eq!(b_col.unique_ids.len(), 1);
+    let b_unique_id = b_col.unique_ids.first().expect("unique id");
+
+    assert_eq!(
+        a_unique_id, b_unique_id,
+        "both columns share the same unique id"
+    );
+}
+
 // Comprehensive test for cross-database relationships
 #[test]
 fn proposal_relationship_matrix() {
@@ -2021,7 +1966,8 @@ fn proposal_relationship_matrix() {
         durable DoA {
             shard { tenantId: int }
 
-            cache(key: int) -> json {
+            cache -> json {
+                key: int
                 "cache/{key}"
             }
         }

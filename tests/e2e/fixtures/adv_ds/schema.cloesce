@@ -20,8 +20,8 @@ model Hamburger for db {
 }
 
 api Hamburger {
-    get noLettuceToppings([source NoLettuce] self) -> array<Topping>
-    get onlyBaconToppings([source OnlyBacon] self) -> array<Topping>
+    self(NoLettuce) get noLettuceToppings -> array<Topping> {}
+    self(OnlyBacon) get onlyBaconToppings -> array<Topping> {}
 }
 
 [crud save]
@@ -68,8 +68,11 @@ source BurgersWithLettuceOrdered for Hamburger {
         }
     }
 
-    [inject db]
-    list(lastId: int, limit: int)
+    list {
+        lastId: int
+        limit: int
+        inject { db }
+    }
 }
 
 [internal]
@@ -80,8 +83,11 @@ source NoLettuce for Hamburger {
         }
     }
 
-    [inject db]
-    get([instance] id: int)
+    get {
+        [instance]
+        id: int
+        inject { db }
+    }
 }
 
 [internal]
@@ -92,12 +98,15 @@ source OnlyBacon for Hamburger {
         }
     }
 
-    [inject db]
-    get([instance] id: int)
+    get {
+        [instance]
+        id: int
+        inject { db }
+    }
 }
 //#endregion
 
-// Exists to show how the Default data source can be overriden 
+// Exists to show how the Default data source can be overriden
 [crud save, get, list]
 model DefaultOverride for db {
     primary {
@@ -106,14 +115,16 @@ model DefaultOverride for db {
 }
 
 // Overrides the Default data source for DefaultOverride with custom `get` and
-// `list` implementations. `save` will still use the default implementation since 
+// `list` implementations. `save` will still use the default implementation since
 // it's not overridden here.
 source Default for DefaultOverride {
     include {}
 
-    [inject db]
-    get()
+    get {
+        inject { db }
+    }
 
-    [inject db]
-    list()
+    list {
+        inject { db }
+    }
 }

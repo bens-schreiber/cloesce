@@ -15,6 +15,7 @@ import {
   R2Field,
   ValidatedField,
   ModelBacking,
+  ParamSource,
 } from "../src/cidl";
 
 export function createIdl(args?: { models?: Model[] }): Cidl {
@@ -185,7 +186,7 @@ export class ModelBuilder {
   method(
     name: string,
     http_verb: HttpVerb,
-    parameters: Field[],
+    parameters: (Field & { source?: ParamSource })[],
     return_type: CidlType,
     data_source: string | null = null,
   ): this {
@@ -193,7 +194,10 @@ export class ModelBuilder {
       name,
       http_verb,
       is_static: data_source === null,
-      parameters: parameters.map((p) => ({ ...p, validators: [] })),
+      parameters: parameters.map(({ source, ...f }) => ({
+        field: { ...f, validators: [] },
+        source: source ?? "Body",
+      })),
       return_type,
       return_media: "Json",
       parameters_media: "Json",

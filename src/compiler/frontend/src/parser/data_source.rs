@@ -4,19 +4,25 @@ use indexmap::IndexMap;
 use crate::{
     AstBlockKind, DataSourceBlock, DataSourceBlockMethod, Keyword, ParsedIncludeTree, Spd, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
+    parser::{Extra, MapSpanned, TokenInput, kw, method_body, symbol, tags},
 };
 
 /// ```cloesce
 /// source SourceName for ModelName {
 ///     include { ... }
 ///
-///     [inject Db]
-///     get(ident: cidl_type, ...)
+///     get {
+///         [tag]* ident: cidl_type
+///         inject { Db }
+///     }
 ///
-///     list(ident: cidl_type, ...)
+///     list {
+///         ident: cidl_type
+///     }
 ///
-///     save(user: partial<User>)
+///     save {
+///         user: partial<User>
+///     }
 /// }
 pub fn data_source_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, Spd<AstBlockKind<'src>>, Extra<'tokens, 'src>> {
@@ -50,22 +56,13 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
-    // ( ident: cidl_type, ... )
-    let method_params = || {
-        tagged_typed_symbol()
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LParen), just(Token::RParen))
-    };
-
-    // [tags]* name(params)
+    // [tags]* name { param* inject* }
     let stub = |name: &'static str, token: Token<'src>| {
         tags()
             .then(just(token).map_with(|_, e| e.span()))
-            .then(method_params())
-            .map_spanned(
-                move |((leading_tags, name_span), parameters)| DataSourceBlockMethod {
+            .then(method_body())
+            .map_spanned(move |((leading_tags, name_span), (parameters, injects))| {
+                DataSourceBlockMethod {
                     method: Symbol {
                         name,
                         span: name_span,
@@ -73,8 +70,9 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                         ..Default::default()
                     },
                     parameters,
-                },
-            )
+                    injects,
+                }
+            })
             .boxed()
     };
 

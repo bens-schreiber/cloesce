@@ -17,8 +17,10 @@
     const __$res = await fetchImpl(__$baseUrl, {
       method: "{% if api.http_verb == HttpVerb::Get %}GET{% else if api.http_verb == HttpVerb::Post %}POST{% else if api.http_verb == HttpVerb::Put %}PUT{% else if api.http_verb == HttpVerb::Patch %}PATCH{% else %}DELETE{% endif %}",
 {%- if !self.is_get_request(&api.http_verb) %}
-      headers: { "Content-Type": "{% if api.parameters_media == MediaType::Json %}application/json{% else %}application/octet-stream{% endif %}" },
+      headers: { "Content-Type": "{% if api.parameters_media == MediaType::Json %}application/json{% else %}application/octet-stream{% endif %}", ...__$headers },
       body: requestBody({{ self.map_media(&api.parameters_media) }}, __$payload),
+{%- else %}
+      headers: __$headers,
 {%- endif %}
     });
 {%- endmacro %}
@@ -113,7 +115,7 @@ export class {{ model.name }} {
   /** Call `{{ model.name }}.{{ api.name }}` over HTTP.{% if !api.is_static %} Instance method.{% else %} Static method.{% endif %} */
   {% if api.is_static %}static {% endif %}async {{ api.name }}(
 {%- for param in &api.parameters %}
-    {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
+    {{ param.field.name }}: {{ self.map_type(&param.field.cidl_type) }},
 {%- endfor %}
 {%- if !api.is_static %}
 {%- for p in self.ds_get(model, api) %}
@@ -138,19 +140,22 @@ export class {{ model.name }} {
     const __$baseUrl = new URL(
       `{{ worker_url }}/{{ model.name }}/{% if !api.is_static %}${__$id}/{% endif %}{{ api.name }}`
     );
+    const __$headers: Record<string, string> = {};
 {%- if !self.is_get_request(&api.http_verb) %}
     const __$payload: any = {};
 {%- endif %}
 
 {%- for param in &api.parameters %}
-{%- if self.is_get_request(&api.http_verb) %}
-{%- if self.is_date(&param.cidl_type) %}
-    __$baseUrl.searchParams.append("{{ param.name }}", {{ param.name }}.toISOString());
+{%- if self.is_header(&param.source) %}
+    __$headers["{{ param.field.name }}"] = {% if self.is_date(&param.field.cidl_type) %}{{ param.field.name }}.toISOString(){% else %}String({{ param.field.name }}){% endif %};
+{%- else if self.is_get_request(&api.http_verb) %}
+{%- if self.is_date(&param.field.cidl_type) %}
+    __$baseUrl.searchParams.append("{{ param.field.name }}", {{ param.field.name }}.toISOString());
 {%- else %}
-    __$baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+    __$baseUrl.searchParams.append("{{ param.field.name }}", String({{ param.field.name }}));
 {%- endif %}
 {%- else %}
-    __$payload["{{ param.name }}"] = {{ param.name }};
+    __$payload["{{ param.field.name }}"] = {{ param.field.name }};
 {%- endif %}
 {%- endfor %}
 {{ fetch_call(api) }}

@@ -4,7 +4,10 @@ d1 {
 
 kv store {
     [maxlen 500]
-    data([regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/] email: string) -> string {
+    data -> string {
+        [regex /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/]
+        email: string
+
         "some_crap/{email}"
     }
 }
@@ -31,15 +34,13 @@ model Validator for db {
 }
 
 api Validator {
-    post someMethod(
-        self,
+    self post someMethod {
+        [lt 100]
+        id: int
 
-        [lt 100] 
-        id: int,
-
-        [len 10] 
-        name: string,
-    )
+        [len 10]
+        name: string
+    }
 }
 
 source None for Validator {

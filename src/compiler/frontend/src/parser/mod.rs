@@ -10,8 +10,8 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, Keyword, PlainOldObjectBlock,
-    Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, InjectInitializer, Keyword,
+    MethodInjectBlock, PlainOldObjectBlock, Span, Spd, Symbol, Tag,
 };
 
 pub type ParserError<'tokens, 'src> = Vec<Rich<'tokens, Token<'src>, Span>>;
@@ -53,7 +53,7 @@ fn parser<'tokens, 'src: 'tokens>()
         env::kv_binding_block().map_spanned(|b| b),
         env::r2_binding_block().map_spanned(|b| b),
         env::durable_binding_block().map_spanned(|b| b),
-        env::vars_block().map_spanned(|b| b),
+        env::var_block().map_spanned(|b| b),
         api::api_block().map_spanned(|b| b),
         poo_block().map_spanned(|b| b),
         inject_block().map_spanned(|b| b),
@@ -148,37 +148,17 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|kinds| Tag::Crud { kinds });
 
-    // [inject binding1, DurableDo(arg1, arg2), GlobalDo(), ...]
-    let inject_entry = symbol()
-        .then(
-            symbol()
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen))
-                .or_not(),
-        )
-        .map(|(symbol, args)| match args {
-            Some(args) => InjectEntry::Context { symbol, args },
-            None => InjectEntry::Binding(symbol),
-        });
-
-    let inject_tag = just(Token::LBracket)
-        .then(kw!(Inject))
-        .ignore_then(
-            inject_entry
-                .separated_by(just(Token::Comma))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RBracket))
-        .map(|entries| Tag::Inject { entries });
-
     // [internal]
     let internal_tag = just(Token::LBracket)
         .then(kw!(Internal))
         .then_ignore(just(Token::RBracket))
         .map(|_| Tag::Internal);
+
+    // [header]
+    let header_tag = just(Token::LBracket)
+        .then(kw!(Header))
+        .then_ignore(just(Token::RBracket))
+        .map(|_| Tag::Header);
 
     // [instance]
     let instance_tag = just(Token::LBracket)
@@ -186,20 +166,25 @@ fn tags<'tokens, 'src: 'tokens>()
         .then_ignore(just(Token::RBracket))
         .map(|_| Tag::Instance);
 
-    // [source SourceName]
-    let source_tag = just(Token::LBracket)
-        .then(kw!(Source))
-        .ignore_then(select! { Token::Ident(name) => name }.map_spanned(|name| name))
+    // [unique a1, a2, ...]
+    let unique_tag = just(Token::LBracket)
+        .then(kw!(Unique))
+        .ignore_then(
+            symbol()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
         .then_ignore(just(Token::RBracket))
-        .map(|name| Tag::Source { name });
+        .map(|fields| Tag::Unique { fields });
 
     choice((
         validator,
         crud_tag,
-        inject_tag,
         internal_tag,
+        header_tag,
         instance_tag,
-        source_tag,
+        unique_tag,
     ))
     .map_spanned(|tag| tag)
     .repeated()
@@ -246,6 +231,89 @@ fn tagged_typed_symbol<'tokens, 'src: 'tokens>()
     tags()
         .then(typed_symbol())
         .map(|(tags, sym)| Symbol { tags, ..sym })
+        .boxed()
+}
+
+/// Parses the brace-delimited body shared by API and data source methods:
+/// ```cloesce
+/// {
+///     [tag]* param: cidl_type
+///
+///     inject {
+///         ident1
+///         ident2::target(arg)
+///         ident3::{ target1(arg1), target2(arg2) }
+///     }
+/// }
+/// ```
+fn method_body<'tokens, 'src: 'tokens>() -> impl Parser<
+    'tokens,
+    TokenInput<'tokens, 'src>,
+    (Vec<Symbol<'src>>, Vec<Spd<MethodInjectBlock<'src>>>),
+    Extra<'tokens, 'src>,
+> {
+    enum Item<'src> {
+        Param(Symbol<'src>),
+        Inject(Spd<MethodInjectBlock<'src>>),
+    }
+
+    // `target(arg)`
+    let initializer = || {
+        symbol()
+            .then(symbol().delimited_by(just(Token::LParen), just(Token::RParen)))
+            .map(|(target, arg)| InjectInitializer { target, arg })
+    };
+
+    // `::{ init, init, ... }` | `::init`
+    let initializers = just(Token::DoubleColon).ignore_then(choice((
+        initializer()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        initializer().map(|i| vec![i]),
+    )));
+
+    // `ident` (flat binding) | `ident::...` (durable object context)
+    let inject_entry = symbol()
+        .then(initializers.or_not())
+        .map(|(symbol, initializers)| match initializers {
+            Some(initializers) => InjectEntry::Context {
+                symbol,
+                initializers,
+            },
+            None => InjectEntry::Binding(symbol),
+        });
+
+    // `inject { entry* }`
+    let inject_block = kw!(Inject)
+        .ignore_then(
+            inject_entry
+                .map_spanned(|e| e)
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map_spanned(|entries| MethodInjectBlock { entries });
+
+    let inject = inject_block.map(Item::Inject).boxed();
+    let param = tagged_typed_symbol().map(Item::Param).boxed();
+    let item = choice((inject, param)).boxed();
+
+    item.repeated()
+        .collect::<Vec<_>>()
+        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+        .map(|items| {
+            let mut parameters = Vec::new();
+            let mut injects = Vec::new();
+            for item in items {
+                match item {
+                    Item::Param(p) => parameters.push(p),
+                    Item::Inject(i) => injects.push(i),
+                }
+            }
+            (parameters, injects)
+        })
         .boxed()
 }
 

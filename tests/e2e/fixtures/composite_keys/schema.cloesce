@@ -8,11 +8,11 @@ model Student for db {
         id: int
         name: string
     }
-    
+
     column {
         favoriteColor: string
     }
-    
+
     // Composite 1:M navigation to StudentCourse join table
     many StudentCourse::{studentId(id), studentName(name)} {
         studentCourses
@@ -24,17 +24,17 @@ model Course for db {
     primary {
         id: int
     }
-    
+
     column {
         title: string
     }
-    
+
     many StudentCourse::courseId(id) {
         studentCourses
     }
 }
 
-// A join table with a composite foreign key to Student 
+// A join table with a composite foreign key to Student
 // and a foreign key to Course
 [crud get, list, save]
 model StudentCourse for db{
@@ -65,8 +65,12 @@ source CoursesOrderedDescending for Student {
         studentCourses
     }
 
-    [inject db]
-    list(lastId: int, lastName: string, limit: int)
+    list {
+        lastId: int
+        lastName: string
+        limit: int
+        inject { db }
+    }
 }
 
 source Default for StudentCourse {

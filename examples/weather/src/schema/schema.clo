@@ -3,7 +3,8 @@ d1 {
 }
 
 r2 Bucket {
-    photos(id: int) {
+    photos {
+        id: int
         "weather/photos/{id}.jpg"
     }
 }
@@ -13,11 +14,11 @@ model WeatherReport for db {
     primary {
         id: int
     }
-    
+
     many Weather::weatherReportId(id) {
         weatherEntries
     }
-    
+
     column {
         title: string
         description: string
@@ -29,7 +30,7 @@ model Weather for db {
     primary {
         id: int
     }
-    
+
     foreign WeatherReport::id {
         weatherReportId
     }
@@ -37,11 +38,11 @@ model Weather for db {
     one WeatherReport::id(weatherReportId) {
         weatherReport
     }
-    
+
     r2 Bucket::photos(id) {
         photo
     }
-    
+
     column {
         dateTime: date
         location: string
@@ -51,10 +52,13 @@ model Weather for db {
 }
 
 api Weather {
-    [inject Bucket]
-    post uploadPhoto(self, s: stream)
-    
-    get downloadPhoto([source R2Only] self) -> stream
+    self post uploadPhoto {
+        s: stream
+
+        inject { Bucket }
+    }
+
+    self(R2Only) get downloadPhoto -> stream {}
 }
 
 source R2Only for Weather {

@@ -51,6 +51,16 @@ impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
                             }
                         }
                     }
+                    Tag::Unique { .. } => {
+                        if model_block.database_binding.is_none() {
+                            self.sink.push(SemanticError::TagInvalidInContext {
+                                tag,
+                                symbol: &model_block.symbol,
+                            });
+                        }
+
+                        // Unique constraints are validated in the ModelBuilder
+                    }
                     _ => self.sink.push(SemanticError::TagInvalidInContext {
                         tag,
                         symbol: &model_block.symbol,
@@ -134,10 +144,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         let has_sql_blocks = self.model.blocks.inners().any(|b| {
             matches!(
                 b,
-                ModelBlockKind::Column(_)
-                    | ModelBlockKind::Foreign(_)
-                    | ModelBlockKind::Primary(_)
-                    | ModelBlockKind::Unique(_)
+                ModelBlockKind::Column(_) | ModelBlockKind::Foreign(_) | ModelBlockKind::Primary(_)
             )
         });
 
@@ -212,7 +219,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                         self.route_field(ma, symbol);
                     }
                 }
-                ModelBlockKind::Unique(_) | ModelBlockKind::Kv(_) | ModelBlockKind::R2(_) => {
+                ModelBlockKind::Kv(_) | ModelBlockKind::R2(_) => {
                     // Processed once all columns are built
                 }
             }
@@ -220,11 +227,17 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
 
         for block in self.model.blocks.inners() {
             match block {
-                ModelBlockKind::Unique(fields) => self.unique_constraint(ma, fields),
                 ModelBlockKind::Kv(kv) => self.kv_field(ma, table, kv),
                 ModelBlockKind::R2(r2) => self.r2_field(ma, table, r2),
                 _ => {}
             }
+        }
+
+        for tag in &self.model.symbol.tags {
+            let Tag::Unique { fields: symbols } = &tag.inner else {
+                continue;
+            };
+            self.unique_constraint(ma, symbols);
         }
 
         if needs_pk && self.primary_columns.is_empty() {
@@ -905,7 +918,6 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
     /// Extends each referenced column with the validators
     /// declared on the corresponding binding template param.
     #[allow(clippy::too_many_arguments)]
-    #[inline(always)]
     fn resolve_binding_ref(
         &mut self,
         ma: &mut ModelAnalysis<'src, 'p, 'sem>,

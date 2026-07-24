@@ -896,7 +896,8 @@ fn validators_in_model() {
         d1 { db }
 
         kv store {
-            slug(id: int) -> string {
+            slug -> string {
+                id: int
                 "product/{id}/meta"
             }
         }

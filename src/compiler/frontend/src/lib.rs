@@ -46,8 +46,6 @@ contextual_keywords! {
     Many => "many",
     Foreign => "foreign",
     Primary => "primary",
-    Optional => "optional",
-    Unique => "unique",
     Column => "column",
     Route => "route",
     For => "for",
@@ -57,9 +55,10 @@ contextual_keywords! {
     Model => "model",
     Poo => "poo",
     Source => "source",
+    SelfKw => "self",
     Inject => "inject",
     Api => "api",
-    Vars => "vars",
+    Var => "var",
     D1 => "d1",
     R2 => "r2",
     Kv => "kv",
@@ -77,6 +76,27 @@ contextual_keywords! {
     Patch => "patch",
     Delete => "delete",
 
+    // Tag
+    Crud => "crud",
+    Internal => "internal",
+    Instance => "instance",
+    Header => "header",
+    Unique => "unique",
+
+
+    // Validator tag (numeric)
+    LessThan => "lt",
+    LessThanOrEqual => "lte",
+    GreaterThan => "gt",
+    GreaterThanOrEqual => "gte",
+    Step => "step",
+
+    // Validator tag (string)
+    Len => "len",
+    MinLen => "minlen",
+    MaxLen => "maxlen",
+    Regex => "regex",
+
     // Generic type
     GOption => "option",
     GArray => "array",
@@ -93,24 +113,6 @@ contextual_keywords! {
     TBlob => "blob",
     TStream => "stream",
     TR2Object => "r2object",
-
-    // Tag
-    Crud => "crud",
-    Internal => "internal",
-    Instance => "instance",
-
-    // Validator tag (numeric)
-    LessThan => "lt",
-    LessThanOrEqual => "lte",
-    GreaterThan => "gt",
-    GreaterThanOrEqual => "gte",
-    Step => "step",
-
-    // Validator tag (string)
-    Len => "len",
-    MinLen => "minlen",
-    MaxLen => "maxlen",
-    Regex => "regex",
 }
 
 /// Formats a [CidlType] into its string representation via [Keyword::as_str]
@@ -191,38 +193,46 @@ pub enum ArgumentLiteral<'src> {
     Regex(&'src str),
 }
 
-/// A single entry in a [Tag::Inject] tag
+#[derive(Debug, Clone)]
+pub struct InjectInitializer<'src> {
+    pub target: Symbol<'src>,
+    pub arg: Symbol<'src>,
+}
+
 #[derive(Debug, Clone)]
 pub enum InjectEntry<'src> {
     /// A flat binding that requires no initializers
     Binding(Symbol<'src>),
 
-    /// A binding that requires initializers, e.g. `binding(arg1, arg2)`
+    /// A binding that requires initializers, e.g. `Durable::{t1(arg1), t2(arg2)}`
     ///
     /// NOTE: Currently used in only Durable Object Context injection
     Context {
+        /// The bound target, e.g. `Durable` in `Durable::t1(arg1)`
         symbol: Symbol<'src>,
-        args: Vec<Symbol<'src>>,
+
+        /// The constructor initializers, e.g. `t1(arg1)`
+        initializers: Vec<InjectInitializer<'src>>,
     },
 }
 
 /// Any `[tag]` attached to a symbol
 #[derive(Debug, Clone)]
 pub enum Tag<'src> {
-    /// [source name]
-    Source { name: Spd<&'src str> },
-
-    /// `[internal]`
+    /// [Keyword::Internal]
     Internal,
 
-    /// `[instance]`
+    /// [Keyword::Header]
+    Header,
+
+    /// [Keyword::Unique]
+    Unique { fields: Vec<Symbol<'src>> },
+
+    /// [Keyword::Instance]
     Instance,
 
-    /// `[crud ...kinds]`
+    /// [Keyword::Crud]
     Crud { kinds: Vec<Spd<CrudKind>> },
-
-    /// `[inject]`
-    Inject { entries: Vec<InjectEntry<'src>> },
 
     /// `[Keyword argument]` where [Keyword] _should_ be a validator keyword (e.g [Keyword::LessThan])
     Validator {
@@ -259,11 +269,20 @@ impl std::hash::Hash for Symbol<'_> {
     }
 }
 
+/// [Keyword::Api]
 pub struct ApiBlock<'src> {
     /// The symbol for the API's name, e.g. `ApiName` in `api ApiName { ... }`
     pub symbol: Symbol<'src>,
 
     pub methods: Vec<Spd<ApiBlockMethod<'src>>>,
+}
+
+pub struct MethodInjectBlock<'src> {
+    pub entries: Vec<Spd<InjectEntry<'src>>>,
+}
+
+pub struct MethodSource<'src> {
+    pub source: Option<Symbol<'src>>,
 }
 
 pub struct ApiBlockMethod<'src> {
@@ -272,18 +291,16 @@ pub struct ApiBlockMethod<'src> {
     /// The [CidlType] of this symbol represents the return type of the API method.
     pub symbol: Symbol<'src>,
 
+    pub source: Option<Spd<MethodSource<'src>>>,
     pub http_verb: HttpVerb,
-    pub parameters: Vec<Spd<ApiBlockMethodParamKind<'src>>>,
-}
-
-pub enum ApiBlockMethodParamKind<'src> {
-    SelfParam(Symbol<'src>),
-    Param(Symbol<'src>),
+    pub parameters: Vec<Symbol<'src>>,
+    pub injects: Vec<Spd<MethodInjectBlock<'src>>>,
 }
 
 pub struct DataSourceBlockMethod<'src> {
     pub method: Symbol<'src>,
     pub parameters: Vec<Symbol<'src>>,
+    pub injects: Vec<Spd<MethodInjectBlock<'src>>>,
 }
 
 pub struct ParsedIncludeTree<'src>(
@@ -291,6 +308,7 @@ pub struct ParsedIncludeTree<'src>(
     pub IndexMap<Symbol<'src>, ParsedIncludeTree<'src>>,
 );
 
+/// [Keyword::Source]
 pub struct DataSourceBlock<'src> {
     /// The symbol for the data source itself, e.g. `SourceName`
     pub symbol: Symbol<'src>,
@@ -298,11 +316,16 @@ pub struct DataSourceBlock<'src> {
     /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
 
-    /// `include { ... }` block
+    /// [Keyword::Include]
     pub tree: Option<ParsedIncludeTree<'src>>,
 
+    /// [Keyword::List]
     pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
+
+    /// [Keyword::Get]
     pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
+
+    /// [Keyword::Save]
     pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
 }
 
@@ -310,7 +333,10 @@ pub struct DataSourceBlock<'src> {
 /// keyword that opens a [NavigationBlock].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cardinality {
+    /// [Keyword::One]
     One,
+
+    /// [Keyword::Many]
     Many,
 }
 
@@ -337,6 +363,7 @@ pub struct NavigationBlock<'src> {
     pub field: Spd<Symbol<'src>>,
 }
 
+/// [Keyword::Foreign]
 pub struct ForeignBlock<'src> {
     /// The referenced model, e.g. `AdjModel` in `foreign AdjModel::field { ... }`.
     pub model: Symbol<'src>,
@@ -394,7 +421,6 @@ pub enum ModelBlockKind<'src> {
     Column(Vec<Symbol<'src>>),
     Foreign(ForeignBlock<'src>),
     Primary(Vec<Spd<SqlBlockKind<'src>>>),
-    Unique(Vec<Symbol<'src>>),
     Navigation(NavigationBlock<'src>),
     Kv(KvFieldBlock<'src>),
     R2(R2FieldBlock<'src>),
@@ -418,11 +444,11 @@ impl<'src> ModelBlockKind<'src> {
                     SqlBlockKind::Foreign(foreign_block) => foreign_block.fields.iter().collect(),
                 })
                 .collect(),
-            ModelBlockKind::Unique(_) => vec![],
         }
     }
 }
 
+/// [Keyword::Model]
 pub struct ModelBlock<'src> {
     /// The symbol for the model name, e.g. `ModelName` in `model ModelName { ... }`
     pub symbol: Symbol<'src>,
@@ -478,6 +504,7 @@ impl<'src> ModelBlock<'src> {
     }
 }
 
+/// [Keyword::Poo]
 pub struct PlainOldObjectBlock<'src> {
     /// The symbol for the POO name, e.g. `MyPoo` in `poo MyPoo { ... }`
     pub symbol: Symbol<'src>,
@@ -485,11 +512,13 @@ pub struct PlainOldObjectBlock<'src> {
     pub fields: Vec<Symbol<'src>>,
 }
 
+/// [Keyword::D1]
 pub struct D1BindingBlock<'src> {
     pub bindings: Vec<Symbol<'src>>,
 }
 
-pub struct VarsBlock<'src> {
+/// [Keyword::Var]
+pub struct VarBlock<'src> {
     pub vars: Vec<Symbol<'src>>,
 }
 
@@ -506,6 +535,7 @@ pub struct KvBindingTemplate<'src> {
     pub key_format: &'src str,
 }
 
+/// [Keyword::Kv]
 pub struct KvBindingBlock<'src> {
     /// The binding name, e.g. `UserMetadata`.
     pub symbol: Symbol<'src>,
@@ -524,6 +554,7 @@ pub struct R2BindingTemplate<'src> {
     pub key_format: &'src str,
 }
 
+/// [Keyword::R2]
 pub struct R2BindingBlock<'src> {
     /// The binding name, e.g. `UserAvatars`.
     pub symbol: Symbol<'src>,
@@ -531,10 +562,12 @@ pub struct R2BindingBlock<'src> {
     pub templates: Vec<Spd<R2BindingTemplate<'src>>>,
 }
 
+/// [Keyword::Shard]
 pub struct DurableShardBlock<'src> {
     pub fields: Vec<Symbol<'src>>,
 }
 
+/// [Keyword::Durable]
 pub struct DurableBindingBlock<'src> {
     /// The binding name, e.g. `LeaderboardDo`.
     pub symbol: Symbol<'src>,
@@ -546,6 +579,7 @@ pub struct DurableBindingBlock<'src> {
     pub templates: Vec<Spd<KvBindingTemplate<'src>>>,
 }
 
+/// [Keyword::Inject]
 pub struct InjectBlock<'src> {
     pub symbols: Vec<Symbol<'src>>,
 }
@@ -560,7 +594,7 @@ pub enum AstBlockKind<'src> {
     KvBinding(KvBindingBlock<'src>),
     R2Binding(R2BindingBlock<'src>),
     DurableBinding(DurableBindingBlock<'src>),
-    Vars(VarsBlock<'src>),
+    Var(VarBlock<'src>),
     Inject(InjectBlock<'src>),
 }
 

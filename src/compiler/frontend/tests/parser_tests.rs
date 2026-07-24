@@ -32,18 +32,20 @@ fn top_level_bindings() {
         }
 
         r2 Assets {
-            asset(id: int) {
+            asset {
+                id: int
                 "assets/{id}"
             }
         }
 
         kv Cache {
-            entry(id: string) -> json {
+            entry -> json {
+                id: string
                 "cache/{id}"
             }
         }
 
-        vars {
+        var {
             api_url: string
             max_retries: int
             threshold: real
@@ -103,12 +105,12 @@ fn top_level_bindings() {
     assert_eq!(entry.key_format, "cache/{id}");
     assert_eq!(entry.params.len(), 1);
 
-    // vars
+    // var
     let vars = ast
         .blocks
         .iter()
         .find_map(|spd| match &spd.inner {
-            AstBlockKind::Vars(v) => Some(
+            AstBlockKind::Var(v) => Some(
                 v.vars
                     .iter()
                     .map(|s| (s.name, &s.cidl_type))
@@ -116,7 +118,7 @@ fn top_level_bindings() {
             ),
             _ => None,
         })
-        .expect("vars block to be present");
+        .expect("var block to be present");
 
     assert_eq!(
         vars,
@@ -143,17 +145,18 @@ fn durable_binding_block() {
                 region: string
             }
 
-            topEntryCache() -> json {
+            topEntryCache -> json {
                 "top"
             }
 
-            topEntryCacheWithDate(date: string) -> json {
+            topEntryCacheWithDate -> json {
+                date: string
                 "top/{date}"
             }
         }
 
         durable GlobalDo {
-            config() -> json {
+            config -> json {
                 "config"
             }
         }
@@ -415,7 +418,7 @@ fn inject_block() {
     );
 
     // Assert
-    let all_injected: Vec<&str> = ast
+    let all_injected = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
@@ -424,7 +427,7 @@ fn inject_block() {
         })
         .flat_map(|i| i.symbols.iter())
         .map(|s| s.name)
-        .collect();
+        .collect::<Vec<_>>();
 
     assert_eq!(
         all_injected,
@@ -441,32 +444,35 @@ fn api_block() {
         model AnotherService {}
 
         api MyAppService {
-            post createItem(
-                name: string,
+            post createItem -> string {
+                name: string
                 count: int
-            ) -> string
+            }
         }
 
         api MyAppService {
-            get listItems() -> array<string>
+            get listItems -> array<string> { }
         }
         "#,
     );
 
     // Assert
-    let dataless_models: Vec<_> = ast
+    let dataless_models = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
             AstBlockKind::Model(m) if m.blocks.is_empty() => Some(m),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(dataless_models.len(), 2);
-    let names: Vec<_> = dataless_models.iter().map(|m| m.symbol.name).collect();
+    let names = dataless_models
+        .iter()
+        .map(|m| m.symbol.name)
+        .collect::<Vec<_>>();
     assert_eq!(names, vec!["MyAppService", "AnotherService"]);
 
-    let api_blocks: Vec<_> = ast
+    let api_blocks = ast
         .blocks
         .iter()
         .filter_map(|spd| match &spd.inner {
@@ -474,7 +480,7 @@ fn api_block() {
             _ => None,
         })
         .filter(|a| a.symbol.name == "MyAppService")
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(
         api_blocks.len(),
         2,
@@ -518,11 +524,17 @@ fn api_context_tag() {
         model Leaderboard {}
 
         api Leaderboard {
-            [inject LeaderboardDo(tenantId)]
-            get topScores(tenantId: int) -> array<string>
+            get topScores -> array<string> {
+                tenantId: int
 
-            [inject GlobalDo()]
-            get config() -> json
+                inject {
+                    LeaderboardDo::tenantId(tenantId)
+                }
+            }
+
+            get config -> json {
+                inject { GlobalDo::{} }
+            }
         }
         "#,
     );
@@ -544,18 +556,21 @@ fn api_context_tag() {
             .find(|m| m.inner.symbol.name == method)
             .unwrap();
         m.inner
-            .symbol
-            .tags
+            .injects
             .iter()
-            .find_map(|t| match &t.inner {
-                Tag::Inject { entries } => entries.iter().find_map(|entry| match entry {
-                    InjectEntry::Context { symbol, args } => Some((
-                        symbol.name.to_string(),
-                        args.iter().map(|a| a.name.to_string()).collect(),
-                    )),
-                    InjectEntry::Binding(_) => None,
-                }),
-                _ => None,
+            .flat_map(|blk| blk.inner.entries.iter())
+            .find_map(|entry| match &entry.inner {
+                InjectEntry::Context {
+                    symbol,
+                    initializers,
+                } => Some((
+                    symbol.name.to_string(),
+                    initializers
+                        .iter()
+                        .map(|i| i.arg.name.to_string())
+                        .collect(),
+                )),
+                InjectEntry::Binding(_) => None,
             })
             .expect("context entry")
     };
@@ -570,10 +585,63 @@ fn api_context_tag() {
 }
 
 #[test]
+fn api_self_receiver() {
+    // Act
+    let ast = lex_and_ast(
+        r#"
+        model Item {}
+
+        api Item {
+            self(Custom) post named -> Item {}
+
+            self post defaulted -> Item {}
+
+            post staticMethod -> Item {}
+        }
+        "#,
+    );
+
+    // Assert
+    let api = ast
+        .blocks
+        .iter()
+        .find_map(|spd| match &spd.inner {
+            AstBlockKind::Api(a) if a.symbol.name == "Item" => Some(a),
+            _ => None,
+        })
+        .expect("Item api block");
+
+    let method = |name: &str| {
+        &api.methods
+            .iter()
+            .find(|m| m.inner.symbol.name == name)
+            .unwrap()
+            .inner
+    };
+
+    let named = method("named");
+    let source = named.source.as_ref().expect("named is an instance method");
+    assert_eq!(source.inner.source.as_ref().map(|s| s.name), Some("Custom"));
+
+    let defaulted = method("defaulted");
+    let source = defaulted
+        .source
+        .as_ref()
+        .expect("defaulted is an instance method");
+    assert!(source.inner.source.is_none());
+
+    // No `self` receiver: a static method.
+    assert!(method("staticMethod").source.is_none());
+}
+
+#[test]
 fn model_primary_unique_optional_foreign() {
     let ast = lex_and_ast(
         r#"
         [crud get, save, list]
+        [unique a, b]
+        [unique orgId2]
+        [unique deptId, role]
         model M for d1_db {
             column {
                 score: real
@@ -590,13 +658,9 @@ fn model_primary_unique_optional_foreign() {
 
             foreign Tag::id { tagId }
             foreign Org::id { orgId2 }
-            foreign Author::id optional { authorId }
+            foreign Author::id option {authorId }
             foreign Dept::id { deptId }
-            foreign Draft::id optional { draftId }
-
-            unique (a, b)
-            unique (orgId2)
-            unique (deptId, role)
+            foreign Draft::id option {draftId }
         }
         "#,
     );
@@ -605,7 +669,7 @@ fn model_primary_unique_optional_foreign() {
 
     assert_eq!(m.database_binding.as_ref().map(|s| s.name), Some("d1_db"));
 
-    let cruds: Vec<CrudKind> = m
+    let cruds = m
         .symbol
         .tags
         .iter()
@@ -613,21 +677,32 @@ fn model_primary_unique_optional_foreign() {
             Tag::Crud { kinds } => kinds.iter().map(|k| k.inner.clone()).collect::<Vec<_>>(),
             _ => Vec::new(),
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(
         cruds.iter().any(|c| matches!(c, CrudKind::Get))
             && cruds.iter().any(|c| matches!(c, CrudKind::Save))
             && cruds.iter().any(|c| matches!(c, CrudKind::List))
     );
 
-    let columns: Vec<&str> = m
+    let uniques = m
+        .symbol
+        .tags
+        .iter()
+        .flat_map(|t| match &t.inner {
+            Tag::Unique { fields } => Some(fields.iter().map(|s| s.name).collect::<Vec<_>>()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(uniques.len(), 3);
+
+    let columns = m
         .blocks
         .iter()
         .flat_map(|spd| match &spd.inner {
             ModelBlockKind::Column(syms) => syms.iter().map(|s| s.name).collect::<Vec<_>>(),
             _ => Vec::new(),
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert!(columns.contains(&"score"));
 
     let primary = m
@@ -691,20 +766,6 @@ fn model_primary_unique_optional_foreign() {
         .unwrap();
     assert!(draft_fb.is_optional);
     assert_eq!(draft_fb.fields[0].name, "draftId");
-
-    let uniques: Vec<Vec<&str>> = m
-        .blocks
-        .iter()
-        .filter_map(|spd| match &spd.inner {
-            ModelBlockKind::Unique(fields) => {
-                Some(fields.iter().map(|s| s.name).collect::<Vec<_>>())
-            }
-            _ => None,
-        })
-        .collect();
-    assert!(uniques.iter().any(|u| u == &vec!["a", "b"]));
-    assert!(uniques.iter().any(|u| u == &vec!["orgId2"]));
-    assert!(uniques.iter().any(|u| u == &vec!["deptId", "role"]));
 }
 
 #[test]
@@ -808,25 +869,29 @@ fn kv_r2_bindings_fields() {
     let ast = lex_and_ast(
         r#"
         kv NsA {
-            value(id: int) -> json {
+            value -> json {
+                id: int
                 "data/{id}"
             }
         }
 
         kv NsB {
-            page(cursor: string) -> json {
+            page -> json {
+                cursor: string
                 "list/{cursor}"
             }
         }
 
         r2 BucketA {
-            photo(id: int) {
+            photo {
+                id: int
                 "photos/{id}.jpg"
             }
         }
 
         r2 BucketB {
-            thumb(cursor: string) {
+            thumb {
+                cursor: string
                 "thumbs/{cursor}"
             }
         }
@@ -938,14 +1003,14 @@ fn validator_tags() {
     assert_eq!(col.cidl_type, CidlType::String);
     assert_eq!(col.tags.len(), 4);
 
-    let validators: Vec<(&Keyword, &ArgumentLiteral)> = col
+    let validators = col
         .tags
         .iter()
         .filter_map(|t| match &t.inner {
             Tag::Validator { name, argument } => Some((name, argument)),
             _ => None,
         })
-        .collect();
+        .collect::<Vec<_>>();
     assert_eq!(validators.len(), 4);
 
     assert!(matches!(validators[0].0, Keyword::Regex));
@@ -990,7 +1055,9 @@ fn kv_durable_spider_form() {
                 doId: string
             }
 
-            value(key1: string, key2: string) -> string {
+            value -> string {
+                key1: string
+                key2: string
                 "value/{key1}/{key2}"
             }
         }

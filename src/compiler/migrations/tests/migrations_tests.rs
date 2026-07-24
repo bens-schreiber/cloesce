@@ -504,6 +504,8 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 r#"
                 d1 { db }
 
+                [unique email]
+                [unique first_name, last_name]
                 model UniqueUser for db {
                     primary {
                         id: int
@@ -515,9 +517,6 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         last_name: string
                         age: int
                     }
-
-                    unique (email)
-                    unique (first_name, last_name)
                 }
             "#,
             );
@@ -545,6 +544,9 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 r#"
                 d1 { db }
 
+                [unique email]
+                [unique first_name, last_name]
+                [unique age]
                 model UniqueUser for db {
                     primary {
                         id: int
@@ -556,10 +558,6 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         last_name: string
                         age: int
                     }
-
-                    unique (email)
-                    unique (first_name, last_name)
-                    unique (age)
                 }
             "#,
             );
@@ -588,6 +586,8 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 r#"
                 d1 { db }
 
+                [unique email]
+                [unique first_name, last_name]
                 model UniqueUser for db {
                     primary {
                         id: int
@@ -599,9 +599,6 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                         last_name: string
                         age: int
                     }
-
-                    unique (email)
-                    unique (first_name, last_name)
                 }
             "#,
             );

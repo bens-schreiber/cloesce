@@ -10,7 +10,8 @@ durable UserDo {
 r2 Avatar {
     // Defines that this r2 bucket owns the avatar for a User at the
     // dynamic key `"avatars/{name}.png"`.
-    avatar(name: string) {
+    avatar {
+        name: string
         "avatars/{name}"
     }
 }
@@ -28,11 +29,11 @@ model User for UserDo(name) {
     many AuthoredSubReddit::name(name) {
         authoredSubReddits
     }
-    
+
     many AuthoredPost::name(name) {
         authoredPosts
     }
-    
+
     many AuthoredComment::name(name) {
         authoredComments
     }
@@ -42,25 +43,32 @@ api User {
     // - Ran within the context of the User DO at `username`
     // - Injects the `Sessions` environment binding
     // - Injects the `UserDo` environment binding at `username`
-    // 
+    //
     // Returns an `AuthResult` object containing the session token and User if successful
-    [inject UserDo(username), Sessions, UserDo]
-    post login(username: string) -> AuthResult
-    
+    post login -> AuthResult {
+        username: string
+
+        inject { UserDo::name(username)  Sessions  UserDo }
+    }
+
     // - Passes `self`, meaning only a hydrated User can call this endpoint
     //    - By default, runs within the context of the User DO that
     //      self is hydrated to.
     // - Injects the `Avatar` environment binding
     // - Accepts a stream of bytes representing the image to upload as the User's avatar
-    [inject Avatar]
-    put uploadAvatar(self, image: stream)
-    
+    self put uploadAvatar {
+        image: stream
+
+        inject { Avatar }
+    }
+
     // - Passes `self`, meaning only a hydrated User can call this endpoint
     //    - By default, runs within the context of the User DO that
     //      self is hydrated to.
     // - Returns a stream of bytes representing the User's avatar image
-    [inject Avatar]
-    get downloadAvatar(self) -> stream
+    self get downloadAvatar -> stream {
+        inject { Avatar }
+    }
 }
 
 // A SQL table that stores the relationship between a User and the SubReddits
@@ -69,7 +77,7 @@ model AuthoredSubReddit for UserDo(name) {
     primary {
         subRedditId: int
     }
-    
+
     one SubReddit::id(subRedditId) {
         // Navigates to the SubReddit row that this User authored.
         subReddit
@@ -82,7 +90,7 @@ model AuthoredPost for UserDo(name) {
     primary {
         postId: string
     }
-    
+
     one Post::doId(postId) {
         // Navigates to the Post DO that this User authored.
         post
@@ -96,7 +104,7 @@ model AuthoredComment for UserDo(name) {
         postId: string
         commentId: int
     }
-    
+
     one Comment::{ doId(postId), id(commentId) } {
         // Navigates to the Comment DO that this User authored.
         comment

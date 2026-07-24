@@ -37,7 +37,7 @@ fn adds_crud_methods_to_models() {
         get_method
             .parameters
             .iter()
-            .map(|p| p.name.to_string())
+            .map(|p| p.field.name.to_string())
             .collect::<Vec<_>>(),
         vec!["orderId", "productId"]
     );
@@ -64,18 +64,18 @@ fn crud_methods_namespace_sources_inherit_validators() {
         source CustomDs for Product {
             include {}
 
-            get(
+            get {
                 [lt 100]
                 id: int
-            )
+            }
 
-            list(
+            list {
                 [step 10]
-                lastSeen_id: int,
+                lastSeen_id: int
 
                 [gt 0]
                 limit: int
-            )
+            }
         }
     "#,
     );
@@ -87,9 +87,14 @@ fn crud_methods_namespace_sources_inherit_validators() {
     {
         let method = find_method(product, "$get").unwrap();
 
-        let id = method.parameters.iter().find(|p| p.name == "id").unwrap();
+        let id = method
+            .parameters
+            .iter()
+            .find(|p| p.field.name == "id")
+            .unwrap();
         assert!(
-            id.validators
+            id.field
+                .validators
                 .first()
                 .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))
                 .unwrap_or(false),
@@ -100,9 +105,14 @@ fn crud_methods_namespace_sources_inherit_validators() {
     {
         let method = find_method(product, "$get_CustomDs").unwrap();
 
-        let id = method.parameters.iter().find(|p| p.name == "id").unwrap();
+        let id = method
+            .parameters
+            .iter()
+            .find(|p| p.field.name == "id")
+            .unwrap();
         assert!(
-            id.validators
+            id.field
+                .validators
                 .first()
                 .map(|v| matches!(v, Validator::LessThan(Number::Int(100))))
                 .unwrap_or(false),
@@ -116,10 +126,11 @@ fn crud_methods_namespace_sources_inherit_validators() {
         let id = method
             .parameters
             .iter()
-            .find(|p| p.name == "lastSeen_id")
+            .find(|p| p.field.name == "lastSeen_id")
             .unwrap();
         assert!(
-            id.validators
+            id.field
+                .validators
                 .first()
                 .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))
                 .unwrap_or(false),
@@ -127,7 +138,7 @@ fn crud_methods_namespace_sources_inherit_validators() {
         method
             .parameters
             .iter()
-            .find(|p| p.name == "limit")
+            .find(|p| p.field.name == "limit")
             .unwrap();
     }
 
@@ -138,10 +149,11 @@ fn crud_methods_namespace_sources_inherit_validators() {
         let last_id = method
             .parameters
             .iter()
-            .find(|p| p.name == "lastSeen_id")
+            .find(|p| p.field.name == "lastSeen_id")
             .unwrap();
         assert!(
             last_id
+                .field
                 .validators
                 .first()
                 .map(|v| matches!(v, Validator::Step(10)))
@@ -151,10 +163,11 @@ fn crud_methods_namespace_sources_inherit_validators() {
         let limit = method
             .parameters
             .iter()
-            .find(|p| p.name == "limit")
+            .find(|p| p.field.name == "limit")
             .unwrap();
         assert!(
             limit
+                .field
                 .validators
                 .first()
                 .map(|v| matches!(v, Validator::GreaterThan(Number::Int(0))))

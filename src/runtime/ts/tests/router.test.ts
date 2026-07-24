@@ -198,7 +198,10 @@ describe("Request Validation", () => {
   test("Request Missing JSON Body => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const model = ModelBuilder.model("Foo").idPk().method("method", "Post", [], "Void").build();
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method("method", "Post", [{ name: "payload", cidl_type: "String", source: "Body" }], "Void")
+      .build();
 
     const route: MatchedRoute = {
       namespace: "Foo",
@@ -219,6 +222,42 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(RouterError.RequestMissingBody);
+  });
+
+  test("Missing required header param => 400", async () => {
+    // Arrange
+    const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method(
+        "method",
+        "Post",
+        [{ name: "X_Tenant", cidl_type: "String", source: "Header" }],
+        "Void",
+      )
+      .build();
+
+    const route: MatchedRoute = {
+      namespace: "Foo",
+      method: model.apis.find((m) => m.name === "method")!,
+      getParamValues: {},
+      impl: mockImpl,
+      model,
+      forward: false,
+    };
+
+    const wasmMock = {} as any;
+    const idlMock = {} as any;
+    const envMock = {} as any;
+
+    // Act
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, idlMock, envMock, route);
+
+    // Assert
+    expect(res.isLeft()).toBe(true);
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
+      RouterError.RequestBodyMissingParameters,
+    );
   });
 });
 

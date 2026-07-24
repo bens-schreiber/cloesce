@@ -16,12 +16,12 @@ use doc::Doc;
 use idl::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, ApiBlockMethodParamKind, ArgumentLiteral, Ast, AstBlockKind,
-    Cardinality, D1BindingBlock, DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock,
-    DurableShardBlock, ForeignBlock, InjectBlock, InjectEntry, Keyword, KvBindingBlock,
-    KvBindingTemplate, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    ApiBlock, ApiBlockMethod, ArgumentLiteral, Ast, AstBlockKind, Cardinality, D1BindingBlock,
+    DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock, ForeignBlock,
+    InjectBlock, InjectEntry, InjectInitializer, Keyword, KvBindingBlock, KvBindingTemplate,
+    KvFieldArgument, KvFieldBlock, MethodInjectBlock, ModelBlock, ModelBlockKind, NavigationBlock,
     NavigationKey, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate,
-    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarsBlock, fmt_cidl_type, lexer::CommentMap,
+    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarBlock, fmt_cidl_type, lexer::CommentMap,
 };
 
 /// Formats an [Ast] into a string, preserving comments and blank lines.
@@ -408,7 +408,7 @@ impl<'src> ToDoc<'src> for AstBlockKind<'src> {
             AstBlockKind::KvBinding(b) => b.to_doc(ctx),
             AstBlockKind::R2Binding(b) => b.to_doc(ctx),
             AstBlockKind::DurableBinding(b) => b.to_doc(ctx),
-            AstBlockKind::Vars(b) => b.to_doc(ctx),
+            AstBlockKind::Var(b) => b.to_doc(ctx),
             AstBlockKind::Inject(b) => b.to_doc(ctx),
         }
     }
@@ -463,29 +463,17 @@ impl<'src> ToDoc<'src> for Tag<'src> {
                 Doc::text(name.as_str()).then(Doc::text(" ")).then(arg)
             }
 
-            Tag::Source { name } => Doc::kw(Keyword::Source)
-                .then(Doc::text(" "))
-                .then(Doc::text(name.inner)),
-
             Tag::Internal => Doc::kw(Keyword::Internal),
             Tag::Instance => Doc::kw(Keyword::Instance),
+            Tag::Header => Doc::kw(Keyword::Header),
+
+            Tag::Unique { fields: symbols } => Doc::kw(Keyword::Unique)
+                .then(Doc::text(" "))
+                .then(comma_separated(symbols, |sym| ctx.sym_doc(sym, 0, true))),
 
             Tag::Crud { kinds } => Doc::kw(Keyword::Crud)
                 .then(Doc::text(" "))
                 .then(comma_separated(kinds, |kind| ctx.spd_doc(kind, 0, true))),
-
-            Tag::Inject { entries } => {
-                Doc::kw(Keyword::Inject)
-                    .then(Doc::text(" "))
-                    .then(comma_separated(entries, |entry| match entry {
-                        InjectEntry::Binding(sym) => ctx.sym_doc(sym, 0, true),
-                        InjectEntry::Context { symbol, args } => ctx
-                            .sym_doc(symbol, 0, true)
-                            .then(Doc::text("("))
-                            .then(comma_separated(args, |arg| ctx.sym_doc(arg, 0, true)))
-                            .then(Doc::text(")")),
-                    }))
-            }
         };
 
         Doc::text("[").then(inner).then(Doc::text("]"))
@@ -537,10 +525,6 @@ impl<'src> ToDoc<'src> for ModelBlockKind<'src> {
             ModelBlockKind::Kv(kv) => kv.to_doc(ctx),
             ModelBlockKind::R2(r2) => r2.to_doc(ctx),
             ModelBlockKind::Primary(blocks) => model_block(Keyword::Primary.as_str(), blocks, ctx),
-            ModelBlockKind::Unique(fields) => Doc::kw(Keyword::Unique)
-                .then(Doc::text(" ("))
-                .then(comma_separated(fields, |sym| ctx.sym_doc(sym, 0, true)))
-                .then(Doc::text(")")),
         }
     }
 }
@@ -575,7 +559,7 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
             .then(Doc::text(" "))
             .then(reference);
         let optional = if self.is_optional {
-            Doc::text(" ").then(Doc::kw(Keyword::Optional))
+            Doc::text(" ").then(Doc::kw(Keyword::GOption))
         } else {
             Doc::nil()
         };
@@ -696,67 +680,97 @@ impl<'src> ToDoc<'src> for ApiBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for ApiBlockMethodParamKind<'src> {
+impl<'src> ToDoc<'src> for MethodInjectBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
+        if self.entries.is_empty() {
+            return Doc::kw(Keyword::Inject).then(Doc::text(" {}"));
+        }
+        let mut inner = Doc::nil();
+        for entry in &self.entries {
+            inner = inner.then(ctx.spd_doc(entry, 3, false));
+        }
+        Doc::kw(Keyword::Inject).then(ctx.block(inner, 3))
+    }
+}
+
+impl<'src> ToDoc<'src> for InjectEntry<'src> {
+    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
-            ApiBlockMethodParamKind::SelfParam(sym) => ctx.sym_doc(sym, 0, true),
-            ApiBlockMethodParamKind::Param(sym) => ctx.sym_doc(sym, 0, true),
+            InjectEntry::Binding(sym) => Doc::text(sym.name),
+            InjectEntry::Context {
+                symbol,
+                initializers,
+            } => {
+                let init_doc = |init: &'src InjectInitializer<'src>| {
+                    Doc::text(init.target.name)
+                        .then(Doc::text("("))
+                        .then(Doc::text(init.arg.name))
+                        .then(Doc::text(")"))
+                };
+
+                let tail = match initializers.as_slice() {
+                    [] => Doc::text("::{}"),
+                    [single] => Doc::text("::").then(init_doc(single)),
+                    many => Doc::text("::{ ")
+                        .then(comma_separated(many, init_doc))
+                        .then(Doc::text(" }")),
+                };
+                Doc::text(symbol.name).then(tail)
+            }
         }
     }
 }
 
 impl<'src> ToDoc<'src> for ApiBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        // Method-level tags precede the verb so they can be parsed back
-        // (e.g. `[inject db] post foo(...)`).
-        let mut tags_doc = Doc::nil();
-        for tag in &self.symbol.tags {
-            ctx.node_ends.borrow_mut().push(tag.span.end);
-            let tag_content = tag.inner.to_doc(ctx);
-            ctx.node_ends.borrow_mut().pop();
-            ctx.advance(tag.span.end);
+        let verb = Doc::text(match &self.http_verb {
+            HttpVerb::Get => Keyword::Get.as_str(),
+            HttpVerb::Post => Keyword::Post.as_str(),
+            HttpVerb::Put => Keyword::Put.as_str(),
+            HttpVerb::Delete => Keyword::Delete.as_str(),
+            HttpVerb::Patch => Keyword::Patch.as_str(),
+        });
 
-            let post_sep = if ctx.gap(tag.span.end, self.symbol.span.start) > 0 {
-                Doc::hardline(1)
-            } else {
-                Doc::text(" ")
-            };
-            tags_doc = tags_doc.then(tag_content).then(post_sep);
-        }
+        let source = match &self.source {
+            None => Doc::nil(),
+            Some(source) => {
+                let source = source.inner.source.as_ref().filter(|s| s.name != "Default");
+                let self_doc = match source {
+                    Some(source) => Doc::kw(Keyword::SelfKw)
+                        .then(Doc::text("("))
+                        .then(Doc::text(source.name))
+                        .then(Doc::text(")")),
+                    None => Doc::kw(Keyword::SelfKw),
+                };
+                self_doc.then(Doc::text(" "))
+            }
+        };
 
-        let params = comma_separated(&self.parameters, |param| ctx.spd_doc(param, 0, true));
-
-        let signature = tags_doc
-            .then(Doc::text(match &self.http_verb {
-                HttpVerb::Get => Keyword::Get.as_str(),
-                HttpVerb::Post => Keyword::Post.as_str(),
-                HttpVerb::Put => Keyword::Put.as_str(),
-                HttpVerb::Delete => Keyword::Delete.as_str(),
-                HttpVerb::Patch => Keyword::Patch.as_str(),
-            }))
+        let signature = source
+            .then(verb)
             .then(Doc::text(" "))
-            .then(Doc::text(self.symbol.name))
-            .then(Doc::text("("))
-            .then(params)
-            .then(Doc::text(")"));
+            .then(Doc::text(self.symbol.name));
 
-        if matches!(self.symbol.cidl_type, CidlType::Void) {
+        let signature = if matches!(self.symbol.cidl_type, CidlType::Void) {
             signature
         } else {
             signature
                 .then(Doc::text(" -> "))
                 .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
-        }
+        };
+
+        signature.then(method_body_doc(ctx, &self.parameters, &self.injects, 2))
     }
 }
 
 impl<'src> ToDoc<'src> for DataSourceBlockMethod<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.parameters, |param| ctx.sym_doc(param, 0, true));
-        ctx.sym_doc(&self.method, 0, true)
-            .then(Doc::text("("))
-            .then(params)
-            .then(Doc::text(")"))
+        ctx.sym_doc(&self.method, 0, true).then(method_body_doc(
+            ctx,
+            &self.parameters,
+            &self.injects,
+            2,
+        ))
     }
 }
 
@@ -837,32 +851,33 @@ impl<'src> ToDoc<'src> for D1BindingBlock<'src> {
     }
 }
 
-impl<'src> ToDoc<'src> for VarsBlock<'src> {
+impl<'src> ToDoc<'src> for VarBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         if self.vars.is_empty() {
-            return Doc::kw(Keyword::Vars).then(Doc::text(" {}"));
+            return Doc::kw(Keyword::Var).then(Doc::text(" {}"));
         }
         let mut inner = Doc::nil();
         for sym in &self.vars {
             inner = inner.then(ctx.sym_doc(sym, 1, false));
         }
-        Doc::kw(Keyword::Vars).then(ctx.block(inner, 1))
+        Doc::kw(Keyword::Var).then(ctx.block(inner, 1))
     }
 }
 
 impl<'src> ToDoc<'src> for KvBindingTemplate<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
+        let mut inner = Doc::nil();
+        for param in &self.params {
+            inner = inner.then(ctx.sym_doc(param, 2, false));
+        }
         let key_format = Doc::hardline(2)
             .then(Doc::text("\""))
             .then(Doc::text(self.key_format))
             .then(Doc::text("\""));
         Doc::text(self.symbol.name)
-            .then(Doc::text("("))
-            .then(params)
-            .then(Doc::text(") -> "))
+            .then(Doc::text(" -> "))
             .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
-            .then(ctx.block(key_format, 2))
+            .then(ctx.block(inner.then(key_format), 2))
     }
 }
 
@@ -882,16 +897,15 @@ impl<'src> ToDoc<'src> for KvBindingBlock<'src> {
 
 impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let params = comma_separated(&self.params, |sym| ctx.sym_doc(sym, 0, true));
+        let mut inner = Doc::nil();
+        for param in &self.params {
+            inner = inner.then(ctx.sym_doc(param, 2, false));
+        }
         let key_format = Doc::hardline(2)
             .then(Doc::text("\""))
             .then(Doc::text(self.key_format))
             .then(Doc::text("\""));
-        Doc::text(self.symbol.name)
-            .then(Doc::text("("))
-            .then(params)
-            .then(Doc::text(")"))
-            .then(ctx.block(key_format, 2))
+        Doc::text(self.symbol.name).then(ctx.block(inner.then(key_format), 2))
     }
 }
 
@@ -968,6 +982,39 @@ fn comma_separated<'src, T, F: FnMut(&'src T) -> Doc<'src>>(
         }
     }
     doc
+}
+
+fn method_body_doc<'src>(
+    ctx: &FmtCtx<'src>,
+    params: &'src [Symbol<'src>],
+    injects: &'src [Spd<MethodInjectBlock<'src>>],
+    depth: usize,
+) -> Doc<'src> {
+    enum Item<'a, 'src> {
+        Param(&'a Symbol<'src>),
+        Inject(&'a Spd<MethodInjectBlock<'src>>),
+    }
+
+    let mut items: Vec<Item<'src, 'src>> = Vec::new();
+    items.extend(params.iter().map(Item::Param));
+    items.extend(injects.iter().map(Item::Inject));
+    items.sort_by_key(|item| match item {
+        Item::Param(p) => p.span.start,
+        Item::Inject(i) => i.span.start,
+    });
+
+    if items.is_empty() {
+        return Doc::text(" {}");
+    }
+
+    let mut inner = Doc::nil();
+    for item in &items {
+        inner = inner.then(match item {
+            Item::Param(p) => ctx.sym_doc(p, depth, false),
+            Item::Inject(i) => ctx.spd_doc(i, depth, false),
+        });
+    }
+    ctx.block(inner, depth)
 }
 
 /// `template` or `template(arg1, arg2, ...)`.

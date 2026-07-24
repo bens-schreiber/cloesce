@@ -11,23 +11,28 @@ model SubReddit for SubRedditDb {
     primary {
         id: int
     }
-    
+
     column {
         title: string
         description: string
     }
-    
+
     many SubRedditPost::subRedditId(id) {
         posts
     }
 }
 
 api SubReddit {
-    [inject SubRedditDb, AuthUser, UserDo]
-    post create(title: string, description: string) -> SubReddit
+    post create -> SubReddit {
+        title: string
+        description: string
 
-    [inject SubRedditDb, PostDo, UserDo]
-    get feed(self) -> array<Post>
+        inject { SubRedditDb  AuthUser  UserDo }
+    }
+
+    self get feed -> array<Post> {
+        inject { SubRedditDb  PostDo  UserDo }
+    }
 }
 
 // Every post that belongs to a SubReddit is stored in its own Durable Object,
@@ -36,11 +41,11 @@ model SubRedditPost for SubRedditDb {
     primary {
         postId: string
     }
-    
+
     foreign SubReddit::id {
         subRedditId
     }
-    
+
     one Post::doId(postId) {
         // Navigates to the Post that belongs to this SubReddit
         post

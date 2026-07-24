@@ -8,7 +8,7 @@ model Weather for db {
     primary {
         id: int
     }
-    
+
     column {
         date: date
         isRaining: bool
@@ -16,7 +16,10 @@ model Weather for db {
 }
 
 api Weather {
-    get isItRainingSomewhere() -> bool
-    get getCurrentDate() -> date
-    get echo(date: date, isRaining: bool) -> Weather
+    get isItRainingSomewhere -> bool {}
+    get getCurrentDate -> date {}
+    get echo -> Weather {
+        date: date
+        isRaining: bool
+    }
 }

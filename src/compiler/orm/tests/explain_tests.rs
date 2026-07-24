@@ -17,13 +17,14 @@ const SRC: &str = r#"
     durable BoardDo {
         shard { tenantId: int }
 
-        topCache() -> json {
+        topCache -> json {
             "top"
         }
     }
 
     r2 Bucket {
-        banner(pid: int) {
+        banner {
+            pid: int
             "banners/{pid}"
         }
     }

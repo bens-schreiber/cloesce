@@ -871,7 +871,8 @@ async fn save_kv_parallel() {
         d1 { db }
 
         kv Cache {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "e/{id}"
             }
         }
@@ -915,7 +916,8 @@ async fn save_kv_delayed() {
         d1 { db }
 
         kv Cache {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "e/{id}"
             }
         }
@@ -959,7 +961,8 @@ async fn save_kv_object_unwrap() {
         d1 { db }
 
         kv Cache {
-            entry(id: int) -> json {
+            entry -> json {
+                id: int
                 "e/{id}"
             }
         }
@@ -999,7 +1002,7 @@ async fn save_do_kv_field() {
         durable BoardDo {
             shard { tenantId: int }
 
-            topCache() -> json {
+            topCache -> json {
                 "top"
             }
         }
@@ -1048,7 +1051,8 @@ async fn save_r2_parallel() {
         d1 { db }
 
         r2 Bucket {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{id}"
             }
         }
@@ -1092,7 +1096,8 @@ async fn save_r2_delayed() {
         d1 { db }
 
         r2 Bucket {
-            avatar(id: int) {
+            avatar {
+                id: int
                 "avatars/{id}"
             }
         }
@@ -1136,7 +1141,8 @@ async fn save_backingless_root() {
         d1 { db }
 
         kv Cache {
-            entry(ownerId: string) -> json {
+            entry -> json {
+                ownerId: string
                 "e/{ownerId}"
             }
         }

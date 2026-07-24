@@ -1,7 +1,7 @@
 use askama::Template;
 use idl::{
     ApiMethod, CidlType, CloesceIdl, DataSourceGetMethodParam, HttpVerb, MediaType, Model,
-    NavigationCardinality, NavigationField,
+    NavigationCardinality, NavigationField, ParamSource,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -105,6 +105,10 @@ impl ClientTemplate<'_> {
 
     fn is_get_request(&self, verb: &HttpVerb) -> bool {
         matches!(verb, HttpVerb::Get)
+    }
+
+    fn is_header(&self, source: &ParamSource) -> bool {
+        matches!(source, ParamSource::Header)
     }
 
     fn is_stream(&self, ty: &CidlType<'_>) -> bool {
