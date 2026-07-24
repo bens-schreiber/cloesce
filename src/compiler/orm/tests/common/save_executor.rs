@@ -1,8 +1,9 @@
 //! A mock runtime executor for [SavePlan].
 
+use idl::TemplateSegment;
+use orm::query::DatabaseKind;
 use orm::query::save::plan::{PathSegment, SaveArg, SavePlan, SaveQuery, SaveStep, SqlStatement};
 use orm::query::select::plan::MapCardinality;
-use orm::query::{DatabaseKind, TemplateSegment};
 use serde_json::{Value, json};
 
 use crate::common::setup::MockStorage;
@@ -367,7 +368,7 @@ fn resolve_key(segments: &[TemplateSegment<'_, SaveArg<'_>>], body: &Value) -> S
     segments
         .iter()
         .map(|segment| match segment {
-            TemplateSegment::Literal(text) => (*text).to_string(),
+            TemplateSegment::Literal(text) => text.as_ref().to_string(),
             TemplateSegment::Value(arg) => match resolve(arg, body) {
                 Value::String(s) => s,
                 other => other.to_string(),

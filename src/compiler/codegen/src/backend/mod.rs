@@ -1,7 +1,9 @@
+use std::borrow::Cow;
+
 use askama::Template;
 use idl::{
     ApiMethod, CidlType, CloesceIdl, DEFAULT_DATA_SOURCE_NAME, DataSource, DurableBinding, Model,
-    ValidatedField,
+    TemplateSegment,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -19,22 +21,30 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.cidl_type(ty)
     }
 
-    fn interpolate_key_format(&self, format: &str, params: &[ValidatedField<'_>]) -> String {
-        let names = params.iter().map(|p| p.name.as_ref());
-        self.mapper.interpolate_format(format, names)
+    fn interpolate_segments(&self, segments: &[TemplateSegment<&str>]) -> String {
+        self.mapper.interpolate_segments(segments)
     }
 
-    fn key_prefix(&self, prefix: &str) -> String {
-        self.mapper.interpolate_format(prefix, std::iter::empty())
+    /// The `list` prefix for a key template: the leading literal rendered as a
+    /// target-language string.
+    fn list_prefix(&self, segments: &[TemplateSegment<&str>]) -> String {
+        format!(
+            "`{}`",
+            self.mapper
+                .escape_string(idl::TemplateSegment::leading_literal(segments))
+        )
     }
 
     fn shard_template(&self, binding: &DurableBinding<'_>) -> String {
-        let mut format = binding.name.to_string();
-        for field in &binding.shard_fields {
-            format.push_str(&format!("/{{{}}}", field.name));
-        }
-        let names = binding.shard_fields.iter().map(|f| f.name.as_ref());
-        self.mapper.interpolate_format(&format, names)
+        let segments = std::iter::once(TemplateSegment::Literal(Cow::Borrowed(binding.name)))
+            .chain(binding.shard_fields.iter().flat_map(|field| {
+                [
+                    TemplateSegment::Literal(Cow::Borrowed("/")),
+                    TemplateSegment::Value(field.name.as_ref()),
+                ]
+            }))
+            .collect::<Vec<_>>();
+        self.mapper.interpolate_segments(&segments)
     }
 
     /// The env-store key for a model or source name (camelCase: `Parent` -> `parent`).

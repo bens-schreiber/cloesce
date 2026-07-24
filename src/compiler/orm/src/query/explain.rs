@@ -470,7 +470,9 @@ mod fmt {
     use std::fmt::Write;
 
     use super::render::Node;
-    use crate::query::{Database, DatabaseKind, TemplateSegment};
+    use idl::TemplateSegment;
+
+    use crate::query::{Database, DatabaseKind};
 
     const MAX_LITERAL: usize = 40;
 
@@ -490,7 +492,7 @@ mod fmt {
         let mut out = String::from("\"");
         for seg in key {
             match seg {
-                TemplateSegment::Literal(s) => out.push_str(s),
+                TemplateSegment::Literal(s) => out.push_str(s.as_ref()),
                 TemplateSegment::Value(v) => {
                     let _ = write!(out, "{{{}}}", value(v));
                 }

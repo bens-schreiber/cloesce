@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use idl::{CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField};
+use idl::{CloesceIdl, IncludeTree, Model, ModelBacking, NavigationField, TemplateSegment};
 
 use crate::query::select::plan::{
     JoinKeys, Mapping, Select, SelectArg, SelectPlan, SelectStep, SqlArgument, SqlSegment,
     TableParent,
 };
-use crate::query::{Database, DatabaseKind, TemplateSegment};
+use crate::query::{Database, DatabaseKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectOperation {
@@ -208,41 +208,49 @@ fn select_keys<'src>(
     table: usize,
     stage: usize,
 ) {
-    let mut push =
-        |field: &'src str, database: Database<'src>, key: &'src str, shard_fields: &[&'src str]| {
-            if !tree.0.contains_key(field) {
-                // Include tree does not request this field, skip.
-                return;
-            }
+    let mut push = |field: &'src str,
+                    database: Database<'src>,
+                    key: &'src [TemplateSegment<'src, &'src str>],
+                    shard_fields: &[&'src str]| {
+        if !tree.0.contains_key(field) {
+            // Include tree does not request this field, skip.
+            return;
+        }
 
-            // The key template and shard fields are owned by `model` at `table`, hydrated at `stage`.
-            let mut inputs = shard_fields.to_vec();
-            let segments = TemplateSegment::parse(key, |arg| {
-                inputs.push(arg);
-                params.arg(table, arg)
-            });
-            let shard = shard_fields
-                .iter()
-                .map(|f| (*f, params.arg(table, f)))
-                .collect();
+        // The key template and shard fields are owned by `model` at `table`, hydrated at `stage`.
+        let mut inputs = shard_fields.to_vec();
+        let segments = key
+            .iter()
+            .map(|segment| match segment {
+                TemplateSegment::Literal(text) => TemplateSegment::Literal(text.clone()),
+                TemplateSegment::Value(arg) => {
+                    inputs.push(*arg);
+                    TemplateSegment::Value(params.arg(table, arg))
+                }
+            })
+            .collect::<Vec<_>>();
+        let shard = shard_fields
+            .iter()
+            .map(|f| (*f, params.arg(table, f)))
+            .collect();
 
-            // The step runs no earlier than the latest stage any of its inputs becomes readable.
-            let step_stage = inputs
-                .iter()
-                .map(|f| params.min_stage(stage, f))
-                .fold(stage, usize::max);
+        // The step runs no earlier than the latest stage any of its inputs becomes readable.
+        let step_stage = inputs
+            .iter()
+            .map(|f| params.min_stage(stage, f))
+            .fold(stage, usize::max);
 
-            let key_table = plan.register_table(Some(TableParent { table, field }));
+        let key_table = plan.register_table(Some(TableParent { table, field }));
 
-            plan.stage_at(step_stage).steps.push(SelectStep {
-                query: Select::Key {
-                    database,
-                    segments,
-                    shard,
-                },
-                table: key_table,
-            });
-        };
+        plan.stage_at(step_stage).steps.push(SelectStep {
+            query: Select::Key {
+                database,
+                segments,
+                shard,
+            },
+            table: key_table,
+        });
+    };
 
     for r2 in &model.r2_fields {
         let database = Database {
@@ -250,7 +258,7 @@ fn select_keys<'src>(
             kind: DatabaseKind::R2,
         };
 
-        push(r2.field.name.as_ref(), database, &r2.key_format, &[]);
+        push(r2.field.name.as_ref(), database, &r2.segments, &[]);
     }
 
     for kv in &model.kv_fields {
@@ -271,7 +279,7 @@ fn select_keys<'src>(
             kind,
         };
 
-        push(kv.field.name.as_ref(), database, &kv.key_format, shard);
+        push(kv.field.name.as_ref(), database, &kv.segments, shard);
     }
 }
 

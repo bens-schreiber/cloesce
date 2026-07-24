@@ -531,8 +531,9 @@ pub struct KvBindingTemplate<'src> {
     /// The parameters required to construct a key for this field.
     pub params: Vec<Symbol<'src>>,
 
-    /// The key format string (e.g. `"metadata/{id}"`)
-    pub key_format: &'src str,
+    /// The key format string (e.g. `"metadata/{id}"`), or `None` for the
+    /// body-less default form.
+    pub key_format: Option<&'src str>,
 }
 
 /// [Keyword::Kv]
@@ -550,8 +551,9 @@ pub struct R2BindingTemplate<'src> {
     /// The parameters required to construct a key for this field.
     pub params: Vec<Symbol<'src>>,
 
-    /// The key format string (e.g. `"key/{id}"`)
-    pub key_format: &'src str,
+    /// The key format string (e.g. `"key/{id}"`), or `None` for the
+    /// body-less default form.
+    pub key_format: Option<&'src str>,
 }
 
 /// [Keyword::R2]

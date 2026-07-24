@@ -1,8 +1,6 @@
 // #region: Global
 durable GlobalDo {
-    metadata -> json {
-        "metadata"
-    }
+    metadata -> json {}
 }
 
 model Global for GlobalDo {
@@ -22,7 +20,6 @@ api Global {
 kv GlobalSubRedditMetadata {
     metadata -> json {
         subId: int
-        "metadata/{subId}"
     }
 }
 
@@ -32,9 +29,7 @@ durable SubRedditDo {
         id: int
     }
 
-    metadata -> json {
-        "metadata"
-    }
+    metadata -> json {}
 }
 
 [crud get, save]

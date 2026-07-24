@@ -4,7 +4,7 @@ use compiler_test::lex_and_ast;
 use frontend::Ast;
 use idl::{
     BackingKind, CidlType, CloesceIdl, MediaType, NavigationCardinality, Number, ParamSource,
-    Validator,
+    TemplateSegment, Validator,
 };
 use semantic::err::SemanticError;
 
@@ -13,6 +13,18 @@ fn analyze<'src, 'p>(ast: &'p Ast<'src>) -> (CloesceIdl<'src>, Vec<SemanticError
         Ok(idl) => (idl, vec![]),
         Err(errors) => (CloesceIdl::default(), errors),
     }
+}
+
+/// Render key segments back to their template string, mirroring
+/// `orm::query::explain::key_template`.
+fn render_segments(segments: &[TemplateSegment<'_, &str>]) -> String {
+    segments
+        .iter()
+        .map(|segment| match segment {
+            TemplateSegment::Literal(text) => text.as_ref().to_string(),
+            TemplateSegment::Value(v) => format!("{{{v}}}"),
+        })
+        .collect()
 }
 
 /// Find exactly one error matching the pattern. Panics if not found.
@@ -811,38 +823,86 @@ fn binding_key_format_invalid_syntax() {
 }
 
 #[test]
-fn key_format_overlap_is_detected_and_scoped_per_namespace() {
+fn binding_template_prefix_is_computed() {
+    // Arrange
     let src = r#"
         kv NS {
             a -> json {
                 id: int
-                "foo/{id}" // overlaps with b
+                "path/to/data/{id}" 
             }
-            b -> json { "foo/bar" }
-        }
-        kv Other {
-            c -> json {
+            b -> json { 
                 id: int
-                "foo/{id}" // overlaps but diff NS
+                "data/{id}/value" 
+            }
+            c -> json { "top" }
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (idl, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "{errors:#?}");
+
+    let ns = idl
+        .wrangler_env
+        .kv_bindings
+        .iter()
+        .find(|b| b.name == "NS")
+        .unwrap();
+    let prefix = |field: &str| {
+        TemplateSegment::leading_literal(
+            &ns.templates
+                .iter()
+                .find(|t| t.field.name == field)
+                .unwrap()
+                .segments,
+        )
+    };
+    assert_eq!(prefix("a"), "path/to/data/");
+    assert_eq!(prefix("b"), "data/");
+    assert_eq!(prefix("c"), "top");
+}
+
+#[test]
+fn default_key_format_is_generated_for_body_less_templates() {
+    // Arrange
+    let src = r#"
+        kv NS {
+            noParams -> json {}
+            withParams -> json {
+                p1: string
+                p2: int
             }
         }
     "#;
 
     // Act
     let parse = lex_and_ast(src);
-    let (_, errors) = analyze(&parse);
+    let (idl, errors) = analyze(&parse);
 
     // Assert
-    assert_eq!(
-        count_errs!(errors, SemanticError::KeyFormatOverlap { .. }),
-        1,
-        "{errors:#?}"
-    );
-    let (first, second) = expect_err!(errors,
-        SemanticError::KeyFormatOverlap { first, second } => (first.name, second.name)
-    );
-    assert_eq!(first, "a");
-    assert_eq!(second, "b");
+    assert_eq!(errors.len(), 0, "{errors:#?}");
+
+    let ns = idl
+        .wrangler_env
+        .kv_bindings
+        .iter()
+        .find(|b| b.name == "NS")
+        .unwrap();
+    let key = |field: &str| {
+        render_segments(
+            &ns.templates
+                .iter()
+                .find(|t| t.field.name == field)
+                .unwrap()
+                .segments,
+        )
+    };
+    assert_eq!(key("noParams"), "noParams");
+    assert_eq!(key("withParams"), "withParams/p1/{p1}/p2/{p2}");
 }
 
 #[test]
@@ -912,14 +972,17 @@ fn kv_r2_templates_inherit_validators_update_key_format() {
         kv_binding.field.validators[0],
         Validator::GreaterThan(Number::Int(10))
     ));
-    assert_eq!(kv_binding.key_format, "users/{userId}");
+    assert_eq!(render_segments(&kv_binding.segments), "users/{userId}");
 
     assert_eq!(user.r2_fields.len(), 1);
     assert_eq!(user.r2_fields[0].binding, "MyR2");
     let r2_binding = &user.r2_fields[0];
     assert_eq!(r2_binding.field.name, "avatar");
     assert_eq!(r2_binding.field.cidl_type, CidlType::R2Object);
-    assert_eq!(r2_binding.key_format, "objects/{name}/{userId}");
+    assert_eq!(
+        render_segments(&r2_binding.segments),
+        "objects/{name}/{userId}"
+    );
 
     let id_col = user
         .primary_columns
@@ -2240,11 +2303,11 @@ fn proposal_relationship_matrix() {
 
     let do_kv = kv_field("DoBacked", "selfCache");
     assert_eq!(do_kv.binding, "DoA");
-    assert_eq!(do_kv.key_format, "cache/{routeId}");
+    assert_eq!(render_segments(&do_kv.segments), "cache/{routeId}");
     assert_eq!(do_kv.shard_fields, vec!["tenantId"]);
 
     let worker_kv = kv_field("Worker", "workerCache");
     assert_eq!(worker_kv.binding, "DoA");
-    assert_eq!(worker_kv.key_format, "cache/{routeId}");
+    assert_eq!(render_segments(&worker_kv.segments), "cache/{routeId}");
     assert_eq!(worker_kv.shard_fields, vec!["tenantId"]);
 }

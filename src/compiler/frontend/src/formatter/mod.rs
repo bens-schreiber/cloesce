@@ -870,10 +870,14 @@ impl<'src> ToDoc<'src> for KvBindingTemplate<'src> {
         for param in &self.params {
             inner = inner.then(ctx.sym_doc(param, 2, false));
         }
-        let key_format = Doc::hardline(2)
-            .then(Doc::text("\""))
-            .then(Doc::text(self.key_format))
-            .then(Doc::text("\""));
+        let mut key_format = Doc::nil();
+        if let Some(kf) = &self.key_format {
+            key_format = Doc::hardline(2)
+                .then(Doc::text("\""))
+                .then(Doc::text(kf))
+                .then(Doc::text("\""));
+        }
+
         Doc::text(self.symbol.name)
             .then(Doc::text(" -> "))
             .then(Doc::owned(fmt_cidl_type(&self.symbol.cidl_type)))
@@ -901,10 +905,15 @@ impl<'src> ToDoc<'src> for R2BindingTemplate<'src> {
         for param in &self.params {
             inner = inner.then(ctx.sym_doc(param, 2, false));
         }
-        let key_format = Doc::hardline(2)
-            .then(Doc::text("\""))
-            .then(Doc::text(self.key_format))
-            .then(Doc::text("\""));
+
+        let mut key_format = Doc::nil();
+        if let Some(kf) = &self.key_format {
+            key_format = Doc::hardline(2)
+                .then(Doc::text("\""))
+                .then(Doc::text(kf))
+                .then(Doc::text("\""));
+        }
+
         Doc::text(self.symbol.name).then(ctx.block(inner.then(key_format), 2))
     }
 }

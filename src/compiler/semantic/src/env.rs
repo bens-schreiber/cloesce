@@ -1,11 +1,15 @@
+use std::borrow::Cow;
+
 use frontend::{SpdSlice, Symbol};
-use idl::{Binding, BindingTemplate, CidlType, DurableBinding, Field, ValidatedField, WranglerEnv};
+use idl::{
+    Binding, BindingTemplate, CidlType, DurableBinding, Field, TemplateSegment, ValidatedField,
+    WranglerEnv,
+};
 
 use crate::{
     SymbolTable,
     err::{ErrorSink, SemanticError},
     resolve_cidl_type, resolve_validator_tags,
-    trie::PrefixTrie,
 };
 
 /// Builds the [WranglerEnv] from the symbol table, resolving and validating
@@ -47,27 +51,23 @@ pub fn analyze<'src, 'p>(
                 .filter_map(|p| validate_symbol(p, sink, table))
                 .collect::<Vec<_>>();
 
-            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
-                || params.len() != bf.params.len()
-            {
+            if params.len() != bf.params.len() {
                 continue;
             }
 
-            let prefix = key_prefix(bf.key_format).to_string();
-            templates.push((
-                &bf.symbol,
-                BindingTemplate {
-                    field,
-                    prefix,
-                    key_format: bf.key_format,
-                    params,
-                },
-            ));
+            let Some(segments) = key_segments(&bf.symbol, bf.key_format, &bf.params, sink) else {
+                continue;
+            };
+            templates.push(BindingTemplate {
+                field,
+                segments,
+                params,
+            });
         }
 
         kv_bindings.push(Binding {
             name: block.symbol.name,
-            templates: finalize_templates(templates, sink),
+            templates,
         });
     }
 
@@ -88,27 +88,23 @@ pub fn analyze<'src, 'p>(
                 .filter_map(|p| validate_symbol(p, sink, table))
                 .collect::<Vec<_>>();
 
-            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
-                || params.len() != bf.params.len()
-            {
+            if params.len() != bf.params.len() {
                 continue;
             }
 
-            let prefix = key_prefix(bf.key_format).to_string();
-            templates.push((
-                &bf.symbol,
-                BindingTemplate {
-                    field,
-                    prefix,
-                    key_format: bf.key_format,
-                    params,
-                },
-            ));
+            let Some(segments) = key_segments(&bf.symbol, bf.key_format, &bf.params, sink) else {
+                continue;
+            };
+            templates.push(BindingTemplate {
+                field,
+                segments,
+                params,
+            });
         }
 
         r2_bindings.push(Binding {
             name: block.symbol.name,
-            templates: finalize_templates(templates, sink),
+            templates,
         });
     }
 
@@ -134,28 +130,24 @@ pub fn analyze<'src, 'p>(
                 .filter_map(|p| validate_symbol(p, sink, table))
                 .collect::<Vec<_>>();
 
-            if !validate_key_format(&bf.symbol, bf.key_format, &bf.params, sink)
-                || params.len() != bf.params.len()
-            {
+            if params.len() != bf.params.len() {
                 continue;
             }
 
-            let prefix = key_prefix(bf.key_format).to_string();
-            templates.push((
-                &bf.symbol,
-                BindingTemplate {
-                    field,
-                    prefix,
-                    key_format: bf.key_format,
-                    params,
-                },
-            ));
+            let Some(segments) = key_segments(&bf.symbol, bf.key_format, &bf.params, sink) else {
+                continue;
+            };
+            templates.push(BindingTemplate {
+                field,
+                segments,
+                params,
+            });
         }
 
         durable_bindings.push(DurableBinding {
             name: block.symbol.name,
             shard_fields,
-            templates: finalize_templates(templates, sink),
+            templates,
         });
     }
 
@@ -177,52 +169,70 @@ fn validate_key_format<'src, 'p>(
     key_format: &'src str,
     params: &'p [Symbol<'src>],
     sink: &mut ErrorSink<'src, 'p>,
-) -> bool {
-    let vars = match extract_braced(key_format) {
+) -> Option<Vec<TemplateSegment<'src, &'src str>>> {
+    let segs = match parse_template(key_format) {
         Ok(v) => v,
         Err(reason) => {
             sink.push(SemanticError::TemplateInvalidFormat { field, reason });
-            return false;
+            return None;
         }
     };
 
-    for var in vars {
-        if !params.iter().any(|p| p.name == var) {
+    for seg in &segs {
+        let TemplateSegment::Value(name) = seg else {
+            continue;
+        };
+
+        if !params.iter().any(|p| p.name == *name) {
             sink.push(SemanticError::TemplateUnknownVariable {
                 field,
-                variable: var,
+                variable: name,
             });
-            return false;
+            return None;
         }
     }
 
-    true
-}
+    return Some(segs);
 
-/// Extracts braced variables from a format string.
-/// e.g. "users/{userId}/posts/{postId}" => ["userId", "postId"].
-///
-/// Returns an error string if the format string is invalid (e.g. nested or
-/// unclosed braces).
-fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
-    let mut out = Vec::new();
-    let mut current = None;
-    for (i, c) in s.char_indices() {
-        match (current.is_some(), c) {
-            (false, '{') => current = Some(i + 1),
-            (true, '{') => return Err("nested brace in key".to_string()),
-            (true, '}') => {
-                let start_idx = current.take().unwrap();
-                out.push(&s[start_idx..i]);
+    /// Splits a format string into literal text and braced variable segments.
+    /// e.g. "users/{userId}/posts/{postId}" =>
+    /// `[Literal("users/"), Value("userId"), Literal("/posts/"), Value("postId")]`.
+    ///
+    /// Returns an error string if the format string is invalid (e.g. nested or
+    /// unclosed braces).
+    fn parse_template<'src>(s: &'src str) -> Result<Vec<TemplateSegment<'src, &'src str>>, String> {
+        let mut out = Vec::new();
+        // Byte index where the current literal run began.
+        let mut literal_start = 0;
+        // Byte index just after the opening `{` of an in-progress placeholder.
+        let mut current = None;
+        for (i, c) in s.char_indices() {
+            match (current, c) {
+                (None, '{') => {
+                    if literal_start < i {
+                        out.push(TemplateSegment::Literal(Cow::Borrowed(
+                            &s[literal_start..i],
+                        )));
+                    }
+                    current = Some(i + 1);
+                }
+                (Some(_), '{') => return Err("nested brace in key".to_string()),
+                (Some(start_idx), '}') => {
+                    out.push(TemplateSegment::Value(&s[start_idx..i]));
+                    current = None;
+                    literal_start = i + 1;
+                }
+                _ => {}
             }
-            (true, _) => {}
-            _ => {}
         }
+        if current.is_some() {
+            return Err("unclosed brace in key".to_string());
+        }
+        if literal_start < s.len() {
+            out.push(TemplateSegment::Literal(Cow::Borrowed(&s[literal_start..])));
+        }
+        Ok(out)
     }
-    if current.is_some() {
-        return Err("unclosed brace in key".to_string());
-    }
-    Ok(out)
 }
 
 fn validate_symbol<'src, 'p>(
@@ -253,29 +263,43 @@ fn validate_symbol<'src, 'p>(
     })
 }
 
-/// Everything in a key format up to (not including) the first `{` placeholder.
-fn key_prefix(key_format: &str) -> &str {
-    match key_format.find('{') {
-        Some(i) => &key_format[..i],
-        None => key_format,
+/// Builds a template's key [TemplateSegment]s. An explicit `Some(fmt)` is
+/// validated and parsed; a body-less `None` yields the generated default key.
+fn key_segments<'src, 'p>(
+    symbol: &'p Symbol<'src>,
+    key_format: Option<&'src str>,
+    params: &'p [Symbol<'src>],
+    sink: &mut ErrorSink<'src, 'p>,
+) -> Option<Vec<TemplateSegment<'src, &'src str>>> {
+    if let Some(fmt) = key_format {
+        return validate_key_format(symbol, fmt, params, sink);
     }
+
+    Some(default_segments(symbol.name, params))
 }
 
-/// Runs overlap detection across a namespace's templates, emitting
-/// [SemanticError::KeyFormatOverlap] for any colliding key formats, then
-/// returns the bare templates for inclusion in the [WranglerEnv].
-fn finalize_templates<'src, 'p>(
-    templates: Vec<(&'p Symbol<'src>, BindingTemplate<'src>)>,
-    sink: &mut ErrorSink<'src, 'p>,
-) -> Vec<BindingTemplate<'src>> {
-    let mut trie = PrefixTrie::new();
-    for (symbol, template) in &templates {
-        if let Some(first) = trie.insert(template.key_format, symbol) {
-            sink.push(SemanticError::KeyFormatOverlap {
-                first,
-                second: symbol,
-            });
-        }
+/// Builds the default key for a body-less template: `name` for zero params, else
+/// `[Literal("name/p0/"), Value(p0), Literal("/p1/"), Value(p1), …]`.
+fn default_segments<'src>(
+    name: &'src str,
+    params: &[Symbol<'src>],
+) -> Vec<TemplateSegment<'src, &'src str>> {
+    if params.is_empty() {
+        return vec![TemplateSegment::Literal(Cow::Borrowed(name))];
     }
-    templates.into_iter().map(|(_, t)| t).collect()
+    params
+        .iter()
+        .enumerate()
+        .flat_map(|(i, p)| {
+            let literal = if i == 0 {
+                format!("{name}/{}/", p.name)
+            } else {
+                format!("/{}/", p.name)
+            };
+            [
+                TemplateSegment::Literal(Cow::Owned(literal)),
+                TemplateSegment::Value(p.name),
+            ]
+        })
+        .collect()
 }

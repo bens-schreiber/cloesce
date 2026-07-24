@@ -15,9 +15,7 @@ durable PostDo {
 
     // Defines that this DO owns metadata for a Post
     // at `"meta"` in the KV store.
-    meta -> PostMeta {
-        "meta"
-    }
+    meta -> PostMeta {}
 }
 
 // A Post owns references to the comments that have been made on it.

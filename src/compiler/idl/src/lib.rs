@@ -332,6 +332,26 @@ impl DataSource<'_> {
     }
 }
 
+/// A template for a KV/R2 key, e.g. `users/{user_id}` where
+/// `user_id` is a dynamic value and `users/` is a literal prefix.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TemplateSegment<'src, V> {
+    /// Text between placeholders
+    #[serde(borrow)]
+    Literal(Cow<'src, str>),
+    Value(V),
+}
+
+impl<'src, V> TemplateSegment<'src, V> {
+    /// The `list` prefix: the first segment's text if it is a `Literal`, else `""`.
+    pub fn leading_literal(segments: &[Self]) -> &str {
+        match segments.first() {
+            Some(Self::Literal(text)) => text.as_ref(),
+            _ => "",
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct KvField<'src> {
     /// The field on the model that represents this KV binding.
@@ -345,7 +365,7 @@ pub struct KvField<'src> {
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub key_format: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 
     /// When [Self::binding] is a Durable Object, the model's local fields that supply the
     /// DO's shard discriminators, in shard-declaration order.
@@ -362,7 +382,7 @@ pub struct R2Field<'src> {
     #[serde(borrow)]
     pub binding: &'src str,
 
-    pub key_format: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 }
 
 #[derive(Deserialize, Serialize, PartialEq)]
@@ -569,11 +589,7 @@ pub struct BindingTemplate<'src> {
     pub params: Vec<ValidatedField<'src>>,
 
     #[serde(borrow)]
-    pub key_format: &'src str,
-
-    /// Everything in `key_format` up to (not including) the first `{` placeholder.
-    /// Used both for `list` codegen and overlap detection.
-    pub prefix: String,
+    pub segments: Vec<TemplateSegment<'src, &'src str>>,
 }
 
 #[derive(Deserialize, Serialize)]

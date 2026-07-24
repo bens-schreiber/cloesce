@@ -12,8 +12,10 @@ use std::borrow::Cow;
 
 use serde::Serialize;
 
+use idl::TemplateSegment;
+
+use crate::query::Database;
 use crate::query::select::plan::MapCardinality;
-use crate::query::{Database, TemplateSegment};
 
 /// The name of a "temporary table" used to capture the primary key of a just-inserted row for a later
 /// read-back. Stores only generated primary keys (auto-increment integers).

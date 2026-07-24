@@ -82,7 +82,7 @@ fn top_level_bindings() {
     assert_eq!(r2.templates.len(), 1);
     let asset = &r2.templates[0].inner;
     assert_eq!(asset.symbol.name, "asset");
-    assert_eq!(asset.key_format, "assets/{id}");
+    assert_eq!(asset.key_format, Some("assets/{id}"));
     assert_eq!(asset.params.len(), 1);
     assert_eq!(asset.params[0].name, "id");
     assert_eq!(asset.params[0].cidl_type, CidlType::Int);
@@ -102,7 +102,7 @@ fn top_level_bindings() {
     let entry = &kv.templates[0].inner;
     assert_eq!(entry.symbol.name, "entry");
     assert_eq!(entry.symbol.cidl_type, CidlType::Json);
-    assert_eq!(entry.key_format, "cache/{id}");
+    assert_eq!(entry.key_format, Some("cache/{id}"));
     assert_eq!(entry.params.len(), 1);
 
     // var
@@ -145,13 +145,10 @@ fn durable_binding_block() {
                 region: string
             }
 
-            topEntryCache -> json {
-                "top"
-            }
+            topEntryCache -> json { }
 
             topEntryCacheWithDate -> json {
                 date: string
-                "top/{date}"
             }
         }
 
@@ -203,12 +200,12 @@ fn durable_binding_block() {
     let cache = &leaderboard.templates[0].inner;
     assert_eq!(cache.symbol.name, "topEntryCache");
     assert_eq!(cache.symbol.cidl_type, CidlType::Json);
-    assert_eq!(cache.key_format, "top");
+    assert_eq!(cache.key_format, None);
     assert!(cache.params.is_empty());
 
     let cache_with_date = &leaderboard.templates[1].inner;
     assert_eq!(cache_with_date.symbol.name, "topEntryCacheWithDate");
-    assert_eq!(cache_with_date.key_format, "top/{date}");
+    assert_eq!(cache_with_date.key_format, None);
     assert_eq!(cache_with_date.params.len(), 1);
     assert_eq!(cache_with_date.params[0].name, "date");
     assert_eq!(cache_with_date.params[0].cidl_type, CidlType::String);

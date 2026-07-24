@@ -12,7 +12,6 @@ r2 Avatar {
     // dynamic key `"avatars/{name}.png"`.
     avatar {
         name: string
-        "avatars/{name}"
     }
 }
 

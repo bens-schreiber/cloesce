@@ -113,13 +113,6 @@ pub enum SemanticError<'src, 'p> {
         reason: String,
     },
 
-    /// Two key formats in the same namespace have overlapping prefixes, so a
-    /// prefix `list` could not unambiguously distinguish them.
-    KeyFormatOverlap {
-        first: &'p Symbol<'src>,
-        second: &'p Symbol<'src>,
-    },
-
     PlainOldObjectInvalidFieldType {
         field: &'p Symbol<'src>,
     },
@@ -501,25 +494,6 @@ fn display(
                     Label::new((path, range))
                         .with_message(reason.as_str())
                         .with_color(Color::Red),
-                )
-        }
-        SemanticError::KeyFormatOverlap { first, second } => {
-            let (first_path, first_range) = span_parts(&first.span, file_table);
-            let (second_path, second_range) = span_parts(&second.span, file_table);
-            report!(second_path.clone(), second_range.clone())
-                .with_message(format!(
-                    "key format for '{}' overlaps with '{}'",
-                    second.name, first.name
-                ))
-                .with_label(
-                    Label::new((second_path, second_range))
-                        .with_message("overlapping prefix here")
-                        .with_color(Color::Red),
-                )
-                .with_label(
-                    Label::new((first_path, first_range))
-                        .with_message("first key format here")
-                        .with_color(Color::Yellow),
                 )
         }
         SemanticError::ArgCountMismatch {

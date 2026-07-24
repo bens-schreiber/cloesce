@@ -171,14 +171,14 @@ function {{ binding.name }}Helpers(namespace: KVNamespace) {
 {%- for template in &binding.templates %}
         {{ template.field.name }}: {
             template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
-                {{ interpolate_key_format(template.key_format, &template.params) }},
+                {{ interpolate_segments(&template.segments) }},
 {%- if template.field.cidl_type.is_kv_object() %}
             get: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): Promise<{{ map_type(&template.field.cidl_type.unwrap_kv()) }} | null> =>
-                namespace.get({{ interpolate_key_format(template.key_format, &template.params) }}) as any,
+                namespace.get({{ interpolate_segments(&template.segments) }}) as any,
             put: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}, {% endfor %}value: {{ map_type(&template.field.cidl_type.unwrap_kv()) }}): Promise<void> =>
-                namespace.put({{ interpolate_key_format(template.key_format, &template.params) }}, value as any),
+                namespace.put({{ interpolate_segments(&template.segments) }}, value as any),
             list: (options?: { limit?: number, cursor?: string }) =>
-                namespace.list({ ...options, prefix: {{ key_prefix(template.prefix) }} }),
+                namespace.list({ ...options, prefix: {{ list_prefix(&template.segments) }} }),
 {%- endif %}
         },
 {%- endfor %}
@@ -192,13 +192,13 @@ function {{ binding.name }}Helpers(bucket: R2Bucket) {
 {%- for template in &binding.templates %}
         {{ template.field.name }}: {
             template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
-                {{ interpolate_key_format(template.key_format, &template.params) }},
+                {{ interpolate_segments(&template.segments) }},
             get: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): Promise<R2ObjectBody | null> =>
-                bucket.get({{ interpolate_key_format(template.key_format, &template.params) }}),
+                bucket.get({{ interpolate_segments(&template.segments) }}),
             put: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}, {% endfor %}value: Parameters<R2Bucket["put"]>[1]): Promise<R2Object | null> =>
-                bucket.put({{ interpolate_key_format(template.key_format, &template.params) }}, value),
+                bucket.put({{ interpolate_segments(&template.segments) }}, value),
             list: (options?: { limit?: number, cursor?: string, delimiter?: string }) =>
-                bucket.list({ ...options, prefix: {{ key_prefix(template.prefix) }} }),
+                bucket.list({ ...options, prefix: {{ list_prefix(&template.segments) }} }),
         },
 {%- endfor %}
     };
@@ -213,11 +213,11 @@ function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
     function get_{{ template.field.name }}(...args: any[]): any {
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvGet" in args[0])) {
             const [ctx{% for param in &template.params %}, {{ param.name }}{% endfor %}] = args;
-            const key = {{ interpolate_key_format(template.key_format, &template.params) }};
+            const key = {{ interpolate_segments(&template.segments) }};
             return "storage" in ctx ? ctx.storage.kv.get(key) : ctx.__cloesceKvGet(key);
         }
         const [{% for field in &binding.shard_fields %}{{ field.name }}{% if !loop.last %}, {% endif %}{% endfor %}{% if !binding.shard_fields.is_empty() && !template.params.is_empty() %}, {% endif %}{% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %}] = args;
-        return (namespace.get(namespace.idFromName({{ shard_template(binding) }})) as any).__cloesceKvGet({{ interpolate_key_format(template.key_format, &template.params) }});
+        return (namespace.get(namespace.idFromName({{ shard_template(binding) }})) as any).__cloesceKvGet({{ interpolate_segments(&template.segments) }});
     }
 
     function put_{{ template.field.name }}(ctx: DurableObjectState | {{ binding.name }}{% for param in &template.params %}, {{ param.name }}: {{ map_type(&param.cidl_type) }}{% endfor %}, value: {{ map_type(&template.field.cidl_type) }}): void;
@@ -226,11 +226,11 @@ function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
         const value = args[args.length - 1];
         if (args[0] instanceof Object && ("storage" in args[0] || "__cloesceKvPut" in args[0])) {
             const [ctx{% for param in &template.params %}, {{ param.name }}{% endfor %}] = args;
-            const key = {{ interpolate_key_format(template.key_format, &template.params) }};
+            const key = {{ interpolate_segments(&template.segments) }};
             return "storage" in ctx ? ctx.storage.kv.put(key, value) : ctx.__cloesceKvPut(key, value);
         }
         const [{% for field in &binding.shard_fields %}{{ field.name }}{% if !loop.last %}, {% endif %}{% endfor %}{% if !binding.shard_fields.is_empty() && !template.params.is_empty() %}, {% endif %}{% for param in &template.params %}{{ param.name }}{% if !loop.last %}, {% endif %}{% endfor %}] = args;
-        return (namespace.get(namespace.idFromName({{ shard_template(binding) }})) as any).__cloesceKvPut({{ interpolate_key_format(template.key_format, &template.params) }}, value);
+        return (namespace.get(namespace.idFromName({{ shard_template(binding) }})) as any).__cloesceKvPut({{ interpolate_segments(&template.segments) }}, value);
     }
 {%- endfor %}
     return {
@@ -243,11 +243,11 @@ function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
 {%- for template in &binding.templates %}
         {{ template.field.name }}: {
             template: ({% for param in &template.params %}{{ param.name }}: {{ map_type(&param.cidl_type) }}{% if !loop.last %}, {% endif %}{% endfor %}): string =>
-                {{ interpolate_key_format(template.key_format, &template.params) }},
+                {{ interpolate_segments(&template.segments) }},
             get: get_{{ template.field.name }},
             put: put_{{ template.field.name }},
             list: (ctx: DurableObjectState) =>
-                ctx.storage.kv.list({ prefix: {{ key_prefix(template.prefix) }} }),
+                ctx.storage.kv.list({ prefix: {{ list_prefix(&template.segments) }} }),
         },
 {%- endfor %}
     };

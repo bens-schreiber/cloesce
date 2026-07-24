@@ -9,20 +9,17 @@ kv MyKv {
     someValue -> json {
         id1: string
         id2: int
-        "value/{id1}/{id2}"
     }
 
     streamValue -> stream {
         id1: string
         id2: int
-        "stream/{id1}/{id2}"
     }
 }
 
 r2 MyR2 {
     fileData {
         id: string
-        "files/{id}"
     }
 
     metadata {
@@ -48,13 +45,10 @@ durable LeaderboardDo {
         tenantId: int
     }
 
-    topEntryCache -> json {
-        "top"
-    }
+    topEntryCache -> json {}
 
     topEntryCacheWithDate -> json {
         date: string
-        "top/{date}"
     }
 }
 
