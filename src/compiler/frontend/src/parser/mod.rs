@@ -257,16 +257,10 @@ fn method_body<'tokens, 'src: 'tokens>() -> impl Parser<
         Inject(Spd<MethodInjectBlock<'src>>),
     }
 
-    // `target(arg1, arg2, ...)`
+    // `target(arg)`
     let initializer = || {
         symbol()
-            .then(
-                symbol()
-                    .separated_by(just(Token::Comma))
-                    .allow_trailing()
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)),
-            )
+            .then(symbol().delimited_by(just(Token::LParen), just(Token::RParen)))
             .map(|(target, arg)| InjectInitializer { target, arg })
     };
 

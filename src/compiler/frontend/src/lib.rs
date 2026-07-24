@@ -196,7 +196,7 @@ pub enum ArgumentLiteral<'src> {
 #[derive(Debug, Clone)]
 pub struct InjectInitializer<'src> {
     pub target: Symbol<'src>,
-    pub arg: Vec<Symbol<'src>>,
+    pub arg: Symbol<'src>,
 }
 
 #[derive(Debug, Clone)]

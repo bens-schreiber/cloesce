@@ -704,7 +704,7 @@ impl<'src> ToDoc<'src> for InjectEntry<'src> {
                 let init_doc = |init: &'src InjectInitializer<'src>| {
                     Doc::text(init.target.name)
                         .then(Doc::text("("))
-                        .then(comma_separated(&init.arg, |arg| Doc::text(arg.name)))
+                        .then(Doc::text(init.arg.name))
                         .then(Doc::text(")"))
                 };
 
