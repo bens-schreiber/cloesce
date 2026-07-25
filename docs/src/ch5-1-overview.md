@@ -1,18 +1,41 @@
 # Data Sources Overview
 
-If you query an instantiated [API](./ch6-1-rest-apis.md) endpoint of a [Model](./ch4-0-models.md), you may notice that Cloesce will leave undefined values or empty arrays in deeply nested compositions with other Models.
-
-This is intentional, and an effect of Data Sources.
-
 ## What are Data Sources?
 
-Data Sources are Cloesce’s response to the overfetching and recursive relationship challenges when modeling relational databases with object-oriented paradigms.
+Data Sources are Cloesce’s answer to querying when there is potential for:
 
-Every Data Source is composed of an _Include Tree_, along with `get`, `list`, and `save` operations. Include Trees are necessary to determine which fields to hydrate when fetching data for a given Model.
+- overfetching
+- recursive relationships
+- complex business logic
 
-For example, in the Model definition below, how should Cloesce know how deep to go when fetching a Person and their associated Dog?
+Every Data Source is composed of:
+
+- an _Include Tree_
+- `get`, `list`, and `save` operations
+
+Data Sources are used extensively in the backend, but are also exposed to the client during API generation. A client may call any of the CRUD operations on a Data Source, making them the go-to method of writing any `get`, `list` or `save` operation for a Model.
+
+## Include Trees
+
+To determine which fields to hydrate, Cloesce uses a construct called the _Include Tree_. An Include Tree is a recursive structure that represents the relationships between Models and their fields, and is used by Cloesce to determine how to fetch data for a given Model.
+
+For example, consider the following `Person` and `Dog` Models:
 
 ```cloesce
+model Person for Db {
+    primary {
+        id: int
+    }
+
+    foreign Dog::id option {
+        dogId
+    }
+
+    one Dog::id(dogId) {
+        dog
+    }
+}
+
 model Dog for Db {
     primary {
         id: int
@@ -22,54 +45,60 @@ model Dog for Db {
         ownerId
     }
 
-    nav Person::id(ownerId) {
+    one Person::id(ownerId) {
         owner
     }
 }
+```
 
-model Person for Db {
-    primary {
-        id: int
-    }
+This relationship is recursive: `Person` has one `Dog`, and `Dog` has one `Person`. If we were to fetch naively, we would end up in an infinite loop of fetching `Person` and `Dog` instances. To prevent this, Cloesce will generate the following Default Include Tree for the `Person` and `Dog` Models:
 
-    nav Dog::ownerId {
+```cloesce
+source Default for Person {
+    include {
         dogs
     }
 }
 
-// => { id: 1, dogs: [ { id: 1, owner: { id: 1, dogs: [ ... ] } } ] } ad infinitum
+source Default for Dog {
+    include {
+        owner {
+            dogs
+        }
+    }
+}
 ```
 
-If we were to follow this structure naively, fetching a `Person` would lead to fetching their `Dog`, which would lead to fetching the same `Person` again, and so on, resulting in an infinite loop of data retrieval.
-
-## Default Data Source
-
-Every Model will come with a Default Data Source (called `Default`) that Cloesce will use whenever an operation does not explicitly specify a Data Source to use.
+Each branch of the Include Tree is a relationship that will be joined when fetching a Model. Relationships can be traversed from Model to Model: if I include an `owner`, I can now include any number of relationships that belong to the `owner`.
 
 ### Default Include Tree
 
-To prevent overfetching (and infinite loops), the Default Data Source will only join:
+To prevent overfetching (and infinite loops), the Default Data Source will join:
 
-- Any R2 and KV fields
-- All [1:1 Navigation Fields](./ch4-5-navigation-fields.md#one-to-one-relationship)
+- R2 and KV fields
+- All [One-to-One Navigation Fields](./ch4-5-navigation-fields.md#one-to-one-relationship)
 - The near side of all [1:M Navigation Fields](./ch4-5-navigation-fields.md#one-to-many-relationship)
 
-## Include Trees
+## CRUD Operations
 
-To determine which fields to hydrate, Cloesce uses a construct called the _Include Tree_. An Include Tree is a recursive structure that represents the relationships between Models and their fields, and is used by Cloesce to determine how to fetch data for a given Model.
+Alongside the Include Tree, every Data Source has three operations: `get`, `list`, and `save`.
 
-For example, in the `Person` and `Dog` Models above, the Default Data Source's Include Tree would join only the field `dogs` on `Person`, but on the `Dog` Model, it would join `owner`, and then finally `dogs`.
+The default implementations of these operations are as so:
+
+- `get`: fetch a single instance by primary keys, route keys and shard keys
+- `list`: fetch a list of instances by primary keys, route keys and shard keys via limited seek pagination
+- `save`: insert, update or upsert an instance and all children by a partial snapshot of a Model
+
+Each default implementation will follow the Include Tree defined in a Data Source, omitting any relationships not within the tree.
+
+For example:
 
 ```cloesce
-// Include Tree for Person
-include {
-    dogs
-}
-
-// Include Tree for Dog
-include {
-    owner {
-        dogs
-    }
+source Default for Person {
+    include {} // Empty!
 }
 ```
+
+The above Data Source includes _no_ relationships, so the default `get` and `list` operations will only return the `Person`'s primary keys and foreign keys, and will not join any relationships. `save` will simply no-op on children.
+
+For more information on how the Cloesce ORM and Query Planner works, read the [ORM Chapter](TODO).

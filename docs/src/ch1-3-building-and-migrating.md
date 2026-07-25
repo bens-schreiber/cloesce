@@ -30,20 +30,24 @@ cloesce compile
 ```
 
 > [!IMPORTANT]
-> Any generated artifacts should not be modified directly or committed to source control. Simply import them into your backend and client code, relying on a build step to run the Cloesce compiler and keep the generated code up to date.
+> Any generated artifacts should not be modified directly or committed to source control.
+>
+> Import them into your backend and client code, relying on a `cloesce compile` build step to keep up to date with your schema.
 
 ## Migrations
 
 > [!TIP]
 > Schema modifications to a [SQLite backed Model](./ch4-1-sqlite-backed-model.md) should be accompanied by a new migration. This ensures that your database schema stays in sync with your Cloesce Models.
 
-Cloesce supports any number of SQLite databases in a single project. To generate SQL migration files for a specific binding, run the following command:
+Cloesce supports any number of SQLite databases in a single project. Migrations turn a Cloesce schema into a set of SQL statements that can be applied to a database, tracking changes over time.
+
+**Specific Binding**
 
 ```bash
 cloesce migrate --binding <binding> <migration-name>
 ```
 
-To generate migrations for all bindings in your project, use the `--all` flag:
+**All Bindings**
 
 ```bash
 cloesce migrate --all <migration-name>
@@ -51,7 +55,7 @@ cloesce migrate --all <migration-name>
 
 ### Apply D1 Migrations
 
-Cloesce generate the SQL for migrations, but not apply them,
+Cloesce generates the SQL for migrations, but does not apply them,
 
 If a [D1 database](./ch3-2-d1.md) is being utilized, you must apply the generated migrations using the Wrangler CLI:
 

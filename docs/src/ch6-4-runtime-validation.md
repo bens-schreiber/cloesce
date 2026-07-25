@@ -1,6 +1,6 @@
 # Runtime Validation
 
-When an HTTP request is made to the Cloesce Router, the incoming data will first be matched to an existing [API](./ch6-1-rest-apis.md) implementation, and then validated against the respective API defined in the Cloesce Schema.
+When an HTTP request is made to the Cloesce Router, incoming data will first be matched to an existing [API](./ch6-1-rest-apis.md) implementation, and then validated against the schema for that API.
 
 Each type is validated in accordance with the rules defined in the [Type Reference](./ch2-0-type-reference.md). If any validation errors occur, a `400 Bad Request` response will be returned with details about the validation errors.
 
@@ -26,12 +26,12 @@ model Post {
     }
 
     foreign (User::id) {
-        user_id
+        userId
     }
 }
 ```
 
-In the above code, the `user_id` field in the `Post` Model will automatically have the `[gt 0]` validator applied to it, since it is a foreign key referencing the `id` field in the `User` Model.
+In the above code, the `userId` field in the `Post` Model will automatically have the `[gt 0]` validator applied to it, since it is a foreign key referencing the `id` field in the `User` Model.
 
 ## Numerical Validators
 

@@ -73,7 +73,7 @@ Foreign key fields inherit the type of the field they reference. In the above ex
 
 ### Optional Foreign Key
 
-To allow `NULL` values in a foreign key field, use the `optional` modifier:
+To allow `NULL` values in a foreign key field, use the `option` modifier:
 
 ```cloesce
 model Person for Db {
@@ -81,7 +81,7 @@ model Person for Db {
         id: int
     }
 
-    foreign Dog::id optional {
+    foreign Dog::id option {
         dogId
     }
 }
@@ -145,10 +145,13 @@ model Course for Db {
 
 ## Unique Constraint
 
-The `unique (field1, field2, ...)` declaration adds a unique constraint over one or more
+The `unique` tag adds a unique constraint over one or more
 existing fields on a Model. It translates to the SQLite `UNIQUE` constraint. A field may participate in any number of unique constraints.
 
 ```cloesce
+[unique email, profileId, dogId]
+[unique username]
+[unique dogId]
 model User for Db {
     primary {
         id: int
@@ -166,14 +169,5 @@ model User for Db {
     foreign Dog::id {
         dogId
     }
-
-    // The combination (email, profileId, dogId) must be unique.
-    unique (email, profileId, dogId)
-
-    // `username` must be unique on its own.
-    unique (username)
-
-    // `dogId` must also be unique on its own
-    unique (dogId)
 }
 ```

@@ -1,38 +1,35 @@
 hljs.registerLanguage("cloesce", function (hljs) {
-  // Top-level declaration keywords
+  // Top-level block declaration keywords
   const KEYWORDS = [
-    "env",
-    "inject",
-    "service",
     "model",
-    "api",
-    "source",
     "poo",
-    "sql",
+    "source",
+    "inject",
+    "api",
+    "var",
     "d1",
     "r2",
     "kv",
-    "vars",
-    "self",
     "durable",
+    "self",
   ];
 
   // Contextual block / structural keywords
   const BLOCK_KEYWORDS = [
-    "route",
-    "shard",
     "primary",
-    "optional",
-    "unique",
-    "foreign",
-    "nav",
+    "route",
     "column",
+    "foreign",
+    "one",
+    "many",
+    "shard",
     "include",
     "for",
     "crud",
-    "use",
     "internal",
     "instance",
+    "header",
+    "unique",
     "lt",
     "lte",
     "gt",
@@ -44,7 +41,7 @@ hljs.registerLanguage("cloesce", function (hljs) {
     "regex",
   ];
 
-  // CRUD / HTTP verbs
+  // HTTP verbs / data source method kinds
   const VERBS = ["get", "post", "put", "patch", "delete", "list", "save"];
 
   const PRIMITIVES = [
@@ -73,14 +70,29 @@ hljs.registerLanguage("cloesce", function (hljs) {
       // Line comments
       hljs.COMMENT("//", "$"),
 
-      // Block comments
-      hljs.COMMENT("/\\*", "\\*/"),
-
       // Strings
       {
         className: "string",
         begin: /"/,
         end: /"/,
+      },
+
+      // Pascal_Snake_Case
+      {
+        className: "symbol",
+        begin: /\b(?=[A-Za-z0-9]*[a-z])[A-Z][a-zA-Z0-9]*(?:_[A-Z][a-zA-Z0-9]*)+\b/,
+      },
+
+      // SCREAMING_SNAKE_CASE
+      {
+        className: "variable.constant",
+        begin: /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/,
+      },
+
+      // PascalCase
+      {
+        className: "title.class",
+        begin: /\b[A-Z][a-zA-Z0-9]*\b/,
       },
 
       // Punctuation tokens

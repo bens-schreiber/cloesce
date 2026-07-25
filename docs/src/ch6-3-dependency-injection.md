@@ -1,95 +1,89 @@
 # Dependency Injection
 
-Any API method may optionally inject [Environment Bindings](./ch3-0-environment.md), or define custom object bindings to inject.
+Any API method may inject [Environment Bindings](./ch3-0-environment.md), or inject custom interfaces defined in the schema.
 
-This allows you to easily access resources such as D1 databases, KV namespaces, R2 buckets, and more within your API implementations without needing a globally scoped environment object.
+The [Cloesce ORM](TODO) implements all of its functionality with dependency injection. To access any generated helper, Data Source, or API method from within an API method, you _must_ inject it at the schema level.
+
+Injecting a dependency into an API method is a hint to the schema: "this API method may read or write to this resource".
 
 ## Injecting Environment Bindings
 
 To inject an Environment Binding, add the `inject` tag to the API method and specify the name of the binding you want to inject:
 
-<!-- env {
-    d1 {
-        db
-    }
-
-    r2 {
-        bucket
-    }
-
-    vars {
-        secret_value: string
-    }
-} -->
-
 ```cloesce
 d1 { Db }
 
-r2 Bucket { }
+r2 Bucket {
+    image {
+        id: string
+    }
+}
 
-vars {
+var {
     SECRET: string
 }
 
-model Person {
-    route{
+model Person for Db {
+    primary {
         id: int
     }
 }
 
 api Person {
-    [inject Db, Bucket, SECRET]
-    get do_stuff(self) -> Person
+    get stuff -> Person {
+        inject {
+            Db
+            Bucket
+            SECRET
+        }
+    }
 }
 ```
 
-In the above code, the backend stub generated for the `do_stuff` API method will pass in a parameter `env` of the type:
+A generated backend stub for the `stuff` API method will include an `env` parameter with **ORM upgraded** types:
 
-```ts
-{
-  Db: D1Database;
-  Bucket: Bucket;
-  SECRET: string;
-}
-```
+- `env.Db` will contain all Models within the `Db` binding, with all of their Data Sources and API methods invokable
+- `env.Bucket` will contain all templated R2 methods for the `Bucket` binding, with read, write and list methods invokable
+- `env.SECRET` will contain the value of the `SECRET` binding, as a string
+
+See the [Cloesce ORM](TODO) for more information on how to use the injected bindings.
 
 ## Defining Custom Inject Bindings
 
-In addition to Environment Bindings, you can also define your own custom Inject bindings. This is useful for cases where you want to inject a resource that is not part of the environment, or if you want to perform some custom logic before injecting the resource.
+Custom values beyond Worker resources can be defined and injected into API methods.
 
-To define some custom structure to be injected, you can use the `inject` keyword in your API definition:
+For example, you may want to create an `Auth` dependency that any API method can inject to perform authentication and authorization checks:
 
 ```cloesce
-inject {
-    YouTubeApi
-    OpenAiClient
-}
+// Define a custom interface to be injected
+inject { Auth }
 
-// ... and then inject as usual:
+// Define an API method that injects the Auth interface
 api Person {
-    [inject YouTubeApi, OpenAiClient]
-    get do_stuff(self) -> Person
+    get stuff -> string {
+        inject { Auth }
+    }
 }
 ```
 
-Unlike Environment Bindings, custom Injections require an explicit implementation:
+In order for the dependency to resolve at runtime (any missing dependency is a `500` error), you must register an implementation in the backend:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
-
-class YouTubeApi extends clo.YouTubeApi {
-  // Add custom methods or properties!
-  constructor() {
-    super();
+// Give the Auth interface a type
+declare module "./backend.js" {
+  interface Auth {
+    username: string | null;
   }
 }
 
-export default {
-  async fetch(request: Request, env: clo.Env): Promise<Response> {
-    const app = clo.cloesce();
-    app.register(new YouTubeApi());
+const stuff: Api.Person.stuff = (env) => HttpResult.ok(200, `my username is ${env.Auth.username}`);
 
-    return await app.run(request, env);
+export default {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    return createApp(env)
+      .register(Auth, { username: "john_doe" })
+      .register(Person, { stuff })
+      .run(request);
   },
 };
 ```

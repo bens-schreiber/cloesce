@@ -29,7 +29,7 @@ This section provides a reference for the types available in the Cloesce Schema 
 
 ### Objects
 
-Any [Model](./ch4-0-models.md) or [Plain Old Object](./ch6-5-plain-old-objects.md) defined in your schema can be referenced as a type. For example, to have a Plain Old Object that references a Model:
+Any [Model](./ch4-0-models.md) or [Plain Old Object](./ch6-5-plain-old-objects.md) defined in your schema can be used as a type:
 
 ```cloesce
 model User for Db {

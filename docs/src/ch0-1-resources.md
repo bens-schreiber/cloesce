@@ -10,4 +10,6 @@ curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
 
 ## VS Code Extension
 
-A basic language highlighting extension for Cloesce is available in the [VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=BenSchreiber.cloesce-lang). In the future, this extension will also include a full LSP server.
+A basic language highlighting extension for Cloesce is available in the [VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=BenSchreiber.cloesce-lang).
+
+In the future, this extension will also include an LSP server.

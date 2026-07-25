@@ -9,14 +9,14 @@ POOs are defined with the `poo` keyword and can have fields just like Models, bu
 To define a POO, you can use the following syntax:
 
 ```cloesce
-poo PersonDTO {
+poo PersonDto {
     id: int
     name: string
     age: int
 }
 ```
 
-The above code defines a POO called `PersonDTO` with three fields: `id`, `name`, and `age`. You can use this POO in your API definitions, data sources, or anywhere else you need to represent structured data without the overhead of a full Model.
+The above code defines a POO called `PersonDto` with three fields: `id`, `name`, and `age`. You can use this POO in your API definitions, data sources, or anywhere else you need to represent structured data without the overhead of a full Model.
 
 ## POO Composition
 

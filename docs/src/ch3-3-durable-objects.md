@@ -8,7 +8,12 @@ To describe them simply (_a task which is difficult to do justice_), Durable Obj
 2. A single threaded sequential execution context.
 3. Capable of being sharded across any number of instances (think _database-per-X_).
 
-Cloesce provides first class support for Durable Objects, allowing you to define them in your schema, generate a fully typed interface, [injecting execution context into your API implementations](./ch6-1-rest-apis.md#execution-context), and using them as a [Model backing](./ch4-1-sqlite-backed-model.md#with-durable-objects).
+Cloesce provides first class support for Durable Objects:
+
+- Define DOs in your schema
+- Generate a fully typed interface
+- Use them as a [Model backing](./ch4-1-sqlite-backed-model.md#with-durable-objects)
+- Execute API methods [within a DOs context](./ch6-1-rest-apis.md#execution-context)
 
 > [!TIP]
 > Durable Objects are **not** a Model, but rather a place that any number of Models can be backed by.
@@ -31,19 +36,16 @@ durable MyShardedDo {
     }
 
     // ... define as many binding templates as necessary
-    settings() -> json {
-        "settings"
-    }
+    settings -> json { }
 
-    userMap(userId: int) -> json {
+    userMap -> json {
+        userId: int
         "user/{userId}"
     }
 }
 
 durable MyGlobalDo {
-    settings() -> json {
-        "settings"
-    }
+    settings -> json { }
 }
 ```
 
@@ -55,26 +57,6 @@ The above example defines two Durable Object bindings:
 
 In both bindings, KV templates can be defined to generate a typed interface for interacting with the Durable Object's KV storage.
 
-In the case of `MyShardedDo`, the `userMap` template will generate an interface for storing user data in the Durable Object's KV storage, with keys formatted as `"user/{userId}"`.
-
-### Generated Interface
-
-Cloesce will create an abstract class to extend for each Durable Object binding defined in the schema, along with helper functions merged into the Cloesce `Env` type.
-
-The generated abstract class provides:
-
-- KV template accessors (e.g. `this.settings`, `this.userMap(userId)`) with `get`, `put`, `list`, and `template` methods for interacting with the Durable Object's KV storage.
-
-- A `cloesce` method for applying [generated migrations](./ch1-3-building-and-migrating.md#migrations) as well as invoking the [Cloesce Router](./ch6-1-rest-apis.md).
-
-The generated `Env` helpers provide:
-
-- `env.MyShardedDo.template(tenant)` — returns the shard key string for a given set of shard parameters.
-- `env.MyShardedDo.id(tenant)` — returns a `DurableObjectId` for the given shard parameters.
-- `env.MyShardedDo.stub(tenant)` — returns a typed `DurableObjectStub` for the given shard parameters.
-
-For global Durable Objects (no shard fields), these helpers take no arguments.
-
 ### Extending the Durable Object Class
 
 The Cloesce Router will forward HTTP requests bound for a particular Durable Object from the Worker to the `fetch` method of the generated Durable Object class.
@@ -82,26 +64,18 @@ The Cloesce Router will forward HTTP requests bound for a particular Durable Obj
 To implement custom logic for handling these requests, extend the generated Durable Object class and implement the `fetch` method:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
+import { createApp, ... } from "@cloesce/backend";
 
-export class MyShardedDo extends clo.MyShardedDo {
-    app: CloesceApp;
+export class SubRedditDo extends DurableObject<CfEnv> {
+  private base = createApp(this, SubRedditDoHost, [subRedditDoInitial])
+    .register(SubReddit, subReddit)
+    .register(Post, post);
 
-    constructor(state: DurableObjectState, env: clo.CfEnv) {
-        super(state, env);
-        this.app = this.cloesce(env, [...migrations]);
-        this.app.register(...);
-    }
-
-    async fetch(request: Request): Promise<Response> {
-        return await this.app.run(request);
-    }
+  async fetch(request: Request): Promise<Response> {
+    return this.base.run(request);
+  }
 }
 ```
-
-Here, the `MyShardedDo` class extends the generated `clo.MyShardedDo` class, and implements the `fetch` method to handle incoming HTTP requests.
-
-The `cloesce` method is used to create a Cloesce application instance, which can be used to register API implementations and run the application.
 
 ### Wrangler Configuration
 
@@ -132,20 +106,24 @@ A Model may be backed by a Durable Object, meaning the data for that Model can b
 durable MyShardedDo {
     shard {
         tenant: int
+        org: string
     }
 }
 
-model Tenant for MyShardedDo(tenant) {
+model Tenant for MyShardedDo::{tenant, org} {
     // ...
 }
 
 // can alias `tenant` to anything
-model Tenant for MyShardedDo(aliasWhatever) {
+model Tenant for MyShardedDo::{tenant(alias), org} {
+    // ...
+}
+
+// if only one shard field, can use singular form
+model Tenant for MyShardedDo::tenant(alias) {
     // ...
 }
 ```
-
-In this case, the `Tenant` Model is backed by the `MyShardedDo` Durable Object, and the `tenant` shard field is declared on the Model.
 
 Read more about backing Models with Durable Objects in the [Models chapter](./ch4-1-sqlite-backed-model.md#with-durable-objects).
 
@@ -159,11 +137,15 @@ Explicitly [inject](./ch6-1-rest-apis.md#execution-context) the Durable Object's
 
 ```cloesce
 api AnyModel {
-    [inject MyShardedDo(tenant)]
-    get doSomething(tenant: int) -> json
+    get doSomething -> json {
+        tenant: int
+
+        inject { MyShardedDo::tenant(tenant) }
+        // or short form: inject { MyShardedDo::tenant }
+    }
 }
 ```
 
-In order to instantiate the `MyShardedDo` execution context, the `tenant` shard parameter must be passed in as an argument to the API method, and the method must be decorated with the `inject` tag.
+In order to instantiate the `MyShardedDo` execution context, the `tenant` shard parameter must be passed in as an argument to the API method under an `inject` block.
 
 Read more about execution context injection in the [API chapter](./ch6-1-rest-apis.md#execution-context) and the [Data Source chapter](./ch5-1-data-sources.md#execution-context).

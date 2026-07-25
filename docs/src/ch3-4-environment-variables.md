@@ -10,7 +10,7 @@ Any number of environment variables can be defined in the schema, which Cloesce 
 To define an environment variable, use the `var` block in the schema:
 
 ```cloesce
-vars {
+var {
     MY_VAR: string
     MY_OTHER_VAR: int
 }
@@ -20,7 +20,8 @@ vars {
 
 ```cloesce
 api Foo {
-    [inject MY_VAR]
-    get foo() -> string
+    get foo -> string {
+        inject { MY_VAR }
+    }
 }
 ```

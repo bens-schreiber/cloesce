@@ -1,6 +1,8 @@
 # APIs
 
-Defining the structure and source of your data with Models and Data Sources is only the first step in building a full stack application with Cloesce. To create a complete application, you also need to define how an outside client (frontend, third party service, etc.) can interact with your application and its data.
+Cloesce generates a RPC-like REST API for every Model in your application. APIs defined in the schema become methods on a generated class, which can be called from a remote client transparently as if the object existed on the client.
+
+Every Data Source defined in your schema becomes an access point for the client to retrieve and update Models.
 
 This chapter covers how to:
 

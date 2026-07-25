@@ -12,18 +12,17 @@ A service is a `model` block with empty braces:
 model FooService {}
 
 api FooService {
-    get do_foo() -> string
+    get foo { }
 }
 ```
 
 The implementation is the same as for any other model:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
-
-const FooService = clo.FooService.impl({
-  do_foo() {
-    return "foo";
+import { Api } from "cloesce";
+export default {
+  foo() {
+    // ...
   },
-});
+} satisfies Api.FooService.foo;
 ```

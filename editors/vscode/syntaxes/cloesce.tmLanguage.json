@@ -26,16 +26,16 @@
       "include": "#self-keyword"
     },
     {
-      "include": "#declaration"
+      "include": "#block-declaration"
     },
     {
       "include": "#http-verb"
     },
     {
-      "include": "#structural-keyword"
+      "include": "#crud-method"
     },
     {
-      "include": "#binding-keyword"
+      "include": "#structural-keyword"
     },
     {
       "include": "#generic-type"
@@ -50,7 +50,13 @@
       "include": "#double-colon"
     },
     {
-      "include": "#type-name"
+      "include": "#pascal-snake-case"
+    },
+    {
+      "include": "#screaming-snake-case"
+    },
+    {
+      "include": "#pascal-case"
     },
     {
       "include": "#identifier"
@@ -103,25 +109,25 @@
       "name": "variable.language.self.cloesce",
       "match": "\\bself\\b"
     },
-    "declaration": {
+    "block-declaration": {
       "comment": "Top-level block keywords",
       "name": "keyword.declaration.cloesce",
-      "match": "\\b(model|poo|source|inject|api)\\b"
+      "match": "\\b(model|poo|source|inject|api|var|d1|r2|kv|durable)\\b"
     },
     "http-verb": {
-      "comment": "HTTP verbs",
+      "comment": "HTTP verbs used to introduce an API method",
       "name": "keyword.control.http.cloesce",
-      "match": "\\b(get|post|put|patch|delete|list|save)\\b"
+      "match": "\\b(get|post|put|patch|delete)\\b"
+    },
+    "crud-method": {
+      "comment": "Data source method kinds",
+      "name": "keyword.control.crud.cloesce",
+      "match": "\\b(list|save)\\b"
     },
     "structural-keyword": {
       "comment": "Block/sub-block keywords used by the parser",
       "name": "keyword.other.cloesce",
-      "match": "\\b(primary|optional|unique|foreign|nav|column|route|shard|include|for|crud|internal|instance|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
-    },
-    "binding-keyword": {
-      "comment": "Storage binding kinds (also introduce top-level binding blocks)",
-      "name": "storage.type.binding.cloesce",
-      "match": "\\b(d1|kv|r2|vars|durable)\\b"
+      "match": "\\b(primary|route|column|foreign|one|many|shard|include|for|crud|internal|instance|header|unique|lt|lte|gt|gte|step|len|minlen|maxlen|regex)\\b"
     },
     "builtin-type": {
       "name": "support.type.primitive.cloesce",
@@ -131,12 +137,23 @@
       "name": "support.type.generic.cloesce",
       "match": "\\b(option|array|kvobject|partial)\\b"
     },
-    "type-name": {
-      "comment": "PascalCase identifiers — visually distinguishes model/source/poo references",
+    "pascal-snake-case": {
+      "comment": "Pascal_Snake_Case — HTTP header identifiers in an API block",
+      "name": "entity.name.tag.header.cloesce",
+      "match": "\\b(?=[A-Za-z0-9]*[a-z])[A-Z][a-zA-Z0-9]*(?:_[A-Z][a-zA-Z0-9]*)+\\b"
+    },
+    "screaming-snake-case": {
+      "comment": "SCREAMING_SNAKE_CASE — variables declared in a var block",
+      "name": "variable.other.constant.cloesce",
+      "match": "\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b"
+    },
+    "pascal-case": {
+      "comment": "PascalCase — Models, Data Sources, POOs, Databases (D1/R2/Durable Objects), Inject identifiers",
       "name": "entity.name.type.cloesce",
-      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+      "match": "\\b[A-Z][a-zA-Z0-9]*\\b"
     },
     "identifier": {
+      "comment": "snake_case or camelCase — fields, parameters, and other bindings",
       "name": "variable.other.cloesce",
       "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
     },
@@ -165,7 +182,7 @@
           "include": "#number"
         },
         {
-          "comment": "Tag-leading keywords: crud/internal/instance/validators via structural, plus inject/source",
+          "comment": "Tag-leading keywords not otherwise covered",
           "name": "keyword.other.cloesce",
           "match": "\\b(inject|source)\\b"
         },
@@ -173,10 +190,13 @@
           "include": "#structural-keyword"
         },
         {
+          "include": "#crud-method"
+        },
+        {
           "include": "#http-verb"
         },
         {
-          "include": "#type-name"
+          "include": "#pascal-case"
         },
         {
           "name": "variable.other.cloesce",
