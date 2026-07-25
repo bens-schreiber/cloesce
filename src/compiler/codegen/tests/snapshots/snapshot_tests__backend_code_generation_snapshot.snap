@@ -1925,9 +1925,11 @@ export type FullEnv = Omit<CfEnv, never | "db" | "MyKv" | "MyR2" | "GlobalDo" | 
 export namespace Env {
     export interface BasicServiceTopScores {
         leaderboardDo: Do_LeaderboardDo<BasicServiceTopScores>;
+        ctx: DurableObjectState;
     }
     export interface BasicServiceGlobalConfig {
         globalDo: Do_GlobalDo<BasicServiceGlobalConfig>;
+        ctx: DurableObjectState;
     }
     export interface ModelWithCompositePkInstanceMethod {
         db: Db_db<ModelWithCompositePkInstanceMethod>;

@@ -446,6 +446,9 @@ export namespace Env {
         {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ route_env_name(model, api) }}>;
 {%- endif %}
 {%- endfor %}
+{%- if api.durable_target.is_some() %}
+        {{ durable_target_key() }}: DurableObjectState;
+{%- endif %}
     }
 {%- endif %}
 {%- endfor %}

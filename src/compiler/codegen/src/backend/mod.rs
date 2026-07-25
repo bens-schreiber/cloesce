@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use askama::Template;
 use idl::{
-    ApiMethod, CidlType, CloesceIdl, DEFAULT_DATA_SOURCE_NAME, DataSource, DurableBinding, Model,
-    TemplateSegment,
+    ApiMethod, CidlType, CloesceIdl, DEFAULT_DATA_SOURCE_NAME, DataSource, DurableBinding,
+    ENV_DURABLE_TARGET_KEY, Model, TemplateSegment,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -199,9 +199,13 @@ impl<'src> BackendTemplate<'src> {
         out
     }
 
-    /// True if the route receives an `env` parameter (it injects or runs in a DO).
+    /// True if the route injects any binding or runs in a DO
     fn route_has_env(&self, api: &ApiMethod<'src>) -> bool {
         !api.injected.is_empty() || api.durable_target.is_some()
+    }
+
+    fn durable_target_key(&self) -> &'static str {
+        ENV_DURABLE_TARGET_KEY
     }
 
     /// The name used to reference an injectable's env/handle type.
