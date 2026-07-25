@@ -1,4 +1,4 @@
-import { createApp, Worker, HeaderService, type Api, type CfEnv } from "./backend.js";
+import { createApp, HeaderService, type Api, type CfEnv } from "./backend.js";
 import { HttpResult } from "cloesce";
 
 const echo: Api.HeaderService.echo = (X_Tenant, payload) =>
@@ -10,6 +10,6 @@ const ping: Api.HeaderService.ping = (X_Tenant) => HttpResult.ok(200, `pong:${X_
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(HeaderService, { echo, count, ping }).run(request);
+    return createApp().worker(env).register(HeaderService, { echo, count, ping }).run(request);
   },
 };

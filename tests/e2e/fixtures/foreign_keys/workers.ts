@@ -1,6 +1,5 @@
 import {
   createApp,
-  Worker,
   A,
   B,
   Course,
@@ -49,7 +48,8 @@ const student: Api.Student.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker)
+    return createApp()
+      .worker(env)
       .register(A, a)
       .register(B, b)
       .register(Person, person)

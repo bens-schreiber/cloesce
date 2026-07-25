@@ -1,4 +1,4 @@
-import { Api, CfEnv, createApp, Worker, Weather, WeatherReport } from "@cloesce/backend.js";
+import { Api, CfEnv, createApp, Weather, WeatherReport } from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
 
 const weatherReport: Api.WeatherReport.Of = {};
@@ -23,9 +23,9 @@ const cors = {
 };
 
 // Exported for use in tests.
-export const app = (env: CfEnv) => {
-  return createApp(env, Worker).register(Weather, weather).register(WeatherReport, weatherReport);
-};
+export function app() {
+  return createApp().register(Weather, weather).register(WeatherReport, weatherReport);
+}
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
@@ -33,7 +33,7 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    const result = await app(env).run(request);
+    const result = await app().worker(env).run(request);
 
     for (const [key, value] of Object.entries(cors)) {
       result.headers.set(key, value);

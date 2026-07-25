@@ -11,15 +11,12 @@ import {
     Needs,
     Awaitable,
     ModelTag,
-    HostTag,
     InjectableTag,
     AppBuilder,
     modelTag,
-    hostTag,
     injectableTag,
     makeApp,
     attachBinding,
-    attachDurableRpc,
 } from "cloesce";
 import type { DurableMigration } from "cloesce";
 import type { DurableObject } from "cloudflare:workers";
@@ -2027,33 +2024,22 @@ export const BasicModel: ModelTag<"BasicModel", Api.BasicModel.Of> = modelTag("B
 export const ModelWithCustomDs: ModelTag<"ModelWithCustomDs", Api.ModelWithCustomDs.Of> = modelTag("ModelWithCustomDs");
 export const HasOneToOne: ModelTag<"HasOneToOne", Api.HasOneToOne.Of> = modelTag("HasOneToOne");
 export const ModelWithCruds: ModelTag<"ModelWithCruds", Api.ModelWithCruds.Of> = modelTag("ModelWithCruds");
-export const Worker: HostTag<"BasicService" | "GlobalSettings" | "HasSqlColumnTypes" | "Leaderboard" | "LeaderboardEntry" | "ModelWithCompositePk" | "ModelWithKv" | "ModelWithR2" | "OneToManyModel" | "RouteCar" | "RouteOwner" | "ToyotaPrius" | "BasicModel" | "ModelWithCustomDs" | "HasOneToOne" | "ModelWithCruds"> = hostTag();
-export const GlobalDoHost: HostTag<"GlobalSettings"> = hostTag();
-export const LeaderboardDoHost: HostTag<"Leaderboard" | "LeaderboardEntry"> = hostTag();
+/** Every model and injectable name. */
+export type Owed = "BasicService" | "GlobalSettings" | "HasSqlColumnTypes" | "Leaderboard" | "LeaderboardEntry" | "ModelWithCompositePk" | "ModelWithKv" | "ModelWithR2" | "OneToManyModel" | "RouteCar" | "RouteOwner" | "ToyotaPrius" | "BasicModel" | "ModelWithCustomDs" | "HasOneToOne" | "ModelWithCruds";
 
 /**
- * Build a Cloesce app for a host, then `register` its models and injectables and
- * `run(request)` (callable only once everything the host owes is present).
+ * Build a Cloesce app, bind its source, then `register` its models and injectables and
+ * `run(request)` (callable only once a source is bound and everything is registered).
  *
- * - **Worker:** `createApp(env, Worker)`.
- * - **Durable Object:** `createApp(this, MyDoHost, [migrations])`, passing the DO instance
- *   itself.
- *
- * Ensure that for a Durable Object the `Host` suffixed tag is used (as opposed to the DO interface).
+ * - **Worker:** `createApp().worker(env)`.
+ * - **Durable Object:** `createApp().durable(this, [migrations])`, passing the DO instance itself.
  */
-export function createApp<M extends string>(env: CfEnv, host: HostTag<M>): AppBuilder<M, never, FullEnv>;
-export function createApp<M extends string>(durableObject: DurableObject<CfEnv>, host: HostTag<M>, migrations?: DurableMigration[]): AppBuilder<M, never, FullEnv>;
-export function createApp<M extends string>(source: CfEnv | DurableObject<CfEnv>, _host: HostTag<M>, migrations: DurableMigration[] = []): AppBuilder<M, never, FullEnv> {
-    let env: CfEnv;
-    let ctx: DurableObjectState | undefined;
-    if (source != null && typeof source === "object" && "ctx" in source && "env" in source) {
-        // Durable Object form: derive env + ctx from the instance and wire its RPC surface.
-        attachDurableRpc(source);
-        env = (source as unknown as { env: CfEnv }).env;
-        ctx = (source as unknown as { ctx: DurableObjectState }).ctx;
-    } else {
-        env = source as CfEnv;
-    }
-    upgradeBindings(env);
-    return makeApp(cidl as any, "http://example.com/path/to/api", env, ctx, migrations) as unknown as AppBuilder<M, never, FullEnv>;
+export function createApp(): AppBuilder<Owed, never, FullEnv, CfEnv, DurableObject<CfEnv>> {
+    return makeApp(cidl as any, "http://example.com/path/to/api", upgradeBindings) as unknown as AppBuilder<
+        Owed,
+        never,
+        FullEnv,
+        CfEnv,
+        DurableObject<CfEnv>
+    >;
 }

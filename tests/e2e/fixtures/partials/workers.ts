@@ -1,4 +1,4 @@
-import { createApp, Worker, Dog, type Api, type CfEnv } from "./backend.js";
+import { createApp, Dog, type Api, type CfEnv } from "./backend.js";
 
 const dog: Api.Dog.Of = {
   create(env, model) {
@@ -12,6 +12,6 @@ const dog: Api.Dog.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(Dog, dog).run(request);
+    return createApp().worker(env).register(Dog, dog).run(request);
   },
 };

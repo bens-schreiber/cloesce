@@ -4,18 +4,15 @@ import { user } from "./user.js";
 import sub from "./sub.js";
 import { post, comment } from "./post.js";
 
-export { UserDo } from "./user.js";
-export { PostDo } from "./post.js";
-
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-export const app = (env: clo.CfEnv) => {
+export function app() {
   return clo
-    .createApp(env, clo.Worker)
+    .createApp()
     .register(clo.User, user)
     .register(clo.SubReddit, sub)
     .register(clo.Post, post)
@@ -24,7 +21,10 @@ export const app = (env: clo.CfEnv) => {
     .register(clo.AuthoredPost, {})
     .register(clo.AuthoredComment, {})
     .register(clo.SubRedditPost, {});
-};
+}
+
+export { UserDo } from "./user.js";
+export { PostDo } from "./post.js";
 
 export default {
   async fetch(request: Request, env: clo.CfEnv): Promise<Response> {
@@ -32,7 +32,7 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    const builder = app(env);
+    const builder = app().worker(env);
     const withAuth = builder.register(
       clo.AuthUser,
       await authFromRequest(builder.env.sessions, request),

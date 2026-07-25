@@ -16,7 +16,7 @@ declare global {
   }
 }
 
-export const app = api.app(env);
+export const app = api.app().worker(env);
 
 beforeAll(async () => {
   const migrations = inject("migrations");

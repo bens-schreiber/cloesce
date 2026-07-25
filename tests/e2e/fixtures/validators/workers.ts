@@ -1,5 +1,5 @@
 import { HttpResult } from "cloesce";
-import { createApp, Worker, Validator, type Api, type CfEnv } from "./backend.js";
+import { createApp, Validator, type Api, type CfEnv } from "./backend.js";
 
 const validator: Api.Validator.Of = {
   someMethod(_self, id, name) {
@@ -17,6 +17,6 @@ const validator: Api.Validator.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(Validator, validator).run(request);
+    return createApp().worker(env).register(Validator, validator).run(request);
   },
 };

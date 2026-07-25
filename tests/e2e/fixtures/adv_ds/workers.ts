@@ -1,6 +1,5 @@
 import {
   createApp,
-  Worker,
   Hamburger,
   Topping,
   HamburgerTopping,
@@ -105,7 +104,8 @@ const defaultOverride: Api.DefaultOverride.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker)
+    return createApp()
+      .worker(env)
       .register(Hamburger, hamburger)
       .register(Topping, {})
       .register(HamburgerTopping, {})

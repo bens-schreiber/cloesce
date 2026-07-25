@@ -242,46 +242,15 @@ impl<'src> BackendTemplate<'src> {
         out
     }
 
-    /// The set of deployable hosts:
-    /// - the Worker (owns everything)
-    /// - One host per Durable Object binding (owns a subset)
-    fn hosts(&self) -> Vec<HostInfo> {
-        let mut hosts = Vec::new();
-
-        let worker_models: Vec<String> = self
-            .idl
+    /// Every model and injectable in the schema, all of which any Cloesce app
+    /// (Worker or Durable Object) must register before it can `run`.
+    fn owed(&self) -> Vec<String> {
+        self.idl
             .models
             .values()
             .map(|m| m.name.to_string())
-            .collect();
-        hosts.push(HostInfo {
-            name: "Worker".to_string(),
-            models: worker_models,
-            injectables: self.injectables_used(),
-        });
-
-        for binding in &self.idl.wrangler_env.durable_bindings {
-            let models: Vec<String> = self
-                .binding_models(binding.name)
-                .iter()
-                .map(|m| m.name.to_string())
-                .collect();
-            let mut injectables: Vec<String> = Vec::new();
-            for model in self.binding_models(binding.name) {
-                for inj in self.model_injectables(model) {
-                    if !injectables.iter().any(|x| x == &inj) {
-                        injectables.push(inj);
-                    }
-                }
-            }
-            hosts.push(HostInfo {
-                name: format!("{}Host", binding.name),
-                models,
-                injectables,
-            });
-        }
-
-        hosts
+            .chain(self.injectables_used())
+            .collect()
     }
 }
 
@@ -294,23 +263,5 @@ impl BackendGenerator {
             mapper: TypeScriptMapper::backend(),
         };
         tmpl.render().expect("Failed to render backend template")
-    }
-}
-
-/// A deployable host (a Worker or one Durable Object) and everything
-/// it needs to run.
-struct HostInfo {
-    name: String,
-    models: Vec<String>,
-    injectables: Vec<String>,
-}
-
-impl HostInfo {
-    fn owed(&self) -> Vec<String> {
-        self.models
-            .iter()
-            .chain(self.injectables.iter())
-            .cloned()
-            .collect()
     }
 }

@@ -18,7 +18,7 @@ declare global {
 }
 
 export function app(username?: string) {
-  const builder = api.app(env);
+  const builder = api.app().worker(env);
   if (!username) {
     return builder;
   }

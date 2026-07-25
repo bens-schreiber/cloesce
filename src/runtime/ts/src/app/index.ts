@@ -10,7 +10,7 @@ export { attachStores, attachBinding } from "./store.js";
 /**
  * Attach the Cloesce RPC surface onto a Durable Object instance's prototype.
  */
-export function attachDurableRpc(host: object): void {
+function attachDurableRpc(host: object): void {
   const proto: any = Object.getPrototypeOf(host);
   if (proto.__cloesceSqlBatch) {
     return;
@@ -59,11 +59,6 @@ export interface ModelTag<Name extends string, Impl> {
   readonly __impl?: Impl;
 }
 
-/** Registration handle for a deployable host; `Models` is the host's owed set. */
-export interface HostTag<Models extends string> {
-  readonly __models?: Models;
-}
-
 /** Registration handle for an injectable; `T` is the (augmentable) provided shape. */
 export interface InjectableTag<Name extends string, T> {
   readonly __name: Name;
@@ -76,25 +71,36 @@ export function modelTag<Name extends string, Impl>(name: Name): ModelTag<Name, 
   return { __name: name } as ModelTag<Name, Impl>;
 }
 
-/** Build a host registration handle. */
-export function hostTag<Models extends string>(): HostTag<Models> {
-  return {} as HostTag<Models>;
-}
-
 /** Build an injectable registration handle. */
 export function injectableTag<Name extends string, T>(name: Name): InjectableTag<Name, T> {
   return { __name: name, __injectable: true } as InjectableTag<Name, T>;
 }
 
+export interface MissingSource {
+  readonly __missingSource: true;
+}
+export interface SourceAlreadyBound {
+  readonly __sourceAlreadyBound: true;
+}
+
 /**
- * The typed assembly builder. Utilizes a phantom union to surface missing
- * bindings at compile time.
+ * The typed assembly builder. Utilizes phantom unions to surface missing
+ * bindings/sources at compile time.
  *
+ * - `worker`/`durable` bind the deployable's source (a raw `RawEnv`, or a Durable Object
+ *   instance of type `DoInstance`)
  * - `register` supplies a model's implementation or an injectable's value widening the phantom `Reg` union.
- * - `run` is not callable until `Reg` covers the host's owed set `Owed`.
+ * - `run` is not callable until a source is bound and `Reg` covers the host's owed set `Owed`.
  * - `Env` is the host's fully-upgraded environment, exposed via `env`.
  */
-export interface AppBuilder<Owed extends string, Reg extends string, Env> {
+export interface AppBuilder<
+  Owed extends string,
+  Reg extends string,
+  Env,
+  RawEnv,
+  DoInstance,
+  Bound extends boolean = false,
+> {
   readonly env: Env;
 
   /**
@@ -113,11 +119,26 @@ export interface AppBuilder<Owed extends string, Reg extends string, Env> {
   register<Name extends Owed, T>(
     tag: ModelTag<Name, T> | InjectableTag<Name, T>,
     value: NoInfer<T>,
-  ): AppBuilder<Owed, Reg | Name, Env>;
+  ): AppBuilder<Owed, Reg | Name, Env, RawEnv, DoInstance, Bound>;
 
-  run: [Owed] extends [Reg]
-    ? (request: Request) => Promise<Response>
-    : MissingBindings<{ unregistered: Exclude<Owed, Reg> }>;
+  /** Bind a Worker's raw environment as this app's source. */
+  worker: Bound extends true
+    ? SourceAlreadyBound
+    : (env: RawEnv) => AppBuilder<Owed, Reg, Env, RawEnv, DoInstance, true>;
+
+  /** Bind a Durable Object instance (and optional migrations) as this app's source. */
+  durable: Bound extends true
+    ? SourceAlreadyBound
+    : (
+        durableObject: DoInstance,
+        migrations?: DurableMigration[],
+      ) => AppBuilder<Owed, Reg, Env, RawEnv, DoInstance, true>;
+
+  run: Bound extends true
+    ? [Owed] extends [Reg]
+      ? (request: Request) => Promise<Response>
+      : MissingBindings<{ unregistered: Exclude<Owed, Reg> }>
+    : MissingSource;
 }
 
 function nameOf(tag: any): string {
@@ -135,11 +156,13 @@ function overlayEnv(parent: any): any {
 }
 
 /**
- * Untyped runtime app. The generated `createApp` upgrades the binding template helpers,
- * then constructs one of these and casts it to the typed {@link AppBuilder}.
+ * Untyped runtime app. The generated `createApp` constructs one of these (with no source
+ * bound yet) and casts it to the typed {@link AppBuilder}. `worker`/`durable` bind the
+ * source, upgrading bindings and attaching stores; `run` is only meaningful afterward.
  */
 export class RuntimeApp {
-  readonly env: any;
+  env: any;
+  private ctx?: DurableObjectState;
   private registry = new Map<string, any>();
 
   /** Per-builder injectable values. Never written onto the shared `env` (see `register`). */
@@ -148,15 +171,30 @@ export class RuntimeApp {
   constructor(
     private readonly cidl: Cidl,
     private readonly workerUrl: string,
-    env: any,
-    private readonly ctx?: DurableObjectState,
-    migrations: DurableMigration[] = [],
-  ) {
+    private readonly upgradeBindings: (env: any) => void,
+  ) {}
+
+  /** Bind a Worker's raw environment as this app's source. */
+  worker(env: any): RuntimeApp {
+    this.upgradeBindings(env);
     this.env = env;
-    attachStores(this.env, cidl, this.registry);
-    if (ctx && migrations.length > 0) {
+    attachStores(this.env, this.cidl, this.registry);
+    return this;
+  }
+
+  /** Bind a Durable Object instance (and optional migrations) as this app's source. */
+  durable(durableObject: any, migrations: DurableMigration[] = []): RuntimeApp {
+    attachDurableRpc(durableObject);
+    const env = durableObject.env;
+    const ctx: DurableObjectState = durableObject.ctx;
+    this.upgradeBindings(env);
+    this.env = env;
+    this.ctx = ctx;
+    attachStores(this.env, this.cidl, this.registry);
+    if (migrations.length > 0) {
       ctx.blockConcurrencyWhile(() => applyDurableMigrations(ctx.storage as any, migrations));
     }
+    return this;
   }
 
   /**
@@ -191,13 +229,11 @@ export class RuntimeApp {
   }
 }
 
-/**  Construct a runtime app. */
+/**  Construct a runtime app with no source bound yet. */
 export function makeApp(
   cidl: Cidl,
   workerUrl: string,
-  env: any,
-  ctx?: DurableObjectState,
-  migrations: DurableMigration[] = [],
+  upgradeBindings: (env: any) => void,
 ): RuntimeApp {
-  return new RuntimeApp(cidl, workerUrl, env, ctx, migrations);
+  return new RuntimeApp(cidl, workerUrl, upgradeBindings);
 }
