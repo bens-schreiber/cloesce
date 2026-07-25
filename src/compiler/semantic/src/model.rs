@@ -295,17 +295,33 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         };
 
         let shard_args = self.model.shard_args.as_deref().unwrap_or(&[]);
-        if shard_args.len() != shard_fields.len() {
-            ma.sink.push(SemanticError::ArgCountMismatch {
-                field: binding_sym,
-                expected: shard_fields.len(),
-                got: shard_args.len(),
-            });
-            return;
+
+        // Every supplied key must name a real shard field of the binding.
+        for key in shard_args {
+            if !shard_fields.iter().any(|s| s.name == key.target.name) {
+                ma.sink.push(SemanticError::DurableUnknownShardField {
+                    binding: binding_sym,
+                    target: &key.target,
+                });
+            }
         }
 
         let mut shard_field_names = Vec::with_capacity(shard_fields.len());
-        for (arg, shard_field) in shard_args.iter().zip(&shard_fields) {
+        for shard_field in &shard_fields {
+            let Some(key) = shard_args
+                .iter()
+                .find(|k| k.target.name == shard_field.name)
+            else {
+                ma.sink.push(SemanticError::DurableMissingShardField {
+                    context: binding_sym,
+                    missing: shard_field.name,
+                });
+                continue;
+            };
+
+            // The alias is optional; without one the shard field's own name is used.
+            let arg = key.local_or_target();
+
             let cidl_type = match resolve_cidl_type(shard_field, &shard_field.cidl_type, table) {
                 Ok(t) => t,
                 Err(e) => {
@@ -561,12 +577,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 continue;
             };
 
-            let Some(local) = key.local.as_ref() else {
-                ma.sink.push(SemanticError::RelationMissingLocalKey {
-                    target: &key.target,
-                });
-                continue;
-            };
+            let local = key.local_or_target();
             let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
                 model: self.name,
                 name: local.name,
@@ -598,13 +609,18 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         // Every route field of the target must be supplied as a key so the target's
         // state can be constructed. Durable Object shard fields are coerced into route fields,
         // so they are also required to be supplied as keys.
-        let shard_fields = target_block.shard_args.as_deref().unwrap_or_default();
+        let shard_fields = target_block
+            .shard_args
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|key| key.local_or_target());
         let route_fields = target_block.blocks.inners().flat_map(|b| match b {
             ModelBlockKind::Route(symbols) => symbols.as_slice(),
             _ => &[],
         });
 
-        for route in shard_fields.iter().chain(route_fields) {
+        for route in shard_fields.chain(route_fields) {
             if !nav.keys.iter().any(|k| k.target.name == route.name) {
                 ma.sink.push(SemanticError::RelationMissingDiscriminator {
                     field,

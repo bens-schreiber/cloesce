@@ -350,7 +350,7 @@ api BasicService {
 }
 
 [crud get, save]
-model Leaderboard for LeaderboardDo(tenantId) {
+model Leaderboard for LeaderboardDo::tenantId {
     kv LeaderboardDo::{ topEntryCache, tenantId(tenantId) } {
         topEntries
     }
@@ -363,7 +363,7 @@ model GlobalSettings for GlobalDo {
 }
 
 [crud get, list, save]
-model LeaderboardEntry for LeaderboardDo(tenantId) {
+model LeaderboardEntry for LeaderboardDo::{ tenantId(tenant) } {
     primary {
         id: int
     }
@@ -373,7 +373,7 @@ model LeaderboardEntry for LeaderboardDo(tenantId) {
         score: int
     }
 
-    kv LeaderboardDo::{ topEntryCache, tenantId(tenantId) } {
+    kv LeaderboardDo::{ topEntryCache, tenantId(tenant) } {
         topEntries
     }
 }

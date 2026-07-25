@@ -565,7 +565,7 @@ async fn do_root_get() {
             shard { subId: int }
         }
 
-        model SubReddit for SubRedditDo(subId) {
+        model SubReddit for SubRedditDo::subId {
             primary { pid: int }
             column { title: string }
         }
@@ -623,7 +623,7 @@ async fn d1_root_do_child_fanout() {
             one Tenant::tenantId(tenantId) { tenant }
         }
 
-        model Tenant for TenantDo(tenantId) {
+        model Tenant for TenantDo::tenantId {
             primary { pid: int }
             column { name: string }
         }
@@ -687,7 +687,7 @@ async fn do_root_d1_child() {
             shard { subId: int }
         }
 
-        model SubReddit for SubRedditDo(subId) {
+        model SubReddit for SubRedditDo::subId {
             primary { pid: int }
             many Post::subPid(pid) { posts }
         }
@@ -1346,7 +1346,7 @@ async fn do_kv_field_on_do_sqlite_model() {
             }
         }
 
-        model Entry for BoardDo(tenantId) {
+        model Entry for BoardDo::tenantId {
             primary { id: int }
             column { score: int }
             kv BoardDo::{ topCache(), tenantId(tenantId) } { top }
@@ -1410,7 +1410,7 @@ async fn route_param_key_fields_on_do_root() {
             }
         }
 
-        model Entry for BoardDo(tenantId) {
+        model Entry for BoardDo::tenantId {
             primary { id: int }
             r2 Bucket::banner(tenantId) { banner }
             kv BoardDo::{ topCache, tenantId(tenantId) } { top }
@@ -1474,7 +1474,7 @@ async fn do_kv_fanout_from_d1_list() {
             one Board::tenantId(tenantId) { board }
         }
 
-        model Board for BoardDo(tenantId) {
+        model Board for BoardDo::tenantId {
             primary { pid: int }
             kv BoardDo::{ topCache(), tenantId(tenantId) } { top }
         }
@@ -1595,7 +1595,7 @@ async fn r2_key_uses_do_root_route_field() {
             }
         }
 
-        model Entry for BoardDo(tenantId) {
+        model Entry for BoardDo::tenantId {
             primary { id: int }
             r2 Bucket::snapshot(tenantId, id) { snapshot }
         }
@@ -1648,7 +1648,7 @@ async fn nav_local_key_is_do_root_route_field() {
             shard { tenantId: int }
         }
 
-        model Board for BoardDo(tenantId) {
+        model Board for BoardDo::tenantId {
             primary { pid: int }
             many Widget::tenantId(tenantId) { widgets }
         }
@@ -1778,7 +1778,7 @@ async fn kv_only_do_root_get() {
             }
         }
 
-        model Board for BoardDo(tenantId) {
+        model Board for BoardDo::tenantId {
             kv BoardDo::{ topCache(), tenantId(tenantId) } { top }
         }
         "#,
@@ -2070,7 +2070,7 @@ async fn kv_key_straddles_nav_inherited_and_local_fields() {
             one Board::tenantId(tenantId) { board }
         }
 
-        model Board for BoardDo(tenantId) {
+        model Board for BoardDo::tenantId {
             primary { pid: int }
             column { itemId: int }
             kv Cache::entry(tenantId, itemId) { entry }

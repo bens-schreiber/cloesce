@@ -758,7 +758,7 @@ async fn save_do_root() {
             shard { subId: int }
         }
 
-        model SubReddit for SubRedditDo(subId) {
+        model SubReddit for SubRedditDo::subId {
             primary { pid: int }
             column { title: string }
             route { note: string }
@@ -812,7 +812,7 @@ async fn save_do_child_shard_from_parent() {
             many Tenant::{ companyId(id), tenantId(tenantId) } { tenants }
         }
 
-        model Tenant for TenantDo(tenantId) {
+        model Tenant for TenantDo::tenantId {
             primary { pid: int }
             column { companyId: int }
             column { name: string }
@@ -1007,7 +1007,7 @@ async fn save_do_kv_field() {
             }
         }
 
-        model Entry for BoardDo(tenantId) {
+        model Entry for BoardDo::tenantId {
             primary { id: int }
             column { score: int }
             kv BoardDo::{ topCache(), tenantId(tenantId) } { top }
@@ -1267,7 +1267,7 @@ async fn save_one_nav_do_child_shard_from_parent() {
             one Tenant::tenantId(tenantId) { tenant }
         }
 
-        model Tenant for TenantDo(tenantId) {
+        model Tenant for TenantDo::tenantId {
             primary { pid: int }
             column { name: string }
         }

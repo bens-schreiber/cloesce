@@ -202,7 +202,8 @@ fn d1_model_column_fk_errors() {
             // nav local field `ghost` does not exist on User
             one Post::id(ghost) { byBadLocal }
 
-            // nav bare form omits the local field
+            // nav bare form omits the local field; it falls back to the like-named
+            // field on User ("id"), which exists, so this resolves without error
             one Post::id { byBareKey }
         }
 
@@ -224,7 +225,7 @@ fn d1_model_column_fk_errors() {
     let (result, errors) = analyze(&parse);
 
     // Assert
-    assert_eq!(errors.len(), 11);
+    assert_eq!(errors.len(), 10);
 
     let column = expect_err!(errors,
         SemanticError::NullablePrimaryKey { column } => column
@@ -279,11 +280,6 @@ fn d1_model_column_fk_errors() {
         })
         .collect::<Vec<_>>();
     assert_eq!(unresolved_nav_fields.len(), 2);
-
-    let missing_local = expect_err!(errors,
-        SemanticError::RelationMissingLocalKey { target } => target.name
-    );
-    assert_eq!(missing_local, "id");
 }
 
 #[test]
@@ -383,6 +379,44 @@ fn d1_model_nav_one_to_many() {
     assert_eq!(author_posts_nav.keys.len(), 1);
     assert_eq!(author_posts_nav.keys[0].local, "id");
     assert_eq!(author_posts_nav.keys[0].target, "authorId");
+}
+
+#[test]
+fn d1_model_nav_bare_key_fallback() {
+    // Arrange: bare nav keys (no explicit local alias) fall back to a like-named
+    // field on the local model, and raise `UnresolvedSymbol` if none exists.
+    let src = &with_env(
+        r#"
+        model Author for my_d1 {
+            primary { id: int }
+
+            column { authorId: int }
+
+            one Post::authorId { byFallback }
+            one Post::title { byMissingFallback }
+        }
+
+        model Post for my_d1 {
+            primary { id: int }
+
+            column {
+                authorId: int
+                title: string
+            }
+        }
+        "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 1, "unexpected errors: {:#?}", errors);
+    let missing = expect_err!(errors,
+        SemanticError::UnresolvedSymbol { symbol } => symbol.name
+    );
+    assert_eq!(missing, "title");
 }
 
 #[test]
@@ -691,7 +725,7 @@ fn nav_requires_every_target_route_field() {
             }
         }
 
-        model Post for SubRedditDo(subId) {
+        model Post for SubRedditDo::id(subId) {
             primary { id: int }
             column { title: string }
 
@@ -708,7 +742,7 @@ fn nav_requires_every_target_route_field() {
             one Ledger::region(title) { partialLedger }
         }
 
-        model Comment for SubRedditDo(subId) {
+        model Comment for SubRedditDo::id(subId) {
             primary { id: int }
             foreign Post::id { postId }
         }
@@ -1665,6 +1699,15 @@ fn inject_context_valid() {
                     GlobalDo::{}
                 }
             }
+
+            // Alias omitted: binds the `tenantId` parameter by its own name.
+            get bareScores -> json {
+                tenantId: int
+
+                inject {
+                    LeaderboardDo::tenantId
+                }
+            }
         }
     "#;
     let parse = lex_and_ast(src);
@@ -1698,6 +1741,19 @@ fn inject_context_valid() {
     let target = config.durable_target.as_ref().expect("durable target");
     assert_eq!(target.binding, "GlobalDo");
     assert!(target.shard_args.is_empty());
+
+    // The alias-less form resolves to the like-named param, validators included.
+    let bare = apis.iter().find(|a| a.name == "bareScores").unwrap();
+    let target = bare.durable_target.as_ref().expect("durable target");
+    assert_eq!(target.binding, "LeaderboardDo");
+    assert_eq!(target.shard_args, vec!["tenantId"]);
+
+    let tenant = bare
+        .parameters
+        .iter()
+        .find(|p| p.field.name == "tenantId")
+        .unwrap();
+    assert_eq!(tenant.field.validators.len(), 1);
 }
 
 #[test]
@@ -1816,7 +1872,7 @@ fn instantiated_method_inherits_durable_target() {
             }
         }
 
-        model SubReddit for SubRedditDo(subId) {
+        model SubReddit for SubRedditDo::id(subId) {
             primary { pid: int }
         }
 
@@ -1861,7 +1917,7 @@ fn instantiated_method_injecting_durable_conflicts() {
             }
         }
 
-        model SubReddit for SubRedditDo(subId) {
+        model SubReddit for SubRedditDo::id(subId) {
             primary { pid: int }
         }
 
@@ -1888,6 +1944,46 @@ fn instantiated_method_injecting_durable_conflicts() {
 }
 
 #[test]
+fn durable_backing_shard_aliasing() {
+    // Arrange
+    let src = r#"
+        durable LeaderboardDo {
+            shard {
+                tenantId: int
+                region: string
+            }
+        }
+
+        // `tenantId` keeps its own name, `region` is aliased to `regionCode`.
+        model Leaderboard for LeaderboardDo::{ tenantId, region(regionCode) } {}
+    "#;
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+
+    let leaderboard = result.models.get("Leaderboard").unwrap();
+    let backing = leaderboard.backing.as_ref().expect("durable backing");
+    assert_eq!(backing.binding, "LeaderboardDo");
+    assert_eq!(backing.fields, vec!["tenantId", "regionCode"]);
+
+    assert_eq!(
+        leaderboard
+            .route_fields
+            .iter()
+            .map(|f| (f.name.as_ref(), &f.cidl_type))
+            .collect::<Vec<_>>(),
+        vec![
+            ("tenantId", &CidlType::Int),
+            ("regionCode", &CidlType::String)
+        ]
+    );
+}
+
+#[test]
 fn durable_backing_errors() {
     // Arrange
     let src = r#"
@@ -1905,11 +2001,14 @@ fn durable_backing_errors() {
             }
         }
 
-        // Shard arg count mismatch: DO has one shard field, model supplies none.
+        // The DO's only shard field goes unsupplied.
         model MissingShard for LeaderboardDo {}
 
+        // Names a shard field the DO does not declare.
+        model UnknownShard for LeaderboardDo::notAShard(x) {}
+
         // Shard args supplied for a non-DO (D1) binding.
-        model ShardOnD1 for my_d1(tenantId) {
+        model ShardOnD1 for my_d1::tenantId {
             primary {
                 id: int
             }
@@ -1921,12 +2020,15 @@ fn durable_backing_errors() {
     let (_, errors) = analyze(&parse);
 
     // Assert
-    let (field, expected, got) = expect_err!(errors,
-        SemanticError::ArgCountMismatch { field, expected, got } => (*field, expected, got)
+    let missing = expect_err!(errors,
+        SemanticError::DurableMissingShardField { missing, .. } => *missing
     );
-    assert_eq!(field.name, "LeaderboardDo");
-    assert_eq!(*expected, 1);
-    assert_eq!(*got, 0);
+    assert_eq!(missing, "tenantId");
+
+    let unknown = expect_err!(errors,
+        SemanticError::DurableUnknownShardField { target, .. } => *target
+    );
+    assert_eq!(unknown.name, "notAShard");
 
     let invalid_d1 = errors
         .iter()
@@ -1948,7 +2050,7 @@ fn route_shard_field_collision_errors() {
         }
 
         // A route field cannot redeclare an inherited shard field (caught as a duplicate).
-        model RouteShardCollision for LeaderboardDo(tenantId) {
+        model RouteShardCollision for LeaderboardDo::tenantId {
             route {
                 tenantId: int
             }
@@ -2090,7 +2192,7 @@ fn proposal_relationship_matrix() {
             }
         }
 
-        model DoBacked for DoA(tenantId) {
+        model DoBacked for DoA::tenantId {
             route {
                 routeId: int
             }
@@ -2108,7 +2210,7 @@ fn proposal_relationship_matrix() {
             kv DoA::{ cache(routeId), tenantId(tenantId) } { selfCache }
         }
 
-        model DoBackedB for DoB(tenantId) {
+        model DoBackedB for DoB::tenantId {
             route {
                 routeId: int
             }
@@ -2122,7 +2224,7 @@ fn proposal_relationship_matrix() {
             }
         }
 
-        model TenantUser for DoA(tenantId) {
+        model TenantUser for DoA::tenantId {
             primary {
                 id: int
             }
@@ -2131,7 +2233,7 @@ fn proposal_relationship_matrix() {
             many TenantPost::tenantId(tenantId) { posts }
         }
 
-        model TenantPost for DoA(tenantId) {
+        model TenantPost for DoA::tenantId {
             primary {
                 id: int
             }

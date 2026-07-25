@@ -307,7 +307,7 @@ export interface LeaderboardEntry {
     id: number;
     playerName: string;
     score: number;
-    tenantId: number;
+    tenant: number;
     topEntries: unknown;
 }
 /** A plain-data `ModelWithCompositePk` value. */
@@ -621,13 +621,13 @@ export interface LeaderboardEntryStore<E> {
          *
          * STAGE 0
          * ├─ SEARCH `LeaderboardEntry` ON durable `LeaderboardDo` ONE
-         * │     SHARD `tenantId` = `$tenantId`
-         * │     ATTACH `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * │     SHARD `tenant` = `$tenant`
+         * │     ATTACH `tenant` = `$tenant`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenant` = `$tenant`
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
-        get(tenantId: number, id: number): Promise<HttpResult<LeaderboardEntry>>;
+        get(tenant: number, id: number): Promise<HttpResult<LeaderboardEntry>>;
         /**
          * List `LeaderboardEntry` rows in key order (seek-paginated).
          *
@@ -639,13 +639,13 @@ export interface LeaderboardEntryStore<E> {
          *
          * STAGE 0
          * ├─ SEARCH `LeaderboardEntry` ON durable `LeaderboardDo` LIMIT `$limit` MANY
-         * │     SHARD `tenantId` = `$tenantId`
-         * │     ATTACH `tenantId` = `$tenantId`
-         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenantId` = `$tenantId`
+         * │     SHARD `tenant` = `$tenant`
+         * │     ATTACH `tenant` = `$tenant`
+         * └─ READ durable `LeaderboardDo` KEY "topEntryCache" INTO `topEntries` SHARD `tenant` = `$tenant`
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
-        list(tenantId: number, lastSeen_id: number, limit: number): Promise<HttpResult<LeaderboardEntry[]>>;
+        list(tenant: number, lastSeen_id: number, limit: number): Promise<HttpResult<LeaderboardEntry[]>>;
         /**
          * Insert or update a `LeaderboardEntry` and every included relation.
          *
@@ -654,7 +654,7 @@ export interface LeaderboardEntryStore<E> {
          * derived from the payload's shape at runtime.
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
-        save(tenantId: number, model: DeepPartial<LeaderboardEntry>): Promise<HttpResult<LeaderboardEntry>>;
+        save(tenant: number, model: DeepPartial<LeaderboardEntry>): Promise<HttpResult<LeaderboardEntry>>;
         /**
          * Hydrate one pre-loaded ("seeded") `LeaderboardEntry` row against this source's include tree.
          *
@@ -668,7 +668,7 @@ export interface LeaderboardEntryStore<E> {
          * return env.leaderboardDo.leaderboardEntry.hydrate(rows[0]);
          * ```
          */
-        hydrate(row: DeepPartial<LeaderboardEntry>, tenantId: number): Promise<HttpResult<LeaderboardEntry>>;
+        hydrate(row: DeepPartial<LeaderboardEntry>, tenant: number): Promise<HttpResult<LeaderboardEntry>>;
         /**
          * Hydrate many pre-loaded ("seeded") `LeaderboardEntry` rows against this source's include tree.
          *
@@ -676,7 +676,7 @@ export interface LeaderboardEntryStore<E> {
          * root fetch is skipped) and are mutated in place and consumed.
          * @returns An {@link HttpResult} with the hydrated rows, or `400` on validation errors.
          */
-        hydrateAll(rows: DeepPartial<LeaderboardEntry>[], tenantId: number): Promise<HttpResult<LeaderboardEntry[]>>;
+        hydrateAll(rows: DeepPartial<LeaderboardEntry>[], tenant: number): Promise<HttpResult<LeaderboardEntry[]>>;
         /**
          * Fill relations onto a value you already hold, against an include `tree`, returning a
          * hydrated copy. Pure data in, pure data out: `self` is neither consumed nor mutated.

@@ -70,12 +70,6 @@ pub enum SemanticError<'src, 'p> {
         missing: &'src str,
     },
 
-    /// A navigation discriminator key omits the local field that supplies it, i.e.
-    /// `Target::key` rather than `Target::key(local)`.
-    RelationMissingLocalKey {
-        target: &'p Symbol<'src>,
-    },
-
     CyclicalRelationship {
         cycle: Vec<&'src str>,
     },
@@ -445,22 +439,6 @@ fn display(
                     Label::new((path, range))
                         .with_message(format!(
                             "the target's '{missing}' must be supplied to construct its state"
-                        ))
-                        .with_color(Color::Red),
-                )
-        }
-        SemanticError::RelationMissingLocalKey { target } => {
-            let (path, range) = span_parts(&target.span, file_table);
-            report!(path.clone(), range.clone())
-                .with_message(format!(
-                    "relation discriminator '{}' is missing a local field",
-                    target.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message(format!(
-                            "supply the local field that resolves it, e.g. `{}(localField)`",
-                            target.name
                         ))
                         .with_color(Color::Red),
                 )

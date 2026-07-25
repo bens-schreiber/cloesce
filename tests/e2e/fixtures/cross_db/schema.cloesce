@@ -45,7 +45,7 @@ source Deep for Author {
 }
 
 [crud get, save, list]
-model Book for LibraryDo(authorId) {
+model Book for LibraryDo::authorId {
     primary {
         id: int
     }

@@ -33,7 +33,7 @@ durable SubRedditDo {
 }
 
 [crud get, save]
-model SubReddit for SubRedditDo(subId) {
+model SubReddit for SubRedditDo::id(subId) {
     kv SubRedditDo::{ metadata, id(subId) } {
         metadata
     }
@@ -53,7 +53,7 @@ api SubReddit {
 }
 
 [crud get, list, save]
-model Post for SubRedditDo(subId) {
+model Post for SubRedditDo::id(subId) {
     primary {
         id: int
     }
@@ -90,7 +90,7 @@ source Custom for Post {
 }
 
 [crud get, list, save]
-model Comment for SubRedditDo(subId) {
+model Comment for SubRedditDo::id(subId) {
     primary {
         id: int
     }

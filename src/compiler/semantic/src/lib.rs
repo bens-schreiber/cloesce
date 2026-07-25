@@ -19,9 +19,8 @@
 
 use frontend::{
     ApiBlock, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock, DataSourceBlock,
-    DurableBindingBlock, InjectBlock, InjectEntry, InjectInitializer, KvBindingBlock,
-    MethodInjectBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag,
-    VarBlock,
+    DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, MethodInjectBlock, ModelBlock,
+    PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, TargetKey, VarBlock,
 };
 use idl::{CidlType, CloesceIdl, DurableTarget, Number, PlainOldObject, ValidatedField, Validator};
 use indexmap::IndexMap;
@@ -266,7 +265,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         );
                     }
 
-                    for arg in model_block.shard_args.iter().flatten() {
+                    for key in model_block.shard_args.iter().flatten() {
+                        let arg = key.local_or_target();
                         insert_local(
                             sink,
                             arg,
@@ -754,7 +754,7 @@ fn resolve_inject<'src, 'p>(
 
     fn resolve_durable_target<'src, 'p>(
         binding: &'p Symbol<'src>,
-        initializers: &'p [InjectInitializer<'src>],
+        initializers: &'p [TargetKey<'src>],
         parameters: &mut [ValidatedField<'src>],
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
@@ -794,7 +794,8 @@ fn resolve_inject<'src, 'p>(
                 continue;
             };
 
-            let arg = &init.arg;
+            // Without an explicit alias the shard field binds to the like-named parameter.
+            let arg = init.local_or_target();
             let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
                 sink.push(SemanticError::UnresolvedSymbol { symbol: arg });
                 continue;
