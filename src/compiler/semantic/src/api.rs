@@ -235,12 +235,21 @@ pub mod analysis {
                     );
 
                     has_stream = true;
-                    let required_params = method.parameters.len();
 
-                    // Only one Stream parameter is allowed, and it must be the
-                    // only non-injected parameter
+                    let mut stream_params = 0;
+                    let mut body_params = 0;
+                    for p in &method.parameters {
+                        match p.cidl_type.root_type() {
+                            CidlType::Stream => stream_params += 1,
+                            _ if !p.tags.iter().any(|t| matches!(t.inner, Tag::Header)) => {
+                                body_params += 1
+                            }
+                            _ => {}
+                        }
+                    }
+
                     ensure!(
-                        required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
+                        stream_params == 1 && body_params == 0,
                         sink,
                         invalid_type_err
                     );

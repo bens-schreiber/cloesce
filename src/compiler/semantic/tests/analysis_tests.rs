@@ -1240,6 +1240,28 @@ fn api_bare_self_defaults_to_default() {
 }
 
 #[test]
+fn api_headers_can_be_on_stream_body() {
+    // Arrange
+    let src = r#"
+        model User {}
+        api User {
+            post image {
+                [header]
+                Authorization: string
+                image: stream
+            }
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_ast(src);
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+}
+
+#[test]
 fn data_source_errors() {
     // Arrange
     let src = &with_env(
