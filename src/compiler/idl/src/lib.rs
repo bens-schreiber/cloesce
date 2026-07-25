@@ -511,6 +511,11 @@ pub struct Model<'src> {
     pub data_sources: BTreeMap<&'src str, DataSource<'src>>,
 
     pub cruds: Vec<CrudKind>,
+
+    /// True if the models fields should not be exposed to the client.
+    ///
+    /// Additionally implies that any [Model::apis] [ApiMethod::is_static] is true.
+    pub is_internal: bool,
 }
 
 impl Model<'_> {

@@ -3,8 +3,8 @@ pub mod analysis {
 
     use crate::{
         LocalSymbolKind, SymbolTable, ensure,
-        err::{ErrorSink, SemanticError},
-        resolve_cidl_type, resolve_inject, resolve_validator_tags,
+        err::{ErrorSink, InternalVisibilityViolation, SemanticError},
+        expect_internal_tag, resolve_cidl_type, resolve_inject, resolve_validator_tags,
     };
     use frontend::{ApiBlockMethod, SpdSlice, Tag};
     use idl::{
@@ -35,7 +35,7 @@ pub mod analysis {
 
             let mut methods = Vec::new();
             for api_method in api_block.methods.inners() {
-                if let Some(m) = method(model, api_method, table, sink) {
+                if let Some(m) = method(model, api_method, models, table, sink) {
                     methods.push(m);
                 }
             }
@@ -48,15 +48,26 @@ pub mod analysis {
     fn method<'src, 'p>(
         model: &Model<'src>,
         method: &'p ApiBlockMethod<'src>,
+        models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> Option<ApiMethod<'src>> {
         // Validate return type
-        let (return_type, return_media) = return_type(method, table, sink);
+        let (return_type, return_media) = return_type(method, models, table, sink);
 
         // Validate parameters
         let (mut parameters, parameters_media, is_static, data_source_name) =
-            parameters(model.name, method, table, sink);
+            parameters(model.name, method, models, table, sink);
+
+        if model.is_internal && !is_static {
+            let tag = expect_internal_tag(table, model.name);
+
+            sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &method.symbol,
+                reason: InternalVisibilityViolation::InstanceMethod,
+            });
+        }
 
         let mut fields = parameters
             .iter()
@@ -105,6 +116,7 @@ pub mod analysis {
 
     fn return_type<'src, 'p>(
         method: &'p ApiBlockMethod<'src>,
+        models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> (CidlType<'src>, MediaType) {
@@ -120,6 +132,18 @@ pub mod analysis {
                 return (CidlType::Void, MediaType::Json);
             }
         };
+
+        if let CidlType::Object { name } = resolved_type.root_type()
+            && models.get(name).is_some_and(|m| m.is_internal)
+        {
+            let tag = expect_internal_tag(table, name);
+
+            sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &method.symbol,
+                reason: InternalVisibilityViolation::ReturnedFromApi,
+            });
+        }
 
         let return_media = match resolved_type.root_type() {
             CidlType::Stream => MediaType::Octet,
@@ -141,6 +165,7 @@ pub mod analysis {
     fn parameters<'src, 'p>(
         model_name: &'src str,
         method: &'p ApiBlockMethod<'src>,
+        models: &IndexMap<&'src str, Model<'src>>,
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
     ) -> (
@@ -207,13 +232,23 @@ pub mod analysis {
                 param,
             };
             match resolved_type.root_type() {
-                CidlType::Object { .. } | CidlType::Partial { .. } => {
+                CidlType::Object { name } | CidlType::Partial { object_name: name } => {
                     // GET requests do not support Object parameters
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         sink,
                         invalid_type_err
                     );
+
+                    if models.get(name).is_some_and(|m| m.is_internal) {
+                        let tag = expect_internal_tag(table, name);
+
+                        sink.push(SemanticError::InternalVisibility {
+                            tag,
+                            symbol: param,
+                            reason: InternalVisibilityViolation::UsedAsParameter,
+                        });
+                    }
                 }
 
                 CidlType::R2Object => {

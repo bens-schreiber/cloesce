@@ -195,6 +195,22 @@ pub enum SemanticError<'src, 'p> {
         tag: &'p Spd<Tag<'src>>,
         symbol: &'p Symbol<'src>,
     },
+
+    /// An internal tagged model tried to expose data to the client
+    InternalVisibility {
+        tag: &'p Spd<Tag<'src>>,
+        symbol: &'p Symbol<'src>,
+        reason: InternalVisibilityViolation,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum InternalVisibilityViolation {
+    CrudTag,
+    InstanceMethod,
+    UsedAsParameter,
+    ReturnedFromApi,
+    Composition,
 }
 
 /// A sink for accumulating semantic errors during analysis,
@@ -803,6 +819,44 @@ fn display(
                     Label::new((t_path, t_range))
                         .with_message("this tag is an instance tag")
                         .with_color(Color::Blue),
+                )
+        }
+        SemanticError::InternalVisibility {
+            tag,
+            symbol,
+            reason,
+        } => {
+            let message = match reason {
+                InternalVisibilityViolation::CrudTag => {
+                    "the `crud` tag is not allowed on an internal model"
+                }
+                InternalVisibilityViolation::InstanceMethod => {
+                    "an internal model may only have static methods"
+                }
+                InternalVisibilityViolation::UsedAsParameter => {
+                    "no API may accept a parameter of an internal model type"
+                }
+                InternalVisibilityViolation::ReturnedFromApi => {
+                    "no API may return an internal model type"
+                }
+                InternalVisibilityViolation::Composition => {
+                    "an internal model cannot be composed into another model or plain-old-object"
+                }
+            };
+
+            let (path, range) = span_parts(&symbol.span, file_table);
+            let (t_path, t_range) = span_parts(&tag.span, file_table);
+            report!(path.clone(), range.clone())
+                .with_message(message)
+                .with_label(
+                    Label::new((t_path, t_range))
+                        .with_message("this model is marked internal")
+                        .with_color(Color::Red),
+                )
+                .with_label(
+                    Label::new((path, range))
+                        .with_message("violates internal-model visibility rules")
+                        .with_color(Color::Yellow),
                 )
         }
     };

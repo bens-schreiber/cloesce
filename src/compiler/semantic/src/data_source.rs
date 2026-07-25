@@ -252,7 +252,7 @@ pub mod analysis {
                     list,
                     get,
                     save,
-                    is_internal,
+                    is_internal: is_internal || model.is_internal,
                     get_plan: None,
                     list_plan: None,
                     get_explain: String::new(),

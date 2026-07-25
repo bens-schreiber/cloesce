@@ -133,6 +133,10 @@ impl ClientTemplate<'_> {
             .map(|ds| ds.get.parameters.as_slice())
             .unwrap_or(&[])
     }
+
+    fn should_emit_class(&self, model: &Model<'_>) -> bool {
+        !model.is_internal || model.apis.iter().any(|api| api.is_static)
+    }
 }
 
 pub struct ClientGenerator;

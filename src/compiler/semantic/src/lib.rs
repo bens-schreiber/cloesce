@@ -23,14 +23,10 @@ use frontend::{
     PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, TargetKey, VarBlock,
 };
 use idl::{CidlType, CloesceIdl, DurableTarget, Number, PlainOldObject, ValidatedField, Validator};
-use indexmap::IndexMap;
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-    err::{BatchResult, ErrorSink, SemanticError},
-    model::ModelAnalysis,
-};
+use crate::err::{BatchResult, ErrorSink, InternalVisibilityViolation, SemanticError};
 
 mod api;
 mod data_source;
@@ -47,14 +43,7 @@ pub fn analyze<'src, 'p>(
     let table = SymbolTable::from_ast(ast, &mut sink);
     let wrangler_env = env::analyze(&table, &mut sink);
     let poos = analyze_poos(&table, &mut sink);
-
-    let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
-        Ok(models) => models,
-        Err(errs) => {
-            sink.extend(errs);
-            IndexMap::default()
-        }
-    };
+    let mut models = model::analyze(&wrangler_env, &table, &mut sink);
 
     let data_source_map = data_source::analysis::analyze(&models, &table, &mut sink);
     for (model_name, ds) in data_source_map {
@@ -83,11 +72,13 @@ pub fn analyze<'src, 'p>(
         poos,
         injects,
     };
+
     let errs = sink.drain();
     if !errs.is_empty() {
         return Err(errs);
     }
 
+    // Expansion passes
     data_source::expansion::expand(&mut idl);
     api::expansion::expand(&mut idl);
     idl.set_merkle_hash();
@@ -117,6 +108,18 @@ fn analyze_poos<'src, 'p>(
             match resolved_type.root_type() {
                 CidlType::Stream => {
                     sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
+                }
+                CidlType::Object { name } | CidlType::Partial { object_name: name }
+                    if let Some(tag) = table
+                        .models
+                        .get(name)
+                        .and_then(|m| find_internal_tag(&m.symbol)) =>
+                {
+                    sink.push(SemanticError::InternalVisibility {
+                        tag,
+                        symbol: field,
+                        reason: InternalVisibilityViolation::Composition,
+                    });
                 }
                 _ => {
                     // All other types are valid
@@ -830,6 +833,34 @@ fn resolve_inject<'src, 'p>(
             shard_args,
         })
     }
+}
+
+/// Returns the first [Tag::Internal] on `symbol`, if any.
+fn find_internal_tag<'src, 'p>(symbol: &'p Symbol<'src>) -> Option<&'p Spd<Tag<'src>>> {
+    symbol
+        .tags
+        .iter()
+        .find(|t| matches!(t.inner, Tag::Internal))
+}
+
+/// Panics if a symbol doesn't have an internal tag.
+///
+/// Used only when an [idl::Model] is built with [idl::Model::is_internal] set to true.
+fn expect_internal_tag<'src, 'p>(
+    table: &SymbolTable<'src, 'p>,
+    name: &'src str,
+) -> &'p Spd<Tag<'src>> {
+    table
+        .models
+        .get(name)
+        .and_then(|model| {
+            model
+                .symbol
+                .tags
+                .iter()
+                .find(|t| matches!(t.inner, Tag::Internal))
+        })
+        .expect("expected an internal tag on a model that is marked as internal")
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type

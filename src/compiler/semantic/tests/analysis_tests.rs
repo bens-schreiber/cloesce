@@ -2435,3 +2435,101 @@ fn proposal_relationship_matrix() {
     assert_eq!(render_segments(&worker_kv.segments), "cache/{routeId}");
     assert_eq!(worker_kv.shard_fields, vec!["tenantId"]);
 }
+
+#[test]
+fn internal_model_valid() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        [internal]
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+            column {
+                password: string
+            }
+        }
+
+        api User {
+            get login -> bool {
+                username: string
+                password: string
+            }
+        }
+
+        source ByName for User {
+            get {
+                username: string
+            }
+        }
+    "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    let user = result.models.get("User").unwrap();
+    assert!(user.is_internal);
+    assert!(
+        user.data_sources.get("ByName").unwrap().is_internal,
+        "data sources of internal models are implicitly internal"
+    );
+}
+
+#[test]
+fn internal_model_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        [internal]
+        [crud get, save, list]
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+        }
+
+        api User {
+            self get passwordMatch -> bool {} // error: instance method
+
+            get getUser -> User { // error: returned from api
+                username: string
+            }
+
+            post takesUser -> bool {
+                u: User // error: used as parameter
+            }
+        }
+
+        model Account for my_d1 {
+            primary {
+                id: int
+            }
+
+            many User::id { // error: navigation targets an internal model
+                users
+            }
+        }
+
+        poo Wrapper {
+            user: User // error: internal model nested in a plain-old-object
+        }
+    "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::InternalVisibility { .. }),
+        6,
+        "unexpected errors: {:#?}",
+        errors
+    );
+}

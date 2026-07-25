@@ -1,7 +1,7 @@
 use crate::{
     LocalSymbolKind, SymbolTable,
-    err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
+    err::{ErrorSink, InternalVisibilityViolation, SemanticError},
+    find_internal_tag, is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
 };
 use frontend::{
     Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind,
@@ -15,84 +15,109 @@ use idl::{
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-pub struct ModelAnalysis<'src, 'p, 'sem> {
+pub fn analyze<'src, 'p, 'sem>(
     env: &'sem WranglerEnv<'src>,
-    sink: ErrorSink<'src, 'p>,
+    table: &SymbolTable<'src, 'p>,
+    sink: &mut ErrorSink<'src, 'p>,
+) -> IndexMap<&'src str, Model<'src>> {
+    let mut models = IndexMap::<&'src str, Model<'src>>::new();
+    let mut ma = ModelAnalysis::new(env, sink);
+
+    for model_block in table.models.values() {
+        if let Some(model) = ma.model(model_block, table) {
+            models.insert(model.name, model);
+        }
+    }
+
+    // Topologically sort models based on FK relationships
+    match kahns(ma.graph, ma.in_degree, table.models.len()) {
+        Ok(rank) => {
+            models.sort_by(|a_name, _, b_name, _| {
+                let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
+                let b_rank: usize = rank.get(b_name).copied().unwrap_or(usize::MAX);
+                a_rank.cmp(&b_rank).then_with(|| a_name.cmp(b_name))
+            });
+        }
+        Err(e) => {
+            sink.push(e);
+        }
+    }
+
+    models
+}
+
+struct ModelAnalysis<'src, 'p, 'sem> {
+    env: &'sem WranglerEnv<'src>,
+    sink: &'sem mut ErrorSink<'src, 'p>,
     in_degree: BTreeMap<&'src str, usize>,
     graph: BTreeMap<&'src str, Vec<&'src str>>,
 }
 
 impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
-    pub fn new(env: &'sem WranglerEnv<'src>) -> Self {
+    fn new(env: &'sem WranglerEnv<'src>, sink: &'sem mut ErrorSink<'src, 'p>) -> Self {
         Self {
             env,
-            sink: ErrorSink::new(),
+            sink,
             in_degree: BTreeMap::new(),
             graph: BTreeMap::new(),
         }
     }
 
-    pub fn analyze(
-        mut self,
+    fn model(
+        &mut self,
+        model_block: &'p ModelBlock<'src>,
         table: &SymbolTable<'src, 'p>,
-    ) -> BatchResult<'src, 'p, IndexMap<&'src str, Model<'src>>> {
-        let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
+    ) -> Option<Model<'src>> {
+        let mut dedup_cruds = HashSet::new();
+        let mut cruds = Vec::new();
+        let mut is_internal = false;
+        let mut crud_tag = None;
 
-        for &model_block in table.models.values() {
-            // Validate tags
-            let mut dedup_cruds = HashSet::new();
-            let mut cruds = Vec::new();
-            for tag in &model_block.symbol.tags {
-                match &tag.inner {
-                    Tag::Crud { kinds } => {
-                        for kind in kinds {
-                            if dedup_cruds.insert(kind.inner.clone()) {
-                                cruds.push(kind);
-                            }
+        // Validate tags
+        for tag in &model_block.symbol.tags {
+            match &tag.inner {
+                Tag::Crud { kinds } => {
+                    crud_tag = Some(tag);
+                    for kind in kinds {
+                        if dedup_cruds.insert(kind.inner.clone()) {
+                            cruds.push(kind);
                         }
                     }
-                    Tag::Unique { .. } => {
-                        if model_block.database_binding.is_none() {
-                            self.sink.push(SemanticError::TagInvalidInContext {
-                                tag,
-                                symbol: &model_block.symbol,
-                            });
-                        }
-
-                        // Unique constraints are validated in the ModelBuilder
-                    }
-                    _ => self.sink.push(SemanticError::TagInvalidInContext {
-                        tag,
-                        symbol: &model_block.symbol,
-                    }),
                 }
-            }
-
-            let builder = ModelBuilder::new(model_block);
-            let Some(mut model) = builder.build(&mut self, table) else {
-                continue;
-            };
-
-            model.cruds = cruds.into_iter().map(|c| c.inner.clone()).collect();
-            models.insert(model.name, model);
-        }
-
-        // Topologically sort models based on FK relationships
-        match kahns(self.graph, self.in_degree, table.models.len()) {
-            Ok(rank) => {
-                models.sort_by(|a_name, _, b_name, _| {
-                    let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
-                    let b_rank: usize = rank.get(b_name).copied().unwrap_or(usize::MAX);
-                    a_rank.cmp(&b_rank).then_with(|| a_name.cmp(b_name))
-                });
-            }
-            Err(e) => {
-                self.sink.push(e);
+                Tag::Internal => {
+                    is_internal = true;
+                }
+                Tag::Unique { .. } => {
+                    if model_block.database_binding.is_none() {
+                        self.sink.push(SemanticError::TagInvalidInContext {
+                            tag,
+                            symbol: &model_block.symbol,
+                        });
+                    }
+                    // Unique constraints are validated in the ModelBuilder
+                }
+                _ => self.sink.push(SemanticError::TagInvalidInContext {
+                    tag,
+                    symbol: &model_block.symbol,
+                }),
             }
         }
 
-        self.sink.finish()?;
-        Ok(models)
+        if is_internal && let Some(tag) = crud_tag {
+            self.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &model_block.symbol,
+                reason: InternalVisibilityViolation::CrudTag,
+            });
+        }
+
+        let builder = ModelBuilder::new(model_block);
+        let mut model = builder.build(self, table)?;
+
+        model.cruds = cruds.into_iter().map(|c| c.inner.clone()).collect();
+        model.is_internal = is_internal;
+
+        Some(model)
     }
 }
 
@@ -561,6 +586,14 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 .push(SemanticError::UnresolvedSymbol { symbol: &nav.model });
             return;
         };
+
+        if let Some(tag) = find_internal_tag(&target_block.symbol) {
+            ma.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &nav.model,
+                reason: InternalVisibilityViolation::Composition,
+            });
+        }
 
         let target_backing = self.resolve_target_backing(table, target_block);
 
