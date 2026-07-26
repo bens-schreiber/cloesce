@@ -1,7 +1,8 @@
 use crate::{
     LocalSymbolKind, SymbolTable,
     err::{ErrorSink, InternalVisibilityViolation, SemanticError},
-    find_internal_tag, is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
+    find_internal_tag, find_internal_tag_obj, is_valid_sql_type, resolve_cidl_type,
+    resolve_validator_tags,
 };
 use frontend::{
     Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind,
@@ -587,7 +588,10 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         };
 
-        if let Some(tag) = find_internal_tag(&target_block.symbol) {
+        if find_internal_tag(self.symbol).is_none()
+            && let Some(tag) = find_internal_tag(&target_block.symbol)
+        {
+            // A public model cannot expose an internal object as a KV value type.
             ma.sink.push(SemanticError::InternalVisibility {
                 tag,
                 symbol: &nav.model,
@@ -821,6 +825,19 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         // Any non-template arg must be a shard argument
         let shard_fields =
             self.resolve_kv_shard_args(ma, table, &kv.binding, &shard_args, &kv.field);
+
+        if find_internal_tag(self.symbol).is_none()
+            && let CidlType::Object { name } | CidlType::Partial { object_name: name } =
+                template.field.cidl_type.root_type()
+            && let Some(tag) = find_internal_tag_obj(table, name)
+        {
+            // A public model cannot expose an internal object as a KV value type.
+            ma.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &kv.field,
+                reason: InternalVisibilityViolation::Composition,
+            });
+        }
 
         self.kv_fields.push(KvField {
             field: ValidatedField {

@@ -49,7 +49,7 @@
 
 {#- --- PLAIN OLD OBJECTS --- #}
 {%- for (_key, poo) in &idl.poos %}
-/** Client-side representation of the `{{ poo.name }}` plain object. */
+{%- if !poo.is_internal %}
 export class {{ poo.name }} {
 {%- for field in &poo.fields %}
   {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
@@ -64,6 +64,7 @@ export class {{ poo.name }} {
     return __$res;
   }
 }
+{%- endif %}
 {%- endfor %}
 
 {#- --- MODELS --- #}

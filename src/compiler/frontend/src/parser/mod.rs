@@ -72,16 +72,20 @@ fn parser<'tokens, 'src: 'tokens>()
 /// ```
 fn poo_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    kw!(Poo)
-        .ignore_then(symbol())
+    tags()
+        .then_ignore(kw!(Poo))
+        .then(symbol())
         .then(
             tagged_typed_symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(symbol, fields)| {
-            AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields })
+        .map(|((tags, symbol), fields)| {
+            AstBlockKind::PlainOldObject(PlainOldObjectBlock {
+                symbol: Symbol { tags, ..symbol },
+                fields,
+            })
         })
         .boxed()
 }

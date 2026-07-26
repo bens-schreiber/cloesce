@@ -2451,6 +2451,28 @@ fn internal_model_valid() {
             }
         }
 
+        kv UserKv {
+            cached -> User {
+                id: int
+                "users/{id}"
+            }
+        }
+
+        [internal]
+        model Session for my_d1 {
+            primary {
+                id: int
+            }
+
+            many User::id { // ok: an internal model may navigate to another internal model
+                user
+            }
+
+            kv UserKv::cached(id) { // ok: an internal model may surface another via `kv`
+                cachedUser
+            }
+        }
+
         api User {
             get login -> bool {
                 username: string
@@ -2477,6 +2499,84 @@ fn internal_model_valid() {
     assert!(
         user.data_sources.get("ByName").unwrap().is_internal,
         "data sources of internal models are implicitly internal"
+    );
+}
+
+#[test]
+fn internal_poo_valid() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        [internal]
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+        }
+
+        [internal]
+        poo Secret {
+            token: string
+        }
+
+        [internal]
+        poo InternalWrapper {
+            secret: Secret // ok: an internal poo may nest another internal poo
+            user: User // ok: an internal poo may nest an internal model
+        }
+    "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (result, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
+    assert!(result.poos.get("Secret").unwrap().is_internal);
+    assert!(result.poos.get("InternalWrapper").unwrap().is_internal);
+}
+
+#[test]
+fn internal_poo_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        [internal]
+        poo Secret {
+            token: string
+        }
+
+        poo Wrapper {
+            secret: Secret // error: internal poo nested in a public plain-old-object
+        }
+
+        model User for my_d1 {
+            primary {
+                id: int
+            }
+        }
+
+        api User {
+            get getSecret -> Secret { } // error: returned from api
+
+            post takesSecret -> bool {
+                s: Secret // error: used as parameter
+            }
+        }
+    "#,
+    );
+    let parse = lex_and_ast(src);
+
+    // Act
+    let (_, errors) = analyze(&parse);
+
+    // Assert
+    assert_eq!(
+        count_errs!(errors, SemanticError::InternalVisibility { .. }),
+        3,
+        "unexpected errors: {:#?}",
+        errors
     );
 }
 
@@ -2518,6 +2618,35 @@ fn internal_model_errors() {
         poo Wrapper {
             user: User // error: internal model nested in a plain-old-object
         }
+
+        kv UserKv {
+            cached -> User {
+                id: int
+                "users/{id}"
+            }
+        }
+
+        durable UserDo {
+            cached -> User {
+                "users/cached"
+            }
+        }
+
+        model Ledger for my_d1 {
+            primary {
+                id: int
+            }
+
+            kv UserKv::cached(id) { // error: model's kv field surfaces an internal model
+                cachedUser
+            }
+        }
+
+        model LedgerDo for UserDo {
+            kv UserDo::cached { // error: model's kv field surfaces an internal model
+                cachedUser
+            }
+        }
     "#,
     );
     let parse = lex_and_ast(src);
@@ -2528,7 +2657,7 @@ fn internal_model_errors() {
     // Assert
     assert_eq!(
         count_errs!(errors, SemanticError::InternalVisibility { .. }),
-        6,
+        8,
         "unexpected errors: {:#?}",
         errors
     );

@@ -581,6 +581,9 @@ pub struct PlainOldObject<'src> {
 
     #[serde(borrow)]
     pub fields: Vec<ValidatedField<'src>>,
+
+    /// True if the POO should not be exposed to the client.
+    pub is_internal: bool,
 }
 
 /// Some field within a KV or R2 binding

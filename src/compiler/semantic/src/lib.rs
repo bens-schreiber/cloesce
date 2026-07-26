@@ -96,6 +96,20 @@ fn analyze_poos<'src, 'p>(
         let poo_name = poo.symbol.name;
         let mut fields = Vec::new();
 
+        // Validate tags
+        let mut is_internal = false;
+        for tag in &poo.symbol.tags {
+            if let Tag::Internal { .. } = &tag.inner {
+                is_internal = true;
+                continue;
+            }
+
+            sink.push(SemanticError::TagInvalidInContext {
+                tag,
+                symbol: &poo.symbol,
+            });
+        }
+
         for field in &poo.fields {
             let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
                 Ok(t) => t,
@@ -110,11 +124,9 @@ fn analyze_poos<'src, 'p>(
                     sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
                 }
                 CidlType::Object { name } | CidlType::Partial { object_name: name }
-                    if let Some(tag) = table
-                        .models
-                        .get(name)
-                        .and_then(|m| find_internal_tag(&m.symbol)) =>
+                    if !is_internal && let Some(tag) = find_internal_tag_obj(table, name) =>
                 {
+                    // A public POO cannot expose an internal object as a field type.
                     sink.push(SemanticError::InternalVisibility {
                         tag,
                         symbol: field,
@@ -146,6 +158,7 @@ fn analyze_poos<'src, 'p>(
             PlainOldObject {
                 name: poo_name,
                 fields,
+                is_internal,
             },
         );
     }
@@ -843,24 +856,21 @@ fn find_internal_tag<'src, 'p>(symbol: &'p Symbol<'src>) -> Option<&'p Spd<Tag<'
         .find(|t| matches!(t.inner, Tag::Internal))
 }
 
-/// Panics if a symbol doesn't have an internal tag.
-///
-/// Used only when an [idl::Model] is built with [idl::Model::is_internal] set to true.
-fn expect_internal_tag<'src, 'p>(
+/// Returns the first [Tag::Internal] on an [idl::Model] or [idl::PlainOldObject]
+/// with the given name, if any.
+fn find_internal_tag_obj<'src, 'p>(
     table: &SymbolTable<'src, 'p>,
     name: &'src str,
-) -> &'p Spd<Tag<'src>> {
-    table
-        .models
-        .get(name)
-        .and_then(|model| {
-            model
-                .symbol
-                .tags
-                .iter()
-                .find(|t| matches!(t.inner, Tag::Internal))
-        })
-        .expect("expected an internal tag on a model that is marked as internal")
+) -> Option<&'p Spd<Tag<'src>>> {
+    if let Some(model) = table.models.get(name) {
+        return find_internal_tag(&model.symbol);
+    }
+
+    if let Some(poo) = table.poos.get(name) {
+        return find_internal_tag(&poo.symbol);
+    }
+
+    None
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type
