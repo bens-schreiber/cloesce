@@ -1,4 +1,4 @@
-import { createApp, Worker, Weather, type Api, type CfEnv } from "./backend.js";
+import { createApp, Weather, type Api, type CfEnv } from "./backend.js";
 
 const weather: Api.Weather.Of = {
   isItRainingSomewhere() {
@@ -16,6 +16,6 @@ const weather: Api.Weather.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(Weather, weather).run(request);
+    return createApp().worker(env).register(Weather, weather).run(request);
   },
 };

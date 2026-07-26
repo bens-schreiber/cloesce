@@ -1,0 +1,33 @@
+d1 {
+    db
+}
+
+[crud save, get, list]
+model VoxMachina for db {
+    primary {
+        id: int
+    }
+
+    column {
+        name: string
+    }
+}
+
+[internal]
+poo Card {
+    name: string
+    isCursed: bool
+}
+
+[internal]
+model DeckOfManyThings for db {
+    primary {
+        id: int
+    }
+}
+
+api DeckOfManyThings {
+    post draw -> bool {
+        drawnBy: string
+    }
+}

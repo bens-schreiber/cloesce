@@ -1,12 +1,4 @@
-import {
-  createApp,
-  Worker,
-  Student,
-  Course,
-  StudentCourse,
-  type Api,
-  type CfEnv,
-} from "./backend.js";
+import { createApp, Student, Course, StudentCourse, type Api, type CfEnv } from "./backend.js";
 
 const CoursesOrderedDescending: Api.Student.CoursesOrderedDescending = {
   async list(env, lastId, lastName, limit) {
@@ -23,7 +15,8 @@ const CoursesOrderedDescending: Api.Student.CoursesOrderedDescending = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker)
+    return createApp()
+      .worker(env)
       .register(Student, { CoursesOrderedDescending })
       .register(Course, {})
       .register(StudentCourse, {})

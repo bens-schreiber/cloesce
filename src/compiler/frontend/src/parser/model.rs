@@ -2,9 +2,9 @@ use chumsky::prelude::*;
 
 use crate::{
     AstBlockKind, Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock,
-    ModelBlockKind, NavigationBlock, NavigationKey, R2FieldBlock, Spd, SqlBlockKind, Symbol,
+    ModelBlockKind, NavigationBlock, R2FieldBlock, Spd, SqlBlockKind, Symbol,
     lexer::Token,
-    parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags},
+    parser::{Extra, MapSpanned, TokenInput, kw, symbol, tagged_typed_symbol, tags, target_keys},
 };
 
 /// `foreign AdjModel::field [optional] { localField ... }`
@@ -155,30 +155,7 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     // `one|many Model::target { ident }`                  (shard-only shorthand)
     // `one|many Model::{ t1(l1), t2(l2) } { ident }`      (spider)
     let navigation_block = {
-        // `target(local)` | `target`
-        let key = || {
-            symbol()
-                .then(
-                    symbol()
-                        .delimited_by(just(Token::LParen), just(Token::RParen))
-                        .or_not(),
-                )
-                .map(|(target, local)| NavigationKey { target, local })
-        };
-
-        // `::target(local)` / `::target` (single) or `::{ t1(l1), t2(l2) }` (spider)
-        let keys = just(Token::DoubleColon)
-            .ignore_then(choice((
-                key()
-                    .separated_by(just(Token::Comma))
-                    .at_least(1)
-                    .allow_trailing()
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-                key().map(|k| vec![k]),
-            )))
-            .or_not()
-            .map(Option::unwrap_or_default);
+        let keys = target_keys().or_not().map(Option::unwrap_or_default);
 
         let cardinality = choice((
             kw!(One).to(Cardinality::One),
@@ -215,15 +192,9 @@ pub fn model_block<'tokens, 'src: 'tokens>()
     .boxed();
 
     // `for Binding`
-    // | `for Binding(shard1, shard2, ...)`
-    let backing = kw!(For).ignore_then(symbol()).then(
-        symbol()
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LParen), just(Token::RParen))
-            .or_not(),
-    );
+    // | `for Binding::shard(alias)`                     (single)
+    // | `for Binding::{ shard1, shard2(alias) }`        (spider)
+    let backing = kw!(For).ignore_then(symbol()).then(target_keys().or_not());
 
     let model_body = tags()
         .then_ignore(kw!(Model))

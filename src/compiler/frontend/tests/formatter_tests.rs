@@ -138,3 +138,72 @@ fn comments_retained() {
 
     insta::assert_snapshot!(formatted);
 }
+
+#[test]
+fn target_keys_round_trip() {
+    // Arrange: every spelling of the shared `::` initializer.
+    let src = r#"durable ShardedDo {
+    shard {
+        tenant: int
+        org: string
+    }
+}
+
+durable GlobalDo {}
+
+model A for ShardedDo::{ tenant, org(orgName) } {}
+
+model B for GlobalDo {}
+
+api A {
+    get aliased -> json {
+        t: int
+
+        inject {
+            ShardedDo::{ tenant(t), org(t) }
+        }
+    }
+
+    get bare -> json {
+        tenant: int
+
+        inject {
+            ShardedDo::tenant
+        }
+    }
+
+    get global -> json {
+        inject {
+            GlobalDo::{}
+        }
+    }
+}
+"#;
+
+    // Act
+    let (ast, lex_results, _) = lex_parse(src);
+    let formatted = formatter::format(&ast, &lex_results[0].comment_map, src);
+
+    // Assert: each `::` spelling survives verbatim. In particular the alias-less
+    // `::tenant` is not expanded, and `GlobalDo::{}` keeps its explicit empty braces
+    // rather than collapsing to a bare binding.
+    for spelling in [
+        "model A for ShardedDo::{ tenant, org(orgName) } {}",
+        "model B for GlobalDo {}",
+        "ShardedDo::{ tenant(t), org(t) }",
+        "ShardedDo::tenant\n",
+        "GlobalDo::{}",
+    ] {
+        assert!(
+            formatted.contains(spelling),
+            "expected `{spelling}` in:\n{formatted}"
+        );
+    }
+
+    // And formatting is idempotent over all of them.
+    let (reparsed, relex, _) = lex_parse(&formatted);
+    assert_eq!(
+        formatter::format(&reparsed, &relex[0].comment_map, &formatted),
+        formatted
+    );
+}

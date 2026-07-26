@@ -638,7 +638,7 @@ fn default_data_source_durable_sqlite() {
         }
 
         [crud get, list, save]
-        model LeaderboardEntry for LeaderboardDo(tenantId) {
+        model LeaderboardEntry for LeaderboardDo::tenantId {
             primary {
                 id: int
             }

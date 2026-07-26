@@ -1,7 +1,8 @@
 use crate::{
     LocalSymbolKind, SymbolTable,
-    err::{BatchResult, ErrorSink, SemanticError},
-    is_valid_sql_type, resolve_cidl_type, resolve_validator_tags,
+    err::{ErrorSink, InternalVisibilityViolation, SemanticError},
+    find_internal_tag, find_internal_tag_obj, is_valid_sql_type, resolve_cidl_type,
+    resolve_validator_tags,
 };
 use frontend::{
     Cardinality, ForeignBlock, KvFieldArgument, KvFieldBlock, ModelBlock, ModelBlockKind,
@@ -15,84 +16,109 @@ use idl::{
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-pub struct ModelAnalysis<'src, 'p, 'sem> {
+pub fn analyze<'src, 'p, 'sem>(
     env: &'sem WranglerEnv<'src>,
-    sink: ErrorSink<'src, 'p>,
+    table: &SymbolTable<'src, 'p>,
+    sink: &mut ErrorSink<'src, 'p>,
+) -> IndexMap<&'src str, Model<'src>> {
+    let mut models = IndexMap::<&'src str, Model<'src>>::new();
+    let mut ma = ModelAnalysis::new(env, sink);
+
+    for model_block in table.models.values() {
+        if let Some(model) = ma.model(model_block, table) {
+            models.insert(model.name, model);
+        }
+    }
+
+    // Topologically sort models based on FK relationships
+    match kahns(ma.graph, ma.in_degree, table.models.len()) {
+        Ok(rank) => {
+            models.sort_by(|a_name, _, b_name, _| {
+                let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
+                let b_rank: usize = rank.get(b_name).copied().unwrap_or(usize::MAX);
+                a_rank.cmp(&b_rank).then_with(|| a_name.cmp(b_name))
+            });
+        }
+        Err(e) => {
+            sink.push(e);
+        }
+    }
+
+    models
+}
+
+struct ModelAnalysis<'src, 'p, 'sem> {
+    env: &'sem WranglerEnv<'src>,
+    sink: &'sem mut ErrorSink<'src, 'p>,
     in_degree: BTreeMap<&'src str, usize>,
     graph: BTreeMap<&'src str, Vec<&'src str>>,
 }
 
 impl<'src, 'p, 'sem> ModelAnalysis<'src, 'p, 'sem> {
-    pub fn new(env: &'sem WranglerEnv<'src>) -> Self {
+    fn new(env: &'sem WranglerEnv<'src>, sink: &'sem mut ErrorSink<'src, 'p>) -> Self {
         Self {
             env,
-            sink: ErrorSink::new(),
+            sink,
             in_degree: BTreeMap::new(),
             graph: BTreeMap::new(),
         }
     }
 
-    pub fn analyze(
-        mut self,
+    fn model(
+        &mut self,
+        model_block: &'p ModelBlock<'src>,
         table: &SymbolTable<'src, 'p>,
-    ) -> BatchResult<'src, 'p, IndexMap<&'src str, Model<'src>>> {
-        let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
+    ) -> Option<Model<'src>> {
+        let mut dedup_cruds = HashSet::new();
+        let mut cruds = Vec::new();
+        let mut is_internal = false;
+        let mut crud_tag = None;
 
-        for &model_block in table.models.values() {
-            // Validate tags
-            let mut dedup_cruds = HashSet::new();
-            let mut cruds = Vec::new();
-            for tag in &model_block.symbol.tags {
-                match &tag.inner {
-                    Tag::Crud { kinds } => {
-                        for kind in kinds {
-                            if dedup_cruds.insert(kind.inner.clone()) {
-                                cruds.push(kind);
-                            }
+        // Validate tags
+        for tag in &model_block.symbol.tags {
+            match &tag.inner {
+                Tag::Crud { kinds } => {
+                    crud_tag = Some(tag);
+                    for kind in kinds {
+                        if dedup_cruds.insert(kind.inner.clone()) {
+                            cruds.push(kind);
                         }
                     }
-                    Tag::Unique { .. } => {
-                        if model_block.database_binding.is_none() {
-                            self.sink.push(SemanticError::TagInvalidInContext {
-                                tag,
-                                symbol: &model_block.symbol,
-                            });
-                        }
-
-                        // Unique constraints are validated in the ModelBuilder
-                    }
-                    _ => self.sink.push(SemanticError::TagInvalidInContext {
-                        tag,
-                        symbol: &model_block.symbol,
-                    }),
                 }
-            }
-
-            let builder = ModelBuilder::new(model_block);
-            let Some(mut model) = builder.build(&mut self, table) else {
-                continue;
-            };
-
-            model.cruds = cruds.into_iter().map(|c| c.inner.clone()).collect();
-            models.insert(model.name, model);
-        }
-
-        // Topologically sort models based on FK relationships
-        match kahns(self.graph, self.in_degree, table.models.len()) {
-            Ok(rank) => {
-                models.sort_by(|a_name, _, b_name, _| {
-                    let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
-                    let b_rank: usize = rank.get(b_name).copied().unwrap_or(usize::MAX);
-                    a_rank.cmp(&b_rank).then_with(|| a_name.cmp(b_name))
-                });
-            }
-            Err(e) => {
-                self.sink.push(e);
+                Tag::Internal => {
+                    is_internal = true;
+                }
+                Tag::Unique { .. } => {
+                    if model_block.database_binding.is_none() {
+                        self.sink.push(SemanticError::TagInvalidInContext {
+                            tag,
+                            symbol: &model_block.symbol,
+                        });
+                    }
+                    // Unique constraints are validated in the ModelBuilder
+                }
+                _ => self.sink.push(SemanticError::TagInvalidInContext {
+                    tag,
+                    symbol: &model_block.symbol,
+                }),
             }
         }
 
-        self.sink.finish()?;
-        Ok(models)
+        if is_internal && let Some(tag) = crud_tag {
+            self.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &model_block.symbol,
+                reason: InternalVisibilityViolation::CrudTag,
+            });
+        }
+
+        let builder = ModelBuilder::new(model_block);
+        let mut model = builder.build(self, table)?;
+
+        model.cruds = cruds.into_iter().map(|c| c.inner.clone()).collect();
+        model.is_internal = is_internal;
+
+        Some(model)
     }
 }
 
@@ -295,17 +321,33 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         };
 
         let shard_args = self.model.shard_args.as_deref().unwrap_or(&[]);
-        if shard_args.len() != shard_fields.len() {
-            ma.sink.push(SemanticError::ArgCountMismatch {
-                field: binding_sym,
-                expected: shard_fields.len(),
-                got: shard_args.len(),
-            });
-            return;
+
+        // Every supplied key must name a real shard field of the binding.
+        for key in shard_args {
+            if !shard_fields.iter().any(|s| s.name == key.target.name) {
+                ma.sink.push(SemanticError::DurableUnknownShardField {
+                    binding: binding_sym,
+                    target: &key.target,
+                });
+            }
         }
 
         let mut shard_field_names = Vec::with_capacity(shard_fields.len());
-        for (arg, shard_field) in shard_args.iter().zip(&shard_fields) {
+        for shard_field in &shard_fields {
+            let Some(key) = shard_args
+                .iter()
+                .find(|k| k.target.name == shard_field.name)
+            else {
+                ma.sink.push(SemanticError::DurableMissingShardField {
+                    context: binding_sym,
+                    missing: shard_field.name,
+                });
+                continue;
+            };
+
+            // The alias is optional; without one the shard field's own name is used.
+            let arg = key.local_or_target();
+
             let cidl_type = match resolve_cidl_type(shard_field, &shard_field.cidl_type, table) {
                 Ok(t) => t,
                 Err(e) => {
@@ -546,6 +588,17 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             return;
         };
 
+        if find_internal_tag(self.symbol).is_none()
+            && let Some(tag) = find_internal_tag(&target_block.symbol)
+        {
+            // A public model cannot expose an internal object as a KV value type.
+            ma.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &nav.model,
+                reason: InternalVisibilityViolation::Composition,
+            });
+        }
+
         let target_backing = self.resolve_target_backing(table, target_block);
 
         // Each key maps a discriminator on the target to a local field on this model.
@@ -561,12 +614,7 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 continue;
             };
 
-            let Some(local) = key.local.as_ref() else {
-                ma.sink.push(SemanticError::RelationMissingLocalKey {
-                    target: &key.target,
-                });
-                continue;
-            };
+            let local = key.local_or_target();
             let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
                 model: self.name,
                 name: local.name,
@@ -598,13 +646,18 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         // Every route field of the target must be supplied as a key so the target's
         // state can be constructed. Durable Object shard fields are coerced into route fields,
         // so they are also required to be supplied as keys.
-        let shard_fields = target_block.shard_args.as_deref().unwrap_or_default();
+        let shard_fields = target_block
+            .shard_args
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|key| key.local_or_target());
         let route_fields = target_block.blocks.inners().flat_map(|b| match b {
             ModelBlockKind::Route(symbols) => symbols.as_slice(),
             _ => &[],
         });
 
-        for route in shard_fields.iter().chain(route_fields) {
+        for route in shard_fields.chain(route_fields) {
             if !nav.keys.iter().any(|k| k.target.name == route.name) {
                 ma.sink.push(SemanticError::RelationMissingDiscriminator {
                     field,
@@ -772,6 +825,19 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
         // Any non-template arg must be a shard argument
         let shard_fields =
             self.resolve_kv_shard_args(ma, table, &kv.binding, &shard_args, &kv.field);
+
+        if find_internal_tag(self.symbol).is_none()
+            && let CidlType::Object { name } | CidlType::Partial { object_name: name } =
+                template.field.cidl_type.root_type()
+            && let Some(tag) = find_internal_tag_obj(table, name)
+        {
+            // A public model cannot expose an internal object as a KV value type.
+            ma.sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &kv.field,
+                reason: InternalVisibilityViolation::Composition,
+            });
+        }
 
         self.kv_fields.push(KvField {
             field: ValidatedField {

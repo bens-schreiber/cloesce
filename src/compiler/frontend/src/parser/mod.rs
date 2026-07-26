@@ -10,8 +10,8 @@ use idl::{CidlType, CrudKind};
 
 use crate::lexer::{FileTable, LexedFile, SpannedToken, Token};
 use crate::{
-    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, InjectInitializer, Keyword,
-    MethodInjectBlock, PlainOldObjectBlock, Span, Spd, Symbol, Tag,
+    ArgumentLiteral, Ast, AstBlockKind, InjectBlock, InjectEntry, Keyword, MethodInjectBlock,
+    PlainOldObjectBlock, Span, Spd, Symbol, Tag, TargetKey,
 };
 
 pub type ParserError<'tokens, 'src> = Vec<Rich<'tokens, Token<'src>, Span>>;
@@ -72,16 +72,20 @@ fn parser<'tokens, 'src: 'tokens>()
 /// ```
 fn poo_block<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, AstBlockKind<'src>, Extra<'tokens, 'src>> {
-    kw!(Poo)
-        .ignore_then(symbol())
+    tags()
+        .then_ignore(kw!(Poo))
+        .then(symbol())
         .then(
             tagged_typed_symbol()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(symbol, fields)| {
-            AstBlockKind::PlainOldObject(PlainOldObjectBlock { symbol, fields })
+        .map(|((tags, symbol), fields)| {
+            AstBlockKind::PlainOldObject(PlainOldObjectBlock {
+                symbol: Symbol { tags, ..symbol },
+                fields,
+            })
         })
         .boxed()
 }
@@ -206,6 +210,36 @@ fn symbol<'tokens, 'src: 'tokens>()
     })
 }
 
+/// The `::` initializer shared by navigation keys, Durable Object backings, and
+/// `inject` contexts:
+///
+/// ```cloesce
+/// ::target            // singular, alias defaults to the target name
+/// ::target(local)     // singular, explicitly aliased
+/// ::{ t1, t2(l2) }    // spider, aliases optional per key
+/// ```
+fn target_keys<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, Vec<TargetKey<'src>>, Extra<'tokens, 'src>> {
+    let key = || {
+        symbol()
+            .then(
+                symbol()
+                    .delimited_by(just(Token::LParen), just(Token::RParen))
+                    .or_not(),
+            )
+            .map(|(target, local)| TargetKey { target, local })
+    };
+
+    just(Token::DoubleColon).ignore_then(choice((
+        key()
+            .separated_by(just(Token::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        key().map(|k| vec![k]),
+    )))
+}
+
 /// ```cloesce
 /// ident: cidl_type
 /// ```
@@ -257,26 +291,9 @@ fn method_body<'tokens, 'src: 'tokens>() -> impl Parser<
         Inject(Spd<MethodInjectBlock<'src>>),
     }
 
-    // `target(arg)`
-    let initializer = || {
-        symbol()
-            .then(symbol().delimited_by(just(Token::LParen), just(Token::RParen)))
-            .map(|(target, arg)| InjectInitializer { target, arg })
-    };
-
-    // `::{ init, init, ... }` | `::init`
-    let initializers = just(Token::DoubleColon).ignore_then(choice((
-        initializer()
-            .separated_by(just(Token::Comma))
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        initializer().map(|i| vec![i]),
-    )));
-
     // `ident` (flat binding) | `ident::...` (durable object context)
     let inject_entry = symbol()
-        .then(initializers.or_not())
+        .then(target_keys().or_not())
         .map(|(symbol, initializers)| match initializers {
             Some(initializers) => InjectEntry::Context {
                 symbol,

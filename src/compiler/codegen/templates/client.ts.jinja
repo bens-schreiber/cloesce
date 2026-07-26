@@ -49,7 +49,7 @@
 
 {#- --- PLAIN OLD OBJECTS --- #}
 {%- for (_key, poo) in &idl.poos %}
-/** Client-side representation of the `{{ poo.name }}` plain object. */
+{%- if !poo.is_internal %}
 export class {{ poo.name }} {
 {%- for field in &poo.fields %}
   {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
@@ -64,10 +64,12 @@ export class {{ poo.name }} {
     return __$res;
   }
 }
+{%- endif %}
 {%- endfor %}
 
 {#- --- MODELS --- #}
 {%- for (_key, model) in &idl.models %}
+{%- if self.should_emit_class(model) %}
 /**
  * Typed client for the `{{ model.name }}` model.
  *
@@ -92,6 +94,7 @@ export class {{ poo.name }} {
  * ```
  */
 export class {{ model.name }} {
+{%- if !model.is_internal %}
 {%- for col in &model.primary_columns %}
   {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
 {%- endfor %}
@@ -110,6 +113,7 @@ export class {{ model.name }} {
 {%- for r2 in &model.r2_fields %}
   {{ r2.field.name }}: {{ self.map_type(&r2.field.cidl_type) }};
 {%- endfor %}
+{%- endif %}
 
 {%- for api in &model.apis %}
   /** Call `{{ model.name }}.{{ api.name }}` over HTTP.{% if !api.is_static %} Instance method.{% else %} Static method.{% endif %} */
@@ -162,6 +166,7 @@ export class {{ model.name }} {
 {{ from_response(api) }}
   }
 {%- endfor %}
+{%- if !model.is_internal %}
 
   /** @internal Reconstruct from a plain JSON object. */
   static fromJson(data: any): {{ model.name }} {
@@ -189,7 +194,9 @@ export class {{ model.name }} {
 {%- endfor %}
     return __$res;
   }
+{%- endif %}
 }
+{%- endif %}
 {%- endfor %}
 
 {#- --- UTILITIES AND TYPES --- #}

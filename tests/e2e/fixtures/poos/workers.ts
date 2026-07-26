@@ -1,5 +1,5 @@
 import { HttpResult } from "cloesce";
-import { createApp, Worker, PooAcceptYield, type Api, type CfEnv } from "./backend.js";
+import { createApp, PooAcceptYield, type Api, type CfEnv } from "./backend.js";
 
 const pooAcceptYield: Api.PooAcceptYield.Of = {
   acceptPoos() {
@@ -16,6 +16,6 @@ const pooAcceptYield: Api.PooAcceptYield.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(PooAcceptYield, pooAcceptYield).run(request);
+    return createApp().worker(env).register(PooAcceptYield, pooAcceptYield).run(request);
   },
 };

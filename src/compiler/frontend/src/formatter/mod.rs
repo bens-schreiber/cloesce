@@ -18,10 +18,10 @@ use idl::{CidlType, CrudKind, HttpVerb};
 use crate::{
     ApiBlock, ApiBlockMethod, ArgumentLiteral, Ast, AstBlockKind, Cardinality, D1BindingBlock,
     DataSourceBlock, DataSourceBlockMethod, DurableBindingBlock, DurableShardBlock, ForeignBlock,
-    InjectBlock, InjectEntry, InjectInitializer, Keyword, KvBindingBlock, KvBindingTemplate,
-    KvFieldArgument, KvFieldBlock, MethodInjectBlock, ModelBlock, ModelBlockKind, NavigationBlock,
-    NavigationKey, ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate,
-    R2FieldBlock, Spd, SqlBlockKind, Symbol, Tag, VarBlock, fmt_cidl_type, lexer::CommentMap,
+    InjectBlock, InjectEntry, Keyword, KvBindingBlock, KvBindingTemplate, KvFieldArgument,
+    KvFieldBlock, MethodInjectBlock, ModelBlock, ModelBlockKind, NavigationBlock,
+    ParsedIncludeTree, PlainOldObjectBlock, R2BindingBlock, R2BindingTemplate, R2FieldBlock, Spd,
+    SqlBlockKind, Symbol, Tag, TargetKey, VarBlock, fmt_cidl_type, lexer::CommentMap,
 };
 
 /// Formats an [Ast] into a string, preserving comments and blank lines.
@@ -426,10 +426,7 @@ impl<'src> ToDoc<'src> for ModelBlock<'src> {
                 .then(ctx.sym_doc(binding, 0, true));
 
             if let Some(shard_args) = &self.shard_args {
-                doc = doc
-                    .then(Doc::text("("))
-                    .then(comma_separated(shard_args, |sym| ctx.sym_doc(sym, 0, true)))
-                    .then(Doc::text(")"));
+                doc = doc.then(target_keys_doc(ctx, shard_args, Doc::nil()));
             }
         }
 
@@ -575,43 +572,14 @@ impl<'src> ToDoc<'src> for ForeignBlock<'src> {
 
 impl<'src> ToDoc<'src> for NavigationBlock<'src> {
     fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
-        let key_doc = |key: &'src NavigationKey<'src>| {
-            let mut d = ctx.sym_doc(&key.target, 0, true);
-            if let Some(local) = &key.local {
-                d = d
-                    .then(Doc::text("("))
-                    .then(ctx.sym_doc(local, 0, true))
-                    .then(Doc::text(")"));
-            }
-            d
-        };
-
         let cardinality = match self.cardinality {
             Cardinality::One => Keyword::One,
             Cardinality::Many => Keyword::Many,
         };
-        let mut doc =
-            Doc::kw(cardinality)
-                .then(Doc::text(" "))
-                .then(ctx.sym_doc(&self.model, 0, true));
-
-        match self.keys.as_slice() {
-            [] => {
-                // No keys, just the model name
-            }
-            [key] => {
-                // `Model::target(local)`.
-                doc = doc.then(Doc::text("::")).then(key_doc(key));
-            }
-            keys => {
-                // `Model::{ t1(l1), t2(l2) }`.
-                let entries = comma_separated(keys, key_doc);
-                doc = doc
-                    .then(Doc::text("::{ "))
-                    .then(entries)
-                    .then(Doc::text(" }"));
-            }
-        }
+        let doc = Doc::kw(cardinality)
+            .then(Doc::text(" "))
+            .then(ctx.sym_doc(&self.model, 0, true))
+            .then(target_keys_doc(ctx, &self.keys, Doc::nil()));
 
         doc.then(ctx.block(ctx.sym_doc(&self.field.inner, 2, false), 2))
     }
@@ -694,29 +662,13 @@ impl<'src> ToDoc<'src> for MethodInjectBlock<'src> {
 }
 
 impl<'src> ToDoc<'src> for InjectEntry<'src> {
-    fn to_doc(&'src self, _ctx: &FmtCtx<'src>) -> Doc<'src> {
+    fn to_doc(&'src self, ctx: &FmtCtx<'src>) -> Doc<'src> {
         match self {
             InjectEntry::Binding(sym) => Doc::text(sym.name),
             InjectEntry::Context {
                 symbol,
                 initializers,
-            } => {
-                let init_doc = |init: &'src InjectInitializer<'src>| {
-                    Doc::text(init.target.name)
-                        .then(Doc::text("("))
-                        .then(Doc::text(init.arg.name))
-                        .then(Doc::text(")"))
-                };
-
-                let tail = match initializers.as_slice() {
-                    [] => Doc::text("::{}"),
-                    [single] => Doc::text("::").then(init_doc(single)),
-                    many => Doc::text("::{ ")
-                        .then(comma_separated(many, init_doc))
-                        .then(Doc::text(" }")),
-                };
-                Doc::text(symbol.name).then(tail)
-            }
+            } => Doc::text(symbol.name).then(target_keys_doc(ctx, initializers, Doc::text("::{}"))),
         }
     }
 }
@@ -991,6 +943,31 @@ fn comma_separated<'src, T, F: FnMut(&'src T) -> Doc<'src>>(
         }
     }
     doc
+}
+
+fn target_keys_doc<'src>(
+    ctx: &FmtCtx<'src>,
+    keys: &'src [TargetKey<'src>],
+    empty: Doc<'src>,
+) -> Doc<'src> {
+    let key_doc = |key: &'src TargetKey<'src>| {
+        let mut d = ctx.sym_doc(&key.target, 0, true);
+        if let Some(local) = &key.local {
+            d = d
+                .then(Doc::text("("))
+                .then(ctx.sym_doc(local, 0, true))
+                .then(Doc::text(")"));
+        }
+        d
+    };
+
+    match keys {
+        [] => empty,
+        [key] => Doc::text("::").then(key_doc(key)),
+        keys => Doc::text("::{ ")
+            .then(comma_separated(keys, key_doc))
+            .then(Doc::text(" }")),
+    }
 }
 
 fn method_body_doc<'src>(

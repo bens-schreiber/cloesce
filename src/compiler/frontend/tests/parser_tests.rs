@@ -1,7 +1,7 @@
 use compiler_test::lex_and_ast;
 use frontend::{
     ArgumentLiteral, Ast, AstBlockKind, Cardinality, ForeignBlock, InjectEntry, Keyword,
-    ModelBlock, ModelBlockKind, NavigationKey, Spd, SqlBlockKind, Tag,
+    ModelBlock, ModelBlockKind, Spd, SqlBlockKind, Tag, TargetKey,
 };
 use idl::{CidlType, CrudKind, HttpVerb};
 
@@ -13,7 +13,7 @@ fn foreign_matches(fb: &ForeignBlock, model: &str, targets: &[&str]) -> bool {
 }
 
 /// Matches a navigation block's key pairs against `(target, local)` tuples.
-fn nav_keys_match(keys: &[NavigationKey], expected: &[(&str, Option<&str>)]) -> bool {
+fn nav_keys_match(keys: &[TargetKey], expected: &[(&str, Option<&str>)]) -> bool {
     keys.len() == expected.len()
         && keys
             .iter()
@@ -224,7 +224,7 @@ fn durable_binding_block() {
 fn model_durable_backing() {
     let ast = lex_and_ast(
         r#"
-        model Leaderboard for LeaderboardDo(tenantId, region) {
+        model Leaderboard for LeaderboardDo::{ tenantId, region(regionAlias) } {
             kv LeaderboardDo::topEntryCache {
                 top
             }
@@ -248,8 +248,11 @@ fn model_durable_backing() {
         .as_ref()
         .expect("Leaderboard to carry shard args");
     assert_eq!(
-        shard_args.iter().map(|s| s.name).collect::<Vec<_>>(),
-        vec!["tenantId", "region"]
+        shard_args
+            .iter()
+            .map(|k| (k.target.name, k.local.as_ref().map(|l| l.name)))
+            .collect::<Vec<_>>(),
+        vec![("tenantId", None), ("region", Some("regionAlias"))]
     );
 
     let top_entry_cache = leaderboard
@@ -532,6 +535,15 @@ fn api_context_tag() {
             get config -> json {
                 inject { GlobalDo::{} }
             }
+
+            // The alias may be omitted, binding the like-named parameter.
+            get bare -> json {
+                tenantId: int
+
+                inject {
+                    LeaderboardDo::tenantId
+                }
+            }
         }
         "#,
     );
@@ -564,7 +576,7 @@ fn api_context_tag() {
                     symbol.name.to_string(),
                     initializers
                         .iter()
-                        .map(|i| i.arg.name.to_string())
+                        .map(|i| i.local_or_target().name.to_string())
                         .collect(),
                 )),
                 InjectEntry::Binding(_) => None,
@@ -579,6 +591,10 @@ fn api_context_tag() {
     let (global_do, global_args) = context_of("config");
     assert_eq!(global_do, "GlobalDo");
     assert!(global_args.is_empty());
+
+    let (bare_do, bare_args) = context_of("bare");
+    assert_eq!(bare_do, "LeaderboardDo");
+    assert_eq!(bare_args, vec!["tenantId"]);
 }
 
 #[test]

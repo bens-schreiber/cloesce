@@ -3,8 +3,8 @@ pub mod analysis {
 
     use crate::{
         LocalSymbolKind, SymbolTable, ensure,
-        err::{ErrorSink, SemanticError},
-        resolve_cidl_type, resolve_inject, resolve_validator_tags,
+        err::{ErrorSink, InternalVisibilityViolation, SemanticError},
+        find_internal_tag_obj, resolve_cidl_type, resolve_inject, resolve_validator_tags,
     };
     use frontend::{ApiBlockMethod, SpdSlice, Tag};
     use idl::{
@@ -57,6 +57,17 @@ pub mod analysis {
         // Validate parameters
         let (mut parameters, parameters_media, is_static, data_source_name) =
             parameters(model.name, method, table, sink);
+
+        if model.is_internal && !is_static {
+            let tag = find_internal_tag_obj(table, model.name)
+                .expect("expected an internal tag on a model that is marked as internal");
+
+            sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &method.symbol,
+                reason: InternalVisibilityViolation::InstanceMethod,
+            });
+        }
 
         let mut fields = parameters
             .iter()
@@ -120,6 +131,17 @@ pub mod analysis {
                 return (CidlType::Void, MediaType::Json);
             }
         };
+
+        if let CidlType::Object { name } | CidlType::Partial { object_name: name } =
+            resolved_type.root_type()
+            && let Some(tag) = find_internal_tag_obj(table, name)
+        {
+            sink.push(SemanticError::InternalVisibility {
+                tag,
+                symbol: &method.symbol,
+                reason: InternalVisibilityViolation::ReturnedFromApi,
+            });
+        }
 
         let return_media = match resolved_type.root_type() {
             CidlType::Stream => MediaType::Octet,
@@ -207,13 +229,21 @@ pub mod analysis {
                 param,
             };
             match resolved_type.root_type() {
-                CidlType::Object { .. } | CidlType::Partial { .. } => {
+                CidlType::Object { name } | CidlType::Partial { object_name: name } => {
                     // GET requests do not support Object parameters
                     ensure!(
                         matches!(method.http_verb, HttpVerb::Get).not(),
                         sink,
                         invalid_type_err
                     );
+
+                    if let Some(tag) = find_internal_tag_obj(table, name) {
+                        sink.push(SemanticError::InternalVisibility {
+                            tag,
+                            symbol: param,
+                            reason: InternalVisibilityViolation::UsedAsParameter,
+                        });
+                    }
                 }
 
                 CidlType::R2Object => {
@@ -235,12 +265,21 @@ pub mod analysis {
                     );
 
                     has_stream = true;
-                    let required_params = method.parameters.len();
 
-                    // Only one Stream parameter is allowed, and it must be the
-                    // only non-injected parameter
+                    let mut stream_params = 0;
+                    let mut body_params = 0;
+                    for p in &method.parameters {
+                        match p.cidl_type.root_type() {
+                            CidlType::Stream => stream_params += 1,
+                            _ if !p.tags.iter().any(|t| matches!(t.inner, Tag::Header)) => {
+                                body_params += 1
+                            }
+                            _ => {}
+                        }
+                    }
+
                     ensure!(
-                        required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
+                        stream_params == 1 && body_params == 0,
                         sink,
                         invalid_type_err
                     );

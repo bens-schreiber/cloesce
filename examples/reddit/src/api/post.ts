@@ -3,6 +3,7 @@ import { DurableObject } from "cloudflare:workers";
 import { HttpResult } from "cloesce";
 import postDoInitial from "../../migrations/PostDo/1784326759_Initial.js";
 import { auth, authFromRequest } from "./auth.js";
+import { app } from "./main.js";
 
 export const post: clo.Api.Post.Of = {
   async create(env, subRedditId, title, content) {
@@ -81,16 +82,14 @@ export const comment: clo.Api.Comment.Of = {
 };
 
 export class PostDo extends DurableObject<clo.CfEnv> {
-  private base = clo
-    .createApp(this, clo.PostDoHost, [postDoInitial])
-    .register(clo.Post, post)
-    .register(clo.Comment, comment);
+  private base = app().durable(this, [postDoInitial]);
 
   async fetch(request: Request): Promise<Response> {
-    const app = this.base.register(
+    const authed = this.base.register(
       clo.AuthUser,
       await authFromRequest(this.base.env.sessions, request),
     );
-    return app.run(request);
+
+    return authed.run(request);
   }
 }

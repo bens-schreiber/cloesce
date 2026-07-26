@@ -1,6 +1,5 @@
 import {
   createApp,
-  Worker,
   ModelWithKv,
   KVOnly,
   KVSibling,
@@ -18,7 +17,8 @@ const modelWithKv: Api.ModelWithKv.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker)
+    return createApp()
+      .worker(env)
       .register(ModelWithKv, modelWithKv)
       .register(KVOnly, {})
       .register(KVSibling, {})

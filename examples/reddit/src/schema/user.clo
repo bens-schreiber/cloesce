@@ -24,16 +24,16 @@ r2 Avatar {
 // Each `many` relationship here has no discriminator aside from directing to this DO,
 // resolving to a SQL SELECT query that returns all rows.
 [crud get]
-model User for UserDo(name) {
-    many AuthoredSubReddit::name(name) {
+model User for UserDo::name {
+    many AuthoredSubReddit::name {
         authoredSubReddits
     }
 
-    many AuthoredPost::name(name) {
+    many AuthoredPost::name {
         authoredPosts
     }
 
-    many AuthoredComment::name(name) {
+    many AuthoredComment::name {
         authoredComments
     }
 }
@@ -72,7 +72,7 @@ api User {
 
 // A SQL table that stores the relationship between a User and the SubReddits
 // they authored.
-model AuthoredSubReddit for UserDo(name) {
+model AuthoredSubReddit for UserDo::name {
     primary {
         subRedditId: int
     }
@@ -85,7 +85,7 @@ model AuthoredSubReddit for UserDo(name) {
 
 // A SQL table that stores the relationship between a User and the Posts
 // they authored.
-model AuthoredPost for UserDo(name) {
+model AuthoredPost for UserDo::name {
     primary {
         postId: string
     }
@@ -98,7 +98,7 @@ model AuthoredPost for UserDo(name) {
 
 // A SQL table that stores the relationship between a User and the Comments
 // they authored.
-model AuthoredComment for UserDo(name) {
+model AuthoredComment for UserDo::name {
     primary {
         postId: string
         commentId: int

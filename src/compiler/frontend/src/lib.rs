@@ -194,25 +194,20 @@ pub enum ArgumentLiteral<'src> {
 }
 
 #[derive(Debug, Clone)]
-pub struct InjectInitializer<'src> {
-    pub target: Symbol<'src>,
-    pub arg: Symbol<'src>,
-}
-
-#[derive(Debug, Clone)]
 pub enum InjectEntry<'src> {
     /// A flat binding that requires no initializers
     Binding(Symbol<'src>),
 
-    /// A binding that requires initializers, e.g. `Durable::{t1(arg1), t2(arg2)}`
+    /// A binding that requires initializers, e.g. `Durable::{t1(arg1), t2}`
     ///
     /// NOTE: Currently used in only Durable Object Context injection
     Context {
         /// The bound target, e.g. `Durable` in `Durable::t1(arg1)`
         symbol: Symbol<'src>,
 
-        /// The constructor initializers, e.g. `t1(arg1)`
-        initializers: Vec<InjectInitializer<'src>>,
+        /// The constructor initializers, e.g. `t1(arg1)`. Each key's local name is the
+        /// method parameter supplying that shard field, defaulting to the field's own name.
+        initializers: Vec<TargetKey<'src>>,
     },
 }
 
@@ -340,13 +335,18 @@ pub enum Cardinality {
     Many,
 }
 
-pub struct NavigationKey<'src> {
-    /// The discriminator field on the target model (its `route`/`primary` field).
+/// One `target(local)` pair of a `::` initializer, e.g.
+/// `::{ target1(local) }` | `::target1(local)` | `::target1`
+#[derive(Debug, Clone)]
+pub struct TargetKey<'src> {
     pub target: Symbol<'src>,
-
-    /// The local field on the current model that supplies the target's discriminator,
-    /// if any. If `None`, the relationship is discriminator-less.
     pub local: Option<Symbol<'src>>,
+}
+
+impl<'src> TargetKey<'src> {
+    pub fn local_or_target(&self) -> &Symbol<'src> {
+        self.local.as_ref().unwrap_or(&self.target)
+    }
 }
 
 pub struct NavigationBlock<'src> {
@@ -357,7 +357,7 @@ pub struct NavigationBlock<'src> {
     pub model: Symbol<'src>,
 
     /// The discriminator key pairs.
-    pub keys: Vec<NavigationKey<'src>>,
+    pub keys: Vec<TargetKey<'src>>,
 
     /// The result field name declared in `{ ... }`.
     pub field: Spd<Symbol<'src>>,
@@ -456,9 +456,9 @@ pub struct ModelBlock<'src> {
     /// `for SomeBinding` in `model M for SomeBinding { ... }`.
     pub database_binding: Option<Symbol<'src>>,
 
-    /// Arguments of a database binding, e.g.
-    /// `(shardKey1, shardKey2)` in `model M for SomeBinding(shardKey1, shardKey2) { ...
-    pub shard_args: Option<Vec<Symbol<'src>>>,
+    /// Shard keys of a Durable Object binding, e.g. `::{ shardKey1, shardKey2(alias) }`
+    /// in `model M for SomeBinding::{ shardKey1, shardKey2(alias) } { ... }`.
+    pub shard_args: Option<Vec<TargetKey<'src>>>,
 
     pub blocks: Vec<Spd<ModelBlockKind<'src>>>,
 }

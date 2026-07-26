@@ -19,19 +19,14 @@
 
 use frontend::{
     ApiBlock, ArgumentLiteral, Ast, AstBlockKind, D1BindingBlock, DataSourceBlock,
-    DurableBindingBlock, InjectBlock, InjectEntry, InjectInitializer, KvBindingBlock,
-    MethodInjectBlock, ModelBlock, PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag,
-    VarBlock,
+    DurableBindingBlock, InjectBlock, InjectEntry, KvBindingBlock, MethodInjectBlock, ModelBlock,
+    PlainOldObjectBlock, R2BindingBlock, Spd, SpdSlice, Symbol, Tag, TargetKey, VarBlock,
 };
 use idl::{CidlType, CloesceIdl, DurableTarget, Number, PlainOldObject, ValidatedField, Validator};
-use indexmap::IndexMap;
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-    err::{BatchResult, ErrorSink, SemanticError},
-    model::ModelAnalysis,
-};
+use crate::err::{BatchResult, ErrorSink, InternalVisibilityViolation, SemanticError};
 
 mod api;
 mod data_source;
@@ -48,14 +43,7 @@ pub fn analyze<'src, 'p>(
     let table = SymbolTable::from_ast(ast, &mut sink);
     let wrangler_env = env::analyze(&table, &mut sink);
     let poos = analyze_poos(&table, &mut sink);
-
-    let mut models = match ModelAnalysis::new(&wrangler_env).analyze(&table) {
-        Ok(models) => models,
-        Err(errs) => {
-            sink.extend(errs);
-            IndexMap::default()
-        }
-    };
+    let mut models = model::analyze(&wrangler_env, &table, &mut sink);
 
     let data_source_map = data_source::analysis::analyze(&models, &table, &mut sink);
     for (model_name, ds) in data_source_map {
@@ -84,11 +72,13 @@ pub fn analyze<'src, 'p>(
         poos,
         injects,
     };
+
     let errs = sink.drain();
     if !errs.is_empty() {
         return Err(errs);
     }
 
+    // Expansion passes
     data_source::expansion::expand(&mut idl);
     api::expansion::expand(&mut idl);
     idl.set_merkle_hash();
@@ -106,6 +96,20 @@ fn analyze_poos<'src, 'p>(
         let poo_name = poo.symbol.name;
         let mut fields = Vec::new();
 
+        // Validate tags
+        let mut is_internal = false;
+        for tag in &poo.symbol.tags {
+            if let Tag::Internal { .. } = &tag.inner {
+                is_internal = true;
+                continue;
+            }
+
+            sink.push(SemanticError::TagInvalidInContext {
+                tag,
+                symbol: &poo.symbol,
+            });
+        }
+
         for field in &poo.fields {
             let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
                 Ok(t) => t,
@@ -118,6 +122,16 @@ fn analyze_poos<'src, 'p>(
             match resolved_type.root_type() {
                 CidlType::Stream => {
                     sink.push(SemanticError::PlainOldObjectInvalidFieldType { field });
+                }
+                CidlType::Object { name } | CidlType::Partial { object_name: name }
+                    if !is_internal && let Some(tag) = find_internal_tag_obj(table, name) =>
+                {
+                    // A public POO cannot expose an internal object as a field type.
+                    sink.push(SemanticError::InternalVisibility {
+                        tag,
+                        symbol: field,
+                        reason: InternalVisibilityViolation::Composition,
+                    });
                 }
                 _ => {
                     // All other types are valid
@@ -144,6 +158,7 @@ fn analyze_poos<'src, 'p>(
             PlainOldObject {
                 name: poo_name,
                 fields,
+                is_internal,
             },
         );
     }
@@ -266,7 +281,8 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         );
                     }
 
-                    for arg in model_block.shard_args.iter().flatten() {
+                    for key in model_block.shard_args.iter().flatten() {
+                        let arg = key.local_or_target();
                         insert_local(
                             sink,
                             arg,
@@ -754,7 +770,7 @@ fn resolve_inject<'src, 'p>(
 
     fn resolve_durable_target<'src, 'p>(
         binding: &'p Symbol<'src>,
-        initializers: &'p [InjectInitializer<'src>],
+        initializers: &'p [TargetKey<'src>],
         parameters: &mut [ValidatedField<'src>],
         table: &SymbolTable<'src, 'p>,
         sink: &mut ErrorSink<'src, 'p>,
@@ -794,7 +810,8 @@ fn resolve_inject<'src, 'p>(
                 continue;
             };
 
-            let arg = &init.arg;
+            // Without an explicit alias the shard field binds to the like-named parameter.
+            let arg = init.local_or_target();
             let Some(param) = parameters.iter_mut().find(|p| p.name == arg.name) else {
                 sink.push(SemanticError::UnresolvedSymbol { symbol: arg });
                 continue;
@@ -829,6 +846,31 @@ fn resolve_inject<'src, 'p>(
             shard_args,
         })
     }
+}
+
+/// Returns the first [Tag::Internal] on `symbol`, if any.
+fn find_internal_tag<'src, 'p>(symbol: &'p Symbol<'src>) -> Option<&'p Spd<Tag<'src>>> {
+    symbol
+        .tags
+        .iter()
+        .find(|t| matches!(t.inner, Tag::Internal))
+}
+
+/// Returns the first [Tag::Internal] on an [idl::Model] or [idl::PlainOldObject]
+/// with the given name, if any.
+fn find_internal_tag_obj<'src, 'p>(
+    table: &SymbolTable<'src, 'p>,
+    name: &'src str,
+) -> Option<&'p Spd<Tag<'src>>> {
+    if let Some(model) = table.models.get(name) {
+        return find_internal_tag(&model.symbol);
+    }
+
+    if let Some(poo) = table.poos.get(name) {
+        return find_internal_tag(&poo.symbol);
+    }
+
+    None
 }
 
 /// Returns if a column in a D1 model is a valid SQLite type

@@ -35,14 +35,14 @@ const SRC: &str = r#"
         one Board::tenantId(tenantId) { board }
     }
 
-    model Board for BoardDo(tenantId) {
+    model Board for BoardDo::tenantId {
         primary { pid: int }
         r2 Bucket::banner(pid) { banner }
         kv BoardDo::{ topCache(), tenantId(tenantId) } { top }
         many Entry::{ tenantId(tenantId), boardId(pid) } { entries }
     }
 
-    model Entry for BoardDo(tenantId) {
+    model Entry for BoardDo::tenantId {
         primary { id: int }
         column { score: int }
         foreign Board::pid { boardId }

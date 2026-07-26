@@ -1,5 +1,5 @@
 import { HttpResult } from "cloesce";
-import { createApp, Worker, BlobService, BlobHaver, type Api, type CfEnv } from "./backend.js";
+import { createApp, BlobService, BlobHaver, type Api, type CfEnv } from "./backend.js";
 
 const blobService: Api.BlobService.Of = {
   incrementBlob(blob) {
@@ -54,7 +54,8 @@ const blobHaver: Api.BlobHaver.Of = {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker)
+    return createApp()
+      .worker(env)
       .register(BlobService, blobService)
       .register(BlobHaver, blobHaver)
       .run(request);

@@ -1,9 +1,13 @@
 import { DurableObject } from "cloudflare:workers";
-import { createApp, Worker, LibraryDoHost, Author, Book, type CfEnv } from "./backend.js";
+import { createApp, Author, Book, type CfEnv } from "./backend.js";
 import libraryDoInitial from "./migrations/LibraryDo/Initial.js";
 
+function app() {
+  return createApp().register(Author, {}).register(Book, {});
+}
+
 export class LibraryDo extends DurableObject<CfEnv> {
-  private base = createApp(this, LibraryDoHost, [libraryDoInitial]).register(Book, {});
+  private base = app().durable(this, [libraryDoInitial]);
   async fetch(request: Request): Promise<Response> {
     return this.base.run(request);
   }
@@ -11,6 +15,6 @@ export class LibraryDo extends DurableObject<CfEnv> {
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env, Worker).register(Author, {}).register(Book, {}).run(request);
+    return app().worker(env).run(request);
   },
 };

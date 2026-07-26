@@ -511,6 +511,11 @@ pub struct Model<'src> {
     pub data_sources: BTreeMap<&'src str, DataSource<'src>>,
 
     pub cruds: Vec<CrudKind>,
+
+    /// True if the models fields should not be exposed to the client.
+    ///
+    /// Additionally implies that any [Model::apis] [ApiMethod::is_static] is true.
+    pub is_internal: bool,
 }
 
 impl Model<'_> {
@@ -576,6 +581,9 @@ pub struct PlainOldObject<'src> {
 
     #[serde(borrow)]
     pub fields: Vec<ValidatedField<'src>>,
+
+    /// True if the POO should not be exposed to the client.
+    pub is_internal: bool,
 }
 
 /// Some field within a KV or R2 binding

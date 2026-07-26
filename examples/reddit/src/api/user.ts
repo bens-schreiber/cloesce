@@ -2,7 +2,8 @@ import * as clo from "@cloesce/backend.js";
 import { DurableObject } from "cloudflare:workers";
 import { HttpResult } from "cloesce";
 import userDoInitial from "../../migrations/UserDo/1784326759_Initial.js";
-import { newToken } from "./auth.js";
+import { authFromRequest, newToken } from "./auth.js";
+import { app } from "./main.js";
 
 export const user: clo.Api.User.Of = {
   async login(env, username) {
@@ -32,14 +33,14 @@ export const user: clo.Api.User.Of = {
 };
 
 export class UserDo extends DurableObject<clo.CfEnv> {
-  private base = clo
-    .createApp(this, clo.UserDoHost, [userDoInitial])
-    .register(clo.User, user)
-    .register(clo.AuthoredSubReddit, {})
-    .register(clo.AuthoredPost, {})
-    .register(clo.AuthoredComment, {});
+  private base = app().durable(this, [userDoInitial]);
 
   async fetch(request: Request): Promise<Response> {
-    return this.base.run(request);
+    const authed = this.base.register(
+      clo.AuthUser,
+      await authFromRequest(this.base.env.sessions, request),
+    );
+
+    return authed.run(request);
   }
 }
