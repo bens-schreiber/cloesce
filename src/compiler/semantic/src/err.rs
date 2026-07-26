@@ -834,13 +834,13 @@ fn display(
                     "an internal model may only have static methods"
                 }
                 InternalVisibilityViolation::UsedAsParameter => {
-                    "no API may accept a parameter of an internal model type"
+                    "no API may accept a parameter of an internal object type"
                 }
                 InternalVisibilityViolation::ReturnedFromApi => {
-                    "no API may return an internal model type"
+                    "no API may return an internal model object type"
                 }
                 InternalVisibilityViolation::Composition => {
-                    "an internal model cannot be composed into another model or plain-old-object"
+                    "an internal object cannot be composed into a public object"
                 }
             };
 
