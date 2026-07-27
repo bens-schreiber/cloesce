@@ -1,6 +1,6 @@
-# Environment Declaration
+# Environment Declarations
 
-Environment bindings are how Cloesce, manages, references and injects Cloudflare Workers bindings in your application.
+Environment bindings are how Cloesce manages, references, and injects Cloudflare Workers bindings in your application.
 
 Currently, Cloesce supports [D1](https://developers.cloudflare.com/d1/), [KV](https://developers.cloudflare.com/kv/), [R2](https://developers.cloudflare.com/r2/), [Durable Objects](https://developers.cloudflare.com/durable-objects/), and [Wrangler Environment Variables](https://developers.cloudflare.com/workers/configuration/environment-variables/).
 

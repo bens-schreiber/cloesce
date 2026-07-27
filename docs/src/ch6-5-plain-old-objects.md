@@ -34,7 +34,7 @@ In the above code, the `GraphNode` POO has a field `children` which is an array 
 
 ## `[internal]` POOs
 
-A Plain Old Object can be marked as `[internal]`, which will prevent any API method to accept or return that POO. For example:
+A Plain Old Object can be marked as `[internal]`, which prevents any API method from accepting or returning that POO. For example:
 
 ```cloesce
 [internal]
@@ -49,6 +49,6 @@ kv Credentials {
 }
 ```
 
-Here, `UserCredentials` is internal, so no API method can accept or return it. It can still be used in a KV template, as those are not exposed to the client.
+Here, `UserCredentials` is internal, so no API method can accept or return it. It can still be used in a KV template, since KV templates are not exposed to the client.
 
-Any Model that is not internal will not be able to have the `Credentials::creds` field referenced in an API method, since it is internal.
+A Model may still have a `Credentials::creds` KV field, but that field cannot be exposed through an API method, since `UserCredentials` itself is internal.

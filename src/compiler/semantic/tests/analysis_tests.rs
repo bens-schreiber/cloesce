@@ -2176,7 +2176,7 @@ fn proposal_relationship_matrix() {
             many D1Primary::primaryId(routeId) { d1BackedMany }
 
             // DO KV from a worker reaching into a DO: shard supplied explicitly.
-            kv DoA::{ cache(routeId), tenantId(tenantId) } { workerCache }
+            kv DoA::{ cache(routeId), tenantId } { workerCache }
         }
 
         model D1Primary for db_a {
@@ -2228,8 +2228,8 @@ fn proposal_relationship_matrix() {
             // DO A -> DO B (1:N)
             many DoBackedB::{ tenantId(tenantId), routeId(routeId) } { doBackedBMany }
 
-            // DO KV from a DO-backed model
-            kv DoA::{ cache(routeId), tenantId(tenantId) } { selfCache }
+            // DO KV from a DO-backed model.
+            kv DoA::{ cache(routeId), tenantId } { selfCache }
         }
 
         model DoBackedB for DoB::tenantId {

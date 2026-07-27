@@ -21,7 +21,7 @@ By default, primary keys are `NOT NULL`, `UNIQUE`, and `AUTOINCREMENT` (for inte
 
 ### Composite Primary Key
 
-Any number of fields can be in the `primary` block, or, any number of `priamry` blocks can exist.
+Any number of fields can be in a single `primary` block, or spread across any number of `primary` blocks.
 
 For example, the following `User` Model has a composite primary key consisting of an `id` field and an `email` field:
 

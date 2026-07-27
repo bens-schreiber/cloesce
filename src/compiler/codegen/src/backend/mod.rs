@@ -47,8 +47,14 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.interpolate_segments(&segments)
     }
 
-    /// The env-store key for a model or source name (camelCase: `Parent` -> `parent`).
+    /// The env-store key for a model, source, or binding name (camelCase: `Parent` -> `parent`).
+    ///
+    /// SCREAMING_SNAKE_CASE names (e.g. env var bindings like `SECRET`) are kept as-is, since
+    /// lowercasing only the first character would produce the awkward `sECRET`.
     fn store_key(&self, name: &str) -> String {
+        if name.is_empty() || name == name.to_uppercase() {
+            return name.to_string();
+        }
         let mut chars = name.chars();
         match chars.next() {
             Some(first) => first.to_lowercase().collect::<String>() + chars.as_str(),

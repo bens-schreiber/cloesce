@@ -106,7 +106,7 @@ The above example defines a relationship where Person has many Dogs, which will 
 
 **No Discriminator Example**
 
-Like with the `one` block, it is not necessary to provide any discriminato, but it may produce a more efficient query plan to do so.
+Like with the `one` block, a discriminator is not required, but providing one may produce a more efficient query plan.
 
 The following is also valid:
 
@@ -138,17 +138,17 @@ model PersonIndex for D1Db {
         tenant: string
     }
 
-    one PersonDo::{personId, tenant} {
+    one Person::{personId, tenant} {
         person
     }
 }
 
 model Person for PersonDo::{personId, tenant} {
-    kv PersonDo::{profile, personId, tenant} {
+    kv PersonDo::{profile(personId, tenant), personId, tenant} {
         profile
     }
 
-    // We can even point back to the index Model, if we want too!
+    // We can even point back to the index Model!
     one PersonIndex::{personId, tenant} {
         index
     }

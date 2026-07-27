@@ -12,8 +12,8 @@ Cloesce provides first class support for Durable Objects:
 
 - Define DOs in your schema
 - Generate a fully typed interface
-- Use them as a [Model backing](./ch4-1-sqlite-backed-model.md#with-durable-objects)
-- Execute API methods [within a DOs context](./ch6-1-rest-apis.md#execution-context)
+- Use them as a [Model backing](./ch4-2-sqlite-backed-model.md#with-durable-objects)
+- Execute API methods [within a DO's context](./ch6-1-rest-apis.md#execution-context)
 
 > [!WARNING]
 > Cloesce is only capable of using the modern [SQLite backed Durable Objects](https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/#sqlite-storage-backend), and does not support the legacy Durable Object storage API.

@@ -1,6 +1,6 @@
 # SQLite Backed Models
 
-Unlike a [Worker Backed Model](./ch4-1-worker-models.md) which have no persistence, a [SQLite Backed Model](./ch4-2-sqlite-backed-model.md) is backed by a SQLite database, which can be stored in either a [D1](./ch3-2-d1.md) database or a [Durable Object](./ch3-3-durable-objects.md).
+Unlike a [Worker Backed Model](./ch4-1-worker-models.md), which has no persistence, a SQLite Backed Model is backed by a SQLite database, stored in either a [D1](./ch3-2-d1.md) database or a [Durable Object](./ch3-3-durable-objects.md).
 
 ## Defining an Environment Binding
 

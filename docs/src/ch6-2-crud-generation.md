@@ -19,7 +19,7 @@ See [Data Sources](./ch5-0-data-sources.md) for more information on how to defin
 
 ## Get
 
-By default, the `get` operation retrieves a single record by its [primary key](./ch4-2-sqlite-constraints.md#primary-key), [shard fields](./ch3-3-durable-objects.md) and [route fields](./ch4-3-kv-fields.md#route-fields). For example:
+By default, the `get` operation retrieves a single record by its [primary key](./ch4-3-sqlite-constraints.md#primary-key), [shard fields](./ch3-3-durable-objects.md) and [route fields](./ch4-1-worker-models.md). For example:
 
 ```cloesce
 [crud get]
@@ -55,7 +55,10 @@ model Person for Db {
 }
 
 source OffsetPagination for Person {
-    list(offset: int, limit: int)
+    list {
+        offset: int
+        limit: int
+    }
 }
 ```
 
@@ -85,7 +88,7 @@ model Person for Db {
 
 ### R2 Fields
 
-If your Model contains an [R2 field](./ch4-4-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data.
+If your Model contains an [R2 field](./ch4-5-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data.
 
 To work around this, you can define a custom [instance method](./ch6-1-rest-apis.md#instance-methods) on your Model that accepts a `stream` parameter:
 

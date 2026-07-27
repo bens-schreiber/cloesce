@@ -12,7 +12,12 @@ import { CloesceError, CloesceResult, InternalError } from "../common.js";
 export type Registry = Map<string, any>;
 
 function storeKey(name: string): string {
-  return name.length === 0 ? name : name[0].toLowerCase() + name.slice(1);
+  if (name.length === 0 || name === name.toUpperCase()) {
+    // SCREAMING_SNAKE_CASE names (e.g. env var bindings) are kept as-is,
+    // since lowercasing only the first character would produce `sECRET`.
+    return name;
+  }
+  return name[0].toLowerCase() + name.slice(1);
 }
 
 /**

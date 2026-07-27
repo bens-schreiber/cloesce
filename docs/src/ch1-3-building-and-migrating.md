@@ -40,7 +40,7 @@ cloesce compile
 ## Migrations
 
 > [!TIP]
-> Schema modifications to a [SQLite backed Model](./ch4-1-sqlite-backed-model.md) should be accompanied by a new migration. This ensures that your database schema stays in sync with your Cloesce Models.
+> Schema modifications to a [SQLite backed Model](./ch4-2-sqlite-backed-model.md) should be accompanied by a new migration. This ensures that your database schema stays in sync with your Cloesce Models.
 
 Migrations turn a Cloesce schema into a set of SQL statements that can be applied to a database, tracking changes over time.
 

@@ -58,15 +58,13 @@ If we were to fetch naively, we would end up in an infinite loop of fetching `Pe
 ```cloesce
 source Default for Person {
     include {
-        dogs
+        dog
     }
 }
 
 source Default for Dog {
     include {
-        owner {
-            dogs
-        }
+        owner
     }
 }
 ```
@@ -78,15 +76,15 @@ Each branch of the Include Tree is a relationship that will be joined when fetch
 To prevent overfetching (and infinite loops), the Default Data Source will join:
 
 - R2 and KV fields
-- All [One-to-One Navigation Fields](./ch4-5-navigation-fields.md#one-to-one-relationship)
-- The near side of all [1:M Navigation Fields](./ch4-5-navigation-fields.md#one-to-many-relationship)
+- All [One-to-One Navigation Fields](./ch4-6-navigation-fields.md#one-to-one)
+- The near side of all [1:M Navigation Fields](./ch4-6-navigation-fields.md#one-to-many)
 - The near side of a recursive relationship
 
 ## CRUD Operations
 
 Alongside the Include Tree, every Data Source has three operations: `get`, `list`, and `save`.
 
-The default implementations of these operations are as so:
+The default implementations of these operations are as follows:
 
 - `get`: fetch a single instance by primary keys, route keys and shard keys
 - `list`: fetch a list of instances by primary keys, route keys and shard keys via limited seek pagination
@@ -104,4 +102,4 @@ source Default for Person {
 
 The above Data Source includes _no_ relationships, so the default `get` and `list` operations will only return the `Person`'s primary keys and foreign keys, and will not join any relationships. `save` will simply no-op on children.
 
-For more information on how the Cloesce ORM and Query Planner works, read the [ORM Chapter](./ch7-0-orm-reference.md).
+For more information on how the Cloesce ORM and Query Planner work, read the [ORM Chapter](./ch7-0-orm-reference.md).

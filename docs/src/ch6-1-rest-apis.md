@@ -46,8 +46,8 @@ The above code defines an API for the `Person` Model:
 | GET    | `/Person/byId`          | `Person` instance |
 | POST   | `/Person/create`        | `Person` instance |
 | DELETE | `/Person/del`           | `void`            |
-| PUT    | `/Person/update`        | `void` instance   |
-| PATCH  | `/Person/updatePartial` | `void` instance   |
+| PUT    | `/Person/update`        | `void`            |
+| PATCH  | `/Person/updatePartial` | `void`            |
 
 All of the above methods are _static_. They do not hydrate an instance of that Model implicitly.
 
@@ -110,7 +110,7 @@ export const byId: Api.Person.byId = (id) => {
 };
 ```
 
-Like with most RPC frameworks, the implementation of the API must be registered such that it can be dispatched to when a request is made. A missing implementation will result in a `501 Not Implemented` response to the client.
+Like with most RPC frameworks, the API implementation must be registered so it can be dispatched to on a matching request. A missing implementation results in a `501 Not Implemented` response.
 
 ```ts
 import { CfEnv, createApp, Person } from "@cloesce/backend.js";

@@ -25,7 +25,7 @@ The above snippet defines a Model `User` with a KV field `settings` that is sour
 The value in the template is typed as `json`, and Cloesce will automatically handle the serialization and deserialization of this field when reading from and writing to KV.
 
 > [!NOTE]
-> If a Model wants to use a Durable Objects KV field, shard fields must be provided in `kv` field:
+> To use a Durable Object's KV field, shard fields must be provided in the `kv` field:
 >
 > ```cloesce
 > durable MyDurableObject {
@@ -50,18 +50,18 @@ A common pattern is to format a key such that any number of related values can b
 ```cloesce
 kv MyNamespace {
     profile -> json {
-        userId: string
+        userId: int
 
         "profile/{userId}"
     }
 
     profileImplicitKey -> json {
-        userId: string
+        userId: int
     }
 }
 ```
 
-Here, `profile` accepts one parameter `userId`, which is a string. The key for this field in KV is defined as `"profile/{userId}"`, where `{userId}` is a placeholder that will be replaced with the actual value of the `userId` parameter when accessing KV.
+Here, `profile` accepts one parameter, `userId`. The key for this field in KV is defined as `"profile/{userId}"`, where `{userId}` is a placeholder replaced with the actual value of the `userId` parameter when accessing KV.
 
 In the `profileImplicitKey` field, the key is not explicitly defined, so Cloesce will automatically generate a key based on the field name and its parameters. In this case, the key will be `"profileImplicitKey/userId/{userId}"`.
 

@@ -7,7 +7,7 @@
 
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value store.
 
-Define a KV binding in your schema to generate a matching Wrangler configuration and a fully a fully typed interface for [querying that namespace in your application code](./ch7-0-orm-reference.md).
+Define a KV binding in your schema to generate a matching Wrangler configuration and a fully typed interface for [querying that namespace in your application code](./ch7-0-orm-reference.md).
 
 ```cloesce
 kv MyNamespace {
@@ -33,7 +33,7 @@ A Wrangler configuration will be generated:
 ```toml
 [[kv_namespaces]]
 binding = "MyNamespace"
-namespace_id = "replace-with-my_namespace-id"
+id = "replace_with_MyNamespace_id"
 ```
 
 ## R2
@@ -60,5 +60,5 @@ Additionally, a Wrangler configuration will be generated:
 ```toml
 [[r2_buckets]]
 binding = "MyBucket"
-bucket_name = "replace-with-my_bucket-name"
+bucket_name = "replace-with-mybucket-name"
 ```

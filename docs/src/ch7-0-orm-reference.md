@@ -31,7 +31,7 @@ Cloesce **upgrades** these bindings to provide a rich set of functionality for y
 
 ## KV, R2, and Durable Object Methods
 
-Key templates can be defined in [R2](./ch3-1-r2.md), [Durable Object KV](./ch3-2-do-kv.md), and [Durable Object](./ch3-3-durable-objects.md) bindings.
+Key templates can be defined in [R2](./ch3-1-kv-and-r2.md#r2), [Durable Object KV](./ch3-3-durable-objects.md), and [Durable Object](./ch3-3-durable-objects.md) bindings.
 
 Each upgraded binding exposes methods to read, write, and list data from these key templates.
 

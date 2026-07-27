@@ -38,10 +38,10 @@ api Person {
 }
 ```
 
-A generated backend stub for the `stuff` API method will include an `env` parameter with **ORM upgraded** types:
+A generated backend stub for the `stuff` API method will include an `env` parameter with **ORM upgraded** types, each reached by its [camelCased binding name](./ch7-0-orm-reference.md):
 
-- `env.Db` will contain all Models within the `Db` binding, with all of their Data Sources and API methods invokable
-- `env.Bucket` will contain all templated R2 methods for the `Bucket` binding, with read, write and list methods invokable
+- `env.db` will contain all Models within the `Db` binding, with all of their Data Sources and API methods invokable
+- `env.bucket` will contain all templated R2 methods for the `Bucket` binding, with read, write and list methods invokable
 - `env.SECRET` will contain the value of the `SECRET` binding, as a string
 
 See the [Cloesce ORM](./ch7-0-orm-reference.md) for more information on how to use the injected bindings.

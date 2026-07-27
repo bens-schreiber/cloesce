@@ -382,6 +382,7 @@ pub struct KvFieldArgument<'src> {
     /// or a Durable Object shard iff the KV Field references a DO binding.
     pub target: Symbol<'src>,
 
+    /// - If empty => `target` alone; for a shard arg, the local field defaults to `target`'s name
     /// - If 1 => `target(local)`
     /// - If >1 => `target(local1, local2, ...)`
     pub local: Vec<Symbol<'src>>,

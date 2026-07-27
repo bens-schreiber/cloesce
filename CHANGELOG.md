@@ -10,6 +10,7 @@
 - `hydrate` and `hydrateAll` methods capable of loading any navigation property on any given Model seed
 - `[header]` tag
 - `[unique]` tag
+- `[internal]` tag for Models and Plain Old Objects
 
 ### Changed
 

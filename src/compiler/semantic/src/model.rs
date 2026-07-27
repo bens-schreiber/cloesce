@@ -891,14 +891,19 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 continue;
             };
 
-            // `shardField(local)` supplies exactly one local field for the shard.
-            let [local] = arg.local.as_slice() else {
-                ma.sink.push(SemanticError::ArgCountMismatch {
-                    field: &arg.target,
-                    expected: 1,
-                    got: arg.local.len(),
-                });
-                continue;
+            // `shardField(local)` supplies exactly one local field for the shard;
+            // `shardField` alone defaults the local field to the shard's own name.
+            let local = match arg.local.as_slice() {
+                [local] => local,
+                [] => &arg.target,
+                _ => {
+                    ma.sink.push(SemanticError::ArgCountMismatch {
+                        field: &arg.target,
+                        expected: 1,
+                        got: arg.local.len(),
+                    });
+                    continue;
+                }
             };
 
             let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {
