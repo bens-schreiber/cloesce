@@ -54,7 +54,7 @@ A simple project structure is created for you.
 │   ├── web/            # Frontend web assets
 │   └── schema/
 │       └── schema.clo  # Cloesce schema
-├── test/               # Unit tests for example Models
+├── test/               # Example unit tests
 ├── migrations/         # Database migration files
 ├── cloesce.jsonc       # Cloesce configuration
 ```

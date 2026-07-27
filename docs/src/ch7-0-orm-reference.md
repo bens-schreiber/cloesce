@@ -1,28 +1,18 @@
 # ORM Reference
 
-> [!WARNING]
-> The ORM is subject to change as new features are added.
-
 Cloesce takes a different approach to the traditional ORM.
 
 Instead of utilizing some framework to query data with a declarative syntax (such as Entity Framework, Prisma, Drizzle, etc.), Cloesce is focused on _hydrating_ and _saving_ your Models across different storage backends.
 
 Additionally, unlike other frameworks that combine an ORM with a REST API (such as Django, Rails, or Coalesce), Cloesce does _not_ use an [Active Record](https://en.wikipedia.org/wiki/Active_record_pattern) pattern, deliberately separating generated database types from database persistence.
 
-Despite this, Cloesce is incredibly powerful, allowing developers to seamlessly interweave business logic with hydration and persistence.
+Despite this, Cloesce is incredibly powerful: developers can seamlessly interweave business logic with hydration and persistence, with a schema enforced at compile time.
 
 ## The Cloesce Environment
 
 Every Cloudflare Workers application defines a set of [Environment Bindings](https://developers.cloudflare.com/workers/runtime-apis/#environment-bindings). These are available to the application at runtime.
 
-Cloesce **upgrades** these bindings to provide a rich set of functionality for your application:
-
-- KV/R2/DO-KV Templates generate fully typed methods to read, write, and list data from the underlying storage backend.
-- Database bindings house namespaces for their respective Models.
-- Models expose the same Data Source and API methods that have been implemented on the backend.
-- Every Model is given powerful `hydrate`, `hydrateAll`, and `load` methods to seamlessly retrieve related data according to the schema in the fastest way possible.
-
-These upgraded bindings are not all exposed to every API method, but must be explicitly injected into each API method that requires them.
+Cloesce **upgrades** these bindings to provide a rich set of functionality for your application, and exposes them only to methods that explicitly inject them.
 
 > [!TIP]
 > After creating an app with `createApp`, the full set of upgraded bindings can be found in the `env` parameter of the app.
@@ -90,14 +80,22 @@ api Person {
 interface KvHelpers<T> {
   /** Renders the key template. */
   template(id: number): string;
+
   /** Reads the value at the templated key. */
   get(id: number): Promise<T | null>;
+
   /** Writes the value at the templated key. */
   put(id: number, value: T): Promise<void>;
+
   /** Lists keys under this template's prefix. */
-  list(options?: { limit?: number; cursor?: string }): Promise<{ keys: { key: number; value: T }[]; cursor?: string }>;
+  list(options?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ keys: { key: number; value: T }[]; cursor?: string }>;
 }
 ```
+
+**Example Usage**
 
 ```ts
 env.myKv.user.template(1); // => "user/1"
@@ -112,14 +110,25 @@ await env.myKv.user.list({ limit: 20 });
 interface R2Helpers {
   /** Renders the key template. */
   template(): string;
+
   /** Reads the object's data. */
   get(): Promise<R2ObjectBody | null>;
+
   /** Writes the object's data. */
-  put(value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob): Promise<R2Object | null>;
+  put(
+    value: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob,
+  ): Promise<R2Object | null>;
+
   /** Lists object HEADs (not their data) under this template's prefix. */
-  list(options?: { limit?: number; cursor?: string; delimiter?: string }): Promise<{ objects: R2Object[]; cursor?: string }>;
+  list(options?: {
+    limit?: number;
+    cursor?: string;
+    delimiter?: string;
+  }): Promise<{ objects: R2Object[]; cursor?: string }>;
 }
 ```
+
+**Example Usage**
 
 ```ts
 env.myBucket.image.template(); // => "image"
@@ -134,10 +143,13 @@ await env.myBucket.image.list({ limit: 20 });
 interface DoHelpers<T> {
   /** Resolves the shard's DurableObjectId. */
   id(tenant: string): DurableObjectId;
+
   /** Resolves a stub for the shard, typed as `T`. */
   stub<T>(tenant: string): DurableObjectStub & T;
 }
 ```
+
+**Example Usage**
 
 ```ts
 env.myDo.id("tenant");
@@ -150,6 +162,7 @@ env.myDo.stub<MyDo>("tenant");
 interface DoKvHelpers<T> {
   /** Renders the key template. */
   template(tenant: string): string;
+
   /**
    * Reads the value at the templated key.
    * Pass shard fields to call from outside the DO (async, routed over RPC).
@@ -158,13 +171,17 @@ interface DoKvHelpers<T> {
    */
   get(tenant: string): Promise<T | null>;
   get(ctx: DurableObjectState): T | null | undefined;
+
   /** Writes the value at the templated key. Same overload as `get`. */
   put(tenant: string, value: T): Promise<void>;
   put(ctx: DurableObjectState, value: T): void;
-  /** Lists keys under this template's prefix. Only callable from inside the DO. */
+
+  /** Lists keys under this template's prefix. */
   list(ctx: DurableObjectState): { key: string; value: T }[];
 }
 ```
+
+**Example Usage**
 
 ```ts
 env.myDo.settings.template("tenant"); // => "custom/key/template/tenant"
@@ -172,20 +189,9 @@ await env.myDo.settings.put("tenant", { hello: "world" }); // outside the DO
 await env.myDo.settings.get("tenant"); // outside the DO
 ```
 
-> [!NOTE]
-> There's no shard-addressed `list` from outside a Durable Object. Listing across shards would mean listing across separate DO instances. From inside the DO's own methods, call the helpers with `this.ctx` instead of shard fields:
->
-> ```ts
-> class MyDo extends DurableObject {
->   async debugDump() {
->     return env.myDo.settings.list(this.ctx);
->   }
-> }
-> ```
-
 ## Model Methods
 
-When a D1 or Durable Object database is injected into an API method, all Models defined against that database become available in their upgraded form, as `ModelStore` objects. Each is reached by its camelCased name off the injected binding.
+When a D1 or Durable Object database is injected into an API method, all Models defined against that database become available in their upgraded form, as `ModelStore` objects.
 
 Every method on a `ModelStore` (`get`, `list`, `save`, `hydrate`, `hydrateAll`, `load`) returns an `HttpResult<T>`. This is the same result wrapper your API methods return:
 
@@ -306,18 +312,12 @@ async feed(self, env) {
 
 How the heck does Cloesce know how to hydrate a Model, with data that could be stored _anywhere_?
 
-Cloesce splits this work into two parts:
+Cloesce splits query work into two parts:
 
 - The **Query Planner** looks at a Model's schema and an include tree, and decides what to fetch, from where, and in what order.
 - The **Query Executor** walks that plan at runtime, and issues the reads and writes.
 
 Plans are of two different IR forms: `select` and `save`.
-
-### Why a Planner
-
-The naive way to hydrate a Model graph is the classic ORM N+1 trap. Fetch the root rows, then loop over them issuing one more fetch per row per relation. For a Model whose relations span several storage backends, that's a separate KV `get` or Durable Object call per row, per relation.
-
-The planner avoids this by reasoning about the shape of the include tree once, instead of once per row. Every read that can happen at the same point in the graph is batched into a single operation, fetching all matching rows for all parents at once. Batches with no dependency on each other run concurrently.
 
 ### Select Plans
 
@@ -330,13 +330,7 @@ Every stage consists of one or more **steps**: a single operation that can be ex
 The planner's goal is to minimize the number of stages, and maximize the number of steps in each stage, such that as much work as possible can be done in parallel.
 
 > [!NOTE]
-> Hydrating an `Org` with a nested `board` (itself with a `banner`, `entries`, and `top`) takes 3 stages and 5 steps.
->
-> - Stage 0 fetches `Org`.
-> - Stage 1 fetches `Board` and reads the DO-KV `top` field, in parallel.
-> - Stage 2 reads the R2 `banner` and searches for `Entry` rows, in parallel.
->
-> Five relations, three round trips. See [Explain Command](#explain-command) for what this looks like.
+> Nested `many` relationships are batch-loaded such that the `N+1` query problem is mitigated.
 
 ### Save Plans
 
@@ -365,22 +359,22 @@ cloesce explain <model> <data_source> <get|list|save> [--dir .] [--payload <file
 
 Each step in the printed tree is one operation. Here's what the grammar means:
 
-| Term | Meaning |
-| --- | --- |
-| `SEARCH` | Reads rows matching a predicate (a `WHERE` clause). |
-| `SCAN` | Reads rows with no predicate, an unfiltered read. |
-| `READ` / `WRITE` | Reads or writes a single KV/DO-KV/R2 key. |
-| `BATCH ON` | A group of SQL statements sent to one database in a single round trip. |
-| `INSERT` | An insert within a `BATCH`, with its column values shown. |
-| `READBACK` | Re-reads a row just written, to pick up generated values like an autoincrementing id. |
-| `SYNTHESIZE` | Assembles a result from values already on hand, no fetch needed. |
-| `INTO` | Where the result of this step lands in the hydrated tree. |
-| `KEY` | The resolved key template for a KV/DO-KV/R2 operation. |
-| `JOIN` | How child rows are matched back to their parent (`parent.field` = `row.field`). |
-| `SHARD` | Which fields select the Durable Object shard for this operation. |
-| `ATTACH` | Extra fields carried onto the result alongside the fetched row. |
-| `VALUE` | The literal value being written. |
-| `ONE` / `MANY` | Whether the step expects a single row or a list. |
+| Term             | Meaning                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `SEARCH`         | Reads rows matching a predicate (a `WHERE` clause).                                   |
+| `SCAN`           | Reads rows with no predicate, an unfiltered read.                                     |
+| `READ` / `WRITE` | Reads or writes a single KV/DO-KV/R2 key.                                             |
+| `BATCH ON`       | A group of SQL statements sent to one database in a single round trip.                |
+| `INSERT`         | An insert within a `BATCH`, with its column values shown.                             |
+| `READBACK`       | Re-reads a row just written, to pick up generated values like an autoincrementing id. |
+| `SYNTHESIZE`     | Assembles a result from values already on hand, no fetch needed.                      |
+| `INTO`           | Where the result of this step lands in the hydrated tree.                             |
+| `KEY`            | The resolved key template for a KV/DO-KV/R2 operation.                                |
+| `JOIN`           | How child rows are matched back to their parent (`parent.field` = `row.field`).       |
+| `SHARD`          | Which fields select the Durable Object shard for this operation.                      |
+| `ATTACH`         | Extra fields carried onto the result alongside the fetched row.                       |
+| `VALUE`          | The literal value being written.                                                      |
+| `ONE` / `MANY`   | Whether the step expects a single row or a list.                                      |
 
 `cloesce explain Org default get` prints:
 

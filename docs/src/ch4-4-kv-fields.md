@@ -1,10 +1,8 @@
 # KV Fields
 
-[Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value store.
+Any Model may have any number of [Cloudflare KV](https://developers.cloudflare.com/kv/) hydrated fields.
 
-Any Model may have any number of KV hydrated fields, which reference templates defined in a KV namespace or Durable Object binding.
-
-Read more about [KV bindings](./ch3-1-kv-and-r2.md#workers-kv) and [Durable Object bindings](./ch3-3-durable-objects.md) in the Environment chapter.
+KV fields reference templates defined in a [KV bindings](./ch3-1-kv-and-r2.md#workers-kv) or [Durable Object bindings](./ch3-3-durable-objects.md).
 
 ## Defining a KV Field
 
@@ -16,15 +14,15 @@ kv MyNamespace {
 }
 
 model User {
-    kv MyNamespace::settings() {
+    kv MyNamespace::settings {
         settings
     }
 }
 ```
 
-The above snippet defines a Model `User` with a KV field `settings` that is stored in the namespace `MyNamespace` under the static key `"settings"`.
+The above snippet defines a Model `User` with a KV field `settings` that is sourced from the namespace `MyNamespace` under the static key `"settings"`.
 
-`settings` is typed as `json`, and Cloesce will automatically handle the serialization and deserialization of this field when reading from and writing to KV.
+The value in the template is typed as `json`, and Cloesce will automatically handle the serialization and deserialization of this field when reading from and writing to KV.
 
 > [!NOTE]
 > If a Model wants to use a Durable Objects KV field, shard fields must be provided in `kv` field:

@@ -1,8 +1,5 @@
 # CRUD Generation
 
-> [!NOTE]
-> The `delete` operation is not currently supported, but will be added in a future release.
-
 Creating the same CRUD operations for each Model can be tedious. Cloesce provides a way to automatically generate these operations based on your Model definitions and Data Source configurations.
 
 For every public Data Source defined on a Model, Cloesce will utilize the `get`, `save`, and `list` methods of that Data Source to generate CRUD API endpoints for that Model.
@@ -10,9 +7,15 @@ For every public Data Source defined on a Model, Cloesce will utilize the `get`,
 See [Data Sources](./ch5-0-data-sources.md) for more information on how to define Data Sources.
 
 > [!NOTE]
-> Tagging a Model with `[crud]` is a client hint to Cloesce: you want to expose these Data Source methods.
+> Tagging a Model with `[crud]` tells the compiler that all Data Sources on that Model should be exposed to the client for that particular set of CRUD operations. This is a hint to the compiler, and does not affect the backend.
 >
 > Cloesce will _always_ have all CRUD methods available to the backend. `[crud]` is only a hint for the client.
+
+> [!NOTE]
+> A Model marked as `[internal]` _cannot_ have `[crud]` applied to it, since it is not exposed to the client.
+
+> [!NOTE]
+> The `delete` operation is not currently supported, but will be added in a future release.
 
 ## Get
 

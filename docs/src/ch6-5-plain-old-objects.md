@@ -31,3 +31,24 @@ poo GraphNode {
 ```
 
 In the above code, the `GraphNode` POO has a field `children` which is an array of `GraphNode`s, allowing you to represent tree-like structures.
+
+## `[internal]` POOs
+
+A Plain Old Object can be marked as `[internal]`, which will prevent any API method to accept or return that POO. For example:
+
+```cloesce
+[internal]
+poo UserCredentials {
+    password: string
+}
+
+kv Credentials {
+    creds -> UserCredentials {
+        username: string
+    }
+}
+```
+
+Here, `UserCredentials` is internal, so no API method can accept or return it. It can still be used in a KV template, as those are not exposed to the client.
+
+Any Model that is not internal will not be able to have the `Credentials::creds` field referenced in an API method, since it is internal.

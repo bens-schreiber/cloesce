@@ -1,6 +1,6 @@
 # Environment Variables
 
-Any number of environment variables can be defined in the schema, which Cloesce will ensure are placed in the Wrangler configuration and made available to the Worker at runtime.
+Any number of environment variables can be defined in the schema, which will be placed in the Wrangler configuration and made available to the Worker at runtime.
 
 ## Defining Environment Variables
 
@@ -19,8 +19,8 @@ var {
 [Inject them](./ch6-3-dependency-injection.md) into an API endpoint like so:
 
 ```cloesce
-api Foo {
-    get foo -> string {
+api Foo  {
+    get bar -> string {
         inject { MY_VAR }
     }
 }

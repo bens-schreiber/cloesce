@@ -2,19 +2,21 @@
 
 Default capabilities for every Data Source are provided by Cloesce, but they can be naive:
 
-- Children are not limited to a certain number of results, which can lead to overfetching.
-- `many` relationships are ordered descending by primary key, which may not be the desired order.
+- Children are not limited to a certain number of results.
+- `many` relationships are ordered descending by primary key.
 - No filtering beyond what has been defined in the schema is provided.
-- Everything is exposed to the client, which may not be desired for security reasons.
+- CRUD operations are exposed to the client.
 
-To combat this, Cloesce allows you to define custom Data Sources for any Model.
+Define custom Data Sources for any Model in your schema to implement the exact behavior you want for your application.
 
 ## Defining a Data Source
 
 > [!NOTE]
-> By default, any scalar property (i.e. SQLite columns) will be included by all Data Sources. They cannot be excluded.
+> Any scalar property (i.e. SQLite columns) will be included in the Include Tree.
 
-Data Sources can be defined with a `source` block. In the inner `include` block, you can specify all fields to include in that Data Source, including R2, KV, and Navigation Fields.
+Data Sources can be defined with a `source` block.
+
+In the inner `include` block, you can specify all relationships to include in that Data Source, including R2, KV, and Navigation Fields.
 
 ```cloesce
 source WithDogsOwnersDogs for Person {
@@ -122,6 +124,8 @@ source ByName for Person {
 ```
 
 ## Internal Data Source
+
+If a Model is decorated with the `[crud]` tag (see the [CRUD Generation](./ch6-2-crud-generation.md) chapter), Cloesce will generate client methods for all Data Sources on that Model.
 
 Data Sources are the preferred way to retrieve Models in Cloesce for both the backend and the client. However, you may not want to expose a Data Source to the client, and only use it internally in your backend.
 

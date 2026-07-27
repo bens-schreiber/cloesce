@@ -1,12 +1,12 @@
 # Data Sources
 
-There are many ways to retrieve a Model.
+Models can be composed of a lot of different kinds of data.
 
 - You may want to retrieve only a subset of the relationships for a Model.
-- You may want to write complex queries with filtering, sorting, ordering, pagination, and even authentication to tell some people that they can't see certain data.
+- You may want to write queries to filter, sort, order, paginate, and even authenticate and authorize access to data.
 
-Cloesce does **not** try to be a general purpose query language.
+Unlike other ORMs, Cloesce is **not** a general purpose query builder.
 
-Instead, when you need business logic, you define Data Sources: stubs that you implement in your own HLL.
+Instead, when you need business logic, you define a **Data Source**: stubs implemented in the runtime.
 
 This chapter provides a reference for how to write Data Sources in Cloesce, which are the building blocks for all data retrieval in your application.

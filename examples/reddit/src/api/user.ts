@@ -5,7 +5,7 @@ import userDoInitial from "../../migrations/UserDo/1784326759_Initial.js";
 import { authFromRequest, newToken } from "./auth.js";
 import { app } from "./main.js";
 
-export const user: clo.Api.User.Of = {
+export const user = {
   async login(env, username) {
     // Logging in just claims a username
     const token = newToken();
@@ -30,7 +30,7 @@ export const user: clo.Api.User.Of = {
     const object = await env.avatar.avatar.get(self.name);
     return object ? HttpResult.ok(200, object.body) : HttpResult.fail(404, "No avatar set.");
   },
-};
+} satisfies clo.Api.User.Of;
 
 export class UserDo extends DurableObject<clo.CfEnv> {
   private base = app().durable(this, [userDoInitial]);

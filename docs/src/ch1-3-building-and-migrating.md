@@ -13,17 +13,20 @@ Define a `cloesce.jsonc` file in your project root to configure the Cloesce comp
 ```
 
 > [!TIP]
-> Multiple configuration files can be defined for different environments (e.g., `staging.cloesce.jsonc`, `production.cloesce.jsonc`).
+> Multiple configuration files can be defined for different environments:
 >
-> Select the desired configuration file using the `--env` flag when running Cloesce commands:
+> - `<name>.cloesce.jsonc`
+>
+> Select the desired configuration file using `--env <name>` when running Cloesce commands:
 >
 > ```bash
+> # given `staging.cloesce.jsonc` exists
 > cloesce --env staging ...
 > ```
 
 ## Compilation
 
-Compilation will transform your Cloesce schema into backend stubs and a client side API under the `.cloesce` directory. In your root directory, run the following command to compile your schema:
+In your root directory, run the following command to compile your schema:
 
 ```bash
 cloesce compile
@@ -39,7 +42,7 @@ cloesce compile
 > [!TIP]
 > Schema modifications to a [SQLite backed Model](./ch4-1-sqlite-backed-model.md) should be accompanied by a new migration. This ensures that your database schema stays in sync with your Cloesce Models.
 
-Cloesce supports any number of SQLite databases in a single project. Migrations turn a Cloesce schema into a set of SQL statements that can be applied to a database, tracking changes over time.
+Migrations turn a Cloesce schema into a set of SQL statements that can be applied to a database, tracking changes over time.
 
 **Specific Binding**
 

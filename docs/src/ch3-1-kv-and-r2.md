@@ -1,23 +1,13 @@
 # Workers KV and R2
 
-> [!TIP]
-> KV and R2 binding templates can be referenced on any Model via [KV Fields](./ch4-3-kv-fields.md) and [R2 Fields](./ch4-4-r2-fields.md), allowing you to easily integrate Workers KV and R2 across the full stack of the application.
-
 > [!NOTE]
-> KV definitions in the schema do not yet support cache control directives and expiration times. This is planned for a future release.
+> Cache control directives and expiration times are planned for a future release.
 
 ## Workers KV
 
-[Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value store. Cloesce provides first class support for KV, allowing a simple binding declaration to generate not only a Wrangler configuration for the namespace, but also a fully typed interface for querying that namespace in your application code.
+[Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value store.
 
-KV supports:
-
-- Eventually consistent writes
-- List queries with key based prefix matching and pagination
-- Metadata on each key-value pair
-- Maximum 25MB value size limit
-
-To define a Workers KV binding, use the `kv` block:
+Define a KV binding in your schema to generate a matching Wrangler configuration and a fully a fully typed interface for [querying that namespace in your application code](./ch7-0-orm-reference.md).
 
 ```cloesce
 kv MyNamespace {
@@ -38,9 +28,7 @@ kv MyNamespace {
 }
 ```
 
-A full interface to query the stores defined templates will be generated for your application code.
-
-Additionally, a Wrangler configuration will be generated:
+A Wrangler configuration will be generated:
 
 ```toml
 [[kv_namespaces]]
@@ -50,15 +38,22 @@ namespace_id = "replace-with-my_namespace-id"
 
 ## R2
 
+Define a [Cloudflare R2](https://developers.cloudflare.com/r2/) binding in your schema to generate a matching Wrangler configuration and a fully typed interface for [querying that bucket in your application code](./ch7-0-orm-reference.md).
+
 ```cloesce
 r2 MyBucket {
     getObject {}
+
+    getObjectCustomKey {
+        param1: string
+        param2: string
+
+        "path/to/{param1}/{param2}"
+    }
 }
 ```
 
 Unlike [Workers KV](#workers-kv), R2 bindings do not have a return type, because they will always return the Cloudflare [R2Object](./ch2-0-type-reference.md#primitives) (a `HEAD` request to the object, not the full value).
-
-A full interface to query the stores defined templates will be generated for your application code.
 
 Additionally, a Wrangler configuration will be generated:
 

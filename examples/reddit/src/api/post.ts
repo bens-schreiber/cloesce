@@ -5,7 +5,7 @@ import postDoInitial from "../../migrations/PostDo/1784326759_Initial.js";
 import { auth, authFromRequest } from "./auth.js";
 import { app } from "./main.js";
 
-export const post: clo.Api.Post.Of = {
+export const post = {
   async create(env, subRedditId, title, content) {
     const username = auth(env);
     if (username instanceof HttpResult) {
@@ -41,9 +41,9 @@ export const post: clo.Api.Post.Of = {
     const meta = { ...self.meta, upvotes: self.meta.upvotes + clampDelta };
     return env.postDo.post.save(self.doId, { meta });
   },
-};
+} satisfies clo.Api.Post.Of;
 
-export const comment: clo.Api.Comment.Of = {
+export const comment = {
   async create(env, postId, content) {
     const username = auth(env);
     if (username instanceof HttpResult) {
@@ -79,7 +79,7 @@ export const comment: clo.Api.Comment.Of = {
       upvotes: self.upvotes + clampDelta,
     });
   },
-};
+} satisfies clo.Api.Comment.Of;
 
 export class PostDo extends DurableObject<clo.CfEnv> {
   private base = app().durable(this, [postDoInitial]);

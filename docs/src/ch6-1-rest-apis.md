@@ -1,7 +1,5 @@
 # REST APIs
 
-Cloesce Models are not just about [defining data](./ch4-0-models.md) and [how to hydrate it](./ch5-0-data-sources.md); they also allow you to define how that data can be accessed and manipulated through APIs.
-
 By defining an API for a Model, you can specify REST endpoints that are generated as backend stubs and client methods, routed by the Cloesce runtime.
 
 ## Defining an API
@@ -26,18 +24,15 @@ api Person {
 
     delete del {
       id: int
-
-      header {
-        X_Auth_Token: string
-      }
+      X_Auth_Token: string
     }
 
-    put update -> Person {
+    put update {
       id: int
       name: string
     }
 
-    patch updatePartial -> Person {
+    patch updatePartial {
       id: int
       name: string
     }
@@ -46,15 +41,15 @@ api Person {
 
 The above code defines an API for the `Person` Model:
 
-| Verb   | Route                   |
-| ------ | ----------------------- |
-| GET    | `/Person/byId`          |
-| POST   | `/Person/create`        |
-| DELETE | `/Person/del`           |
-| PUT    | `/Person/update`        |
-| PATCH  | `/Person/updatePartial` |
+| Verb   | Route                   | Result            |
+| ------ | ----------------------- | ----------------- |
+| GET    | `/Person/byId`          | `Person` instance |
+| POST   | `/Person/create`        | `Person` instance |
+| DELETE | `/Person/del`           | `void`            |
+| PUT    | `/Person/update`        | `void` instance   |
+| PATCH  | `/Person/updatePartial` | `void` instance   |
 
-All of the above methods are _static_, meaning they are called in the namespace of a Model, but do not need to hydrate an instance of that Model.
+All of the above methods are _static_. They do not hydrate an instance of that Model implicitly.
 
 > [!TIP]
 >
@@ -62,6 +57,23 @@ All of the above methods are _static_, meaning they are called in the namespace 
 > of defining them in an API.
 >
 > Every Data Source will generate a corresponding API method for the client by default.
+
+### `[header]` tag
+
+API methods accept all parameters in the request body by default. If you want to accept a parameter from the request headers instead, you can tag that parameter with `[header]`:
+
+```cloesce
+api Person {
+    delete del {
+      id: int
+
+      [header]
+      X_Auth_Token: string
+    }
+}
+```
+
+Headers may use `Pascal_Snake_Case` to indicate that it should be parsed as `X-Auth-Token` in the request headers.
 
 ### Generated Code
 
@@ -79,7 +91,7 @@ export default {
     // ...
   },
 
-  del(X_Auth_Token, id) {
+  del(id) {
     // ...
   },
 
@@ -107,14 +119,14 @@ import person from "./person.js";
 // src/index.ts
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    const app = createApp(env).register(Person, person);
+    const app = createApp().worker(env).register(Person, person);
 
     return app.run(request);
   },
 };
 ```
 
-#### Registering Durable Object APIs
+### Registering Durable Object APIs
 
 Durable Objects receive forwarded requests from Workers by the Cloesce runtime, and need their own app registration:
 
@@ -123,7 +135,7 @@ import { createApp, CfEnv } from "@cloesce/backend";
 import person from "./person.js";
 
 export class MyDurable extends DurableObject<CfEnv> {
-  private base = createApp(this, []).register(Person, person);
+  private base = createApp().durable(this).register(Person, person);
 
   async fetch(request: Request): Promise<Response> {
     return this.base.run(request);
@@ -140,7 +152,9 @@ Many API endpoints start out by:
 - Returning a `404 Not Found` if it doesn't exist
 - Operating on the row if it does exist
 
-Cloesce provides a shortcut for this common pattern with _instance methods_. An instance method is an API method that calls some Data Source `get` method to hydrate an instance of a Model, and then passes that instance to the API method implementation.
+Cloesce provides a shortcut for this common pattern with _instance methods_.
+
+An instance method is an API method that calls some Data Source `get` method to hydrate an instance of a Model, and then passes that instance to the API method implementation.
 
 For example:
 
@@ -167,8 +181,6 @@ export const myself: Api.Person.myself = (self) => self;
 ```
 
 The `self` parameter is a flat object containing all of the fields of that `Person` instance returned by the (default) Data Sources `get` method.
-
-No methods are generated on the interface: Cloesce does not use an ["Active Record"](https://en.wikipedia.org/wiki/Active_record_pattern) pattern. See [Dependency Injection](./ch6-3-dependency-injection.md) for how to access all Data Sources and methods of a Model from within an API method.
 
 ### Using a Custom Data Source
 
@@ -201,6 +213,38 @@ api Person {
 In the above code, the `myself` API method will use the `WithoutAvatar` data source to hydrate the `self` instance, which excludes the `avatar` field.
 
 Any API method can be hydrated with any Data Source (for the same Model).
+
+## `[internal]` Models
+
+A Model may be sensitive and confined to only the backend of your application by using the `[internal]` tag.
+
+This will prevent any API from accepting that Model as a parameter or returning it as a result, and will not let any public Model compose a relationship with that Model.
+
+No interface will reach the generated client. However, _static APIs_ may be created for that Model, exposing only the methods you want to the client:
+
+```cloesce
+[internal]
+model UnHashedPassword for Db {
+  primary {
+    id: int
+  }
+
+  column {
+    password: string
+  }
+}
+
+api UnHashedPassword {
+  get isThisMyPassword -> bool {
+    id: int
+    password: string
+  }
+}
+```
+
+Because one static API method is defined, the client will be able to call `UnHashedPassword.isThisMyPassword` with an `id` and `password`, and receive a boolean result.
+
+The fields of `UnHashedPassword` will not be exposed to the client.
 
 ## Execution Context
 
@@ -284,10 +328,6 @@ api Counter {
 
 If a JSON body is defined in an API method, Cloesce will parse and validate the body before passing it to the method implementation. This is suitable for most use cases, but for certain scenarios such as file uploads or real-time data processing, you may want to handle the request body as a stream.
 
-<!-- Cloesce buffers the full body of an incoming request by default, which is suitable for most use cases. However, for certain scenarios such as file uploads or real-time data processing, you may want to handle the request body as a stream.
-
-To define a streaming API method, you can use the `stream` type in the API definition: -->
-
 ```cloesce
 model File {
     primary {
@@ -323,6 +363,8 @@ The implementation of the `upload` method would need to handle the incoming stre
 >   name: string
 > }
 > ```
+>
+> Parameters tagged with `[header]` are still allowed, since they are not part of the request body.
 
 ## HttpResult
 

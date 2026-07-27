@@ -17,9 +17,9 @@ Data Sources are used extensively in the backend, but are also exposed to the cl
 
 ## Include Trees
 
-To determine which fields to hydrate, Cloesce uses a construct called the _Include Tree_. An Include Tree is a recursive structure that represents the relationships between Models and their fields, and is used by Cloesce to determine how to fetch data for a given Model.
+To determine which fields to hydrate, Cloesce uses a construct called the _Include Tree_. An Include Tree is a recursive structure that represents the relationships between Models and their fields.
 
-For example, consider the following `Person` and `Dog` Models:
+Consider the following example of a `Person` and `Dog` Model:
 
 ```cloesce
 model Person for Db {
@@ -51,7 +51,9 @@ model Dog for Db {
 }
 ```
 
-This relationship is recursive: `Person` has one `Dog`, and `Dog` has one `Person`. If we were to fetch naively, we would end up in an infinite loop of fetching `Person` and `Dog` instances. To prevent this, Cloesce will generate the following Default Include Tree for the `Person` and `Dog` Models:
+`Person` has one `Dog`, and `Dog` has one `Person`.
+
+If we were to fetch naively, we would end up in an infinite loop of fetching `Person` and `Dog` instances. To prevent this, Cloesce will generate the following Default Data Source for the `Person` and `Dog` Models:
 
 ```cloesce
 source Default for Person {
@@ -78,6 +80,7 @@ To prevent overfetching (and infinite loops), the Default Data Source will join:
 - R2 and KV fields
 - All [One-to-One Navigation Fields](./ch4-5-navigation-fields.md#one-to-one-relationship)
 - The near side of all [1:M Navigation Fields](./ch4-5-navigation-fields.md#one-to-many-relationship)
+- The near side of a recursive relationship
 
 ## CRUD Operations
 
@@ -101,4 +104,4 @@ source Default for Person {
 
 The above Data Source includes _no_ relationships, so the default `get` and `list` operations will only return the `Person`'s primary keys and foreign keys, and will not join any relationships. `save` will simply no-op on children.
 
-For more information on how the Cloesce ORM and Query Planner works, read the [ORM Chapter](TODO).
+For more information on how the Cloesce ORM and Query Planner works, read the [ORM Chapter](./ch7-0-orm-reference.md).

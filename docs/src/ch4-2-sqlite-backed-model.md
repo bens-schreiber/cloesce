@@ -1,8 +1,6 @@
 # SQLite Backed Models
 
-Models are able to pull from various sources of data, including SQLite databases stored in [D1](./ch3-2-d1.md) and [Durable Objects](./ch3-3-durable-objects.md).
-
-When backed by a SQLite database, a Model's properties will translate to a table in that particular database.
+Unlike a [Worker Backed Model](./ch4-1-worker-models.md) which have no persistence, a [SQLite Backed Model](./ch4-2-sqlite-backed-model.md) is backed by a SQLite database, which can be stored in either a [D1](./ch3-2-d1.md) database or a [Durable Object](./ch3-3-durable-objects.md).
 
 ## Defining an Environment Binding
 
@@ -96,6 +94,24 @@ The above code defines a Model "User" stored in the Durable Object `MyDurableObj
 >   // ...
 > }
 > ```
+
+> [!TIP]
+> Just because a Model is backed by a Durable Object does not mean it uses the Durable Object's SQLite storage.
+>
+> A `column`, `primary` or `foreign` field must be defined for the Model to be represented as a table in SQLite.
+>
+> For example, the `Gnat` Model from the previous chapter could be backed by a Durable Object:
+>
+> ```cloesce
+> model Gnat for MyDurableObject::tenant {
+>     route {
+>         id: int
+>         buzzing: bool
+>     }
+> }
+> ```
+>
+> `Gnat`'s fields are still ephermal, existing for the duration of a request. However, it is tied to an instance of a Durable Object, which will be created based on the `tenant` shard key.
 
 ### Across the Stack
 

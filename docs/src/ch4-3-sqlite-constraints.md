@@ -7,7 +7,7 @@ This chapter provides a reference for the SQLite specific features of Models.
 
 ## Primary Key
 
-A `primary` block is required in every SQLite backed Model. It directly translates to the SQLite `PRIMARY KEY` constraint.
+A `primary` block is required in **every** SQLite backed Model. It directly translates to the SQLite `PRIMARY KEY` constraint.
 
 ```cloesce
 model User for Db {
@@ -17,11 +17,11 @@ model User for Db {
 }
 ```
 
-Note that by default, primary key fields are `NOT NULL`, `UNIQUE`, and `AUTOINCREMENT` (for integer fields).
+By default, primary keys are `NOT NULL`, `UNIQUE`, and `AUTOINCREMENT` (for integer fields).
 
 ### Composite Primary Key
 
-Any number of fields can be in the `primary` block, or, any number of `priamry` blocks can exist, defining a composite primary key.
+Any number of fields can be in the `primary` block, or, any number of `priamry` blocks can exist.
 
 For example, the following `User` Model has a composite primary key consisting of an `id` field and an `email` field:
 
@@ -47,7 +47,9 @@ model User for Db {
 
 ## Foreign Key
 
-The `foreign` block allows you to define foreign key relationships between Models. It translates to the SQLite `FOREIGN KEY` constraint.
+The `foreign` block allows you to define foreign key relationships between Models, if they are in the same SQLite backing store.
+
+It translates to the SQLite `FOREIGN KEY` constraint.
 
 ```cloesce
 model Dog for Db {
@@ -64,12 +66,15 @@ model Person for Db {
     // Person has a foreign key relationship to Dog's field `id`
     // through its own field `dogId`.
     foreign Dog::id {
+        // Types are inferred from the referenced field, so `dogId` is of type `int`.
         dogId
     }
 }
 ```
 
-Foreign key fields inherit the type of the field they reference. In the above example, `Person::dogId` is of type `int` because it references `Dog::id`, which is of type `int`. Foreign key fields are also `NOT NULL` by default, but they do not have to be unique.
+Foreign key fields inherit the type of the field they reference. In the above example, `Person::dogId` is of type `int` because it references `Dog::id`, which is of type `int`.
+
+Foreign key fields are `NOT NULL` by default.
 
 ### Optional Foreign Key
 
@@ -106,7 +111,7 @@ model Dog for Db {
         id: int
     }
 
-    foreign (Person::firstName, Person::lastName) {
+    foreign Person::{ firstName, lastName } {
         ownerFirstName
         ownerLastName
     }

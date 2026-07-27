@@ -2,9 +2,7 @@
 
 Any API method may inject [Environment Bindings](./ch3-0-environment.md), or inject custom interfaces defined in the schema.
 
-The [Cloesce ORM](TODO) implements all of its functionality with dependency injection. To access any generated helper, Data Source, or API method from within an API method, you _must_ inject it at the schema level.
-
-Injecting a dependency into an API method is a hint to the schema: "this API method may read or write to this resource".
+The [Cloesce ORM](./ch7-0-orm-reference.md) is invoked through dependency injected bindings. To access any generated helper, Data Source, or API method from within an API method, you _must_ inject it at the schema level.
 
 ## Injecting Environment Bindings
 
@@ -46,7 +44,7 @@ A generated backend stub for the `stuff` API method will include an `env` parame
 - `env.Bucket` will contain all templated R2 methods for the `Bucket` binding, with read, write and list methods invokable
 - `env.SECRET` will contain the value of the `SECRET` binding, as a string
 
-See the [Cloesce ORM](TODO) for more information on how to use the injected bindings.
+See the [Cloesce ORM](./ch7-0-orm-reference.md) for more information on how to use the injected bindings.
 
 ## Defining Custom Inject Bindings
 
@@ -80,7 +78,8 @@ const stuff: Api.Person.stuff = (env) => HttpResult.ok(200, `my username is ${en
 
 export default {
   async fetch(request: Request, env: CfEnv): Promise<Response> {
-    return createApp(env)
+    return createApp()
+      .worker(env)
       .register(Auth, { username: "john_doe" })
       .register(Person, { stuff })
       .run(request);
