@@ -13,7 +13,7 @@ import {
 
 const a: Api.A.Of = {
   create(env, model) {
-    return env.db.A.save(model);
+    return env.db.a.save(model);
   },
   withoutB(self) {
     return self;
