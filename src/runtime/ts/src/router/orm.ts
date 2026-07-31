@@ -408,6 +408,11 @@ function toSqlBind(value: unknown): unknown {
   return value;
 }
 
+/** Whether a type is `option<T>`, and so may be omitted by the caller. */
+export function isNullable(cidlType: CidlType): boolean {
+  return typeof cidlType === "object" && "Nullable" in cidlType;
+}
+
 /**
  * @internal
  *

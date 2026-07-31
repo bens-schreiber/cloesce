@@ -33,7 +33,7 @@ impl std::fmt::Display for OrmErrorKind {
                 "Primary key field '{field}' on model '{model}' cannot be auto-incrementing"
             ),
             OrmErrorKind::MissingField { expected, missing } => {
-                write!(f, "Missing field: expected '{expected}', got '{missing}'")
+                write!(f, "Missing field '{missing}': expected '{expected}'")
             }
             OrmErrorKind::TypeMismatch { expected, got } => {
                 write!(f, "Type mismatch: expected '{expected}', got '{got}'")

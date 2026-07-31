@@ -81,6 +81,16 @@ fn undefined() {
         let result = validate(CidlType::Array(Box::new(CidlType::Int)), None, &idl);
         assert_eq!(result.unwrap(), Some(Value::Array(vec![])));
     }
+
+    // An absent `option<T>` binds to null rather than failing.
+    {
+        let idl = empty_idl();
+        let result = validate(CidlType::nullable(CidlType::String), None, &idl);
+        assert_eq!(result.unwrap(), Some(Value::Null));
+
+        let result = validate(CidlType::nullable(CidlType::Int), None, &idl);
+        assert_eq!(result.unwrap(), Some(Value::Null));
+    }
 }
 
 #[test]
@@ -92,11 +102,18 @@ fn null_value() {
         assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
     }
 
-    // Null string for non-nullable type
+    // The literal string "null" is ordinary data, not a sentinel for absence.
     {
         let idl = empty_idl();
         let result = validate(CidlType::String, Some(json!("null")), &idl);
-        assert!(matches!(result, Err(OrmErrorKind::MissingField { .. })));
+        assert_eq!(result.unwrap(), Some(json!("null")));
+
+        let result = validate(
+            CidlType::nullable(CidlType::String),
+            Some(json!("null")),
+            &idl,
+        );
+        assert_eq!(result.unwrap(), Some(json!("null")));
     }
 
     // Null allowed for nullable type

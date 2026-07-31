@@ -2,7 +2,7 @@ import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm
 import { Cidl, Model, ApiMethod, DataSource, Field, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
-import { hydrateType } from "./orm.js";
+import { hydrateType, isNullable } from "./orm.js";
 import { crudRoute } from "./crud.js";
 import { sourceStore } from "../app/store.js";
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
@@ -365,10 +365,15 @@ async function validateRequest(
     }
   }
 
-  if (!requiredParams.every((p) => p.field.name in params)) {
+  // An absent `option<T>` is not an error: the validator binds it to null. Only
+  // non-nullable parameters are genuinely required to be present.
+  const missing = requiredParams.filter(
+    (p) => !isNullable(p.field.cidl_type) && !(p.field.name in params),
+  );
+  if (missing.length > 0) {
     return invalidRequest(
       RouterError.RequestBodyMissingParameters,
-      "One or more required parameters are missing",
+      `Missing required parameter(s): ${missing.map((p) => p.field.name).join(", ")}`,
     );
   }
 
@@ -398,7 +403,9 @@ async function validateRequest(
       wasm.validate_type,
       [
         WasmResource.fromString(JSON.stringify(field), wasm),
-        WasmResource.fromString(JSON.stringify(value), wasm),
+        // `JSON.stringify(undefined)` is `undefined`, not a string; an absent parameter
+        // must cross the boundary as the JSON literal `null`.
+        WasmResource.fromString(JSON.stringify(value ?? null), wasm),
       ],
       wasm,
     );

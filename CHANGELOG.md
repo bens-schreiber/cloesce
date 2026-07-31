@@ -29,6 +29,9 @@
 
 ### Fixed
 
+- An issue where `option<T>` treated the `null` string as a `null` value instead of a string.
+- A bug where environment variables were not correctly being generated.
+
 # [0.5.2] - 6/21/2026
 
 ### Added
