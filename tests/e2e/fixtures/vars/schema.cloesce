@@ -1,0 +1,19 @@
+var {
+    JWT_SECRET: string
+}
+
+poo Token {
+    value: string
+}
+
+model Session {}
+
+api Session {
+    post login -> Token {
+        email: string
+
+        inject {
+            JWT_SECRET
+        }
+    }
+}

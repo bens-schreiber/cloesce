@@ -123,7 +123,7 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 {%- endmacro -%}
 
 {%- macro route_needs(api) -%}
-{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{% if is_injectable(b) %}{{ b }}{% else %}{{ store_key(b) }}{% endif %}"{% endfor -%}
+{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{% if is_injectable(b) || is_var(b) %}{{ b }}{% else %}{{ store_key(b) }}{% endif %}"{% endfor -%}
 {%- endmacro -%}
 
 /**
@@ -442,6 +442,8 @@ export namespace Env {
 {%- for b in route_env_bindings(api) %}
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
 {%- else %}
         {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ route_env_name(model, api) }}>;
 {%- endif %}
@@ -458,6 +460,8 @@ export namespace Env {
 {%- for b in &ds.get.injected %}
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
 {%- else %}
         {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Get>;
 {%- endif %}
@@ -469,6 +473,8 @@ export namespace Env {
 {%- for b in &ds.list.injected %}
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
 {%- else %}
         {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}List>;
 {%- endif %}
@@ -480,6 +486,8 @@ export namespace Env {
 {%- for b in &ds.save.injected %}
 {%- if is_injectable(b) %}
         {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
 {%- else %}
         {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Save>;
 {%- endif %}
