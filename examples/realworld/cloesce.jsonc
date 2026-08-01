@@ -1,0 +1,5 @@
+{
+    "src_paths": ["./src/schema"],
+    "workers_url": "http://localhost:5001/api",
+    "wrangler_config_format": "toml"
+}
