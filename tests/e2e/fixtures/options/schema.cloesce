@@ -1,0 +1,29 @@
+model OptionService {}
+
+api OptionService {
+    // GET whose every parameter is optional. Omitting them entirely must bind each
+    // to null rather than 400ing, so plain `curl`/conformance-suite requests work.
+    get search -> string {
+        tag: option<string>
+        limit: option<int>
+    }
+
+    // Mixed required/optional: only the required one may be demanded.
+    get find -> string {
+        slug: string
+        tag: option<string>
+    }
+
+    // Body-sourced optionals: an omitted key and an explicit JSON `null` must both
+    // bind to null.
+    post update -> string {
+        bio: option<string>
+        image: option<string>
+    }
+
+    // An optional header may simply be absent.
+    get whoami -> string {
+        [header]
+        X_Tenant: option<string>
+    }
+}

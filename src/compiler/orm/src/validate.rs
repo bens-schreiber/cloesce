@@ -27,6 +27,7 @@ pub fn validate_cidl_type(
     }
 
     let is_partial = partial || matches!(&cidl_type, CidlType::Partial { .. });
+    let is_nullable = matches!(&cidl_type, CidlType::Nullable(_));
 
     let Some(mut value) = value else {
         // We will let arrays be undefined and interpret that as an empty array.
@@ -38,14 +39,18 @@ pub fn validate_cidl_type(
             return Ok(None);
         }
 
+        // An absent `option<T>` binds to null: omitting it is how a caller says "not provided".
+        if is_nullable {
+            return Ok(Some(Value::Null));
+        }
+
         fail!(OrmErrorKind::MissingField {
             expected: fmt_cidl_type(cidl_type),
             missing: field.name.to_string(),
         });
     };
 
-    let is_nullable = matches!(&cidl_type, CidlType::Nullable(_));
-    if value.is_null() || value == Value::String("null".to_string()) {
+    if value.is_null() {
         // NOTE: Partial types are always nullable.
         if is_nullable || is_partial {
             return Ok(Some(Value::Null));

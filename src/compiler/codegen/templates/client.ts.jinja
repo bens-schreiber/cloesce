@@ -151,9 +151,19 @@ export class {{ model.name }} {
 
 {%- for param in &api.parameters %}
 {%- if self.is_header(&param.source) %}
+{%- if self.is_nullable(&param.field.cidl_type) %}
+    if ({{ param.field.name }} !== null && {{ param.field.name }} !== undefined) {
+      __$headers["{{ param.field.name }}"] = {% if self.is_date(&param.field.cidl_type) %}{{ param.field.name }}.toISOString(){% else %}String({{ param.field.name }}){% endif %};
+    }
+{%- else %}
     __$headers["{{ param.field.name }}"] = {% if self.is_date(&param.field.cidl_type) %}{{ param.field.name }}.toISOString(){% else %}String({{ param.field.name }}){% endif %};
+{%- endif %}
 {%- else if self.is_get_request(&api.http_verb) %}
-{%- if self.is_date(&param.field.cidl_type) %}
+{%- if self.is_nullable(&param.field.cidl_type) %}
+    if ({{ param.field.name }} !== null && {{ param.field.name }} !== undefined) {
+      __$baseUrl.searchParams.append("{{ param.field.name }}", {% if self.is_date(&param.field.cidl_type) %}{{ param.field.name }}.toISOString(){% else %}String({{ param.field.name }}){% endif %});
+    }
+{%- else if self.is_date(&param.field.cidl_type) %}
     __$baseUrl.searchParams.append("{{ param.field.name }}", {{ param.field.name }}.toISOString());
 {%- else %}
     __$baseUrl.searchParams.append("{{ param.field.name }}", String({{ param.field.name }}));

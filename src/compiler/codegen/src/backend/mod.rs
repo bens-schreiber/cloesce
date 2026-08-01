@@ -213,6 +213,11 @@ impl<'src> BackendTemplate<'src> {
         self.idl.injects.contains(&name)
     }
 
+    /// True if the name is a plain `var` env value rather than a store-backed binding.
+    fn is_var(&self, name: &str) -> bool {
+        self.idl.wrangler_env.vars.iter().any(|v| v.name == name)
+    }
+
     /// Every injectable name a model's routes or stubbed data-source verbs require.
     fn model_injectables(&self, model: &Model<'src>) -> Vec<String> {
         let route_injects = model.apis.iter().flat_map(|api| api.injected.iter());

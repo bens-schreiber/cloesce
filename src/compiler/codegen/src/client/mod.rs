@@ -115,6 +115,10 @@ impl ClientTemplate<'_> {
         matches!(ty.root_type(), CidlType::Stream)
     }
 
+    fn is_nullable(&self, ty: &CidlType<'_>) -> bool {
+        ty.is_nullable()
+    }
+
     fn contains_stream(&self, ty: &CidlType<'_>) -> bool {
         cidl_type_contains!(ty, CidlType::Stream)
     }

@@ -259,6 +259,87 @@ describe("Request Validation", () => {
       RouterError.RequestBodyMissingParameters,
     );
   });
+
+  test("Omitted option<T> query params pass the presence gate", async () => {
+    // Arrange
+    const request = createRequest("http://foo.com/api/Foo/method");
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method(
+        "method",
+        "Get",
+        [
+          { name: "tag", cidl_type: { Nullable: "String" } },
+          { name: "limit", cidl_type: { Nullable: "Int" } },
+        ],
+        "Void",
+      )
+      .build();
+
+    const route: MatchedRoute = {
+      namespace: "Foo",
+      method: model.apis.find((m) => m.name === "method")!,
+      getParamValues: {},
+      impl: mockImpl,
+      model,
+      forward: false,
+    };
+
+    // Validation is stubbed out to isolate the presence gate.
+    const wasmMock = {} as any;
+    const idlMock = {} as any;
+    const envMock = {} as any;
+
+    // Act
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, idlMock, envMock, {
+      ...route,
+      method: { ...route.method, parameters_media: "Octet" },
+    } as MatchedRoute);
+
+    // Assert: absence of an `option<T>` is not a missing-parameter error.
+    expect(res.isLeft()).toBe(false);
+  });
+
+  test("Omitted non-nullable param still => 400, and names the parameter", async () => {
+    // Arrange
+    const request = createRequest("http://foo.com/api/Foo/method");
+    const model = ModelBuilder.model("Foo")
+      .idPk()
+      .method(
+        "method",
+        "Get",
+        [
+          { name: "tag", cidl_type: { Nullable: "String" } },
+          { name: "slug", cidl_type: "String" },
+        ],
+        "Void",
+      )
+      .build();
+
+    const route: MatchedRoute = {
+      namespace: "Foo",
+      method: model.apis.find((m) => m.name === "method")!,
+      getParamValues: {},
+      impl: mockImpl,
+      model,
+      forward: false,
+    };
+
+    const wasmMock = {} as any;
+    const idlMock = {} as any;
+    const envMock = {} as any;
+
+    // Act
+    const res = await _cloesceInternal.validateRequest(request, wasmMock, idlMock, envMock, route);
+
+    // Assert
+    expect(res.isLeft()).toBe(true);
+    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
+      RouterError.RequestBodyMissingParameters,
+    );
+    expect(res.unwrapLeft().message).toContain("slug");
+    expect(res.unwrapLeft().message).not.toContain("tag");
+  });
 });
 
 describe("Method Dispatch", () => {
