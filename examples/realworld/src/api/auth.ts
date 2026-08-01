@@ -1,4 +1,4 @@
-import { Auth, FullEnv, User, UserDto, ProfileDto } from "@cloesce/backend.js";
+import { Auth, Env, User, UserDto, ProfileDto } from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
 
 declare module "@cloesce/backend.js" {
@@ -14,9 +14,9 @@ function mockToken(user: User) {
   return `mock.jwt.${user.id}`;
 }
 
-export async function authFromRequest(env: FullEnv, request: Request): Promise<Auth> {
+export async function authFromRequest(db: Env.Db, request: Request): Promise<Auth> {
   const id = Number(request.headers.get("Authorization")?.match(/mock\.jwt\.(\d+)$/)?.[1]);
-  return { user: id ? ((await env.db.user.get(id)).data ?? null) : null };
+  return { user: id ? ((await db.User.get(id)).data ?? null) : null };
 }
 
 export function requireAuth(env: { Auth: Auth }): User | HttpResult<never> {

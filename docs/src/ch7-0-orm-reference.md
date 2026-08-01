@@ -23,11 +23,11 @@ Cloesce **upgrades** these bindings to provide a rich set of functionality for y
 >
 > // ...
 > const app = createApp(env).register(...);
-> await app.env.db.person.get(1);
+> await app.env.Db.Person.get(1);
 > ```
 
 > [!NOTE]
-> Every property on the upgraded `env` is reached by its `camelCased` binding or Model name (`db`, `person`, `myKv`, ...).
+> Every property on the upgraded `env` is reached by exactly the name it is declared with in the schema (`Db`, `Person`, `MyKv`, ...).
 
 ## KV, R2, and Durable Object Methods
 
@@ -98,10 +98,10 @@ interface KvHelpers<T> {
 **Example Usage**
 
 ```ts
-env.myKv.user.template(1); // => "user/1"
-await env.myKv.user.put(1, { hello: "world" });
-await env.myKv.user.get(1); // => { hello: "world" } | null
-await env.myKv.user.list({ limit: 20 });
+env.MyKv.user.template(1); // => "user/1"
+await env.MyKv.user.put(1, { hello: "world" });
+await env.MyKv.user.get(1); // => { hello: "world" } | null
+await env.MyKv.user.list({ limit: 20 });
 ```
 
 ### R2
@@ -131,10 +131,10 @@ interface R2Helpers {
 **Example Usage**
 
 ```ts
-env.myBucket.image.template(); // => "image"
-await env.myBucket.image.put(new Uint8Array([1, 2, 3]));
-await env.myBucket.image.get(); // => R2ObjectBody | null
-await env.myBucket.image.list({ limit: 20 });
+env.MyBucket.image.template(); // => "image"
+await env.MyBucket.image.put(new Uint8Array([1, 2, 3]));
+await env.MyBucket.image.get(); // => R2ObjectBody | null
+await env.MyBucket.image.list({ limit: 20 });
 ```
 
 ### Durable Object
@@ -152,8 +152,8 @@ interface DoHelpers<T> {
 **Example Usage**
 
 ```ts
-env.myDo.id("tenant");
-env.myDo.stub<MyDo>("tenant");
+env.MyDo.id("tenant");
+env.MyDo.stub<MyDo>("tenant");
 ```
 
 ### Durable Object KV
@@ -184,9 +184,9 @@ interface DoKvHelpers<T> {
 **Example Usage**
 
 ```ts
-env.myDo.settings.template("tenant"); // => "custom/key/template/tenant"
-await env.myDo.settings.put("tenant", { hello: "world" }); // outside the DO
-await env.myDo.settings.get("tenant"); // outside the DO
+env.MyDo.settings.template("tenant"); // => "custom/key/template/tenant"
+await env.MyDo.settings.put("tenant", { hello: "world" }); // outside the DO
+await env.MyDo.settings.get("tenant"); // outside the DO
 ```
 
 ## Model Methods
@@ -196,7 +196,7 @@ When a D1 or Durable Object database is injected into an API method, all Models 
 Every method on a `ModelStore` (`get`, `list`, `save`, `hydrate`, `hydrateAll`, `load`) returns an `HttpResult<T>`. This is the same result wrapper your API methods return:
 
 ```ts
-const result = await env.db.person.get(1);
+const result = await env.Db.Person.get(1);
 if (!result.ok) return result; // propagate the 404/400
 const person = result.data!;
 ```
@@ -206,15 +206,15 @@ const person = result.data!;
 Every `ModelStore` exposes the model's **Default Data Source** directly as `get`, `list`, and `save`:
 
 ```ts
-await env.db.person.get(1); // Promise<HttpResult<Person>>
-await env.db.person.list(0, 20); // Promise<HttpResult<Person[]>>
-await env.db.person.save({ id: 1, name: "Ada", age: 30 }); // Promise<HttpResult<Person>>
+await env.Db.Person.get(1); // Promise<HttpResult<Person>>
+await env.Db.Person.list(0, 20); // Promise<HttpResult<Person[]>>
+await env.Db.Person.save({ id: 1, name: "Ada", age: 30 }); // Promise<HttpResult<Person>>
 ```
 
-Every other Data Source is available as its own property, keyed by its camelCased name. It exposes the same `get`/`list`/`save` shape, scoped to that source's include tree and parameters:
+Every other Data Source is available as its own property, keyed by its declared name. It exposes the same `get`/`list`/`save` shape, scoped to that source's include tree and parameters:
 
 ```ts
-await env.db.person.overAge.list(18, 0, 20); // scoped to the `OverAge` source
+await env.Db.Person.OverAge.list(18, 0, 20); // scoped to the `OverAge` source
 ```
 
 ### `hydrate` and `hydrateAll`
@@ -274,14 +274,15 @@ import { Api } from "@cloesce/backend.js";
 export const overAge = {
   async list(env, age, lastId, limit) {
     // Get the list of people over 18 from the database
-    const res = await env.db
-      .prepare(`SELECT * FROM Person WHERE age > ?1 AND id > ?2 ORDER BY id ASC LIMIT ?3`)
+    const res = await env.Db.prepare(
+      `SELECT * FROM Person WHERE age > ?1 AND id > ?2 ORDER BY id ASC LIMIT ?3`,
+    )
       .bind(age, lastId, limit)
       .all();
 
     // Ta-da! Cloesce turned all of the database row results into fully hydrated Person
     // instances, with their R2 fields populated.
-    return env.db.person.overAge.hydrateAll(res.results);
+    return env.Db.Person.OverAge.hydrateAll(res.results);
   },
 } satisfies Api.Person.OverAge.Of;
 ```
@@ -294,7 +295,7 @@ Where `hydrate`/`hydrateAll` run a source's precompiled include tree, `load` pla
 
 ```ts
 async feed(self, env) {
-  const full = await env.subRedditDb.subReddit.load(self, {
+  const full = await env.SubRedditDb.SubReddit.load(self, {
     posts: {
       post: {
         meta: {},

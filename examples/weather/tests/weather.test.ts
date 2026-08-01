@@ -7,11 +7,11 @@ describe("Cloudflare Workers Integration Tests", () => {
   test("Download a thumbnail", async () => {
     // Arrange
     const env = app.env;
-    const weather = env.db.weather;
+    const weather = env.db.Weather;
     const testData = "test-data";
 
     const report = (
-      await env.db.weatherReport.save({
+      await env.db.WeatherReport.save({
         title: "Test Report",
         description: "This is a test weather report.",
         weatherEntries: [

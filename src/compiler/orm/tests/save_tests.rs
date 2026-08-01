@@ -1583,3 +1583,315 @@ fn assert_body_deps_lift_stage(plan: &SavePlan) {
         }
     }
 }
+
+#[sqlx::test]
+async fn save_unique_key_upserts() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        [unique name]
+        model Horse for db {
+            primary { id: int }
+            column {
+                name: string
+                color: string
+            }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // No data present
+    {
+        // Act
+        let (plan, body) = save_ok(
+            &idl,
+            "Horse",
+            json!({}),
+            json!({ "name": "Spirit", "color": "bay" }),
+            &mut storage,
+        )
+        .await;
+
+        // Assert
+        let stmts = batches(&plan, 0, 0);
+        assert_eq!(
+            write_sql(&stmts[0]),
+            r#"INSERT INTO "Horse" ("name", "color") VALUES (?1, ?2) ON CONFLICT ("name") DO UPDATE SET "color" = excluded."color""#,
+            "the unique key is the conflict target, itself excluded from the update"
+        );
+        assert_eq!(
+            write_sql(&stmts[1]),
+            r#"INSERT OR REPLACE INTO "$cloesce_tmp" ("path", "primary_key") VALUES ('', json_object('id', (SELECT "id" FROM "Horse" WHERE "name" = ?1)))"#,
+            "the id is read back through the unique key, not last_insert_rowid()"
+        );
+        assert_eq!(body, json!({ "id": 1, "name": "Spirit", "color": "bay" }));
+    }
+
+    // Value conflicts
+    {
+        // Act
+        let (_, body) = save_ok(
+            &idl,
+            "Horse",
+            json!({}),
+            json!({ "name": "Spirit", "color": "roan" }),
+            &mut storage,
+        )
+        .await;
+
+        // Assert
+        assert_eq!(
+            body,
+            json!({ "id": 1, "name": "Spirit", "color": "roan" }),
+            "the existing row is updated in place, keeping its id"
+        );
+    }
+}
+
+#[sqlx::test]
+async fn save_unique_key_only_does_nothing() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        [unique name]
+        model Tag for db {
+            primary { id: int }
+            column { name: string }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (plan, body) = save_ok(
+        &idl,
+        "Tag",
+        json!({}),
+        json!({ "name": "rust" }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        write_sql(&batches(&plan, 0, 0)[0]),
+        r#"INSERT INTO "Tag" ("name") VALUES (?1) ON CONFLICT ("name") DO NOTHING"#,
+        "nothing to update, but the row must exist for its id to be read back"
+    );
+    assert_eq!(body, json!({ "id": 1, "name": "rust" }));
+
+    // Act
+    let (_, body) = save_ok(
+        &idl,
+        "Tag",
+        json!({}),
+        json!({ "name": "rust" }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        body,
+        json!({ "id": 1, "name": "rust" }),
+        "saving the same tag twice resolves onto the existing row"
+    );
+}
+
+#[sqlx::test]
+async fn save_unique_key_threads_child_id() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        model Post for db {
+            primary { id: int }
+            column { title: string }
+            many PostTag::postId(id) { tags }
+        }
+
+        model PostTag for db {
+            primary {
+                foreign Post::id { postId }
+                foreign Tag::id { tagId }
+            }
+            one Tag::id(tagId) { tag }
+        }
+
+        [unique name]
+        model Tag for db {
+            primary { id: int }
+            column { name: string }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+    let include = json!({ "tags": { "tag": {} } });
+
+    // No conflict
+    {
+        // Act
+        let (_, first) = save_ok(
+            &idl,
+            "Post",
+            include.clone(),
+            json!({ "title": "Hi", "tags": [ { "tag": { "name": "rust" } } ] }),
+            &mut storage,
+        )
+        .await;
+
+        // Assert
+        assert_eq!(
+            first,
+            json!({
+                "id": 1,
+                "title": "Hi",
+                "tags": [ { "postId": 1, "tagId": 1, "tag": { "id": 1, "name": "rust" } } ]
+            }),
+            "a brand new tag is created and its id threads into the join row"
+        );
+    }
+
+    // Conflict
+    {
+        // Act
+        let (_, second) = save_ok(
+            &idl,
+            "Post",
+            include,
+            json!({ "title": "Again", "tags": [ { "tag": { "name": "rust" } } ] }),
+            &mut storage,
+        )
+        .await;
+
+        // Assert
+        assert_eq!(
+            second,
+            json!({
+                "id": 2,
+                "title": "Again",
+                "tags": [ { "postId": 2, "tagId": 1, "tag": { "id": 1, "name": "rust" } } ]
+            }),
+            "the existing tag id threads through, rather than a stale last_insert_rowid()"
+        );
+    }
+}
+
+#[sqlx::test]
+async fn save_ambiguous_unique_keys_insert() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        [unique email]
+        [unique username]
+        model User for db {
+            primary { id: int }
+            column {
+                email: string
+                username: string
+            }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (plan, _) = save_ok(
+        &idl,
+        "User",
+        json!({}),
+        json!({ "email": "a@b.c", "username": "ana" }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        write_sql(&batches(&plan, 0, 0)[0]),
+        r#"INSERT INTO "User" ("email", "username") VALUES (?1, ?2)"#,
+        "two resolved unique keys make the conflict target arbitrary, so no upsert"
+    );
+}
+
+#[sqlx::test]
+async fn save_nullable_unique_key_inserts() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        [unique tenantId, slug]
+        model Page for db {
+            primary { id: int }
+            column {
+                tenantId: int
+                slug: option<string>
+            }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (plan, _) = save_ok(
+        &idl,
+        "Page",
+        json!({}),
+        json!({ "tenantId": 7 }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        write_sql(&batches(&plan, 0, 0)[0]),
+        r#"INSERT INTO "Page" ("tenantId", "slug") VALUES (?1, ?2)"#,
+        "a unique key over a nullable column never conflicts in SQLite, so it cannot \
+         identify the row and no upsert is emitted"
+    );
+}
+
+#[sqlx::test]
+async fn save_pk_wins_over_unique_key() {
+    // Arrange
+    let idl = src_to_idl(
+        r#"
+        d1 { db }
+
+        [unique name]
+        model Horse for db {
+            primary { id: int }
+            column {
+                name: string
+                color: string
+            }
+        }
+        "#,
+    );
+    let mut storage = MockStorage::from_idl(&idl, &[]).await;
+
+    // Act
+    let (plan, _) = save_ok(
+        &idl,
+        "Horse",
+        json!({}),
+        json!({ "id": 3, "name": "Spirit", "color": "bay" }),
+        &mut storage,
+    )
+    .await;
+
+    // Assert
+    assert_eq!(
+        write_sql(&batches(&plan, 0, 0)[0]),
+        r#"INSERT INTO "Horse" ("name", "color", "id") VALUES (?1, ?2, ?3) ON CONFLICT ("id") DO UPDATE SET "name" = excluded."name", "color" = excluded."color""#,
+        "a resolved PK stays the conflict target"
+    );
+}

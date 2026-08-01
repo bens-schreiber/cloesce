@@ -30,7 +30,7 @@ const noLettuce: Api.Hamburger.NoLettuce = {
         .all()
     ).results;
 
-    return env.db.hamburger.noLettuce.hydrate({ ...burger, toppings });
+    return env.db.Hamburger.NoLettuce.hydrate({ ...burger, toppings });
   },
 };
 
@@ -54,7 +54,7 @@ const onlyBacon: Api.Hamburger.OnlyBacon = {
         .bind(id)
         .all()
     ).results;
-    return env.db.hamburger.onlyBacon.hydrate({ ...burger, toppings });
+    return env.db.Hamburger.OnlyBacon.hydrate({ ...burger, toppings });
   },
 };
 
@@ -73,17 +73,17 @@ const burgersWithLettuceOrdered: Api.Hamburger.BurgersWithLettuceOrdered = {
         .bind(lastId, limit)
         .all()
     ).results;
-    return env.db.hamburger.burgersWithLettuceOrdered.hydrateAll(rows);
+    return env.db.Hamburger.BurgersWithLettuceOrdered.hydrateAll(rows);
   },
 };
 
 const hamburger: Api.Hamburger.Of = {
   noLettuceToppings(self) {
-    return self.toppings.map((t) => t.topping);
+    return self.toppings.map((t) => t.topping!);
   },
 
   onlyBaconToppings(self) {
-    return self.toppings.map((t) => t.topping);
+    return self.toppings.map((t) => t.topping!);
   },
 
   BurgersWithLettuceOrdered: burgersWithLettuceOrdered,

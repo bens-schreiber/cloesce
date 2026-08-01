@@ -564,6 +564,29 @@ impl Model<'_> {
             || self.has_r2()
     }
 
+    /// Every candidate key of this model: primary key(s) first, then each `[unique ...]
+    /// constraint grouped by its shared id, ordered by id.
+    ///
+    /// A column participating in several constraints appears in several groups. Semantic
+    /// analysis strips primary key references out of `[unique ...]`, so no group past the
+    /// first overlaps the primary key.
+    pub fn unique_keys(&self) -> Vec<Vec<&Column<'_>>> {
+        let uniques = self
+            .columns
+            .iter()
+            .flat_map(|col| col.unique_ids.iter().map(move |id| (*id, col)))
+            .fold(BTreeMap::<usize, Vec<_>>::new(), |mut groups, (id, col)| {
+                groups.entry(id).or_default().push(col);
+                groups
+            });
+
+        (!self.primary_columns.is_empty())
+            .then(|| self.primary_columns.iter().collect())
+            .into_iter()
+            .chain(uniques.into_values())
+            .collect()
+    }
+
     /// Returns all columns, including primary key columns, as a single list.
     /// The boolean indicates whether the column is a primary key column.
     pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'_>, bool)> {

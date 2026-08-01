@@ -11,6 +11,7 @@
 - `[header]` tag
 - `[unique]` tag
 - `[internal]` tag for Models and Plain Old Objects
+- `cloesce fmt` accepts optional file and directory paths, defaulting to the config's `src` paths
 
 ### Changed
 
@@ -27,11 +28,17 @@
 - Removed the `inject` tag in favor of a new `inject` block under an API definition
 - Removed the `source` tag in favor of a new `self` syntax
 - Reworked parameter list syntax to use a more uniform bracketed syntax.
+- The `save` method can fall back to a unique key if a primary key is not present, using UPSERT semantics.
 
 ### Fixed
 
 - An issue where `option<T>` treated the `null` string as a `null` value instead of a string.
 - A bug where environment variables were not correctly being generated.
+- Durable Object KV fields are now typed as nullable, reflecting that a storage read can miss
+- Nullable types generate as `T | undefined | null` in TypeScript, rather than `T | null`
+- One-to-one nav props now generate as `T | undefined` in TypeScript, rather than `T`
+- Data source CRUD methods had a fixed declaration order, which has been removed.
+- `.run()` no longer returns a `Response` with immutable headers
 
 # [0.5.2] - 6/21/2026
 

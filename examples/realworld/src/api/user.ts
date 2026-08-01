@@ -4,8 +4,7 @@ import { profileDto, requireAuth, userDto } from "./auth.js";
 
 const ByName = {
   async get(env, name) {
-    const user = await env.db
-      .prepare(`SELECT * FROM "User" WHERE "username" = ?1`)
+    const user = await env.Db.prepare(`SELECT * FROM "User" WHERE "username" = ?1`)
       .bind(name)
       .first<User>();
     if (!user) {
@@ -20,12 +19,12 @@ export default {
   ByName,
 
   async register(env, username, email, password) {
-    const user = await env.db.user.byName.get(username);
+    const user = await env.Db.User.ByName.get(username);
     if (user.ok) {
       return HttpResult.fail(422, `Username "${username}" is already taken.`);
     }
 
-    const saved = await env.db.user.save({
+    const saved = await env.Db.User.save({
       username,
       email,
       bio: "",
@@ -37,8 +36,7 @@ export default {
   },
 
   async login(env, email, password) {
-    const user = await env.db
-      .prepare(`SELECT * FROM "User" WHERE "email" = ?1`)
+    const user = await env.Db.prepare(`SELECT * FROM "User" WHERE "email" = ?1`)
       .bind(email)
       .first<User>();
     if (!user || user.passwordHash !== password) {
@@ -54,7 +52,7 @@ export default {
       return me;
     }
 
-    const saved = await env.db.user.save({
+    const saved = await env.Db.User.save({
       id: me.id,
       username: user.username ?? me.username,
       email: user.email ?? me.email,
@@ -66,13 +64,13 @@ export default {
   },
 
   async profile(env, username) {
-    const them = await env.db.user.byName.get(username);
+    const them = await env.Db.User.ByName.get(username);
     if (!them.ok) {
       return HttpResult.fail(them.status, them.message);
     }
 
     const me = env.Auth.user;
-    const following = me ? (await env.db.follow.get(me.id, them.data!.id)).ok : false;
+    const following = me ? (await env.Db.Follow.get(me.id, them.data!.id)).ok : false;
 
     return profileDto(them.data!, following);
   },
@@ -83,7 +81,7 @@ export default {
       return me;
     }
 
-    const them = await env.db.user.byName.get(username);
+    const them = await env.Db.User.ByName.get(username);
     if (!them.ok) {
       return HttpResult.fail(them.status, them.message);
     }
@@ -91,7 +89,7 @@ export default {
       return HttpResult.fail(422, "You cannot follow yourself.");
     }
 
-    const saved = await env.db.follow.save({ followerId: me.id, followeeId: them.data!.id });
+    const saved = await env.Db.Follow.save({ followerId: me.id, followeeId: them.data!.id });
     if (!saved.ok) {
       return HttpResult.fail(saved.status, saved.message);
     }
@@ -105,13 +103,12 @@ export default {
       return me;
     }
 
-    const them = await env.db.user.byName.get(username);
+    const them = await env.Db.User.ByName.get(username);
     if (!them.ok) {
       return HttpResult.fail(them.status, them.message);
     }
 
-    await env.db
-      .prepare(`DELETE FROM "Follow" WHERE "followerId" = ?1 AND "followeeId" = ?2`)
+    await env.Db.prepare(`DELETE FROM "Follow" WHERE "followerId" = ?1 AND "followeeId" = ?2`)
       .bind(me.id, them.data!.id)
       .run();
 
@@ -124,8 +121,7 @@ export default {
       return me;
     }
 
-    const rows = await env.db
-      .prepare(`SELECT a.* FROM "Article" a
+    const rows = await env.Db.prepare(`SELECT a.* FROM "Article" a
                 JOIN "Follow" f ON f."followeeId" = a."authorId"
                 WHERE f."followerId" = ?1
                 ORDER BY a."createdAt" DESC, a."id" DESC
@@ -133,7 +129,7 @@ export default {
       .bind(me.id, limit ?? 20, offset ?? 0)
       .all<Article>();
 
-    return rows.results.length ? env.db.article.hydrateAll(rows.results) : HttpResult.ok(200, []);
+    return rows.results.length ? env.Db.Article.hydrateAll(rows.results) : HttpResult.ok(200, []);
   },
 
   current(env) {

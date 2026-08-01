@@ -208,6 +208,15 @@ describe("Custom data source reaching the DO over RPC", () => {
     expect(list.data!.some((p) => p.title === "rpc-post")).toBe(true);
   });
 
+  it("$get_Custom reaches the injected DO context through `env.ctx`", async () => {
+    const saved = await Post.$save_Custom({ title: "ctx-post", content: "ctx" }, 2);
+    expectHttpResult(saved, "$save_Custom should be OK");
+
+    const got = await Post.$get_Custom(saved.data!.id, 2);
+    expectHttpResult(got, "$get_Custom should reach ctx and be OK");
+    expect(got.data!.title).toBe("ctx-post");
+  });
+
   it("$get_Custom for a missing row returns 404", async () => {
     const res = await Post.$get_Custom(999999, 1);
     expect(res.ok, `expected 404\n\n${JSON.stringify(res)}`).toBe(false);

@@ -8,6 +8,7 @@ import {
   type Api,
   type CfEnv,
   KValue,
+  HttpResult,
 } from "./backend.js";
 import globalDoInitial from "./migrations/GlobalDo/Initial.js";
 import subRedditDoInitial from "./migrations/SubRedditDo/Initial.js";
@@ -36,14 +37,19 @@ const subReddit: Api.SubReddit.Of = {
 };
 
 const custom: Api.Post.Custom = {
-  get(env, id, subId) {
-    return env.subRedditDo.post.get(subId, id);
+  async get(env, id, subId) {
+    const key = `Custom/lastGet/${subId}`;
+    env.ctx.storage.kv.put(key, id);
+    if (env.ctx.storage.kv.get(key) !== id) {
+      return HttpResult.fail(500, "injected ctx did not round-trip through shard storage");
+    }
+    return env.SubRedditDo.Post.get(subId, id);
   },
   list(env, subId) {
-    return env.subRedditDo.post.list(subId, 0, 100);
+    return env.SubRedditDo.Post.list(subId, 0, 100);
   },
   save(env, post, subId) {
-    return env.subRedditDo.post.save(subId, post);
+    return env.SubRedditDo.Post.save(subId, post);
   },
 };
 

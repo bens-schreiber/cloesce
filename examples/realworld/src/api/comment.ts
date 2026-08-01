@@ -4,8 +4,7 @@ import { requireAuth } from "./auth.js";
 
 const Default = {
   async list(env, articleId) {
-    const rows = await env.db
-      .prepare(`SELECT * FROM "Comment" WHERE "articleId" = ?1
+    const rows = await env.Db.prepare(`SELECT * FROM "Comment" WHERE "articleId" = ?1
                 ORDER BY "createdAt" DESC, "id" DESC`)
       .bind(articleId)
       .all<Comment>();
@@ -24,7 +23,7 @@ export default {
     }
 
     const now = new Date().toISOString();
-    return env.db.comment.save({
+    return env.Db.Comment.save({
       body,
       articleId,
       authorId: me.id,
@@ -43,7 +42,7 @@ export default {
       return HttpResult.fail(403, "You may only edit your own comments.");
     }
 
-    return await env.db.comment.save({
+    return await env.Db.Comment.save({
       ...self,
       ...comment,
       updatedAt: new Date().toISOString(),
@@ -59,6 +58,6 @@ export default {
       return HttpResult.fail(403, "You may only delete your own comments.");
     }
 
-    await env.db.prepare(`DELETE FROM "Comment" WHERE "id" = ?1`).bind(self.id).run();
+    await env.Db.prepare(`DELETE FROM "Comment" WHERE "id" = ?1`).bind(self.id).run();
   },
 } satisfies Api.Comment.Of;

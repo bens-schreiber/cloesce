@@ -11,15 +11,6 @@ import { CloesceError, CloesceResult, InternalError } from "../common.js";
  */
 export type Registry = Map<string, any>;
 
-function storeKey(name: string): string {
-  if (name.length === 0 || name === name.toUpperCase()) {
-    // SCREAMING_SNAKE_CASE names (e.g. env var bindings) are kept as-is,
-    // since lowercasing only the first character would produce `sECRET`.
-    return name;
-  }
-  return name[0].toLowerCase() + name.slice(1);
-}
-
 /**
  * Proxy traps that make an overlay object behave as an upgraded binding handle for a
  * *per-request child* env:
@@ -47,12 +38,12 @@ export function overlayTraps(fallback: any): ProxyHandler<any> {
 
 /**
  * @internal
- * Upgrade a raw Cloudflare binding with Cloesce's field helpers and expose it under its
- * camelCased name (e.g. `env.subRedditDb`).
+ * Upgrade a raw Cloudflare binding with Cloesce's field helpers, in place under its declared
+ * name (e.g. `env.SubRedditDb`).
  *
  * Helpers are assigned onto the raw binding in place so it stays a real `D1Database` /
- * `KVNamespace` / ... that native host APIs accept and every handle forwards them. The
- * camelCased handle is what callers use; model stores are added later by {@link attachStores}.
+ * `KVNamespace` / ... that native host APIs accept and every handle forwards them. Model
+ * stores are added later by {@link attachStores}.
  */
 export function attachBinding(env: any, rawName: string, helpers: object = {}): void {
   const raw = env[rawName];
@@ -65,16 +56,15 @@ export function attachBinding(env: any, rawName: string, helpers: object = {}): 
 
 /** Return the handle for a binding on `env`. */
 function bindingHandle(env: any, binding: string): any {
-  const key = storeKey(binding);
-  if (Object.prototype.hasOwnProperty.call(env, key)) {
-    return env[key];
+  if (Object.prototype.hasOwnProperty.call(env, binding)) {
+    return env[binding];
   }
   const raw = env[binding];
   if (raw == null) {
     return undefined;
   }
   const handle = new Proxy({}, overlayTraps(raw));
-  Object.defineProperty(env, key, { value: handle, enumerable: true, configurable: true });
+  Object.defineProperty(env, binding, { value: handle, enumerable: true, configurable: true });
   return handle;
 }
 
@@ -292,7 +282,7 @@ export function attachStores(env: any, cidl: Cidl, registry: Registry): void {
       if (ds.name === "Default") {
         Object.assign(store, verbs);
       } else {
-        store[storeKey(ds.name)] = verbs;
+        store[ds.name] = verbs;
       }
     }
 
@@ -307,7 +297,7 @@ export function attachStores(env: any, cidl: Cidl, registry: Registry): void {
     if (binding) {
       const handle = bindingHandle(env, binding);
       if (handle != null) {
-        handle[storeKey(model.name)] = store;
+        handle[model.name] = store;
       }
     } else {
       env[model.name] = store;
@@ -326,5 +316,5 @@ export function sourceStore(env: any, model: Model, sourceName: string): any {
   if (!store) {
     return undefined;
   }
-  return sourceName === "Default" ? store : store[storeKey(sourceName)];
+  return sourceName === "Default" ? store : store[sourceName];
 }

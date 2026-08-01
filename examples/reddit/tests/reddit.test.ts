@@ -3,14 +3,14 @@ import { app } from "./setup.js";
 
 describe("Auth", () => {
   it("login claims a username and returns a token + user", async () => {
-    const res = await app().env.userDo.user.login("alice");
+    const res = await app().env.UserDo.User.login("alice");
     expect(res.data?.token).toBeTypeOf("string");
     expect(res.data?.user.name).toBe("alice");
   });
 
   it("posting while anonymous is 401", async () => {
-    const sub = await app("user").env.subRedditDb.subReddit.create("r/anon", "anon");
-    const res = await app().env.postDo.post.create(sub.data!.id, "anon", "nope");
+    const sub = await app("user").env.SubRedditDb.SubReddit.create("r/anon", "anon");
+    const res = await app().env.PostDo.Post.create(sub.data!.id, "anon", "nope");
     expect(res.status).toBe(401);
   });
 });
@@ -18,13 +18,13 @@ describe("Auth", () => {
 describe("Subreddits", () => {
   it("a logged-in user can create one (D1 assigns its id)", async () => {
     const env = app("alice").env;
-    const sub = await env.subRedditDb.subReddit.create("r/dogs", "doggos");
+    const sub = await env.SubRedditDb.SubReddit.create("r/dogs", "doggos");
     expect(sub.data?.id).toBeTypeOf("number");
     expect(sub.data?.title).toBe("r/dogs");
   });
 
   it("created subreddits appear in the global listing", async () => {
-    const subs = app("alice").env.subRedditDb.subReddit;
+    const subs = app("alice").env.SubRedditDb.SubReddit;
 
     const sub = await subs.create("r/cats", "catto");
     const dir = await subs.list(0, 100);
@@ -35,9 +35,9 @@ describe("Subreddits", () => {
 describe("Posts, comments, and the feed", () => {
   it("create a post, comment on it, then read it back with its comments", async () => {
     const env = app("alice").env;
-    const subs = env.subRedditDb.subReddit;
-    const posts = env.postDo.post;
-    const comments = env.postDo.comment;
+    const subs = env.SubRedditDb.SubReddit;
+    const posts = env.PostDo.Post;
+    const comments = env.PostDo.Comment;
 
     const sub = await subs.create("r/test", "test");
     const post = (await posts.create(sub.data!.id, "Cats", "meow")).data!;
@@ -47,16 +47,16 @@ describe("Posts, comments, and the feed", () => {
 
     await comments.create(post.doId, "agreed!");
 
-    const view = (await env.postDo.post.get(post.doId)).data!;
+    const view = (await env.PostDo.Post.get(post.doId)).data!;
     expect(view.meta.title).toBe("Cats");
     expect(view.comments.map((c: any) => c.content)).toContain("agreed!");
   });
 
   it("each post gets its own DO, so comments do not leak between posts", async () => {
     const env = app("alice").env;
-    const subs = env.subRedditDb.subReddit;
-    const posts = env.postDo.post;
-    const comments = env.postDo.comment;
+    const subs = env.SubRedditDb.SubReddit;
+    const posts = env.PostDo.Post;
+    const comments = env.PostDo.Comment;
 
     const sub = await subs.create("r/test", "test");
     const a = (await posts.create(sub.data!.id, "A", "a")).data!;
@@ -65,15 +65,15 @@ describe("Posts, comments, and the feed", () => {
 
     await comments.create(a.doId, "only on A");
 
-    const viewB = (await env.postDo.post.get(b.doId)).data!;
+    const viewB = (await env.PostDo.Post.get(b.doId)).data!;
     expect(viewB.comments).toEqual([]);
   });
 
   it("the feed hydrates each post out of its own DO, isolated per sub", async () => {
     const env = app("alice").env;
-    const subs = env.subRedditDb.subReddit;
-    const posts = env.postDo.post;
-    const comments = env.postDo.comment;
+    const subs = env.SubRedditDb.SubReddit;
+    const posts = env.PostDo.Post;
+    const comments = env.PostDo.Comment;
 
     const sub = await subs.create("r/feed", "feed");
     const other = await subs.create("r/empty", "empty");
@@ -95,9 +95,9 @@ describe("Posts, comments, and the feed", () => {
 describe("Voting", () => {
   it("up then down nets to zero on a post; up works on a comment", async () => {
     const env = app("alice").env;
-    const subs = env.subRedditDb.subReddit;
-    const posts = env.postDo.post;
-    const comments = env.postDo.comment;
+    const subs = env.SubRedditDb.SubReddit;
+    const posts = env.PostDo.Post;
+    const comments = env.PostDo.Comment;
 
     const sub = await subs.create("r/vote", "vote");
     const post = (await posts.create(sub.data!.id, "vote", "body")).data!;
@@ -116,10 +116,10 @@ describe("Voting", () => {
 describe("Authorship", () => {
   it("creating things records them in the author's own DO", async () => {
     const env = app("dana").env;
-    const users = env.userDo.user;
-    const subs = env.subRedditDb.subReddit;
-    const posts = env.postDo.post;
-    const comments = env.postDo.comment;
+    const users = env.UserDo.User;
+    const subs = env.SubRedditDb.SubReddit;
+    const posts = env.PostDo.Post;
+    const comments = env.PostDo.Comment;
 
     await users.login("dana");
     const sub = (await subs.create("r/dana", "dana")).data!;

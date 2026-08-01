@@ -61,7 +61,7 @@ pub mod analysis {
             // Validate include tree via BFS. A missing tree falls back to the
             // generated default during expansion and needs no validation.
             let mut q = std::collections::VecDeque::new();
-            if let Some(tree) = &ds.tree {
+            if let Some(tree) = ds.tree() {
                 q.push_back((tree, model));
             }
             while let Some((node, parent_model)) = q.pop_front() {
@@ -109,8 +109,7 @@ pub mod analysis {
             // For each verb: if the user declared a stub, validate and capture it.
             // Otherwise a default-valued method is left in place for the expansion pass to fill.
             let list = ds
-                .list
-                .as_ref()
+                .method("list")
                 .map(|method| {
                     let mut parameters = method
                         .inner
@@ -144,8 +143,7 @@ pub mod analysis {
                 .unwrap_or_default();
 
             let get = ds
-                .get
-                .as_ref()
+                .method("get")
                 .map(|method| {
                     let (mut fields, instance_fields): (Vec<_>, Vec<_>) = method
                         .inner
@@ -203,8 +201,7 @@ pub mod analysis {
                 .unwrap_or_default();
 
             let save = ds
-                .save
-                .as_ref()
+                .method("save")
                 .map(|method| {
                     let mut parameters = method
                         .inner
@@ -241,7 +238,7 @@ pub mod analysis {
                 model_sym.name,
                 DataSource {
                     name: ds.symbol.name,
-                    tree: match &ds.tree {
+                    tree: match ds.tree() {
                         Some(tree) => parsed_include_tree_to_idl(tree),
                         None => include_dfs(
                             models,

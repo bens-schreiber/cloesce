@@ -13,7 +13,7 @@ import {
 
 const a: Api.A.Of = {
   create(env, model) {
-    return env.db.a.save(model);
+    return env.db.A.save(model);
   },
   withoutB(self) {
     return self;
@@ -26,7 +26,7 @@ const b: Api.B.Of = {
 
 const person: Api.Person.Of = {
   create(env, model) {
-    return env.db.person.save(model);
+    return env.db.Person.save(model);
   },
   withoutDogs(self) {
     return self;
@@ -39,7 +39,7 @@ const dog: Api.Dog.Of = {
 
 const student: Api.Student.Of = {
   create(env, model) {
-    return env.db.student.withCoursesStudentsCourses.save(model);
+    return env.db.Student.WithCoursesStudentsCourses.save(model);
   },
   none(self) {
     return self;

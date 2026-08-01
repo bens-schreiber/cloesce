@@ -1,5 +1,5 @@
 import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
-import { Cidl, Model, ApiMethod, DataSource, Field, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
+import { Cidl, Model, ApiMethod, DataSource, Field } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
 import { HttpResult } from "../ui/backend.js";
 import { hydrateType, isNullable } from "./orm.js";
@@ -81,16 +81,16 @@ export async function router(
   workerUrl: string,
   env: any,
   registry: Map<string, any>,
-  durableContext: unknown,
 ): Promise<Response> {
   await RuntimeContainer.init(idl);
 
   try {
-    const result = await route(request, idl, workerUrl, env, registry, durableContext);
+    const result = await route(request, idl, workerUrl, env, registry);
 
     if (result instanceof Response) {
-      // A forwarded Durable Object response is passed through unchanged.
-      return result;
+      // A forwarded Durable Object response arrives with immutable headers, so
+      // hand back a copy callers are free to mutate.
+      return mutableResponse(result);
     }
 
     if (result.status === 500) {
@@ -127,10 +127,8 @@ async function route(
   workerUrl: string,
   env: any,
   registry: Map<string, any>,
-  durableContext: unknown,
 ): Promise<HttpResult<unknown> | Response> {
   const { wasm } = RuntimeContainer.get();
-
   const routeRes = matchRoute(request, idl, workerUrl);
   if (routeRes.isLeft()) {
     return routeRes.value;
@@ -159,7 +157,7 @@ async function route(
     return hydrated.value;
   }
 
-  return await methodDispatch(route.impl!, hydrated?.unwrap(), route, params, env, durableContext);
+  return await methodDispatch(route.impl!, hydrated?.unwrap(), route, params, env);
 }
 
 /**
@@ -425,6 +423,18 @@ function readHeader(request: Request, name: string): string | null {
 }
 
 /**
+ * Rebuilds a response whose headers are immutable (as they are on any response
+ * returned from a `stub.fetch`), so callers can layer CORS and friends on top.
+ */
+function mutableResponse(response: Response): Response {
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: new Headers(response.headers),
+  });
+}
+
+/**
  * Forwards a request to a Durable Object instance
  */
 async function forward(
@@ -514,7 +524,6 @@ async function methodDispatch(
   route: MatchedRoute,
   params: Record<string, unknown>,
   env: any,
-  durableContext: unknown,
 ): Promise<HttpResult<unknown>> {
   const paramArray: any[] = !route.method.is_static ? [obj] : [];
 
@@ -522,10 +531,6 @@ async function methodDispatch(
   // they never receive `env` as an argument even though the schema records their bindings.
   const isCrud = route.method.name.startsWith("$");
   if (!isCrud && (route.method.injected.length > 0 || route.method.durable_target != null)) {
-    // A durable route runs inside its DO; surface that context under the well-known key.
-    if (route.method.durable_target != null) {
-      env[ENV_DURABLE_TARGET_KEY] = durableContext;
-    }
     paramArray.push(env);
   }
 

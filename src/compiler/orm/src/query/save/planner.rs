@@ -374,10 +374,16 @@ impl<'src> Planner<'src> {
         {
             // Emit a tmp-capture for the auto-incremented PK, so this row's
             // children can reference it.
-            self.batches[batch_idx].writes.push(SqlStatement::Write {
-                sql: tmp_capture_sql(&dotted(&path), pk_name),
-                arguments: vec![],
-            });
+            let (sql, arguments) = match row.conflict_target() {
+                // Upserting on a unique key; the insert may not have generated the id.
+                Some(target) if !target[0].is_pk => {
+                    tmp_capture_keyed_sql(&dotted(&path), pk_name, model.name, &target)
+                }
+                _ => (tmp_capture_sql(&dotted(&path), pk_name), vec![]),
+            };
+            self.batches[batch_idx]
+                .writes
+                .push(SqlStatement::Write { sql, arguments });
             self.batches[batch_idx].uses_tmp = true;
             pks.push((
                 pk_name,
@@ -884,6 +890,44 @@ impl<'src> RowSql<'_, 'src> {
         }
     }
 
+    /// The `ON CONFLICT` target for this row's insert.
+    ///
+    /// The primary key wins whenever it is fully resolved. Otherwise (an auto-incremented PK)
+    /// the payload may still have pinned a `[unique ...]` constraint, which identifies the row
+    /// just as well.
+    ///
+    /// A payload resolving two independent unique keys stays a plain insert, so the
+    /// duplicate surfaces as a constraint error instead of silently overwriting whichever key
+    /// the planner happened to pick.
+    fn conflict_target(&self) -> Option<Vec<&FinalCol<'src>>> {
+        let pks = self.cols.iter().filter(|c| c.is_pk).collect::<Vec<_>>();
+        if !pks.is_empty() && pks.iter().all(|c| resolved(c)) {
+            return Some(pks);
+        }
+
+        let mut candidates = self
+            .model
+            .unique_keys()
+            .into_iter()
+            // SQLite treats NULLs as distinct, so a constraint over a nullable column never
+            // conflicts and cannot identify a row.
+            .filter(|key| key.iter().all(|u| !u.field.cidl_type.is_nullable()))
+            .filter_map(|key| {
+                key.iter()
+                    .map(|u| {
+                        self.cols
+                            .iter()
+                            .find(|c| c.name == u.field.name.as_ref())
+                            .filter(|c| resolved(c))
+                    })
+                    .collect::<Option<Vec<_>>>()
+            })
+            // The primary key was already rejected above as unresolved.
+            .filter(|key| key.iter().all(|c| !c.is_pk));
+
+        candidates.next().filter(|_| candidates.next().is_none())
+    }
+
     fn insert(&self) -> SqlStatement<'src> {
         let mut names = Vec::new();
         let mut placeholders = Vec::new();
@@ -913,33 +957,29 @@ impl<'src> RowSql<'_, 'src> {
                 placeholders.join(", ")
             );
 
-            // Upsert when every PK is resolved (present, not auto-increment) and non-PK columns
-            // exist to update.
-            let all_pks_resolved = !self
-                .cols
-                .iter()
-                .any(|c| c.is_pk && matches!(c.value, FinalValue::Skip));
+            // Upsert when a candidate key identifies the row.
+            if let Some(target) = self.conflict_target() {
+                let names = target.iter().map(|c| quote(c.name)).collect::<Vec<_>>();
 
-            let pk_names = self
-                .cols
-                .iter()
-                .filter(|c| c.is_pk)
-                .map(|c| quote(c.name))
-                .collect::<Vec<_>>();
+                let updates = self
+                    .cols
+                    .iter()
+                    .filter(|c| !c.is_pk && resolved(c))
+                    .filter(|c| !target.iter().any(|t| t.name == c.name))
+                    .map(|c| format!("{0} = excluded.{0}", quote(c.name)))
+                    .collect::<Vec<_>>();
 
-            let updates = self
-                .cols
-                .iter()
-                .filter(|c| !c.is_pk && !matches!(c.value, FinalValue::Skip))
-                .map(|c| format!("{0} = excluded.{0}", quote(c.name)))
-                .collect::<Vec<_>>();
-
-            if all_pks_resolved && !pk_names.is_empty() && !updates.is_empty() {
-                sql.push_str(&format!(
-                    " ON CONFLICT ({}) DO UPDATE SET {}",
-                    pk_names.join(", "),
-                    updates.join(", ")
-                ));
+                if !updates.is_empty() {
+                    sql.push_str(&format!(
+                        " ON CONFLICT ({}) DO UPDATE SET {}",
+                        names.join(", "),
+                        updates.join(", ")
+                    ));
+                } else if !target[0].is_pk {
+                    // Nothing to update, but the row must exist for its key to be read back.
+                    // A PK target is left alone so a junction row still raises the conflict.
+                    sql.push_str(&format!(" ON CONFLICT ({}) DO NOTHING", names.join(", ")));
+                }
             }
             sql
         };
@@ -1062,6 +1102,11 @@ fn template_segments<'src>(
     (segments, delayed)
 }
 
+/// Whether a column made it into the write (an auto-incremented PK does not).
+fn resolved(col: &FinalCol) -> bool {
+    !matches!(col.value, FinalValue::Skip)
+}
+
 /// `INSERT OR REPLACE INTO "$cloesce_tmp" ...`
 /// capturing a generated single PK by path.
 fn tmp_capture_sql(tmp_path: &str, pk_column: &str) -> String {
@@ -1071,6 +1116,45 @@ fn tmp_capture_sql(tmp_path: &str, pk_column: &str) -> String {
         tmp_path,
         pk_column,
     )
+}
+
+/// [tmp_capture_sql] for a row that upserts on a `[unique ...]` key.
+///
+/// `last_insert_rowid()` is not updated when the insert takes its `ON CONFLICT` branch, so it
+/// would hand children a stale id. Read the PK back through the key that was just written.
+fn tmp_capture_keyed_sql<'src>(
+    tmp_path: &str,
+    pk_column: &str,
+    table: &str,
+    target: &[&FinalCol<'src>],
+) -> (String, Vec<SaveArg<'src>>) {
+    let mut arguments = Vec::new();
+    let predicates = target
+        .iter()
+        .map(|c| {
+            let rhs = match &c.value {
+                FinalValue::Arg(arg) => {
+                    arguments.push(arg.clone());
+                    format!("?{}", arguments.len())
+                }
+                FinalValue::Inline(expr) => expr.clone(),
+                FinalValue::Skip => unreachable!("a conflict target is always resolved"),
+            };
+            format!("{} = {}", quote(c.name), rhs)
+        })
+        .collect::<Vec<_>>();
+
+    let sql = format!(
+        "INSERT OR REPLACE INTO {} (\"path\", \"primary_key\") VALUES ('{}', json_object('{}', (SELECT {} FROM {} WHERE {})))",
+        quote(TMP_TABLE),
+        tmp_path,
+        pk_column,
+        quote(pk_column),
+        quote(table),
+        predicates.join(" AND "),
+    );
+
+    (sql, arguments)
 }
 
 /// `(SELECT json_extract("primary_key", '$.<col>')

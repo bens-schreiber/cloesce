@@ -11,7 +11,8 @@
 //! - `migrate`: Generates a SQL migration file and a CIDL file containing only the migrated models based on the
 //!   differences between the current CIDL and the last migrated CIDL.
 //!
-//! - `fmt`: Formats `.clo` and `.cloesce` source files according to a consistent style.
+//! - `fmt`: Formats `.clo` and `.cloesce` source files according to a consistent style. Accepts optional
+//!   file or directory paths; without them, the `src` paths from the config file are used.
 //!
 //! - `version`: Displays the current version of the `cloesce` binary and checks for updates.
 //!
@@ -115,56 +116,64 @@ impl CloesceConfig {
 
     /// Scans the `src_paths` directories for `.clo` and `.cloesce` files,
     fn collect_sources(&self, root: &Path) -> Vec<PathBuf> {
-        fn is_source(path: &Path) -> bool {
-            matches!(
-                path.extension().and_then(|e| e.to_str()),
-                Some("cloesce") | Some("clo")
-            )
-        }
-
-        let mut results = Vec::new();
-        for p in &self.parsed.src_paths {
-            let full = {
-                let p = Path::new(p);
-                if p.is_absolute() {
-                    p.to_path_buf()
-                } else {
-                    root.to_path_buf().join(p)
-                }
-            };
-
-            if !full.exists() {
-                tracing::warn!("src path does not exist: {}", full.display());
-                continue;
-            }
-
-            if full.is_file() {
-                if is_source(&full) {
-                    results.push(full);
-                }
-                continue;
-            }
-
-            let mut queue = VecDeque::new();
-            queue.push_back(full);
-            while let Some(dir) = queue.pop_front() {
-                let Ok(entries) = std::fs::read_dir(&dir) else {
-                    continue;
-                };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        queue.push_back(path);
-                    } else if is_source(&path) {
-                        results.push(path);
-                    }
-                }
-            }
-        }
+        let results = collect_sources_from(root, self.parsed.src_paths.iter().map(Path::new));
 
         tracing::info!("Found {} source files.", results.len());
         results
     }
+}
+
+/// Expands each path into the `.clo` and `.cloesce` files it contains,
+/// recursing into directories. Paths are resolved relative to `root`.
+/// Missing paths are warned about and skipped.
+fn collect_sources_from<'a>(root: &Path, paths: impl Iterator<Item = &'a Path>) -> Vec<PathBuf> {
+    fn is_source(path: &Path) -> bool {
+        matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("cloesce") | Some("clo")
+        )
+    }
+
+    let mut results = Vec::new();
+    for p in paths {
+        let full = if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            root.to_path_buf().join(p)
+        };
+
+        if !full.exists() {
+            tracing::warn!("src path does not exist: {}", full.display());
+            continue;
+        }
+
+        if full.is_file() {
+            if is_source(&full) {
+                results.push(full);
+            } else {
+                tracing::warn!("skipping {}: not a .clo or .cloesce file", full.display());
+            }
+            continue;
+        }
+
+        let mut queue = VecDeque::new();
+        queue.push_back(full);
+        while let Some(dir) = queue.pop_front() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    queue.push_back(path);
+                } else if is_source(&path) {
+                    results.push(path);
+                }
+            }
+        }
+    }
+
+    results
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -263,6 +272,8 @@ fn open_file_or_create(path: &Path) -> Result<File, String> {
 
 #[derive(Args)]
 struct FormatArgs {
+    paths: Vec<PathBuf>,
+
     #[arg(long)]
     check: bool,
 }
@@ -317,8 +328,12 @@ fn main() {
             }
             Command::Fmt(args) => {
                 tracing::warn!("The format command is experimental, use with caution.");
-                let config = CloesceConfig::load(&root, cli.env)?;
-                let sources = config.collect_sources(&root);
+                let sources = if args.paths.is_empty() {
+                    let config = CloesceConfig::load(&root, cli.env)?;
+                    config.collect_sources(&root)
+                } else {
+                    collect_sources_from(&root, args.paths.iter().map(PathBuf::as_path))
+                };
                 format::format(sources, args)?;
 
                 let elapsed = start_time.elapsed();
@@ -1147,6 +1162,11 @@ mod format {
     use super::*;
 
     pub fn format(target_paths: Vec<PathBuf>, args: FormatArgs) -> Result<(), String> {
+        if target_paths.is_empty() {
+            tracing::warn!("No source files to format.");
+            return Ok(());
+        }
+
         // Lexing
         let sources = target_paths
             .into_iter()

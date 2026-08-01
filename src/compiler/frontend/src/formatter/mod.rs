@@ -735,24 +735,36 @@ impl<'src> ToDoc<'src> for DataSourceBlock<'src> {
             .then(Doc::text(" "))
             .then(ctx.sym_doc(&self.model, 0, true));
 
-        let mut include = match &self.tree {
-            None => Doc::nil(),
-            Some(tree) if tree.0.is_empty() => Doc::hardline(1)
-                .then(Doc::kw(Keyword::Include))
-                .then(Doc::text(" {}")),
-            Some(tree) => Doc::hardline(1)
-                .then(Doc::kw(Keyword::Include))
-                .then(ctx.block(tree.to_doc_at(ctx, 2), 2)),
-        };
+        let members = self
+            .includes
+            .iter()
+            .map(|include| {
+                let doc = match &include.inner.tree {
+                    tree if tree.0.is_empty() => Doc::kw(Keyword::Include).then(Doc::text(" {}")),
+                    tree => Doc::kw(Keyword::Include).then(ctx.block(tree.to_doc_at(ctx, 2), 2)),
+                };
+                (include.span.start, doc)
+            })
+            .chain(
+                self.methods
+                    .iter()
+                    .map(|stub| (stub.span.start, ctx.spd_doc(stub, 1, true))),
+            )
+            .collect::<std::collections::BTreeMap<_, _>>();
 
-        for stub in [&self.get, &self.list, &self.save].into_iter().flatten() {
-            include = include
-                .then(Doc::hardline(1))
-                .then(Doc::hardline(1))
-                .then(ctx.spd_doc(stub, 1, true));
-        }
+        let body = members
+            .into_values()
+            .enumerate()
+            .fold(Doc::nil(), |body, (i, member)| {
+                let separator = if i == 0 {
+                    Doc::hardline(1)
+                } else {
+                    Doc::hardline(1).then(Doc::hardline(1))
+                };
+                body.then(separator).then(member)
+            });
 
-        source_doc.then(ctx.block(include, 1))
+        source_doc.then(ctx.block(body, 1))
     }
 }
 

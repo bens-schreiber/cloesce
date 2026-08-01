@@ -245,13 +245,52 @@ function LeaderboardDoHelpers(namespace: DurableObjectNamespace) {
     };
 }
 
-/** @internal Per-binding upgraded types (raw API plus Cloesce field helpers). */
+/**
+ * Per-binding upgraded types: the raw Cloudflare API, plus Cloesce's field helpers and the
+ * store of every model the binding hosts.
+ *
+ * `E` is the ambient environment the handle was reached through; it gates the store members
+ * that need bindings the caller might not hold. It defaults to {@link Env.AllBindings} (every
+ * binding present), which is what you want when naming a handle directly, as in
+ * `function foo(db: Env.MyDb)`.
+ */
 export namespace Env {
-    export type MyKv = CfEnv["MyKv"] & ReturnType<typeof MyKvHelpers>;
-    export type MyR2 = CfEnv["MyR2"] & ReturnType<typeof MyR2Helpers>;
-    export type GlobalDo = CfEnv["GlobalDo"] & ReturnType<typeof GlobalDoHelpers>;
-    export type LeaderboardDo = CfEnv["LeaderboardDo"] & ReturnType<typeof LeaderboardDoHelpers>;
-    export type db = CfEnv["db"];
+    /** @internal The "every binding is present" key set: the root {@link Env}'s own view. */
+    export type AllBindings = Record<keyof CfEnv | "YouTubeApi", unknown>;
+    export type MyKv<E = AllBindings> = CfEnv["MyKv"] & ReturnType<typeof MyKvHelpers>;
+    export type MyR2<E = AllBindings> = CfEnv["MyR2"] & ReturnType<typeof MyR2Helpers>;
+    export type GlobalDo<E = AllBindings> = CfEnv["GlobalDo"] & ReturnType<typeof GlobalDoHelpers> & {
+        /** Store for the `GlobalSettings` model, which this binding hosts. */
+        GlobalSettings: Needs<E, "GlobalDo", GlobalSettingsStore<E>>;
+    };
+    export type LeaderboardDo<E = AllBindings> = CfEnv["LeaderboardDo"] & ReturnType<typeof LeaderboardDoHelpers> & {
+        /** Store for the `Leaderboard` model, which this binding hosts. */
+        Leaderboard: Needs<E, "LeaderboardDo", LeaderboardStore<E>>;
+        /** Store for the `LeaderboardEntry` model, which this binding hosts. */
+        LeaderboardEntry: Needs<E, "LeaderboardDo", LeaderboardEntryStore<E>>;
+    };
+    export type db<E = AllBindings> = CfEnv["db"] & {
+        /** Store for the `HasSqlColumnTypes` model, which this binding hosts. */
+        HasSqlColumnTypes: Needs<E, "db", HasSqlColumnTypesStore<E>>;
+        /** Store for the `ModelWithCompositePk` model, which this binding hosts. */
+        ModelWithCompositePk: Needs<E, "db", ModelWithCompositePkStore<E>>;
+        /** Store for the `ModelWithKv` model, which this binding hosts. */
+        ModelWithKv: Needs<E, "db", ModelWithKvStore<E>>;
+        /** Store for the `ModelWithR2` model, which this binding hosts. */
+        ModelWithR2: Needs<E, "db", ModelWithR2Store<E>>;
+        /** Store for the `OneToManyModel` model, which this binding hosts. */
+        OneToManyModel: Needs<E, "db", OneToManyModelStore<E>>;
+        /** Store for the `ToyotaPrius` model, which this binding hosts. */
+        ToyotaPrius: Needs<E, "db", ToyotaPriusStore<E>>;
+        /** Store for the `BasicModel` model, which this binding hosts. */
+        BasicModel: Needs<E, "db", BasicModelStore<E>>;
+        /** Store for the `ModelWithCustomDs` model, which this binding hosts. */
+        ModelWithCustomDs: Needs<E, "db", ModelWithCustomDsStore<E>>;
+        /** Store for the `HasOneToOne` model, which this binding hosts. */
+        HasOneToOne: Needs<E, "db", HasOneToOneStore<E>>;
+        /** Store for the `ModelWithCruds` model, which this binding hosts. */
+        ModelWithCruds: Needs<E, "db", ModelWithCrudsStore<E>>;
+    };
     export type MY_VAR = CfEnv["MY_VAR"];
 }
 
@@ -278,7 +317,7 @@ export interface BasicService {
 }
 /** A plain-data `GlobalSettings` value. */
 export interface GlobalSettings {
-    config: unknown;
+    config: unknown | undefined | null;
 }
 /** A plain-data `HasSqlColumnTypes` value. */
 export interface HasSqlColumnTypes {
@@ -288,16 +327,16 @@ export interface HasSqlColumnTypes {
     dub: number;
     boo: boolean;
     dat: Date;
-    strNull: string | null;
-    integerNull: number | null;
-    dubNull: number | null;
-    booNull: boolean | null;
-    dateNull: Date | null;
+    strNull: string | undefined | null;
+    integerNull: number | undefined | null;
+    dubNull: number | undefined | null;
+    booNull: boolean | undefined | null;
+    dateNull: Date | undefined | null;
 }
 /** A plain-data `Leaderboard` value. */
 export interface Leaderboard {
     tenantId: number;
-    topEntries: unknown;
+    topEntries: unknown | undefined | null;
 }
 /** A plain-data `LeaderboardEntry` value. */
 export interface LeaderboardEntry {
@@ -305,7 +344,7 @@ export interface LeaderboardEntry {
     playerName: string;
     score: number;
     tenant: number;
-    topEntries: unknown;
+    topEntries: unknown | undefined | null;
 }
 /** A plain-data `ModelWithCompositePk` value. */
 export interface ModelWithCompositePk {
@@ -338,7 +377,7 @@ export interface RouteCar {
 export interface RouteOwner {
     ownerId: string;
     modelYear: number;
-    car: RouteCar;
+    car: RouteCar | undefined;
     metadata: KValue<unknown>;
 }
 /** A plain-data `ToyotaPrius` value. */
@@ -359,14 +398,14 @@ export interface ModelWithCustomDs {
     id: number;
     name: string;
     oneToManyId: number;
-    oneToManyModel: OneToManyModel;
+    oneToManyModel: OneToManyModel | undefined;
     data: R2ObjectBody;
 }
 /** A plain-data `HasOneToOne` value. */
 export interface HasOneToOne {
     id: number;
     basicModelId: number;
-    oneToOneNav: BasicModel;
+    oneToOneNav: BasicModel | undefined;
 }
 /** A plain-data `ModelWithCruds` value. */
 export interface ModelWithCruds {
@@ -377,6 +416,7 @@ export interface ModelWithCruds {
 export interface YouTubeApi {}
 export const YouTubeApi: InjectableTag<"YouTubeApi", YouTubeApi> = injectableTag("YouTubeApi");
 export interface GlobalSettingsStore<E> {
+
         /**
          * Load a single `GlobalSettings` by key.
          *
@@ -427,8 +467,8 @@ export interface GlobalSettingsStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.globalDo.prepare(sql).bind(id).all<GlobalSettings>()).results;
-         * return env.globalDo.globalSettings.hydrate(rows[0]);
+         * const rows = (await env.GlobalDo.prepare(sql).bind(id).all<GlobalSettings>()).results;
+         * return env.GlobalDo.GlobalSettings.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<GlobalSettings>): Promise<HttpResult<GlobalSettings>>;
@@ -449,12 +489,13 @@ export interface GlobalSettingsStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.globalDo.globalSettings.load(row, { children: true });
+         * const full = await env.GlobalDo.GlobalSettings.load(row, { children: true });
          * ```
          */
         load(self: GlobalSettings, tree: IncludeTree<GlobalSettings>): Promise<HttpResult<GlobalSettings>>;
 }
 export interface HasSqlColumnTypesStore<E> {
+
         /**
          * Load a single `HasSqlColumnTypes` by key.
          *
@@ -500,7 +541,7 @@ export interface HasSqlColumnTypesStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<HasSqlColumnTypes>()).results;
-         * return env.db.hasSqlColumnTypes.hydrate(rows[0]);
+         * return env.db.HasSqlColumnTypes.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<HasSqlColumnTypes>): Promise<HttpResult<HasSqlColumnTypes>>;
@@ -521,12 +562,13 @@ export interface HasSqlColumnTypesStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.hasSqlColumnTypes.load(row, { children: true });
+         * const full = await env.db.HasSqlColumnTypes.load(row, { children: true });
          * ```
          */
         load(self: HasSqlColumnTypes, tree: IncludeTree<HasSqlColumnTypes>): Promise<HttpResult<HasSqlColumnTypes>>;
 }
 export interface LeaderboardStore<E> {
+
         /**
          * Load a single `Leaderboard` by key.
          *
@@ -579,8 +621,8 @@ export interface LeaderboardStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.leaderboardDo.prepare(sql).bind(id).all<Leaderboard>()).results;
-         * return env.leaderboardDo.leaderboard.hydrate(rows[0]);
+         * const rows = (await env.LeaderboardDo.prepare(sql).bind(id).all<Leaderboard>()).results;
+         * return env.LeaderboardDo.Leaderboard.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<Leaderboard>, tenantId: number): Promise<HttpResult<Leaderboard>>;
@@ -601,12 +643,13 @@ export interface LeaderboardStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.leaderboardDo.leaderboard.load(row, { children: true });
+         * const full = await env.LeaderboardDo.Leaderboard.load(row, { children: true });
          * ```
          */
         load(self: Leaderboard, tree: IncludeTree<Leaderboard>): Promise<HttpResult<Leaderboard>>;
 }
 export interface LeaderboardEntryStore<E> {
+
         /**
          * Load a single `LeaderboardEntry` by key.
          *
@@ -661,8 +704,8 @@ export interface LeaderboardEntryStore<E> {
          * @returns An {@link HttpResult} with the hydrated row, or `404` if it resolves to null.
          * @example
          * ```ts
-         * const rows = (await env.leaderboardDo.prepare(sql).bind(id).all<LeaderboardEntry>()).results;
-         * return env.leaderboardDo.leaderboardEntry.hydrate(rows[0]);
+         * const rows = (await env.LeaderboardDo.prepare(sql).bind(id).all<LeaderboardEntry>()).results;
+         * return env.LeaderboardDo.LeaderboardEntry.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<LeaderboardEntry>, tenant: number): Promise<HttpResult<LeaderboardEntry>>;
@@ -683,12 +726,13 @@ export interface LeaderboardEntryStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.leaderboardDo.leaderboardEntry.load(row, { children: true });
+         * const full = await env.LeaderboardDo.LeaderboardEntry.load(row, { children: true });
          * ```
          */
         load(self: LeaderboardEntry, tree: IncludeTree<LeaderboardEntry>): Promise<HttpResult<LeaderboardEntry>>;
 }
 export interface ModelWithCompositePkStore<E> {
+
         /**
          * Load a single `ModelWithCompositePk` by key.
          *
@@ -734,7 +778,7 @@ export interface ModelWithCompositePkStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithCompositePk>()).results;
-         * return env.db.modelWithCompositePk.hydrate(rows[0]);
+         * return env.db.ModelWithCompositePk.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithCompositePk>): Promise<HttpResult<ModelWithCompositePk>>;
@@ -755,7 +799,7 @@ export interface ModelWithCompositePkStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.modelWithCompositePk.load(row, { children: true });
+         * const full = await env.db.ModelWithCompositePk.load(row, { children: true });
          * ```
          */
         load(self: ModelWithCompositePk, tree: IncludeTree<ModelWithCompositePk>): Promise<HttpResult<ModelWithCompositePk>>;
@@ -763,6 +807,7 @@ export interface ModelWithCompositePkStore<E> {
         instanceMethod: Needs<E, "db", (self: ModelWithCompositePk, input: string) => Promise<HttpResult<string>>>;
 }
 export interface ModelWithKvStore<E> {
+
         /**
          * Load a single `ModelWithKv` by key.
          *
@@ -820,7 +865,7 @@ export interface ModelWithKvStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithKv>()).results;
-         * return env.db.modelWithKv.hydrate(rows[0]);
+         * return env.db.ModelWithKv.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithKv>): Promise<HttpResult<ModelWithKv>>;
@@ -841,7 +886,7 @@ export interface ModelWithKvStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.modelWithKv.load(row, { children: true });
+         * const full = await env.db.ModelWithKv.load(row, { children: true });
          * ```
          */
         load(self: ModelWithKv, tree: IncludeTree<ModelWithKv>): Promise<HttpResult<ModelWithKv>>;
@@ -853,6 +898,7 @@ export interface ModelWithKvStore<E> {
         hasKvParamAndRes: (self: ModelWithKv, input: KValue<string>) => Promise<HttpResult<KValue<string>>>;
 }
 export interface ModelWithR2Store<E> {
+
         /**
          * Load a single `ModelWithR2` by key.
          *
@@ -906,7 +952,7 @@ export interface ModelWithR2Store<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithR2>()).results;
-         * return env.db.modelWithR2.hydrate(rows[0]);
+         * return env.db.ModelWithR2.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithR2>): Promise<HttpResult<ModelWithR2>>;
@@ -927,7 +973,7 @@ export interface ModelWithR2Store<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.modelWithR2.load(row, { children: true });
+         * const full = await env.db.ModelWithR2.load(row, { children: true });
          * ```
          */
         load(self: ModelWithR2, tree: IncludeTree<ModelWithR2>): Promise<HttpResult<ModelWithR2>>;
@@ -935,6 +981,7 @@ export interface ModelWithR2Store<E> {
         hasR2ParamAndRes: (self: ModelWithR2, input: R2ObjectBody) => Promise<HttpResult<R2ObjectBody>>;
 }
 export interface OneToManyModelStore<E> {
+
         /**
          * Load a single `OneToManyModel` by key.
          *
@@ -990,7 +1037,7 @@ export interface OneToManyModelStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<OneToManyModel>()).results;
-         * return env.db.oneToManyModel.hydrate(rows[0]);
+         * return env.db.OneToManyModel.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<OneToManyModel>): Promise<HttpResult<OneToManyModel>>;
@@ -1011,12 +1058,13 @@ export interface OneToManyModelStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.oneToManyModel.load(row, { children: true });
+         * const full = await env.db.OneToManyModel.load(row, { children: true });
          * ```
          */
         load(self: OneToManyModel, tree: IncludeTree<OneToManyModel>): Promise<HttpResult<OneToManyModel>>;
 }
 export interface RouteCarStore<E> {
+
         /**
          * Load a single `RouteCar` by key.
          *
@@ -1091,6 +1139,7 @@ export interface RouteCarStore<E> {
         load(self: RouteCar, tree: IncludeTree<RouteCar>): Promise<HttpResult<RouteCar>>;
 }
 export interface RouteOwnerStore<E> {
+
         /**
          * Load a single `RouteOwner` by key.
          *
@@ -1181,6 +1230,7 @@ export interface RouteOwnerStore<E> {
         instanceMethod: (self: RouteOwner, input: string) => Promise<HttpResult<string>>;
 }
 export interface ToyotaPriusStore<E> {
+
         /**
          * Load a single `ToyotaPrius` by key.
          *
@@ -1240,7 +1290,7 @@ export interface ToyotaPriusStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ToyotaPrius>()).results;
-         * return env.db.toyotaPrius.hydrate(rows[0]);
+         * return env.db.ToyotaPrius.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1261,16 +1311,17 @@ export interface ToyotaPriusStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.toyotaPrius.load(row, { children: true });
+         * const full = await env.db.ToyotaPrius.load(row, { children: true });
          * ```
          */
         load(self: ToyotaPrius, tree: IncludeTree<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
-        withKv: ToyotaPriusWithKvSource;
-        withR2: ToyotaPriusWithR2Source;
+        WithKv: ToyotaPriusWithKvSource;
+        WithR2: ToyotaPriusWithR2Source;
         /** API route `ToyotaPrius.instanceMethod`. */
         instanceMethod: (self: ToyotaPrius, input: string) => Promise<HttpResult<string>>;
 }
 export interface ToyotaPriusWithKvSource {
+
         /**
          * Load a single `ToyotaPrius` by key.
          *
@@ -1326,7 +1377,7 @@ export interface ToyotaPriusWithKvSource {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ToyotaPrius>()).results;
-         * return env.db.toyotaPrius.hydrate(rows[0]);
+         * return env.db.ToyotaPrius.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1340,6 +1391,7 @@ export interface ToyotaPriusWithKvSource {
         hydrateAll(rows: DeepPartial<ToyotaPrius>[]): Promise<HttpResult<ToyotaPrius[]>>;
 }
 export interface ToyotaPriusWithR2Source {
+
         /**
          * Load a single `ToyotaPrius` by key.
          *
@@ -1395,7 +1447,7 @@ export interface ToyotaPriusWithR2Source {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ToyotaPrius>()).results;
-         * return env.db.toyotaPrius.hydrate(rows[0]);
+         * return env.db.ToyotaPrius.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1409,6 +1461,7 @@ export interface ToyotaPriusWithR2Source {
         hydrateAll(rows: DeepPartial<ToyotaPrius>[]): Promise<HttpResult<ToyotaPrius[]>>;
 }
 export interface BasicModelStore<E> {
+
         /**
          * Load a single `BasicModel` by key.
          *
@@ -1454,7 +1507,7 @@ export interface BasicModelStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<BasicModel>()).results;
-         * return env.db.basicModel.hydrate(rows[0]);
+         * return env.db.BasicModel.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<BasicModel>): Promise<HttpResult<BasicModel>>;
@@ -1475,12 +1528,13 @@ export interface BasicModelStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.basicModel.load(row, { children: true });
+         * const full = await env.db.BasicModel.load(row, { children: true });
          * ```
          */
         load(self: BasicModel, tree: IncludeTree<BasicModel>): Promise<HttpResult<BasicModel>>;
 }
 export interface ModelWithCustomDsStore<E> {
+
         /**
          * Load a single `ModelWithCustomDs` by key.
          *
@@ -1548,7 +1602,7 @@ export interface ModelWithCustomDsStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithCustomDs>()).results;
-         * return env.db.modelWithCustomDs.hydrate(rows[0]);
+         * return env.db.ModelWithCustomDs.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithCustomDs>): Promise<HttpResult<ModelWithCustomDs>>;
@@ -1569,38 +1623,17 @@ export interface ModelWithCustomDsStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.modelWithCustomDs.load(row, { children: true });
+         * const full = await env.db.ModelWithCustomDs.load(row, { children: true });
          * ```
          */
         load(self: ModelWithCustomDs, tree: IncludeTree<ModelWithCustomDs>): Promise<HttpResult<ModelWithCustomDs>>;
-        custom: ModelWithCustomDsCustomSource;
+        Custom: ModelWithCustomDsCustomSource;
         /** API route `ModelWithCustomDs.instanceMethod`. */
         instanceMethod: (self: ModelWithCustomDs, input: string) => Promise<HttpResult<string>>;
 }
 export interface ModelWithCustomDsCustomSource {
-        /**
-         * Load a single `ModelWithCustomDs` by key.
-         *
-         * @remarks Runs this precompiled read plan:
-         * ```
-         * SELECT PLAN (GET) `ModelWithCustomDs` · 2 stages · 4 steps
-         * INCLUDE
-         * ├─ `data`
-         * └─ `oneToManyModel`
-         *    └─ `oneToManyNav`
-         *
-         * STAGE 0
-         * ├─ SEARCH `ModelWithCustomDs` ON d1 `db` ONE
-         * └─ READ r2 `MyR2` KEY "custom/{`$id`}/data" INTO `data`
-         *
-         * STAGE 1
-         * ├─ SEARCH `OneToManyModel` ON d1 `db` INTO `oneToManyModel` ONE
-         * │     JOIN `parent.oneToManyId` = `row.id`
-         * └─ SEARCH `BasicModel` ON d1 `db` INTO `oneToManyModel.oneToManyNav` MANY
-         *       JOIN `parent.id` = `row.fk_to_model`
-         * ```
-         * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
-         */
+
+        /** Custom over-ridden default `get` implementation. */
         get(id: number, externalParam: string): Promise<HttpResult<ModelWithCustomDs>>;
         /**
          * List `ModelWithCustomDs` rows in key order (seek-paginated).
@@ -1645,7 +1678,7 @@ export interface ModelWithCustomDsCustomSource {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithCustomDs>()).results;
-         * return env.db.modelWithCustomDs.hydrate(rows[0]);
+         * return env.db.ModelWithCustomDs.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithCustomDs>): Promise<HttpResult<ModelWithCustomDs>>;
@@ -1659,6 +1692,7 @@ export interface ModelWithCustomDsCustomSource {
         hydrateAll(rows: DeepPartial<ModelWithCustomDs>[]): Promise<HttpResult<ModelWithCustomDs[]>>;
 }
 export interface HasOneToOneStore<E> {
+
         /**
          * Load a single `HasOneToOne` by key.
          *
@@ -1716,7 +1750,7 @@ export interface HasOneToOneStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<HasOneToOne>()).results;
-         * return env.db.hasOneToOne.hydrate(rows[0]);
+         * return env.db.HasOneToOne.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<HasOneToOne>): Promise<HttpResult<HasOneToOne>>;
@@ -1737,12 +1771,13 @@ export interface HasOneToOneStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.hasOneToOne.load(row, { children: true });
+         * const full = await env.db.HasOneToOne.load(row, { children: true });
          * ```
          */
         load(self: HasOneToOne, tree: IncludeTree<HasOneToOne>): Promise<HttpResult<HasOneToOne>>;
 }
 export interface ModelWithCrudsStore<E> {
+
         /**
          * Load a single `ModelWithCruds` by key.
          *
@@ -1788,7 +1823,7 @@ export interface ModelWithCrudsStore<E> {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithCruds>()).results;
-         * return env.db.modelWithCruds.hydrate(rows[0]);
+         * return env.db.ModelWithCruds.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithCruds>): Promise<HttpResult<ModelWithCruds>>;
@@ -1809,38 +1844,17 @@ export interface ModelWithCrudsStore<E> {
          * @returns An {@link HttpResult} with the hydrated copy.
          * @example
          * ```ts
-         * const full = await env.db.modelWithCruds.load(row, { children: true });
+         * const full = await env.db.ModelWithCruds.load(row, { children: true });
          * ```
          */
         load(self: ModelWithCruds, tree: IncludeTree<ModelWithCruds>): Promise<HttpResult<ModelWithCruds>>;
-        byName: ModelWithCrudsByNameSource;
+        ByName: ModelWithCrudsByNameSource;
 }
 export interface ModelWithCrudsByNameSource {
-        /**
-         * Load a single `ModelWithCruds` by key.
-         *
-         * @remarks Runs this precompiled read plan:
-         * ```
-         * SELECT PLAN (GET) `ModelWithCruds` · 1 stage · 1 step
-         *
-         * STAGE 0
-         * └─ SEARCH `ModelWithCruds` ON d1 `db` ONE
-         * ```
-         * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
-         */
+
+        /** Custom over-ridden default `get` implementation. */
         get(name: string): Promise<HttpResult<ModelWithCruds>>;
-        /**
-         * List `ModelWithCruds` rows in key order (seek-paginated).
-         *
-         * @remarks Runs this precompiled read plan:
-         * ```
-         * SELECT PLAN (LIST) `ModelWithCruds` · 1 stage · 1 step
-         *
-         * STAGE 0
-         * └─ SEARCH `ModelWithCruds` ON d1 `db` LIMIT `$limit` MANY
-         * ```
-         * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
-         */
+        /** Custom over-ridden default `list` implementation. */
         list(name: string, limit: number): Promise<HttpResult<ModelWithCruds[]>>;
         /**
          * Insert or update a `ModelWithCruds` and every included relation.
@@ -1861,7 +1875,7 @@ export interface ModelWithCrudsByNameSource {
          * @example
          * ```ts
          * const rows = (await env.db.prepare(sql).bind(id).all<ModelWithCruds>()).results;
-         * return env.db.modelWithCruds.hydrate(rows[0]);
+         * return env.db.ModelWithCruds.hydrate(rows[0]);
          * ```
          */
         hydrate(row: DeepPartial<ModelWithCruds>): Promise<HttpResult<ModelWithCruds>>;
@@ -1875,67 +1889,41 @@ export interface ModelWithCrudsByNameSource {
         hydrateAll(rows: DeepPartial<ModelWithCruds>[]): Promise<HttpResult<ModelWithCruds[]>>;
 }
 
-// A handle alias is emitted for every binding (even one that hosts no model), so a route
-// that injects a raw KV/R2/DO binding still has a type to reference.
-// These should not be used directly; use the `Env` namespace instead.
-export type Db_db<E> = Env.db & {
-    hasSqlColumnTypes: Needs<E, "db", HasSqlColumnTypesStore<E>>;
-    modelWithCompositePk: Needs<E, "db", ModelWithCompositePkStore<E>>;
-    modelWithKv: Needs<E, "db", ModelWithKvStore<E>>;
-    modelWithR2: Needs<E, "db", ModelWithR2Store<E>>;
-    oneToManyModel: Needs<E, "db", OneToManyModelStore<E>>;
-    toyotaPrius: Needs<E, "db", ToyotaPriusStore<E>>;
-    basicModel: Needs<E, "db", BasicModelStore<E>>;
-    modelWithCustomDs: Needs<E, "db", ModelWithCustomDsStore<E>>;
-    hasOneToOne: Needs<E, "db", HasOneToOneStore<E>>;
-    modelWithCruds: Needs<E, "db", ModelWithCrudsStore<E>>;
-};
-export type Kv_MyKv<E> = Env.MyKv & {
-};
-export type R2_MyR2<E> = Env.MyR2 & {
-};
-export type Do_GlobalDo<E> = Env.GlobalDo & {
-    globalSettings: Needs<E, "globalDo", GlobalSettingsStore<E>>;
-};
-export type Do_LeaderboardDo<E> = Env.LeaderboardDo & {
-    leaderboard: Needs<E, "leaderboardDo", LeaderboardStore<E>>;
-    leaderboardEntry: Needs<E, "leaderboardDo", LeaderboardEntryStore<E>>;
-};
-
 /**
  * The fully-upgraded Cloesce environment. Contains:
- * - every binding (camelCased, e.g. `env.subRedditDb`) and injectable
+ * - every binding (e.g. `env.SubRedditDb`) and injectable, under its declared name
  * - each binding carrying its model stores
  * - each unbacked model's store, directly (e.g. `env.Foo` for a model with no D1/DO binding)
  *
- * Bindings are reached only under their camelCased name; the raw `wrangler.toml` (capitalized)
- * keys are omitted from `CfEnv` here, leaving Cloesce's own vars/injectables intact.
+ * Every binding keeps its declared `wrangler.toml` name; the raw `CfEnv` entry is replaced by
+ * the upgraded handle (see the {@link Env} namespace), leaving Cloesce's own vars/injectables
+ * intact.
  */
-export type FullEnv = Omit<CfEnv, never | "db" | "MyKv" | "MyR2" | "GlobalDo" | "LeaderboardDo"> & {
-    RouteCar: RouteCarStore<FullEnv>;
-    RouteOwner: RouteOwnerStore<FullEnv>;
-    db: Db_db<FullEnv>;
-    myKv: Env.MyKv;
-    myR2: Env.MyR2;
-    globalDo: Do_GlobalDo<FullEnv>;
-    leaderboardDo: Do_LeaderboardDo<FullEnv>;
+export interface Env extends Omit<CfEnv, never | "db" | "MyKv" | "MyR2" | "GlobalDo" | "LeaderboardDo"> {
+    RouteCar: RouteCarStore<Env.AllBindings>;
+    RouteOwner: RouteOwnerStore<Env.AllBindings>;
+    db: Env.db;
+    MyKv: Env.MyKv;
+    MyR2: Env.MyR2;
+    GlobalDo: Env.GlobalDo;
+    LeaderboardDo: Env.LeaderboardDo;
     YouTubeApi: YouTubeApi;
-};
+}
 
 export namespace Env {
     export interface BasicServiceTopScores {
-        leaderboardDo: Do_LeaderboardDo<BasicServiceTopScores>;
+        LeaderboardDo: Env.LeaderboardDo<BasicServiceTopScores>;
         ctx: DurableObjectState;
     }
     export interface BasicServiceGlobalConfig {
-        globalDo: Do_GlobalDo<BasicServiceGlobalConfig>;
+        GlobalDo: Env.GlobalDo<BasicServiceGlobalConfig>;
         ctx: DurableObjectState;
     }
     export interface ModelWithCompositePkInstanceMethod {
-        db: Db_db<ModelWithCompositePkInstanceMethod>;
+        db: Env.db<ModelWithCompositePkInstanceMethod>;
     }
     export interface ModelWithKvInstanceMethod {
-        db: Db_db<ModelWithKvInstanceMethod>;
+        db: Env.db<ModelWithKvInstanceMethod>;
     }
 }
 
@@ -2036,11 +2024,11 @@ export type Owed = "BasicService" | "GlobalSettings" | "HasSqlColumnTypes" | "Le
  * - **Worker:** `createApp().worker(env)`.
  * - **Durable Object:** `createApp().durable(this, [migrations])`, passing the DO instance itself.
  */
-export function createApp(): AppBuilder<Owed, never, FullEnv, CfEnv, DurableObject<CfEnv>> {
+export function createApp(): AppBuilder<Owed, never, Env, CfEnv, DurableObject<CfEnv>> {
     return makeApp(cidl as any, "http://example.com/path/to/api", upgradeBindings) as unknown as AppBuilder<
         Owed,
         never,
-        FullEnv,
+        Env,
         CfEnv,
         DurableObject<CfEnv>
     >;

@@ -31,13 +31,12 @@ export default {
     }
 
     const builder = app().worker(env);
-    const withAuth = builder.register(clo.Auth, await authFromRequest(builder.env, request));
+    const withAuth = builder.register(clo.Auth, await authFromRequest(builder.env.Db, request));
     const res = await withAuth.run(request);
 
-    // Response headers from a forwarded DO fetch can be immutable, so rebuild.
-    return new Response(res.body, {
-      status: res.status,
-      headers: { ...Object.fromEntries(res.headers), ...cors },
-    });
+    for (const [name, value] of Object.entries(cors)) {
+      res.headers.set(name, value);
+    }
+    return res;
   },
 };
