@@ -204,7 +204,17 @@ enum LocalSymbolKind<'src> {
         model: &'src str,
         name: &'src str,
     },
+    DataSourceInclude {
+        model: &'src str,
+        data_source: &'src str,
+    },
+    DataSourceMethodDecl {
+        model: &'src str,
+        data_source: &'src str,
+        name: &'src str,
+    },
     DataSourceMethodParam {
+        model: &'src str,
         data_source: &'src str,
         method: &'src str,
         name: &'src str,
@@ -345,20 +355,36 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                         },
                     );
 
-                    for (method_name, method) in [
-                        ("list", &data_source_block.list),
-                        ("get", &data_source_block.get),
-                    ]
-                    .into_iter()
-                    .filter_map(|(n, m)| m.as_ref().map(|spd| (n, &spd.inner)))
-                    {
+                    for include in &data_source_block.includes {
+                        insert_local(
+                            sink,
+                            &include.inner.keyword,
+                            LocalSymbolKind::DataSourceInclude {
+                                model: data_source_block.model.name,
+                                data_source: data_source_block.symbol.name,
+                            },
+                        );
+                    }
+
+                    for method in data_source_block.methods.iter().map(|m| &m.inner) {
+                        insert_local(
+                            sink,
+                            &method.method,
+                            LocalSymbolKind::DataSourceMethodDecl {
+                                model: data_source_block.model.name,
+                                data_source: data_source_block.symbol.name,
+                                name: method.method.name,
+                            },
+                        );
+
                         for param in &method.parameters {
                             insert_local(
                                 sink,
                                 param,
                                 LocalSymbolKind::DataSourceMethodParam {
+                                    model: data_source_block.model.name,
                                     data_source: data_source_block.symbol.name,
-                                    method: method_name,
+                                    method: method.method.name,
                                     name: param.name,
                                 },
                             );

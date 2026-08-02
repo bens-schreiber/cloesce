@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use askama::Template;
 use idl::{
-    ApiMethod, CidlType, CloesceIdl, DEFAULT_DATA_SOURCE_NAME, DataSource, DurableBinding,
-    ENV_DURABLE_TARGET_KEY, Model, TemplateSegment,
+    ApiMethod, CidlType, CloesceIdl, DataSource, DurableBinding, DurableTarget,
+    ENV_DURABLE_TARGET_KEY, Model, NavigationCardinality, NavigationField, TemplateSegment,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -19,6 +19,10 @@ struct BackendTemplate<'src> {
 impl<'src> BackendTemplate<'src> {
     fn map_type(&self, ty: &CidlType<'_>) -> String {
         self.mapper.cidl_type(ty)
+    }
+
+    fn is_one_to_one(&self, nav: &NavigationField<'_>) -> bool {
+        matches!(nav.cardinality, NavigationCardinality::One)
     }
 
     fn interpolate_segments(&self, segments: &[TemplateSegment<&str>]) -> String {
@@ -47,15 +51,6 @@ impl<'src> BackendTemplate<'src> {
         self.mapper.interpolate_segments(&segments)
     }
 
-    /// The env-store key for a model or source name (camelCase: `Parent` -> `parent`).
-    fn store_key(&self, name: &str) -> String {
-        let mut chars = name.chars();
-        match chars.next() {
-            Some(first) => first.to_lowercase().collect::<String>() + chars.as_str(),
-            None => String::new(),
-        }
-    }
-
     /// Capitalize the first character (`create` -> `Create`), for building type names.
     fn cap_first(&self, name: &str) -> String {
         let mut chars = name.chars();
@@ -68,35 +63,6 @@ impl<'src> BackendTemplate<'src> {
     /// The `Env.<Route>` interface name for a route: `<Model><Method>`.
     fn route_env_name(&self, model: &Model<'src>, api: &ApiMethod<'src>) -> String {
         format!("{}{}", model.name, self.cap_first(&api.name))
-    }
-
-    /// The store-handle type prefix for a binding, keyed by its kind.
-    fn binding_prefix(&self, name: &str) -> &'static str {
-        if self.idl.wrangler_env.d1_bindings.contains(&name) {
-            return "Db";
-        }
-
-        if self
-            .idl
-            .wrangler_env
-            .kv_bindings
-            .iter()
-            .any(|b| b.name == name)
-        {
-            return "Kv";
-        }
-
-        if self
-            .idl
-            .wrangler_env
-            .r2_bindings
-            .iter()
-            .any(|b| b.name == name)
-        {
-            return "R2";
-        }
-
-        "Do"
     }
 
     /// True if any model is backed by this binding.
@@ -143,25 +109,6 @@ impl<'src> BackendTemplate<'src> {
             .collect()
     }
 
-    /// User routes that appear as their own member on the model store.
-    ///
-    /// - Excludes a route whose name collides with a data source's store key (e.g. a
-    ///   `withoutB` route backed by a `WithoutB` source).
-    /// - The source (or verb) keeps the store slot; the route stays reachable over HTTP.
-    fn store_route_apis<'a>(&self, model: &'a Model<'src>) -> Vec<&'a ApiMethod<'src>> {
-        let reserved: Vec<String> = model
-            .data_sources
-            .values()
-            .filter(|ds| ds.name != DEFAULT_DATA_SOURCE_NAME)
-            .map(|ds| self.store_key(ds.name))
-            .collect();
-
-        self.user_routes(model)
-            .into_iter()
-            .filter(|api| !reserved.contains(&api.name.to_string()))
-            .collect()
-    }
-
     /// Data sources with stubbed verbs
     fn stub_sources<'a>(&self, model: &'a Model<'src>) -> Vec<&'a DataSource<'src>> {
         model
@@ -190,18 +137,27 @@ impl<'src> BackendTemplate<'src> {
     ///
     /// Deduped in decl order.
     fn route_env_bindings(&self, api: &ApiMethod<'src>) -> Vec<String> {
-        let mut out: Vec<String> = api.injected.iter().map(|s| s.to_string()).collect();
-        if let Some(dt) = &api.durable_target
-            && !out.iter().any(|b| b == dt.binding)
-        {
-            out.push(dt.binding.to_string());
-        }
-        out
+        self.env_bindings(&api.injected, &api.durable_target)
     }
 
     /// True if the route injects any binding or runs in a DO
     fn route_has_env(&self, api: &ApiMethod<'src>) -> bool {
         !api.injected.is_empty() || api.durable_target.is_some()
+    }
+
+    /// As [Self::route_env_bindings], for a data source verb.
+    fn env_bindings(
+        &self,
+        injected: &[&'src str],
+        durable_target: &Option<DurableTarget<'src>>,
+    ) -> Vec<String> {
+        let mut out: Vec<String> = injected.iter().map(|s| s.to_string()).collect();
+        if let Some(dt) = durable_target
+            && !out.iter().any(|b| b == dt.binding)
+        {
+            out.push(dt.binding.to_string());
+        }
+        out
     }
 
     fn durable_target_key(&self) -> &'static str {

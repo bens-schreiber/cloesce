@@ -9,7 +9,7 @@ const CoursesOrderedDescending: Api.Student.CoursesOrderedDescending = {
       .bind(lastId, lastName, limit);
 
     const students = (await query.all<Student>()).results;
-    return env.db.student.coursesOrderedDescending.hydrateAll(students);
+    return env.db.Student.CoursesOrderedDescending.hydrateAll(students);
   },
 };
 

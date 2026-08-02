@@ -1,26 +1,38 @@
 # CRUD Generation
 
-> [!NOTE]
-> The `delete` operation is not currently supported, but will be added in a future release.
-
 Creating the same CRUD operations for each Model can be tedious. Cloesce provides a way to automatically generate these operations based on your Model definitions and Data Source configurations.
 
 For every public Data Source defined on a Model, Cloesce will utilize the `get`, `save`, and `list` methods of that Data Source to generate CRUD API endpoints for that Model.
 
+See [Data Sources](./ch5-0-data-sources.md) for more information on how to define Data Sources.
+
+> [!NOTE]
+> Tagging a Model with `[crud]` tells the compiler that all Data Sources on that Model should be exposed to the client for that particular set of CRUD operations. This is a hint to the compiler, and does not affect the backend.
+>
+> Cloesce will _always_ have all CRUD methods available to the backend. `[crud]` is only a hint for the client.
+
+> [!NOTE]
+> A Model marked as `[internal]` _cannot_ have `[crud]` applied to it, since it is not exposed to the client.
+
+> [!NOTE]
+> The `delete` operation is not currently supported, but will be added in a future release.
+
 ## Get
 
-By default, the `get` operation retrieves a single record by its [primary key](./ch4-2-sqlite-constraints.md#primary-key), [shard fields](./ch3-3-durable-objects.md) and [route fields](./ch4-3-kv-fields.md#route-fields). For example:
+By default, the `get` operation retrieves a single record by its [primary key](./ch4-3-sqlite-constraints.md#primary-key), [shard fields](./ch3-3-durable-objects.md) and [route fields](./ch4-1-worker-models.md). For example:
 
 ```cloesce
 [crud get]
-model Person for PersonDo(tenant) {
+model Person for PersonDo::tenant {
     primary {
         id: int
     }
 }
 
 source Custom for Person {
-    get(special_id: int)
+    get {
+        special_id: string
+    }
 }
 ```
 
@@ -31,9 +43,6 @@ The above schema will generate two API methods:
 - `GET /Person/$get_Custom`: Accepts argument `special_id`, hydrates with the Custom Data Source, and returns a `Person` instance if a record is found
 
 ## List
-
-> [!IMPORTANT]
-> The `list` operation can only be used if your Model does not have _any_ [route fields](./ch4-3-kv-fields.md#route-fields).
 
 The `list` operation retrieves multiple records. By default, it will use a seek based pagination strategy. For example:
 
@@ -46,7 +55,10 @@ model Person for Db {
 }
 
 source OffsetPagination for Person {
-    list(offset: int, limit: int)
+    list {
+        offset: int
+        limit: int
+    }
 }
 ```
 
@@ -55,6 +67,9 @@ The above schema will generate two API methods:
 - `GET /Person/$list`: Accepts arguments `limit` and `lastSeen_id`, hydrates with the Default Data Source, and returns a paginated list of `Person` instances
 
 - `GET /Person/$list_OffsetPagination`: Accepts arguments `offset` and `limit`, hydrates with the Custom Data Source, and returns a paginated list of `Person` instances
+
+> [!NOTE]
+> Not all Models truly support `list` operations. A Model with no SQLite backing will simply return a singleton array, because there is no way to enumerate all instances of that Model.
 
 ## Save
 
@@ -71,25 +86,11 @@ model Person for Db {
 }
 ```
 
-The client could then invoke a method like:
-
-```ts
-export class Person {
-  // ...
-  static async $save(model: DeepPartial<Person>): Promise<HttpResult<Person>> {
-    // ...
-  }
-}
-
-const result = await Person.$save({
-  id: 1,
-  name: "Alice",
-});
-```
-
 ### R2 Fields
 
-If your Model contains an [R2 field](./ch4-4-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data. To work around this, you can define a custom [instance method](./ch6-1-rest-apis.md#instance-methods) on your Model that accepts a `stream` parameter:
+If your Model contains an [R2 field](./ch4-5-r2-fields.md), the `save` operation will not be able to accept any data for that field, since the ORM is designed only for JSON serializable data.
+
+To work around this, you can define a custom [instance method](./ch6-1-rest-apis.md#instance-methods) on your Model that accepts a `stream` parameter:
 
 ```cloesce
 model Person {
@@ -103,17 +104,10 @@ model Person {
 }
 
 api Person {
-    [inject Bucket]
-    post upload_photo(self, photo: stream)
+    self post upload_photo {
+        body: stream
+
+        inject { Bucket }
+    }
 }
-```
-
-```ts
-import * as clo from "@cloesce/backend.js";
-
-export const Person = clo.Person.impl({
-  async upload_photo(self, env, photo) {
-    await env.Bucket.photos.put(photo);
-  },
-});
 ```

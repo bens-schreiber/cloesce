@@ -9,14 +9,14 @@ POOs are defined with the `poo` keyword and can have fields just like Models, bu
 To define a POO, you can use the following syntax:
 
 ```cloesce
-poo PersonDTO {
+poo PersonDto {
     id: int
     name: string
     age: int
 }
 ```
 
-The above code defines a POO called `PersonDTO` with three fields: `id`, `name`, and `age`. You can use this POO in your API definitions, data sources, or anywhere else you need to represent structured data without the overhead of a full Model.
+The above code defines a POO called `PersonDto` with three fields: `id`, `name`, and `age`. You can use this POO in your API definitions, data sources, or anywhere else you need to represent structured data without the overhead of a full Model.
 
 ## POO Composition
 
@@ -31,3 +31,24 @@ poo GraphNode {
 ```
 
 In the above code, the `GraphNode` POO has a field `children` which is an array of `GraphNode`s, allowing you to represent tree-like structures.
+
+## `[internal]` POOs
+
+A Plain Old Object can be marked as `[internal]`, which prevents any API method from accepting or returning that POO. For example:
+
+```cloesce
+[internal]
+poo UserCredentials {
+    password: string
+}
+
+kv Credentials {
+    creds -> UserCredentials {
+        username: string
+    }
+}
+```
+
+Here, `UserCredentials` is internal, so no API method can accept or return it. It can still be used in a KV template, since KV templates are not exposed to the client.
+
+A Model may still have a `Credentials::creds` KV field, but that field cannot be exposed through an API method, since `UserCredentials` itself is internal.

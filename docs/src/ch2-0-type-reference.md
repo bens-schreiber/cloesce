@@ -1,6 +1,6 @@
 # Type Reference
 
-This section provides a reference for the types available in the Cloesce Schema Language. These types can be used to define your application's data [Models](./ch4-0-models.md), [APIs](./ch6-1-rest-apis.md), [Data Sources](./ch5-0-data-sources.md), and more.
+This section provides a reference for the types available in the Cloesce Schema Language.
 
 ## All Types
 
@@ -29,7 +29,7 @@ This section provides a reference for the types available in the Cloesce Schema 
 
 ### Objects
 
-Any [Model](./ch4-0-models.md) or [Plain Old Object](./ch6-5-plain-old-objects.md) defined in your schema can be referenced as a type. For example, to have a Plain Old Object that references a Model:
+Any [Model](./ch4-0-models.md) or [Plain Old Object](./ch6-5-plain-old-objects.md) defined in your schema can be used as a type:
 
 ```cloesce
 model User for Db {
@@ -43,7 +43,7 @@ model User for Db {
 }
 
 poo Profile {
-    user: User
+    user: User // A reference to the User Model
     bio: string
 }
 ```
@@ -60,6 +60,6 @@ poo Profile {
 | `blob`   | BLOB             |
 | `json`   | TEXT (JSON)      |
 
-By default, all of these types are `NOT NULL` in a SQLite database.
+Some areas of the schema will only accept types that are compatible with SQLite. By default, all of these types are `NOT NULL` in a SQLite database.
 
-To allow `NULL` values, wrap the type in the `option` generic, e.g. `option<string>`.
+To allow `NULL` values, wrap the type in the `option` generic, e.g. `option<string>` (which is SQLite compatible).

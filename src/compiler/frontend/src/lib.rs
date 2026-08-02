@@ -303,6 +303,13 @@ pub struct ParsedIncludeTree<'src>(
     pub IndexMap<Symbol<'src>, ParsedIncludeTree<'src>>,
 );
 
+/// [Keyword::Include]
+pub struct DataSourceIncludeBlock<'src> {
+    /// The `include` keyword itself
+    pub keyword: Symbol<'src>,
+    pub tree: ParsedIncludeTree<'src>,
+}
+
 /// [Keyword::Source]
 pub struct DataSourceBlock<'src> {
     /// The symbol for the data source itself, e.g. `SourceName`
@@ -311,17 +318,21 @@ pub struct DataSourceBlock<'src> {
     /// The symbol for the model this data source is for, e.g. `for ModelName`
     pub model: Symbol<'src>,
 
-    /// [Keyword::Include]
-    pub tree: Option<ParsedIncludeTree<'src>>,
+    pub includes: Vec<Spd<DataSourceIncludeBlock<'src>>>,
 
-    /// [Keyword::List]
-    pub list: Option<Spd<DataSourceBlockMethod<'src>>>,
+    pub methods: Vec<Spd<DataSourceBlockMethod<'src>>>,
+}
 
-    /// [Keyword::Get]
-    pub get: Option<Spd<DataSourceBlockMethod<'src>>>,
+impl<'src> DataSourceBlock<'src> {
+    /// The first `include` block, if any.
+    pub fn tree(&self) -> Option<&ParsedIncludeTree<'src>> {
+        self.includes.first().map(|i| &i.inner.tree)
+    }
 
-    /// [Keyword::Save]
-    pub save: Option<Spd<DataSourceBlockMethod<'src>>>,
+    /// The first declaration of `name`, if any.
+    pub fn method(&self, name: &str) -> Option<&Spd<DataSourceBlockMethod<'src>>> {
+        self.methods.iter().find(|m| m.inner.method.name == name)
+    }
 }
 
 /// The explicit cardinality of a relationship, as stated by the `one` or `many`
@@ -382,6 +393,7 @@ pub struct KvFieldArgument<'src> {
     /// or a Durable Object shard iff the KV Field references a DO binding.
     pub target: Symbol<'src>,
 
+    /// - If empty => `target` alone; for a shard arg, the local field defaults to `target`'s name
     /// - If 1 => `target(local)`
     /// - If >1 => `target(local1, local2, ...)`
     pub local: Vec<Symbol<'src>>,

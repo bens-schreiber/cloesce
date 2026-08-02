@@ -5,13 +5,13 @@ import userDoInitial from "../../migrations/UserDo/1784326759_Initial.js";
 import { authFromRequest, newToken } from "./auth.js";
 import { app } from "./main.js";
 
-export const user: clo.Api.User.Of = {
+export const user = {
   async login(env, username) {
     // Logging in just claims a username
     const token = newToken();
-    await env.sessions.session.put(token, username);
+    await env.Sessions.session.put(token, username);
 
-    const found = await env.userDo.user.get(username);
+    const found = await env.UserDo.User.get(username);
     const user = found.data ?? {
       name: username,
       authoredSubReddits: [],
@@ -23,14 +23,14 @@ export const user: clo.Api.User.Of = {
   },
 
   async uploadAvatar(self, env, image) {
-    await env.avatar.avatar.put(self.name, image);
+    await env.Avatar.avatar.put(self.name, image);
   },
 
   async downloadAvatar(self, env) {
-    const object = await env.avatar.avatar.get(self.name);
+    const object = await env.Avatar.avatar.get(self.name);
     return object ? HttpResult.ok(200, object.body) : HttpResult.fail(404, "No avatar set.");
   },
-};
+} satisfies clo.Api.User.Of;
 
 export class UserDo extends DurableObject<clo.CfEnv> {
   private base = app().durable(this, [userDoInitial]);
@@ -38,7 +38,7 @@ export class UserDo extends DurableObject<clo.CfEnv> {
   async fetch(request: Request): Promise<Response> {
     const authed = this.base.register(
       clo.AuthUser,
-      await authFromRequest(this.base.env.sessions, request),
+      await authFromRequest(this.base.env.Sessions, request),
     );
 
     return authed.run(request);

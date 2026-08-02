@@ -3,6 +3,7 @@ packages:
   - tests/e2e
   - examples/weather
   - examples/reddit
+  - examples/realworld
 allowBuilds:
   esbuild: true
   sharp: false

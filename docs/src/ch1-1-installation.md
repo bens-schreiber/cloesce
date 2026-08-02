@@ -1,9 +1,7 @@
 # Installation
 
 > [!NOTE]
-> Only TypeScript compilation is supported.
->
-> Support for additional languages will be added in future releases.
+> Only TypeScript-to-TypeScript compilation is currently supported.
 
 ## Installing the Compiler
 
@@ -55,9 +53,8 @@ A simple project structure is created for you.
 │   ├── api/            # API route handlers
 │   ├── web/            # Frontend web assets
 │   └── schema/
-│       └── schema.clo  # Cloesce schema definition
-├── test/               # Unit tests for example Models
+│       └── schema.clo  # Cloesce schema
+├── test/               # Example unit tests
 ├── migrations/         # Database migration files
 ├── cloesce.jsonc       # Cloesce configuration
-└── package.json
 ```

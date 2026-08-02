@@ -1,0 +1,253 @@
+//! Contains the schema for the `Article` model, which represents an article in the system.
+//!
+//! Cloesce will generate the model into a SQL table in the "Db" database.
+//!
+//! Includes all Data Sources and API methods.
+
+[unique slug]
+[crud get, list]
+model Article for Db {
+    primary {
+        id: int
+    }
+
+    /// NOTE: User is an internal model,
+    /// we cannot have any navigation properties to it.
+    foreign User::id {
+        authorId
+    }
+
+    column {
+        [minlen 1]
+        slug: string
+
+        [minlen 1]
+        title: string
+
+        description: string
+        body: string
+        createdAt: date
+        updatedAt: date
+    }
+
+    kv FavoriteDo::{count, articleId(id)} {
+        favoriteCount
+    }
+
+    many ArticleTag::articleId(id) {
+        tags
+    }
+
+    many Comment::articleId(id) {
+        comments
+    }
+
+    many Favorite::articleId(id) {
+        favoritedBy
+    }
+}
+
+/// Defines the default set of CRUD operations for `Article`.
+/// Because `Article` is tagged with `[crud get, list]`, these will be exposed
+/// as a public API method that can be called by clients.
+source Default for Article {
+    include {
+        tags {
+            tag
+        }
+        comments
+        favoritedBy
+        favoriteCount
+    }
+
+    /// Get by slug
+    get {
+        [instance]
+        slug: string
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// List with filters and pagination.
+    list {
+        tag: option<string>
+        author: option<string>
+        favorited: option<string>
+        limit: option<int>
+        offset: option<int>
+
+        inject {
+            Db
+            Auth
+        }
+    }
+}
+
+/// A source whose `get` executes inside of the
+/// FavoriteDo Durable Object, which is a single-threaded execution environment.
+///
+/// Internal, as it is not useful to the client.
+[internal]
+source InFavoriteDo for Article {
+    include {}
+
+    get {
+        [instance]
+        id: int
+
+        inject {
+            Db
+            Auth
+            FavoriteDo::articleId(id)
+        }
+    }
+}
+
+api Article {
+    post create -> Article {
+        title: string
+        description: string
+        body: string
+        tags: array<string>
+
+        inject {
+            Db
+            Auth
+            FavoriteDo
+        }
+    }
+
+    self put update -> Article {
+        article: partial<Article>
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+
+    /// Given that the client has some Article, delete it.
+    self(InFavoriteDo) delete del {
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given that the client has some Article, favorite it
+    self(InFavoriteDo) put favorite {
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given that the client has some Article, unfavorite it
+    self(InFavoriteDo) delete unfavorite {
+        inject {
+            Db
+            Auth
+        }
+    }
+}
+
+/// A keyword or label that can be associated with an Article.
+[unique name]
+[crud list]
+model Tag for Db {
+    primary {
+        id: int
+    }
+
+    column {
+        [minlen 1]
+        name: string
+    }
+}
+
+/// Join table: article <-> tag.
+model ArticleTag for Db {
+    primary {
+        foreign Article::id {
+            articleId
+        }
+
+        foreign Tag::id {
+            tagId
+        }
+    }
+
+    one Tag::id(tagId) {
+        tag
+    }
+}
+
+/// A comment on an Article, authored by a User.
+[crud list, save]
+model Comment for Db {
+    primary {
+        id: int
+    }
+
+    foreign Article::id {
+        articleId
+    }
+
+    /// NOTE: User is an internal model,
+    /// we cannot have any navigation properties to it.
+    foreign User::id {
+        authorId
+    }
+
+    column {
+        [minlen 1]
+        body: string
+
+        createdAt: date
+        updatedAt: date
+    }
+}
+
+source Default for Comment {
+    /// List all comments for a given article.
+    list {
+        articleId: int
+
+        inject {
+            Db
+        }
+    }
+}
+
+api Comment {
+    post create -> Comment {
+        articleId: int
+        body: string
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    self put update -> Comment {
+        comment: partial<Comment>
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given that the client has some Comment, delete it.
+    self delete del {
+        inject {
+            Db
+            Auth
+        }
+    }
+}

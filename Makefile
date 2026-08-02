@@ -123,6 +123,18 @@ build-docs:
 		echo "CLOESCE: pandoc not found, skipping llms-full.txt generation"; \
 	fi
 
+.PHONY: build-install-vscode
+build-install-vscode:
+	@echo "CLOESCE: Building and installing VSCode extension..."
+	@cd editors/vscode && npm install && npx vsce package
+	@VSIX_FILE=$$(ls -t editors/vscode/cloesce-lang-*.vsix 2>/dev/null | head -1); \
+	if [ -z "$$VSIX_FILE" ]; then \
+		echo "❌ Error: No .vsix file found"; \
+		exit 1; \
+	fi; \
+	code --install-extension "$$VSIX_FILE"; \
+	echo "✅ VSCode extension installed. Reload VSCode to see changes."
+
 .PHONY: clean
 clean:
 	@echo "CLOESCE: Cleaning build artifacts..."

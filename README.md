@@ -1,64 +1,19 @@
-# cloesce (alpha, v0.5.0)
+# cloesce (alpha, v0.6.0)
 
 > [!WARNING]
 > Cloesce is under active development, expanding its feature set as it pushes toward full Cloudflare
 > support across any language. The syntax and features described here are subject to change as the project evolves.
 
-**Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com). From one language, generate an entire application with support for:
+**Cloesce** is a schema language that describes a full stack application built on [Cloudflare's edge ecosystem](https://workers.cloudflare.com).
 
 | Feature                 | Support |
 | ----------------------- | ------- |
 | ORM                     | ✅      |
-| RPC stubs               | ✅      |
-| Infrastructure as Code  | ✅      |
+| Query Planner           | ✅      |
+| RPC                     | ✅      |
 | SQL Migrations          | ✅      |
-| Middleware              | ✅      |
 | Runtime Type Validation | ✅      |
-
-## How Easy can Full Stack Development Be?
-
-```
-kv Namespace {
-    settings(id: int) -> json {
-        "user/settings/{id}"
-    }
-}
-
-r2 Bucket {
-    avatar(id: int) {
-        "user/avatars/{id}.png"
-    }
-}
-
-d1 { Db }
-
-[crud get, save, list]
-model User for Db {
-    primary {
-        id: int
-    }
-
-    column {
-        name: string
-    }
-
-    nav Posts::id {
-        posts
-    }
-
-    kv Namespace::settings(id) {
-        settings
-    }
-
-    r2 Bucket::avatar(id) {
-        avatar
-    }
-}
-
-api User {
-    get helloWorld(self) -> User
-}
-```
+| Infrastructure as Code  | 🟨      |
 
 ## Documentation
 

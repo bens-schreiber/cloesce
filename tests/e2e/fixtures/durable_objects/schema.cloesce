@@ -74,7 +74,7 @@ source Custom for Post {
     get {
         id: int
         subId: int
-        inject { SubRedditDo }
+        inject { SubRedditDo::id(subId) }
     }
 
     list {

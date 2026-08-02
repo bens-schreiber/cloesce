@@ -2,7 +2,7 @@ import { createApp, Dog, type Api, type CfEnv } from "./backend.js";
 
 const dog: Api.Dog.Of = {
   create(env, model) {
-    return env.db.dog.save(model);
+    return env.db.Dog.save(model);
   },
 
   getPartialSelf(self) {

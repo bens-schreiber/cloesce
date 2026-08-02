@@ -1,0 +1,23 @@
+{
+  "name": "examples-realworld",
+  "version": "1.0.0",
+  "description": "A Conduit (RealWorld) clone built on D1 and Durable Objects.",
+  "scripts": {
+    "start:dev": "wrangler dev --port 5001",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cloesce": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "@cloudflare/vitest-pool-workers": "^0.16.15",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "wrangler": "^4.61.1"
+  }
+}

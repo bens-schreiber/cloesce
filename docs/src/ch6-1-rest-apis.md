@@ -1,7 +1,5 @@
 # REST APIs
 
-Cloesce Models are not just about [defining data](./ch4-0-models.md) and [how to hydrate it](./ch5-0-data-sources.md); they also allow you to define how that data can be accessed and manipulated through APIs.
-
 By defining an API for a Model, you can specify REST endpoints that are generated as backend stubs and client methods, routed by the Cloesce runtime.
 
 ## Defining an API
@@ -16,35 +14,76 @@ model Person for Db {
 }
 
 api Person {
-    get by_id(id: int) -> Person
-    post create(name: string) -> Person
-    delete del(id: int)
-    put update(id: int, name: string) -> Person
-    patch update_name(id: int, name: string) -> Person
+    get byId -> Person {
+      id: int
+    }
+
+    post create -> Person {
+      name: string
+    }
+
+    delete del {
+      id: int
+      X_Auth_Token: string
+    }
+
+    put update {
+      id: int
+      name: string
+    }
+
+    patch updatePartial {
+      id: int
+      name: string
+    }
 }
 ```
 
 The above code defines an API for the `Person` Model:
 
-| Verb   | Route                 |
-| ------ | --------------------- |
-| GET    | `/Person/by_id`       |
-| POST   | `/Person/create`      |
-| DELETE | `/Person/del`         |
-| PUT    | `/Person/update`      |
-| PATCH  | `/Person/update_name` |
+| Verb   | Route                   | Result            |
+| ------ | ----------------------- | ----------------- |
+| GET    | `/Person/byId`          | `Person` instance |
+| POST   | `/Person/create`        | `Person` instance |
+| DELETE | `/Person/del`           | `void`            |
+| PUT    | `/Person/update`        | `void`            |
+| PATCH  | `/Person/updatePartial` | `void`            |
 
-All of the above methods are _static_, meaning they are called in the namespace of a Model, but do not need to hydrate an instance of that Model.
+All of the above methods are _static_. They do not hydrate an instance of that Model implicitly.
 
-### Transpiled Code
+> [!TIP]
+>
+> It is heavily recommended to use [Data Sources](./ch5-0-data-sources.md) to define generic `get`, `list` and `save` methods instead
+> of defining them in an API.
+>
+> Every Data Source will generate a corresponding API method for the client by default.
+
+### `[header]` tag
+
+API methods accept all parameters in the request body by default. If you want to accept a parameter from the request headers instead, you can tag that parameter with `[header]`:
+
+```cloesce
+api Person {
+    delete del {
+      id: int
+
+      [header]
+      X_Auth_Token: string
+    }
+}
+```
+
+Headers may use `Pascal_Snake_Case` to indicate that it should be parsed as `X-Auth-Token` in the request headers.
+
+### Generated Code
 
 After running `cloesce compile`, the above API definition could be implemented in TypeScript as follows:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
+import { Api } from "@cloesce/backend.js";
 
-export const Person = clo.Person.impl({
-  by_id(id) {
+export default {
+  byId(id) {
     // ...
   },
 
@@ -55,33 +94,69 @@ export const Person = clo.Person.impl({
   del(id) {
     // ...
   },
-});
+
+  update(id, name) {
+    // ...
+  },
+
+  updatePartial(id, name) {
+    // ...
+  },
+} satisfies Api.Person.Of;
+
+// alternatively, each API could be implemented individually:
+export const byId: Api.Person.byId = (id) => {
+  // ...
+};
 ```
 
-While the backend code must be implemented manually, the frontend client methods are generated automatically by Cloesce based on the API definition:
+Like with most RPC frameworks, the API implementation must be registered so it can be dispatched to on a matching request. A missing implementation results in a `501 Not Implemented` response.
 
 ```ts
-// .cloesce/client.ts
-export class Person {
-  id: number;
+import { CfEnv, createApp, Person } from "@cloesce/backend.js";
+import person from "./person.js";
 
-  static async by_id(id: number): Promise<HttpResult<Person>> {
-    // ...
-  }
+// src/index.ts
+export default {
+  async fetch(request: Request, env: CfEnv): Promise<Response> {
+    const app = createApp().worker(env).register(Person, person);
 
-  static async create(name: string): Promise<HttpResult<Person>> {
-    // ...
-  }
+    return app.run(request);
+  },
+};
+```
 
-  static async del(id: number): Promise<HttpResult<void>> {
-    // ...
+### Registering Durable Object APIs
+
+Durable Objects receive forwarded requests from Workers by the Cloesce runtime, and need their own app registration:
+
+```ts
+import { createApp, CfEnv } from "@cloesce/backend.js";
+import person from "./person.js";
+
+export class MyDurable extends DurableObject<CfEnv> {
+  private base = createApp().durable(this).register(Person, person);
+
+  async fetch(request: Request): Promise<Response> {
+    return this.base.run(request);
   }
 }
 ```
 
 ## Instance Methods
 
-With Cloesce, you can skip the step of manually hydrating and validating a Model instance. By passing the `self` keyword in the API method parameters, Cloesce will automatically hydrate the instance from the relevant data source and pass it as an argument to the method. For example:
+Many API endpoints start out by:
+
+- Selecting a row from a database
+- Seeing if it exists
+- Returning a `404 Not Found` if it doesn't exist
+- Operating on the row if it does exist
+
+Cloesce provides a shortcut for this common pattern with _instance methods_.
+
+An instance method is an API method that calls some Data Source `get` method to hydrate an instance of a Model, and then passes that instance to the API method implementation.
+
+For example:
 
 ```cloesce
 model Person for Db {
@@ -91,26 +166,27 @@ model Person for Db {
 }
 
 api Person {
-    get myself(self) -> Person
+    self get myself -> Person { }
 }
 ```
 
-The above code defines an API method `GET /Person/:id/myself`, which can be implemented in TypeScript:
+The above example is hydrated with `Person`'s default Data Source `get` method, which will retrieve the `Person` instance by its primary key `id`. If the instance does not exist, a `404 Not Found` response will be returned to the client.
+
+It can be implemented in TypeScript like so:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
+import { Api } from "@cloesce/backend.js";
 
-export const Person = clo.Person.impl({
-  myself(self) {
-    // `self` is an instance of `clo.Person.Self` that has been automatically hydrated by Cloesce
-    return self;
-  },
-});
+export const myself: Api.Person.myself = (self) => self;
 ```
+
+The `self` parameter is a flat object containing all of the fields of that `Person` instance returned by the (default) Data Sources `get` method.
 
 ### Using a Custom Data Source
 
-By default, all API methods will use the [Default Data Source](./ch5-1-overview.md#default-data-source) to hydrate the `self` instance. However, you can specify a custom data source with the `source` tag:
+By default, all API methods will use the [Default Data Source](./ch5-1-overview.md#default-data-source) to hydrate the `self` instance.
+
+Specify a custom data source like so:
 
 ```cloesce
 model Person for Db {
@@ -130,15 +206,51 @@ source WithoutAvatar for Person {
 }
 
 api Person {
-    get myself([source WithoutAvatar] self) -> Person
+    self(WithoutAvatar) get myself -> Person { }
 }
 ```
 
-In the above code, the `myself` API method will use the `WithoutAvatar` data source to hydrate the `self` instance, which excludes the `avatar` field. This allows you to have different API methods that return different subsets of the Model's data based on the data source used.
+In the above code, the `myself` API method will use the `WithoutAvatar` data source to hydrate the `self` instance, which excludes the `avatar` field.
+
+Any API method can be hydrated with any Data Source (for the same Model).
+
+## `[internal]` Models
+
+A Model may be sensitive and confined to only the backend of your application by using the `[internal]` tag.
+
+This will prevent any API from accepting that Model as a parameter or returning it as a result, and will not let any public Model compose a relationship with that Model.
+
+No interface will reach the generated client. However, _static APIs_ may be created for that Model, exposing only the methods you want to the client:
+
+```cloesce
+[internal]
+model UnHashedPassword for Db {
+  primary {
+    id: int
+  }
+
+  column {
+    password: string
+  }
+}
+
+api UnHashedPassword {
+  get isThisMyPassword -> bool {
+    id: int
+    password: string
+  }
+}
+```
+
+Because one static API method is defined, the client will be able to call `UnHashedPassword.isThisMyPassword` with an `id` and `password`, and receive a boolean result.
+
+The fields of `UnHashedPassword` will not be exposed to the client.
 
 ## Execution Context
 
-[Durable Objects](./ch3-3-durable-objects.md) do not define just an area for storing data, but a single threaded execution context. Any method may be executed in the context of a Durable Object using [Dependency Injection](./ch6-3-dependency-injection.md). For example:
+[Durable Objects](./ch3-3-durable-objects.md) do not define just an area for storing data, but a single threaded execution context.
+
+Any method may be executed in the context of a Durable Object using [Dependency Injection](./ch6-3-dependency-injection.md). For example:
 
 ```cloesce
 durable CounterDo {
@@ -149,8 +261,11 @@ durable CounterDo {
 
 model Counter {}
 api Counter {
-  [inject CounterDo(tenant)]
-  put increment(tenant: string) -> int
+  put increment -> int {
+    tenant: string
+
+    inject { CounterDo::tenant }
+  }
 }
 ```
 
@@ -163,54 +278,72 @@ Because `increment` injects an instantiated instance of `CounterDo`, any code wi
 > If a Durable Object has no shard keys, it is effectively a singleton, and can be injected as:
 >
 > ```cloesce
-> [inject Global()]
-> put method()
+> put method {
+>    inject { CounterDo::{} }
+> }
 > ```
 
 > [!NOTE]
-> Injecting the Durable Object namespace is different than injecting an instance of that durable object. For example, `[inject CounterDo]` would inject the namespace, allowing you to create and manage instances of that Durable Object within your method, but not execute code within the context of any particular instance.
+> Injecting the Durable Object namespace is different than injecting an instance of that durable object.
+>
+> For example, `inject { CounterDo }` would inject the namespace, allowing you to create and manage instances of that Durable Object within your method, but not execute code within the context of any particular instance.
 
 ### Data Source Execution Context
 
-Any method of a [Data Source](./ch5-0-data-sources.md) can also be executed in the context of a Durable Object by using the `inject` tag within that Data Source. The default implementation of a Data Source for some Durable Object backed Model will always be executed in the context of that Durable Object.
+A Data Source may execute in the context of a Durable Object with the same syntax as an API method.
 
-Additionally, passing `self` to an API method will utilize the context defined in the `get` method of the Data Source. This means that if the `get` method of the Data Source is executed in the context of a Durable Object, then any API method that hydrates `self` from that Data Source will also be executed in that context. For example:
+This means that any API method that uses that Data Source to hydrate `self` will also execute in the context of that Durable Object.
+
+An instance method already runs inside the Durable Object injected by the Data Source that hydrates its `self`. Injecting that context again in the API method is a compile error; omit the injection and use the one inherited from the Data Source.
+
+By default, the `get` method of a Data Source injects its host Model's Durable Object.
+
+> [!NOTE]
+> The `[instance]` tag may only be applied to a parameter that names a `column` or `primary` field of the Model. Shard keys and `route` fields do not qualify, and must be passed as ordinary parameters.
 
 ```cloesce
+durable CounterDo {
+    shard {
+        tenant: string
+    }
+}
+
+model Counter for CounterDo::tenant {
+    primary {
+        id: int
+    }
+}
+
 source Default for Counter {
-    [inject CounterDo(tenant)]
-    get([instance] tenant: string)
+    get {
+      [instance]
+      id: int
+
+      tenant: string
+
+      inject { CounterDo::tenant }
+    }
 }
 
 source OutsideContext for Counter {
-    get([instance] tenant: string)
+    get {
+      [instance]
+      id: int
+    }
 }
 
 api Counter {
     // Executed inside of CounterDo
-    get myself(self) -> Counter
+    self get myself -> Counter { }
 
     // Executed outside of CounterDo
-    get outside([source OutsideContext] self) -> Counter
+    self(OutsideContext) get outside -> Counter { }
 }
 ```
 
-> [!IMPORTANT]
-> An instantiated method inherits its execution context from the `get` method of its Data Source, so it must **not** also inject one explicitly. Doing so is a compile error:
->
-> ```cloesce
-> api Counter {
->     // Error: `self` already runs inside CounterDo via the Data Source's `get`
->     [inject CounterDo(tenant)]
->     get myself(self, tenant: string) -> Counter
-> }
-> ```
-
 ## Streams
 
-Cloesce buffers the full body of an incoming request by default, which is suitable for most use cases. However, for certain scenarios such as file uploads or real-time data processing, you may want to handle the request body as a stream.
-
-To define a streaming API method, you can use the `stream` type in the API definition:
+If a JSON body is defined in an API method, Cloesce will parse and validate the body before passing it to the method implementation. This is suitable for most use cases, but for certain scenarios such as file uploads or real-time data processing, you may want to handle the request body as a stream.
 
 ```cloesce
 model File {
@@ -220,8 +353,12 @@ model File {
 }
 
 api File {
-    post upload(file: stream) -> File
-    get download(id: int) -> stream
+    post upload -> File {
+      file: stream
+    }
+    get download -> stream {
+      id: int
+    }
 }
 ```
 
@@ -232,7 +369,25 @@ The above code defines two API methods for the `File` Model:
 
 The implementation of the `upload` method would need to handle the incoming stream appropriately by inspecting the [ReadableStream](https://developers.cloudflare.com/workers/runtime-apis/streams/readablestream/) passed in as the `file` parameter. Similarly, the `download` method would need to return a stream that can be consumed by the client for downloading the file.
 
+> [!NOTE]
+> By using `stream` in a request body, you forgo the ability to have any other parameters in the body, other than the stream itself and HTTP headers.
+>
+> For example, the following will not compile:
+>
+> ```cloesce
+> post upload -> File {
+>   file: stream
+>   name: string
+> }
+> ```
+>
+> Parameters tagged with `[header]` are still allowed, since they are not part of the request body.
+
 ## HttpResult
+
+Any method may return an `HttpResult` to indicate a success or failure of the API call. Failures may include only a status code and message, while successes may include a status code, data, and headers.
+
+If the result of an API method is not an `HttpResult`, Cloesce will automatically wrap the result in an `HttpResult.ok` with a `200 OK` status code and a `Content-Type` of `application/json`.
 
 Both the backend and frontend utilize the `HttpResult` type to represent the result of a REST API call. This type encapsulates the success or failure of the API call, along with any relevant data or error information.
 
@@ -272,25 +427,26 @@ model Garfield for Db {
 }
 
 api Garfield {
-    get by_id(id: int) -> Garfield
+    get byId -> Garfield {
+      id: int
+    }
 }
 ```
 
-The implementation of the `by_id` method could return an `HttpResult` like so:
+The implementation of the `byId` method could return an `HttpResult` like so:
 
 ```ts
-import * as clo from "@cloesce/backend.js";
+import { Api } from "@cloesce/backend.js";
+import { HttpResult } from "cloesce";
 
-export const Garfield = clo.Garfield.impl({
-  by_id(id) {
-    const today = new Date();
-    const isMonday = today.getDay() === 1;
+export const byId: Api.Garfield.byId = (id) => {
+  const today = new Date();
+  const isMonday = today.getDay() === 1;
 
-    if (isMonday) {
-      return HttpResult.fail(503, "Garfield hates Mondays");
-    }
+  if (isMonday) {
+    return HttpResult.fail(503, "Garfield hates Mondays");
+  }
 
-    return HttpResult.ok(200, { id });
-  },
-});
+  return HttpResult.ok(200, { id });
+};
 ```

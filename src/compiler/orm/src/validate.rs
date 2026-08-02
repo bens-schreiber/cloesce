@@ -73,6 +73,8 @@ pub fn validate_cidl_type(
     };
 
     let result = match unwrapped_type {
+        CidlType::Json => Some(value),
+
         CidlType::Int => match &value {
             Value::Number(num) if num.is_i64() => Some(value),
             Value::String(s) if s.parse::<i64>().is_ok() => {
@@ -81,6 +83,7 @@ pub fn validate_cidl_type(
             }
             _ => fail!(type_mismatch_err(value)),
         },
+
         CidlType::Real => match &value {
             Value::Number(num) if num.is_f64() || num.is_i64() => Some(value),
             Value::String(s) if s.parse::<f64>().is_ok() => {
@@ -90,6 +93,7 @@ pub fn validate_cidl_type(
             }
             _ => fail!(type_mismatch_err(value)),
         },
+
         CidlType::String => {
             if value.is_string() {
                 Some(value)

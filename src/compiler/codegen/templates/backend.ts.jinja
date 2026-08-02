@@ -34,6 +34,9 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 {%- endmacro -%}
 
 {%- macro source_verbs(model, ds, is_default) -%}
+{%- if ds.get.is_stub %}
+{{ "        " }}/** Custom over-ridden default `get` implementation. */
+{%- else %}
 {{ "        " }}/**
          * Load a single `{{ model.name }}` by key.
          *
@@ -43,7 +46,11 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * ```
          * @returns An {@link HttpResult} with the row, `404` if not found, or `400` on validation errors.
          */
+{%- endif %}
         get({{ get_params(ds.get) }}): Promise<HttpResult<{{ model.name }}>>;
+{%- if ds.list.is_stub %}
+        /** Custom over-ridden default `list` implementation. */
+{%- else %}
         /**
          * List `{{ model.name }}` rows in key order (seek-paginated).
          *
@@ -53,15 +60,21 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * ```
          * @returns An {@link HttpResult} with the page of rows, or `400` on validation errors.
          */
+{%- endif %}
         list({{ method_params(ds.list) }}): Promise<HttpResult<{{ model.name }}[]>>;
+{%- if ds.save.is_stub %}
+        /** Custom over-ridden default `save` implementation. */
+{%- else %}
         /**
          * Insert or update a `{{ model.name }}` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
+{%- endif %}
         save({{ method_params(ds.save) }}): Promise<HttpResult<{{ model.name }}>>;
         /**
          * Hydrate one pre-loaded ("seeded") `{{ model.name }}` row against this source's include tree.
@@ -73,8 +86,8 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @example
          * ```ts
 {%- if let Some(binding) = model_binding(model) %}
-         * const rows = (await env.{{ store_key(binding) }}.prepare(sql).bind(id).all<{{ model.name }}>()).results;
-         * return env.{{ store_key(binding) }}.{{ store_key(model.name) }}.hydrate(rows[0]);
+         * const rows = (await env.{{ binding }}.prepare(sql).bind(id).all<{{ model.name }}>()).results;
+         * return env.{{ binding }}.{{ model.name }}.hydrate(rows[0]);
 {%- else %}
          * const rows = await fetchRowsSomehow();
          * return env.{{ model.name }}.hydrate(rows[0]);
@@ -101,7 +114,7 @@ export type { DeepPartial, IncludeTree } from "cloesce";
          * @example
          * ```ts
 {%- if let Some(binding) = model_binding(model) %}
-         * const full = await env.{{ store_key(binding) }}.{{ store_key(model.name) }}.load(row, { children: true });
+         * const full = await env.{{ binding }}.{{ model.name }}.load(row, { children: true });
 {%- else %}
          * const full = await env.{{ model.name }}.load(row, { children: true });
 {%- endif %}
@@ -123,7 +136,42 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 {%- endmacro -%}
 
 {%- macro route_needs(api) -%}
-{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{% if is_injectable(b) || is_var(b) %}{{ b }}{% else %}{{ store_key(b) }}{% endif %}"{% endfor -%}
+{%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{{ b }}"{% endfor -%}
+{%- endmacro -%}
+
+{%- macro stub_verb_env(model, ds, verb, suffix) -%}
+{%- if verb.is_stub && !env_bindings(&verb.injected, &verb.durable_target).is_empty() %}
+    export interface {{ model.name }}{{ ds.name }}{{ suffix }} {
+{%- for b in env_bindings(&verb.injected, &verb.durable_target) %}
+{%- if is_injectable(b) %}
+        {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
+{%- else %}
+        {{ b }}: Env.{{ b }}<{{ model.name }}{{ ds.name }}{{ suffix }}>;
+{%- endif %}
+{%- endfor %}
+{%- if verb.durable_target.is_some() %}
+        {{ durable_target_key() }}: DurableObjectState;
+{%- endif %}
+    }
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro stub_verb_param(model, ds, verb, suffix) -%}
+{%- if !env_bindings(&verb.injected, &verb.durable_target).is_empty() -%}
+env: Env.{{ model.name }}{{ ds.name }}{{ suffix }}{% if !verb.parameters.is_empty() %}, {% endif %}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro binding_stores(binding) -%}
+{%- if binding_hosts_models(binding) %} & {
+{%- for m in binding_models(binding) %}
+        /** Store for the `{{ m.name }}` model, which this binding hosts. */
+        {{ m.name }}: Needs<E, "{{ binding }}", {{ m.name }}Store<E>>;
+{%- endfor %}
+    }
+{%- endif -%}
 {%- endmacro -%}
 
 /**
@@ -251,19 +299,29 @@ function {{ binding.name }}Helpers(namespace: DurableObjectNamespace) {
 }
 {%- endfor %}
 
-/** @internal Per-binding upgraded types (raw API plus Cloesce field helpers). */
+/**
+ * Per-binding upgraded types: the raw Cloudflare API, plus Cloesce's field helpers and the
+ * store of every model the binding hosts.
+ *
+ * `E` is the ambient environment the handle was reached through; it gates the store members
+ * that need bindings the caller might not hold. It defaults to {@link Env.AllBindings} (every
+ * binding present), which is what you want when naming a handle directly, as in
+ * `function foo(db: Env.MyDb)`.
+ */
 export namespace Env {
+    /** @internal The "every binding is present" key set: the root {@link Env}'s own view. */
+    export type AllBindings = Record<keyof CfEnv{% for inject in &idl.injects %} | "{{ inject }}"{% endfor %}, unknown>;
 {%- for b in &idl.wrangler_env.kv_bindings %}
-    export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
+    export type {{ b.name }}<E = AllBindings> = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>{{ binding_stores(b.name) }};
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
-    export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
+    export type {{ b.name }}<E = AllBindings> = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>{{ binding_stores(b.name) }};
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
-    export type {{ b.name }} = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>;
+    export type {{ b.name }}<E = AllBindings> = CfEnv["{{ b.name }}"] & ReturnType<typeof {{ b.name }}Helpers>{{ binding_stores(b.name) }};
 {%- endfor %}
 {%- for binding in &idl.wrangler_env.d1_bindings %}
-    export type {{ binding }} = CfEnv["{{ binding }}"];
+    export type {{ binding }}<E = AllBindings> = CfEnv["{{ binding }}"]{{ binding_stores(binding) }};
 {%- endfor %}
 {%- for var in &idl.wrangler_env.vars %}
     export type {{ var.name }} = CfEnv["{{ var.name }}"];
@@ -308,7 +366,7 @@ export interface {{ model.name }} {
     {{ field.name }}: {{ map_type(&field.cidl_type) }};
 {%- endfor %}
 {%- for nav in &model.navigation_fields %}
-    {{ nav.field.name }}: {{ map_type(&nav.field.cidl_type) }};
+    {{ nav.field.name }}: {{ map_type(&nav.field.cidl_type) }}{% if is_one_to_one(nav) %} | undefined{% endif %};
 {%- endfor %}
 {%- for r2 in &model.r2_fields %}
     {{ r2.field.name }}: {{ map_type(&r2.field.cidl_type) }};
@@ -334,10 +392,10 @@ export interface {{ model.name }}Store<E> {
 {%- endfor %}
 {%- for ds in model.data_sources.values() %}
 {%- if ds.name != "Default" %}
-        {{ store_key(ds.name) }}: {{ model.name }}{{ ds.name }}Source;
+        {{ ds.name }}: {{ model.name }}{{ ds.name }}Source;
 {%- endif %}
 {%- endfor %}
-{%- for api in store_route_apis(model) %}
+{%- for api in user_routes(model) %}
         /** API route `{{ model.name }}.{{ api.name }}`. */
         {{ api.name }}: {% if route_has_env(api) %}Needs<E, {{ route_needs(api) }}, ({{ store_route_sig(model, api) }}) => Promise<HttpResult<{{ map_type(&api.return_type) }}>>>{% else %}({{ store_route_sig(model, api) }}) => Promise<HttpResult<{{ map_type(&api.return_type) }}>>{% endif %};
 {%- endfor %}
@@ -352,87 +410,40 @@ export interface {{ model.name }}{{ ds.name }}Source {
 {%- endif %}
 {%- endfor %}
 
-// A handle alias is emitted for every binding (even one that hosts no model), so a route
-// that injects a raw KV/R2/DO binding still has a type to reference.
-// These should not be used directly; use the `Env` namespace instead.
-{%- for binding in &idl.wrangler_env.d1_bindings %}
-export type Db_{{ binding }}<E> = Env.{{ binding }} & {
-{%- for m in binding_models(binding) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ store_key(binding) }}", {{ m.name }}Store<E>>;
-{%- endfor %}
-};
-{%- endfor %}
-{%- for b in &idl.wrangler_env.kv_bindings %}
-export type Kv_{{ b.name }}<E> = Env.{{ b.name }} & {
-{%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
-{%- endfor %}
-};
-{%- endfor %}
-{%- for b in &idl.wrangler_env.r2_bindings %}
-export type R2_{{ b.name }}<E> = Env.{{ b.name }} & {
-{%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
-{%- endfor %}
-};
-{%- endfor %}
-{%- for b in &idl.wrangler_env.durable_bindings %}
-export type Do_{{ b.name }}<E> = Env.{{ b.name }} & {
-{%- for m in binding_models(b.name) %}
-    {{ store_key(m.name) }}: Needs<E, "{{ store_key(b.name) }}", {{ m.name }}Store<E>>;
-{%- endfor %}
-};
-{%- endfor %}
-
 /**
  * The fully-upgraded Cloesce environment. Contains:
- * - every binding (camelCased, e.g. `env.subRedditDb`) and injectable
+ * - every binding (e.g. `env.SubRedditDb`) and injectable, under its declared name
  * - each binding carrying its model stores
  * - each unbacked model's store, directly (e.g. `env.Foo` for a model with no D1/DO binding)
  *
- * Bindings are reached only under their camelCased name; the raw `wrangler.toml` (capitalized)
- * keys are omitted from `CfEnv` here, leaving Cloesce's own vars/injectables intact.
+ * Every binding keeps its declared `wrangler.toml` name; the raw `CfEnv` entry is replaced by
+ * the upgraded handle (see the {@link Env} namespace), leaving Cloesce's own vars/injectables
+ * intact.
  */
-export type FullEnv = Omit<CfEnv, never
+export interface Env extends Omit<CfEnv, never
 {%- for binding in &idl.wrangler_env.d1_bindings %} | "{{ binding }}"{%- endfor %}
 {%- for b in &idl.wrangler_env.kv_bindings %} | "{{ b.name }}"{%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %} | "{{ b.name }}"{%- endfor %}
-{%- for b in &idl.wrangler_env.durable_bindings %} | "{{ b.name }}"{%- endfor %}> & {
+{%- for b in &idl.wrangler_env.durable_bindings %} | "{{ b.name }}"{%- endfor %}> {
 {%- for model in unbacked_models_with_store() %}
-    {{ model.name }}: {{ model.name }}Store<FullEnv>;
+    {{ model.name }}: {{ model.name }}Store<Env.AllBindings>;
 {%- endfor %}
 {%- for binding in &idl.wrangler_env.d1_bindings %}
-{%- if binding_hosts_models(binding) %}
-    {{ store_key(binding) }}: Db_{{ binding }}<FullEnv>;
-{%- else %}
-    {{ store_key(binding) }}: Env.{{ binding }};
-{%- endif %}
+    {{ binding }}: Env.{{ binding }};
 {%- endfor %}
 {%- for b in &idl.wrangler_env.kv_bindings %}
-{%- if binding_hosts_models(b.name) %}
-    {{ store_key(b.name) }}: Kv_{{ b.name }}<FullEnv>;
-{%- else %}
-    {{ store_key(b.name) }}: Env.{{ b.name }};
-{%- endif %}
+    {{ b.name }}: Env.{{ b.name }};
 {%- endfor %}
 {%- for b in &idl.wrangler_env.r2_bindings %}
-{%- if binding_hosts_models(b.name) %}
-    {{ store_key(b.name) }}: R2_{{ b.name }}<FullEnv>;
-{%- else %}
-    {{ store_key(b.name) }}: Env.{{ b.name }};
-{%- endif %}
+    {{ b.name }}: Env.{{ b.name }};
 {%- endfor %}
 {%- for b in &idl.wrangler_env.durable_bindings %}
-{%- if binding_hosts_models(b.name) %}
-    {{ store_key(b.name) }}: Do_{{ b.name }}<FullEnv>;
-{%- else %}
-    {{ store_key(b.name) }}: Env.{{ b.name }};
-{%- endif %}
+    {{ b.name }}: Env.{{ b.name }};
 {%- endfor %}
 {%- for inject in &idl.injects %}
     {{ inject }}: {{ inject }};
 {%- endfor %}
-};
+}
 
 export namespace Env {
 {%- for (_key, model) in &idl.models %}
@@ -445,7 +456,7 @@ export namespace Env {
 {%- else if is_var(b) %}
         {{ b }}: Env.{{ b }};
 {%- else %}
-        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ route_env_name(model, api) }}>;
+        {{ b }}: Env.{{ b }}<{{ route_env_name(model, api) }}>;
 {%- endif %}
 {%- endfor %}
 {%- if api.durable_target.is_some() %}
@@ -455,45 +466,9 @@ export namespace Env {
 {%- endif %}
 {%- endfor %}
 {%- for ds in stub_sources(model) %}
-{%- if ds.get.is_stub && !ds.get.injected.is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}Get {
-{%- for b in &ds.get.injected %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Get>;
-{%- endif %}
-{%- endfor %}
-    }
-{%- endif %}
-{%- if ds.list.is_stub && !ds.list.injected.is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}List {
-{%- for b in &ds.list.injected %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}List>;
-{%- endif %}
-{%- endfor %}
-    }
-{%- endif %}
-{%- if ds.save.is_stub && !ds.save.injected.is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}Save {
-{%- for b in &ds.save.injected %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ store_key(b) }}: {{ binding_prefix(b) }}_{{ b }}<{{ model.name }}{{ ds.name }}Save>;
-{%- endif %}
-{%- endfor %}
-    }
-{%- endif %}
+{{- stub_verb_env(model, ds, ds.get, "Get") }}
+{{- stub_verb_env(model, ds, ds.list, "List") }}
+{{- stub_verb_env(model, ds, ds.save, "Save") }}
 {%- endfor %}
 {%- endfor %}
 }
@@ -507,13 +482,13 @@ export namespace Api {
 {%- for ds in stub_sources(model) %}
         export interface {{ ds.name }} {
 {%- if ds.get.is_stub %}
-            get({% if !ds.get.injected.is_empty() %}env: Env.{{ model.name }}{{ ds.name }}Get{% if !ds.get.parameters.is_empty() %}, {% endif %}{% endif %}{{ get_params(ds.get) }}): Promise<HttpResult<{{ model.name }}>>;
+            get({{ stub_verb_param(model, ds, ds.get, "Get") }}{{ get_params(ds.get) }}): Promise<HttpResult<{{ model.name }}>>;
 {%- endif %}
 {%- if ds.list.is_stub %}
-            list({% if !ds.list.injected.is_empty() %}env: Env.{{ model.name }}{{ ds.name }}List{% if !ds.list.parameters.is_empty() %}, {% endif %}{% endif %}{{ method_params(ds.list) }}): Promise<HttpResult<{{ model.name }}[]>>;
+            list({{ stub_verb_param(model, ds, ds.list, "List") }}{{ method_params(ds.list) }}): Promise<HttpResult<{{ model.name }}[]>>;
 {%- endif %}
 {%- if ds.save.is_stub %}
-            save({% if !ds.save.injected.is_empty() %}env: Env.{{ model.name }}{{ ds.name }}Save{% if !ds.save.parameters.is_empty() %}, {% endif %}{% endif %}{{ method_params(ds.save) }}): Promise<HttpResult<{{ model.name }}>>;
+            save({{ stub_verb_param(model, ds, ds.save, "Save") }}{{ method_params(ds.save) }}): Promise<HttpResult<{{ model.name }}>>;
 {%- endif %}
         }
 {%- endfor %}
@@ -535,11 +510,11 @@ export type Owed = {% if owed().is_empty() %}never{% else %}{% for m in owed() %
  * - **Worker:** `createApp().worker(env)`.
  * - **Durable Object:** `createApp().durable(this, [migrations])`, passing the DO instance itself.
  */
-export function createApp(): AppBuilder<Owed, never, FullEnv, CfEnv, DurableObject<CfEnv>> {
+export function createApp(): AppBuilder<Owed, never, Env, CfEnv, DurableObject<CfEnv>> {
     return makeApp(cidl as any, "{{ worker_url }}", upgradeBindings) as unknown as AppBuilder<
         Owed,
         never,
-        FullEnv,
+        Env,
         CfEnv,
         DurableObject<CfEnv>
     >;

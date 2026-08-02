@@ -1,0 +1,203 @@
+//! Contains the schema for the `User` model, which represents a user in the system.
+//!
+//! Cloesce will generate the model into a SQL table in the "Db" database.
+//!
+//! Includes all Data Sources and API methods.
+
+/// Because a User contains sensitive information, we mark this model as `internal` so that it is
+/// not exposed to the public API.
+[unique email]
+[unique username]
+[internal]
+model User for Db {
+    primary {
+        id: int
+    }
+
+    column {
+        [minlen 1]
+        [maxlen 40]
+        username: string
+
+        email: string
+        bio: string
+        image: option<string>
+        passwordHash: string
+    }
+
+    r2 Avatars::avatar(id) {
+        avatar
+    }
+}
+
+[internal]
+source ByName for User {
+    get {
+        name: string
+
+        inject { Db }
+    }
+}
+
+/// Because User is marked as internal, it CANNOT have any `self` API methods.
+///
+/// This API definition can be viewed as a "User Service", exposing helpful
+/// methods to the public API that operate on the User model, which they cannot access directly.
+api User {
+    /// Register a new user in the system.
+    /// Returns a [UserDto] with the new user's information and a JWT token.
+    post register -> UserDto {
+        [minlen 1]
+        username: string
+
+        [regex /^[^@\s]+@[^@\s]+\.[^@\s]+$/]
+        email: string
+
+        [minlen 8]
+        password: string
+
+        inject {
+            Db
+            Session
+        }
+    }
+
+    /// Log in an existing user in the system.
+    /// Returns a [UserDto] with the user's information and a JWT token.
+    post login -> UserDto {
+        email: string
+        password: string
+
+        inject {
+            Db
+            Session
+        }
+    }
+
+    /// Return the currently authenticated user, refreshing their token.
+    get current -> UserDto {
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Update the current user's information in the system.
+    put update -> UserDto {
+        user: partial<UserDto>
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given a username, return the profile of that user.
+    get profile -> ProfileDto {
+        username: string
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given a username, follow another user.
+    post follow -> ProfileDto {
+        username: string
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given a username, unfollow another user.
+    delete unfollow -> ProfileDto {
+        username: string
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// A feed of articles for the authenticated user.
+    get feed -> array<Article> {
+        limit: option<int>
+        offset: option<int>
+
+        inject {
+            Db
+            Auth
+        }
+    }
+
+    /// Given a username, stream that user's avatar image.
+    get downloadAvatar -> stream {
+        username: string
+
+        inject {
+            Db
+            Avatars
+        }
+    }
+
+    /// Upload the current user's avatar image.
+    put uploadAvatar {
+        avatar: stream
+
+        inject {
+            Db
+            Auth
+            Avatars
+        }
+    }
+}
+
+/// A Plain Old Object (POO) that is a subset of information in a [User] model,
+/// safe to expose to the public API.
+///
+/// Used to signify the current user.
+poo UserDto {
+    email: string
+    username: string
+    bio: string
+    image: option<string>
+    token: string
+}
+
+/// The profile of another User, which is a subset of information in a [User] model,
+/// safe to expose to the public API.
+poo ProfileDto {
+    username: string
+    bio: string
+    image: option<string>
+    following: bool
+}
+
+/// Join table: `followerId` follows `followeeId`.
+model Follow for Db {
+    primary {
+        foreign User::id {
+            followerId
+        }
+
+        foreign User::id {
+            followeeId
+        }
+    }
+}
+
+// Join table: user favorited article.
+model Favorite for Db {
+    primary {
+        foreign User::id {
+            userId
+        }
+
+        foreign Article::id {
+            articleId
+        }
+    }
+}

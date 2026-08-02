@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "target": "ES2020",
+    "moduleResolution": "nodenext",
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "skipLibCheck": true,
+
+    "paths": {
+      "@cloesce/*": ["./.cloesce/*"],
+    },
+  },
+  "include": [".cloesce/*.ts", "src/api/**/*.ts", "tests/**/*.ts", "migrations/**/*.ts"],
+}

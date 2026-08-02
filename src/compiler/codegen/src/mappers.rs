@@ -49,7 +49,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
             CidlType::Object { name, .. } => name.to_string(),
-            CidlType::Nullable(inner) => format!("{} | null", self.cidl_type(inner)),
+            CidlType::Nullable(inner) => format!("{} | undefined | null", self.cidl_type(inner)),
             CidlType::Array(inner) => format!("{}[]", self.cidl_type(inner)),
             CidlType::Void => "void".to_string(),
             CidlType::Partial { object_name, .. } => {

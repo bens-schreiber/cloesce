@@ -1,6 +1,6 @@
 # Runtime Validation
 
-When an HTTP request is made to the Cloesce Router, the incoming data will first be matched to an existing [API](./ch6-1-rest-apis.md) implementation, and then validated against the respective API defined in the Cloesce Schema.
+When an HTTP request is made to the Cloesce Router, incoming data will first be matched to an existing [API](./ch6-1-rest-apis.md) implementation, and then validated against the schema for that API.
 
 Each type is validated in accordance with the rules defined in the [Type Reference](./ch2-0-type-reference.md). If any validation errors occur, a `400 Bad Request` response will be returned with details about the validation errors.
 
@@ -10,28 +10,30 @@ In addition to this, several _Validator Tags_ are also supported for more comple
 
 Validator Tags can be applied to any field (i.e. it follows the syntax `field: type`) in a [Model](./ch4-0-models.md), [API](./ch6-1-rest-apis.md) parameter, or [Data Source](./ch5-0-data-sources.md) parameter.
 
-A [foreign key](./ch4-2-sqlite-constraints.md#foreign-key) field will automatically inherit all validators from the field it references. For example:
+A [foreign key](./ch4-3-sqlite-constraints.md#foreign-key) field will automatically inherit all validators from the field it references. For example:
 
 ```cloesce
-model User {
+d1 { Db }
+
+model User for Db {
     primary {
         [gt 0]
         id: int
     }
 }
 
-model Post {
+model Post for Db {
     primary {
         id: int
     }
 
-    foreign (User::id) {
-        user_id
+    foreign User::id {
+        userId
     }
 }
 ```
 
-In the above code, the `user_id` field in the `Post` Model will automatically have the `[gt 0]` validator applied to it, since it is a foreign key referencing the `id` field in the `User` Model.
+In the above code, the `userId` field in the `Post` Model will automatically have the `[gt 0]` validator applied to it, since it is a foreign key referencing the `id` field in the `User` Model.
 
 ## Numerical Validators
 

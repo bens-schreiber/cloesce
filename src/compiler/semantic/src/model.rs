@@ -839,10 +839,17 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
             });
         }
 
+        // A Durable Object storage read can always miss, so its value type is nullable.
+        // Workers KV reads carry their own miss through [CidlType::KvObject]'s `value`.
+        let cidl_type = match &template.field.cidl_type {
+            ty @ (CidlType::KvObject(_) | CidlType::Nullable(_)) => ty.clone(),
+            ty => CidlType::nullable(ty.clone()),
+        };
+
         self.kv_fields.push(KvField {
             field: ValidatedField {
                 name: kv.field.name.into(),
-                cidl_type: template.field.cidl_type.clone(),
+                cidl_type,
                 validators: template.field.validators.clone(),
             },
             binding: kv.binding.name,
@@ -891,14 +898,19 @@ impl<'src, 'p, 'sem> ModelBuilder<'src, 'p> {
                 continue;
             };
 
-            // `shardField(local)` supplies exactly one local field for the shard.
-            let [local] = arg.local.as_slice() else {
-                ma.sink.push(SemanticError::ArgCountMismatch {
-                    field: &arg.target,
-                    expected: 1,
-                    got: arg.local.len(),
-                });
-                continue;
+            // `shardField(local)` supplies exactly one local field for the shard;
+            // `shardField` alone defaults the local field to the shard's own name.
+            let local = match arg.local.as_slice() {
+                [local] => local,
+                [] => &arg.target,
+                _ => {
+                    ma.sink.push(SemanticError::ArgCountMismatch {
+                        field: &arg.target,
+                        expected: 1,
+                        got: arg.local.len(),
+                    });
+                    continue;
+                }
             };
 
             let Some(local_field) = table.local.get(&LocalSymbolKind::ModelField {

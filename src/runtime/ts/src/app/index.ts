@@ -1,4 +1,4 @@
-import { Cidl } from "../cidl.js";
+import { Cidl, ENV_DURABLE_TARGET_KEY } from "../cidl.js";
 import { RuntimeContainer, router } from "../router/router.js";
 import { attachStores, overlayTraps } from "./store.js";
 import { durableSqlBatch } from "../router/orm.js";
@@ -162,7 +162,6 @@ function overlayEnv(parent: any): any {
  */
 export class RuntimeApp {
   env: any;
-  private ctx?: DurableObjectState;
   private registry = new Map<string, any>();
 
   /** Per-builder injectable values. Never written onto the shared `env` (see `register`). */
@@ -185,11 +184,11 @@ export class RuntimeApp {
   /** Bind a Durable Object instance (and optional migrations) as this app's source. */
   durable(durableObject: any, migrations: DurableMigration[] = []): RuntimeApp {
     attachDurableRpc(durableObject);
-    const env = durableObject.env;
     const ctx: DurableObjectState = durableObject.ctx;
+    const env = overlayEnv(durableObject.env);
     this.upgradeBindings(env);
     this.env = env;
-    this.ctx = ctx;
+    env[ENV_DURABLE_TARGET_KEY] = ctx;
     attachStores(this.env, this.cidl, this.registry);
     if (migrations.length > 0) {
       ctx.blockConcurrencyWhile(() => applyDurableMigrations(ctx.storage as any, migrations));
@@ -220,7 +219,7 @@ export class RuntimeApp {
   }
 
   run(request: Request): Promise<Response> {
-    return router(request, this.cidl, this.workerUrl, this.env, this.registry, this.ctx);
+    return router(request, this.cidl, this.workerUrl, this.env, this.registry);
   }
 
   /** Force the ORM WASM module to initialize (for tests that read `env` before `run`). */

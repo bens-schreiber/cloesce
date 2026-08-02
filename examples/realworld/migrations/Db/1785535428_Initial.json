@@ -1,0 +1,461 @@
+{
+  "hash": 6153033576592492021,
+  "models": {
+    "Tag": {
+      "hash": 16178655405167613706,
+      "name": "Tag",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 14791947322933395333,
+          "field": {
+            "name": "name",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "MinLength": 1
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [
+            0
+          ],
+          "composite_id": null
+        }
+      ]
+    },
+    "User": {
+      "hash": 3366199503161303079,
+      "name": "User",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 4219320940442741418,
+          "field": {
+            "name": "username",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "MinLength": 1
+              },
+              {
+                "MaxLength": 40
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [
+            1
+          ],
+          "composite_id": null
+        },
+        {
+          "hash": 5792374016679206491,
+          "field": {
+            "name": "email",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [
+            0
+          ],
+          "composite_id": null
+        },
+        {
+          "hash": 11157831856909898988,
+          "field": {
+            "name": "bio",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 2745540862250222523,
+          "field": {
+            "name": "image",
+            "cidl_type": {
+              "Nullable": "String"
+            },
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5688633008415534751,
+          "field": {
+            "name": "passwordHash",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    },
+    "Article": {
+      "hash": 11504084480771699311,
+      "name": "Article",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6808072019702599551,
+          "field": {
+            "name": "authorId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "User",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 7793806361616746868,
+          "field": {
+            "name": "slug",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "MinLength": 1
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [
+            0
+          ],
+          "composite_id": null
+        },
+        {
+          "hash": 16671312646982238929,
+          "field": {
+            "name": "title",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "MinLength": 1
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 17301296087702549672,
+          "field": {
+            "name": "description",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 9609503645697775919,
+          "field": {
+            "name": "body",
+            "cidl_type": "String",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 12365561967997301169,
+          "field": {
+            "name": "createdAt",
+            "cidl_type": "DateIso",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 17509261079456573198,
+          "field": {
+            "name": "updatedAt",
+            "cidl_type": "DateIso",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    },
+    "Follow": {
+      "hash": 3084623099483810937,
+      "name": "Follow",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 5630659708656044121,
+          "field": {
+            "name": "followerId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "User",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 6363808367827659391,
+          "field": {
+            "name": "followeeId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "User",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    },
+    "ArticleTag": {
+      "hash": 2872043091715678670,
+      "name": "ArticleTag",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 14594844605910405319,
+          "field": {
+            "name": "articleId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Article",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 523822169927382588,
+          "field": {
+            "name": "tagId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Tag",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    },
+    "Comment": {
+      "hash": 7717153270206627604,
+      "name": "Comment",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 11242363380471083085,
+          "field": {
+            "name": "articleId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Article",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 6808072019702599551,
+          "field": {
+            "name": "authorId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "User",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 9609503645697775919,
+          "field": {
+            "name": "body",
+            "cidl_type": "String",
+            "validators": [
+              {
+                "MinLength": 1
+              }
+            ]
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 12365561967997301169,
+          "field": {
+            "name": "createdAt",
+            "cidl_type": "DateIso",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 17509261079456573198,
+          "field": {
+            "name": "updatedAt",
+            "cidl_type": "DateIso",
+            "validators": []
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ]
+    },
+    "Favorite": {
+      "hash": 1607040546264580260,
+      "name": "Favorite",
+      "backing": {
+        "binding": "Db",
+        "fields": [],
+        "kind": "D1"
+      },
+      "primary_columns": [
+        {
+          "hash": 8611724780585527221,
+          "field": {
+            "name": "userId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "User",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 14594844605910405319,
+          "field": {
+            "name": "articleId",
+            "cidl_type": "Int",
+            "validators": []
+          },
+          "foreign_key_reference": {
+            "model_name": "Article",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": []
+    }
+  }
+}
