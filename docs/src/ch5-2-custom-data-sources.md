@@ -61,11 +61,11 @@ source ByName for Person {
 
 A backend stub will be generated for the `get` method above, which you can then fill with custom logic for fetching a `Person` by their `name` instead of their `id`.
 
-The `save` and `list` methods will use default implementations if not overriden.
+The `save` and `list` methods will use default implementations if not overridden.
 
 ### `instance` tag
 
-Data Sources are used by API methods to denote how to hydrate an ["instance method"](TODO). From the clients perspective, an instance method is a method on a class, like:
+Data Sources are used by API methods to denote how to hydrate an ["instance method"](./ch6-1-rest-apis.md#instance-methods). From the client's perspective, an instance method is a method on a class, like:
 
 ```ts
 const person = await Person.get({ id: 1 });
@@ -104,7 +104,7 @@ source ByName for Person {
 
 ## List Method
 
-The `get` method of a Data Source is special in that it can be used to hydrate an instance of a Model on an API call (see [instance methods](TODO)).
+The `get` method of a Data Source is special in that it can be used to hydrate an instance of a Model on an API call (see [instance methods](./ch6-1-rest-apis.md#instance-methods)).
 
 The `list` method however is purely utility for the backend and client to retrieve a list of instances of a Model.
 
@@ -112,8 +112,6 @@ The `list` method however is purely utility for the backend and client to retrie
 source ByName for Person {
     include {
         dogs
-        cats
-        etc
     }
 
     list {

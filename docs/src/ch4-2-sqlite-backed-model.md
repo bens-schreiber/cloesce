@@ -111,7 +111,7 @@ The above code defines a Model "User" stored in the Durable Object `MyDurableObj
 > }
 > ```
 >
-> `Gnat`'s fields are still ephermal, existing for the duration of a request. However, it is tied to an instance of a Durable Object, which will be created based on the `tenant` shard key.
+> `Gnat`'s fields are still ephemeral, existing for the duration of a request. However, it is tied to an instance of a Durable Object, which will be created based on the `tenant` shard key.
 
 ### Across the Stack
 

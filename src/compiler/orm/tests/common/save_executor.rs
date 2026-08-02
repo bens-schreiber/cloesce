@@ -210,7 +210,6 @@ fn sink(step: &SaveStep, out: StepResult, body: &mut Value, storage: &mut MockSt
         }
         StepResult::Write(write, result) => {
             let map = match write.kind {
-                DatabaseKind::R2 => storage.r2.entry(write.binding).or_default(),
                 DatabaseKind::Kv => storage.kv.entry(write.binding).or_default(),
                 DatabaseKind::DurableObject => storage
                     .durable_kv

@@ -11,14 +11,14 @@ Every Cloudflare Workers application defines a set of [Environment Bindings](htt
 Cloesce **upgrades** these bindings to provide a rich set of functionality for your application, and exposes them only to methods that explicitly inject them.
 
 > [!TIP]
-> After creating an app with `createApp`, the full set of upgraded bindings can be found in the `env` parameter of the app.
+> The full set of upgraded bindings is exposed as the `env` property of the app, once a source has been bound with `worker` or `durable`.
 > This allows you to utilize the bindings in your own middleware, or tests.
 >
 > ```ts
-> import { createApp } from "cloesce";
+> import { createApp } from "@cloesce/backend.js";
 >
 > // ...
-> const app = createApp(env).register(...);
+> const app = createApp().worker(env).register(...);
 > await app.env.Db.Person.get(1);
 > ```
 
@@ -34,7 +34,7 @@ Each upgraded binding exposes methods to read, write, and list data from these k
 ```cloesce
 durable MyDo {
     shard {
-        tenant: id
+        tenant: string
     }
 
     settings -> json {
@@ -373,7 +373,7 @@ Each step in the printed tree is one operation. Here's what the grammar means:
 | `VALUE`          | The literal value being written.                                                      |
 | `ONE` / `MANY`   | Whether the step expects a single row or a list.                                      |
 
-`cloesce explain Org default get` prints:
+`cloesce explain Org Default get` prints:
 
 ```
 SELECT PLAN (GET) `Org` · 3 stages · 5 steps
@@ -401,10 +401,10 @@ STAGE 2
       ATTACH `tenantId` = tenantId
 ```
 
-`cloesce explain Org default save --payload payload.json` prints the save plan. The payload here creates an `Org` along with its `Board`, one `Entry`, a KV-backed `top`, and an R2-backed `banner`:
+`cloesce explain Org Default save --payload payload.json` prints the save plan. The payload here creates an `Org` along with its `Board`, one `Entry`, and a KV-backed `top`:
 
 ```
-SAVE PLAN `Org` · 2 stages · 4 steps
+SAVE PLAN `Org` · 1 stage · 3 steps
 INCLUDE
 └─ `board`
    ├─ `banner`
@@ -422,11 +422,20 @@ STAGE 0
 │  └─ READBACK `Entry` INTO `board.entries[0]`
 └─ WRITE durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = 7
    └─ VALUE {"cached":true}
-
-STAGE 1
-└─ WRITE r2 `Bucket` KEY "banners/{saved.board.pid}" INTO `board.banner`
-   └─ VALUE {"url":"b.png"}
 ```
 
 > [!NOTE]
-> `Entry`'s insert waits for the same stage as `Board`'s insert-and-readback because it's batched onto the same Durable Object round trip. The `banner` write is pushed into its own later stage, since it needs `saved.board.pid`, a value that doesn't exist until `Board`'s insert is read back in stage 0.
+> `Entry`'s insert shares a stage with `Board`'s insert-and-readback because it's batched onto the same Durable Object round trip.
+>
+> `banner` appears in the include tree but produces no step: R2 fields are read-only, so a save never writes to a bucket.
+
+> [!WARNING]
+> **`save` does not write R2 objects.** An R2 field hydrates as an `R2Object` HEAD metadata such as `key`, `size`, and `etag`, not the object's bytes, so there is no value a save payload could carry that would meaningfully round-trip into the bucket. Including an R2 field in a save payload is silently ignored.
+>
+> Upload through the bucket binding directly:
+>
+> ```ts
+> await env.Avatars.avatar.put(user.id, bytes);
+> ```
+>
+> Reads are unaffected: an included R2 field still hydrates on `get`, `list`, and `hydrateAll`.

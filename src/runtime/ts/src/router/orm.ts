@@ -359,8 +359,14 @@ class R2KeyStore implements KeyStore {
     return this.bucket.get(key);
   }
 
-  async put(key: string, value: unknown): Promise<void> {
-    await this.bucket.put(key, value as any);
+  /**
+   * R2 fields are read-only, so the save planner never emits a write against a bucket.
+   */
+  put(key: string): Promise<void> {
+    throw new InternalError(
+      `Refusing to write R2 key "${key}": R2 fields are read-only. ` +
+        `Upload through the bucket binding instead.`,
+    );
   }
 }
 

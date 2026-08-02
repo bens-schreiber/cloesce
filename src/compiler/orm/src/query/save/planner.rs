@@ -448,7 +448,7 @@ impl<'src> Planner<'src> {
             );
         }
 
-        // KV / R2 writes
+        // KV writes
         self.write_keys(model, obj, tree, &instance)?;
 
         // Many navs, plus child-owned 1:1 navs
@@ -512,12 +512,12 @@ impl<'src> Planner<'src> {
         Ok(())
     }
 
-    /// KV / R2 writes for `model`, gated by the include `tree`.
+    /// KV writes for `model`, gated by the include `tree`.
     ///
     /// - A key covered entirely by route params or payload values can be written in
     ///   the same stage as the parent row (executed in parallel)
     /// - A key that references a generated PK is delayed to the next stage.
-    /// - R2/KV fields are optional, so a missing field is silently ignored.
+    /// - KV fields are optional, so a missing field is silently ignored.
     fn write_keys(
         &mut self,
         model: &'src Model<'src>,
@@ -537,33 +537,6 @@ impl<'src> Planner<'src> {
                 instance.stage
             }
         };
-
-        for r2 in &model.r2_fields {
-            let name = r2.field.name.as_ref();
-            if !tree.0.contains_key(name) {
-                continue;
-            }
-            let Some(value) = obj.and_then(|o| o.get(name)) else {
-                // The R2 field is missing from the payload, safely ignore it.
-                continue;
-            };
-
-            let (segments, delayed) = template_segments(&r2.segments, obj, instance);
-            push(
-                stage_for(delayed),
-                name,
-                SaveQuery::KeyWrite {
-                    database: Database {
-                        name: r2.binding,
-                        kind: DatabaseKind::R2,
-                    },
-                    segments,
-                    value,
-                    metadata: None,
-                    shard: vec![],
-                },
-            );
-        }
 
         for kv in &model.kv_fields {
             let name = kv.field.name.as_ref();

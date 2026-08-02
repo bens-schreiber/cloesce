@@ -54,6 +54,15 @@ async fn seed(
     common::save_executor::execute(&plan, storage).await;
 }
 
+/// Write an R2 object directly into the mock bucket.
+fn seed_r2(storage: &mut MockStorage, binding: &str, key: &str, value: Value) {
+    storage
+        .r2
+        .entry(binding.to_string())
+        .or_default()
+        .insert(key.to_string(), value);
+}
+
 async fn execute_ok<'idl>(
     idl: &'idl CloesceIdl<'_>,
     op: SelectOperation,
@@ -1052,14 +1061,8 @@ async fn r2_field_on_d1_root() {
     );
 
     let mut storage = MockStorage::from_idl(&idl, &[]).await;
-    seed(
-        &idl,
-        "User",
-        json!({ "avatar": {} }),
-        json!({ "id": 1, "avatar": { "url": "u1" } }),
-        &mut storage,
-    )
-    .await;
+    seed(&idl, "User", json!({}), json!({ "id": 1 }), &mut storage).await;
+    seed_r2(&mut storage, "Bucket", "avatars/1", json!({ "url": "u1" }));
 
     // Act
     let (plan, body) = execute_ok(
@@ -1109,14 +1112,13 @@ async fn r2_field_list_fanout() {
 
     let mut storage = MockStorage::from_idl(&idl, &[]).await;
     for (id, url) in [(1, "u1"), (2, "u2")] {
-        seed(
-            &idl,
-            "User",
-            json!({ "avatar": {} }),
-            json!({ "id": id, "avatar": { "url": url } }),
+        seed(&idl, "User", json!({}), json!({ "id": id }), &mut storage).await;
+        seed_r2(
             &mut storage,
-        )
-        .await;
+            "Bucket",
+            &format!("avatars/{id}"),
+            json!({ "url": url }),
+        );
     }
 
     // Act
@@ -1422,11 +1424,12 @@ async fn route_param_key_fields_on_do_root() {
     seed(
         &idl,
         "Entry",
-        json!({ "banner": {}, "top": {} }),
-        json!({ "id": 1, "top": [1, 2], "tenantId": 7, "banner": { "img": "b7" } }),
+        json!({ "top": {} }),
+        json!({ "id": 1, "top": [1, 2], "tenantId": 7 }),
         &mut storage,
     )
     .await;
+    seed_r2(&mut storage, "Bucket", "banner/7", json!({ "img": "b7" }));
 
     // Act
     let (plan, body) = execute_ok(
@@ -1606,11 +1609,12 @@ async fn r2_key_uses_do_root_route_field() {
     seed(
         &idl,
         "Entry",
-        json!({ "snapshot": {} }),
-        json!({ "id": 1, "tenantId": 7, "snapshot": { "url": "s1" } }),
+        json!({}),
+        json!({ "id": 1, "tenantId": 7 }),
         &mut storage,
     )
     .await;
+    seed_r2(&mut storage, "Bucket", "snap/7/1", json!({ "url": "s1" }));
 
     // Act
     let (plan, body) = execute_ok(

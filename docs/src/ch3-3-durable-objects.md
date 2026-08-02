@@ -56,17 +56,19 @@ The Cloesce Router will forward HTTP requests bound for a particular Durable Obj
 To implement custom logic for handling these requests, extend the generated Durable Object class and implement the `fetch` method:
 
 ```ts
-import { createApp, ... } from "@cloesce/backend";
+import { createApp, CfEnv } from "@cloesce/backend.js";
+import initMigration from "../migrations/SubRedditDo/1785712992_init.js";
 
 export class SubRedditDo extends DurableObject<CfEnv> {
-  private base = createApp()
-    .durable(this, [...migrations]);
+  private base = createApp().durable(this, [initMigration]);
 
   async fetch(request: Request): Promise<Response> {
     return this.base.run(request);
   }
 }
 ```
+
+See [Building and Migrating](./ch1-3-building-and-migrating.md#apply-durable-object-migrations) for how those migration modules are generated.
 
 ### Wrangler Configuration
 

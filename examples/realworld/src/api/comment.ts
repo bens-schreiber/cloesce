@@ -4,8 +4,9 @@ import { requireAuth } from "./auth.js";
 
 const Default = {
   async list(env, articleId) {
-    const rows = await env.Db.prepare(`SELECT * FROM "Comment" WHERE "articleId" = ?1
-                ORDER BY "createdAt" DESC, "id" DESC`)
+    const rows = await env.Db.prepare(`
+      SELECT * FROM "Comment" WHERE "articleId" = ?1
+      ORDER BY "createdAt" DESC, "id" DESC`)
       .bind(articleId)
       .all<Comment>();
 

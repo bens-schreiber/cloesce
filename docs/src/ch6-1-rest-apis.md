@@ -131,7 +131,7 @@ export default {
 Durable Objects receive forwarded requests from Workers by the Cloesce runtime, and need their own app registration:
 
 ```ts
-import { createApp, CfEnv } from "@cloesce/backend";
+import { createApp, CfEnv } from "@cloesce/backend.js";
 import person from "./person.js";
 
 export class MyDurable extends DurableObject<CfEnv> {
@@ -294,14 +294,31 @@ A Data Source may execute in the context of a Durable Object with the same synta
 
 This means that any API method that uses that Data Source to hydrate `self` will also execute in the context of that Durable Object.
 
-It is illegal to inject a Durable Object into an API method that hydrates `self` from a Data Source that already injects that same Durable Object. The police will be called, and you will be fined $500.
+An instance method already runs inside the Durable Object injected by the Data Source that hydrates its `self`. Injecting that context again in the API method is a compile error; omit the injection and use the one inherited from the Data Source.
 
 By default, the `get` method of a Data Source injects its host Model's Durable Object.
 
+> [!NOTE]
+> The `[instance]` tag may only be applied to a parameter that names a `column` or `primary` field of the Model. Shard keys and `route` fields do not qualify, and must be passed as ordinary parameters.
+
 ```cloesce
+durable CounterDo {
+    shard {
+        tenant: string
+    }
+}
+
+model Counter for CounterDo::tenant {
+    primary {
+        id: int
+    }
+}
+
 source Default for Counter {
     get {
       [instance]
+      id: int
+
       tenant: string
 
       inject { CounterDo::tenant }
@@ -311,7 +328,7 @@ source Default for Counter {
 source OutsideContext for Counter {
     get {
       [instance]
-      tenant: string
+      id: int
     }
 }
 
@@ -420,6 +437,7 @@ The implementation of the `byId` method could return an `HttpResult` like so:
 
 ```ts
 import { Api } from "@cloesce/backend.js";
+import { HttpResult } from "cloesce";
 
 export const byId: Api.Garfield.byId = (id) => {
   const today = new Date();

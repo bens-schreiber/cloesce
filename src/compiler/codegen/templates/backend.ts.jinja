@@ -68,9 +68,10 @@ export type { DeepPartial, IncludeTree } from "cloesce";
         /**
          * Insert or update a `{{ model.name }}` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
 {%- endif %}
@@ -136,6 +137,31 @@ export type { DeepPartial, IncludeTree } from "cloesce";
 
 {%- macro route_needs(api) -%}
 {%- for b in route_env_bindings(api) %}{% if !loop.first %} | {% endif %}"{{ b }}"{% endfor -%}
+{%- endmacro -%}
+
+{%- macro stub_verb_env(model, ds, verb, suffix) -%}
+{%- if verb.is_stub && !env_bindings(&verb.injected, &verb.durable_target).is_empty() %}
+    export interface {{ model.name }}{{ ds.name }}{{ suffix }} {
+{%- for b in env_bindings(&verb.injected, &verb.durable_target) %}
+{%- if is_injectable(b) %}
+        {{ b }}: {{ b }};
+{%- else if is_var(b) %}
+        {{ b }}: Env.{{ b }};
+{%- else %}
+        {{ b }}: Env.{{ b }}<{{ model.name }}{{ ds.name }}{{ suffix }}>;
+{%- endif %}
+{%- endfor %}
+{%- if verb.durable_target.is_some() %}
+        {{ durable_target_key() }}: DurableObjectState;
+{%- endif %}
+    }
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro stub_verb_param(model, ds, verb, suffix) -%}
+{%- if !env_bindings(&verb.injected, &verb.durable_target).is_empty() -%}
+env: Env.{{ model.name }}{{ ds.name }}{{ suffix }}{% if !verb.parameters.is_empty() %}, {% endif %}
+{%- endif -%}
 {%- endmacro -%}
 
 {%- macro binding_stores(binding) -%}
@@ -440,54 +466,9 @@ export namespace Env {
 {%- endif %}
 {%- endfor %}
 {%- for ds in stub_sources(model) %}
-{%- if ds.get.is_stub && !env_bindings(&ds.get.injected, &ds.get.durable_target).is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}Get {
-{%- for b in env_bindings(&ds.get.injected, &ds.get.durable_target) %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ b }}: Env.{{ b }}<{{ model.name }}{{ ds.name }}Get>;
-{%- endif %}
-{%- endfor %}
-{%- if ds.get.durable_target.is_some() %}
-        {{ durable_target_key() }}: DurableObjectState;
-{%- endif %}
-    }
-{%- endif %}
-{%- if ds.list.is_stub && !env_bindings(&ds.list.injected, &ds.list.durable_target).is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}List {
-{%- for b in env_bindings(&ds.list.injected, &ds.list.durable_target) %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ b }}: Env.{{ b }}<{{ model.name }}{{ ds.name }}List>;
-{%- endif %}
-{%- endfor %}
-{%- if ds.list.durable_target.is_some() %}
-        {{ durable_target_key() }}: DurableObjectState;
-{%- endif %}
-    }
-{%- endif %}
-{%- if ds.save.is_stub && !env_bindings(&ds.save.injected, &ds.save.durable_target).is_empty() %}
-    export interface {{ model.name }}{{ ds.name }}Save {
-{%- for b in env_bindings(&ds.save.injected, &ds.save.durable_target) %}
-{%- if is_injectable(b) %}
-        {{ b }}: {{ b }};
-{%- else if is_var(b) %}
-        {{ b }}: Env.{{ b }};
-{%- else %}
-        {{ b }}: Env.{{ b }}<{{ model.name }}{{ ds.name }}Save>;
-{%- endif %}
-{%- endfor %}
-{%- if ds.save.durable_target.is_some() %}
-        {{ durable_target_key() }}: DurableObjectState;
-{%- endif %}
-    }
-{%- endif %}
+{{- stub_verb_env(model, ds, ds.get, "Get") }}
+{{- stub_verb_env(model, ds, ds.list, "List") }}
+{{- stub_verb_env(model, ds, ds.save, "Save") }}
 {%- endfor %}
 {%- endfor %}
 }
@@ -501,13 +482,13 @@ export namespace Api {
 {%- for ds in stub_sources(model) %}
         export interface {{ ds.name }} {
 {%- if ds.get.is_stub %}
-            get({% if !env_bindings(&ds.get.injected, &ds.get.durable_target).is_empty() %}env: Env.{{ model.name }}{{ ds.name }}Get{% if !ds.get.parameters.is_empty() %}, {% endif %}{% endif %}{{ get_params(ds.get) }}): Promise<HttpResult<{{ model.name }}>>;
+            get({{ stub_verb_param(model, ds, ds.get, "Get") }}{{ get_params(ds.get) }}): Promise<HttpResult<{{ model.name }}>>;
 {%- endif %}
 {%- if ds.list.is_stub %}
-            list({% if !env_bindings(&ds.list.injected, &ds.list.durable_target).is_empty() %}env: Env.{{ model.name }}{{ ds.name }}List{% if !ds.list.parameters.is_empty() %}, {% endif %}{% endif %}{{ method_params(ds.list) }}): Promise<HttpResult<{{ model.name }}[]>>;
+            list({{ stub_verb_param(model, ds, ds.list, "List") }}{{ method_params(ds.list) }}): Promise<HttpResult<{{ model.name }}[]>>;
 {%- endif %}
 {%- if ds.save.is_stub %}
-            save({% if !env_bindings(&ds.save.injected, &ds.save.durable_target).is_empty() %}env: Env.{{ model.name }}{{ ds.name }}Save{% if !ds.save.parameters.is_empty() %}, {% endif %}{% endif %}{{ method_params(ds.save) }}): Promise<HttpResult<{{ model.name }}>>;
+            save({{ stub_verb_param(model, ds, ds.save, "Save") }}{{ method_params(ds.save) }}): Promise<HttpResult<{{ model.name }}>>;
 {%- endif %}
         }
 {%- endfor %}

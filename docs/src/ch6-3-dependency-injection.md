@@ -67,6 +67,9 @@ api Person {
 In order for the dependency to resolve at runtime (any missing dependency is a `500` error), you must register an implementation in the backend:
 
 ```ts
+import { Api, Auth, CfEnv, createApp, Person } from "@cloesce/backend.js";
+import { HttpResult } from "cloesce";
+
 // Give the Auth interface a type
 declare module "./backend.js" {
   interface Auth {

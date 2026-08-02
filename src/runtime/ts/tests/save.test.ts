@@ -7,7 +7,6 @@ import {
   d1,
   doDb,
   kvDb,
-  r2Db,
   sunkError,
 } from "./common/executor.js";
 import {
@@ -175,22 +174,6 @@ describe("executeSave KeyWrite", () => {
     expect(body).toEqual({ id: 7, profile: { bio: "hi" } });
     expect(resolver.keyStores.get("kv|[]")!.puts).toEqual([
       { key: "profile:7", value: { bio: "hi" }, metadata: { v: 3 } },
-    ]);
-  });
-
-  test("R2-style write passes undefined metadata", async () => {
-    const resolver = new MockResolver();
-    const plan = savePlan([
-      keyWriteStep([field("blob")], r2Db(), [{ Literal: "blob:1" }], {
-        bytes: [1, 2],
-      }),
-    ]);
-
-    const body = await executeSaveOk(plan, resolver);
-
-    expect(body).toEqual({ blob: { bytes: [1, 2] } });
-    expect(resolver.keyStores.get("r2|[]")!.puts).toEqual([
-      { key: "blob:1", value: { bytes: [1, 2] }, metadata: undefined },
     ]);
   });
 

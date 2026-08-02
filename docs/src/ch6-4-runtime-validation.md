@@ -13,14 +13,16 @@ Validator Tags can be applied to any field (i.e. it follows the syntax `field: t
 A [foreign key](./ch4-3-sqlite-constraints.md#foreign-key) field will automatically inherit all validators from the field it references. For example:
 
 ```cloesce
-model User {
+d1 { Db }
+
+model User for Db {
     primary {
         [gt 0]
         id: int
     }
 }
 
-model Post {
+model Post for Db {
     primary {
         id: int
     }

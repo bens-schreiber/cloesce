@@ -1,6 +1,6 @@
 # APIs
 
-Cloesce generates a RPC-like REST API for every Model in your application.
+Cloesce generates an RPC-like REST API for every Model in your application.
 
 This chapter covers how to:
 

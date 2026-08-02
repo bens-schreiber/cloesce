@@ -1,4 +1,5 @@
-//! Snapshot tests for the query-plan explainer. Planning only — no MockStorage / sqlx.
+//! Snapshot tests for the query-plan explainer.
+//! Useful to see what the `explain` command output looks like.
 
 mod common;
 
@@ -66,7 +67,6 @@ fn explain_save_snapshot() {
         "tenantId": 7,
         "board": {
             "tenantId": 7,
-            "banner": { "url": "b.png" },
             "top": { "cached": true },
             "entries": [ { "tenantId": 7, "score": 42 } ]
         }

@@ -10,9 +10,6 @@ declare module "@cloesce/backend.js" {
 
     /**
      * The session token that authenticated this request, if any.
-     * `userDto` echoes this back to the client as the `Authorization` value
-     * to keep using; `register`/`login` mint a fresh one instead, since
-     * there is no incoming session to reuse.
      */
     token: string | null;
   }

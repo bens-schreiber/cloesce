@@ -12,6 +12,16 @@ Define a `cloesce.jsonc` file in your project root to configure the Cloesce comp
 }
 ```
 
+All keys are optional except `src_paths`, which tells the compiler where to find your `.clo` files:
+
+| Key                      | Default                   | Description                                                       |
+| ------------------------ | ------------------------- | ----------------------------------------------------------------- |
+| `src_paths`              | `[]`                      | Directories searched for `.clo` schema files.                     |
+| `out_path`               | `".cloesce"`              | Directory for generated artifacts (`cidl.json`, backend, client). |
+| `workers_url`            | `"http://localhost:8787"` | Base URL the generated client sends requests to.                  |
+| `migrations_path`        | `"./migrations"`          | Directory where generated SQL migrations are written.             |
+| `wrangler_config_format` | `"toml"`                  | Format of the generated Wrangler config: `"toml"` or `"jsonc"`.   |
+
 > [!TIP]
 > Multiple configuration files can be defined for different environments:
 >
@@ -44,6 +54,8 @@ cloesce compile
 
 Migrations turn a Cloesce schema into a set of SQL statements that can be applied to a database, tracking changes over time.
 
+Each migration is written to `<migrations_path>/<binding>/`, and one of `--binding` or `--all` is required.
+
 **Specific Binding**
 
 ```bash
@@ -58,12 +70,31 @@ cloesce migrate --all <migration-name>
 
 ### Apply D1 Migrations
 
-Cloesce generates the SQL for migrations, but does not apply them,
+Cloesce generates the SQL for migrations, but does not apply them.
 
-If a [D1 database](./ch3-2-d1.md) is being utilized, you must apply the generated migrations using the Wrangler CLI:
+If a [D1 database](./ch3-2-d1.md) is being utilized, a `.sql` file is generated, which you must apply using the Wrangler CLI:
 
 ```bash
 npx wrangler d1 migrations apply <binding-name>
+```
+
+### Apply Durable Object Migrations
+
+A [Durable Object's](./ch3-3-durable-objects.md) SQLite storage is not reachable from the Wrangler CLI, so its migrations are generated as `.ts` modules instead of `.sql` files.
+
+Import each one and pass it to `durable`. They are applied once, in order, before the Durable Object serves any request:
+
+```ts
+import { createApp, CfEnv } from "@cloesce/backend.js";
+import initMigration from "../migrations/MyDo/1785712992_init.js";
+
+export class MyDo extends DurableObject<CfEnv> {
+  private base = createApp().durable(this, [initMigration]);
+
+  async fetch(request: Request): Promise<Response> {
+    return this.base.run(request);
+  }
+}
 ```
 
 ## Running

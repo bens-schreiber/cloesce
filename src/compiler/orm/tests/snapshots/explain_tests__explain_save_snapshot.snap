@@ -1,9 +1,8 @@
 ---
 source: src/compiler/orm/tests/explain_tests.rs
-assertion_line: 75
 expression: "explain_save(\"Org\", &tree(include()), &plan)"
 ---
-SAVE PLAN `Org` · 2 stages · 4 steps
+SAVE PLAN `Org` · 1 stage · 3 steps
 INCLUDE
 └─ `board`
    ├─ `banner`
@@ -21,7 +20,3 @@ STAGE 0
 │  └─ READBACK `Entry` INTO `board.entries[0]`
 └─ WRITE durable `BoardDo` KEY "top" INTO `board.top` SHARD `tenantId` = 7
    └─ VALUE {"cached":true}
-
-STAGE 1
-└─ WRITE r2 `Bucket` KEY "banners/{saved.board.pid}" INTO `board.banner`
-   └─ VALUE {"url":"b.png"}
