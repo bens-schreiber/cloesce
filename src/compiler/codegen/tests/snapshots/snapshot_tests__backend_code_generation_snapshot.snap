@@ -452,9 +452,10 @@ export interface GlobalSettingsStore<E> {
         /**
          * Insert or update a `GlobalSettings` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<GlobalSettings>): Promise<HttpResult<GlobalSettings>>;
@@ -525,9 +526,10 @@ export interface HasSqlColumnTypesStore<E> {
         /**
          * Insert or update a `HasSqlColumnTypes` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<HasSqlColumnTypes>): Promise<HttpResult<HasSqlColumnTypes>>;
@@ -606,9 +608,10 @@ export interface LeaderboardStore<E> {
         /**
          * Insert or update a `Leaderboard` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(tenantId: number, model: DeepPartial<Leaderboard>): Promise<HttpResult<Leaderboard>>;
@@ -689,9 +692,10 @@ export interface LeaderboardEntryStore<E> {
         /**
          * Insert or update a `LeaderboardEntry` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(tenant: number, model: DeepPartial<LeaderboardEntry>): Promise<HttpResult<LeaderboardEntry>>;
@@ -762,9 +766,10 @@ export interface ModelWithCompositePkStore<E> {
         /**
          * Insert or update a `ModelWithCompositePk` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithCompositePk>): Promise<HttpResult<ModelWithCompositePk>>;
@@ -849,9 +854,10 @@ export interface ModelWithKvStore<E> {
         /**
          * Insert or update a `ModelWithKv` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithKv>): Promise<HttpResult<ModelWithKv>>;
@@ -936,9 +942,10 @@ export interface ModelWithR2Store<E> {
         /**
          * Insert or update a `ModelWithR2` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithR2>): Promise<HttpResult<ModelWithR2>>;
@@ -1021,9 +1028,10 @@ export interface OneToManyModelStore<E> {
         /**
          * Insert or update a `OneToManyModel` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<OneToManyModel>): Promise<HttpResult<OneToManyModel>>;
@@ -1096,9 +1104,10 @@ export interface RouteCarStore<E> {
         /**
          * Insert or update a `RouteCar` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<RouteCar>): Promise<HttpResult<RouteCar>>;
@@ -1185,9 +1194,10 @@ export interface RouteOwnerStore<E> {
         /**
          * Insert or update a `RouteOwner` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<RouteOwner>): Promise<HttpResult<RouteOwner>>;
@@ -1274,9 +1284,10 @@ export interface ToyotaPriusStore<E> {
         /**
          * Insert or update a `ToyotaPrius` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1361,9 +1372,10 @@ export interface ToyotaPriusWithKvSource {
         /**
          * Insert or update a `ToyotaPrius` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1431,9 +1443,10 @@ export interface ToyotaPriusWithR2Source {
         /**
          * Insert or update a `ToyotaPrius` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ToyotaPrius>): Promise<HttpResult<ToyotaPrius>>;
@@ -1491,9 +1504,10 @@ export interface BasicModelStore<E> {
         /**
          * Insert or update a `BasicModel` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<BasicModel>): Promise<HttpResult<BasicModel>>;
@@ -1586,9 +1600,10 @@ export interface ModelWithCustomDsStore<E> {
         /**
          * Insert or update a `ModelWithCustomDs` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithCustomDs>): Promise<HttpResult<ModelWithCustomDs>>;
@@ -1662,9 +1677,10 @@ export interface ModelWithCustomDsCustomSource {
         /**
          * Insert or update a `ModelWithCustomDs` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithCustomDs>): Promise<HttpResult<ModelWithCustomDs>>;
@@ -1734,9 +1750,10 @@ export interface HasOneToOneStore<E> {
         /**
          * Insert or update a `HasOneToOne` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<HasOneToOne>): Promise<HttpResult<HasOneToOne>>;
@@ -1807,9 +1824,10 @@ export interface ModelWithCrudsStore<E> {
         /**
          * Insert or update a `ModelWithCruds` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithCruds>): Promise<HttpResult<ModelWithCruds>>;
@@ -1859,9 +1877,10 @@ export interface ModelWithCrudsByNameSource {
         /**
          * Insert or update a `ModelWithCruds` and every included relation.
          *
-         * @param model A {@link DeepPartial} of the row. Every field the schema maps onto the model
-         * (D1 columns, KV / R2 fields) is routed to its backend automatically; the save plan is
+         * @param model A {@link DeepPartial} of the row. Every writable field the schema maps onto
+         * the model (D1 columns, KV fields) is routed to its backend automatically; the save plan is
          * derived from the payload's shape at runtime.
+         *
          * @returns An {@link HttpResult} with the saved row, `404` if the target vanished, or `400` on validation errors.
          */
         save(model: DeepPartial<ModelWithCruds>): Promise<HttpResult<ModelWithCruds>>;
