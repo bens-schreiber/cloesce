@@ -9,70 +9,111 @@ import { Article, Comment, Tag, User, UserDto } from "@cloesce/client.js";
  * writer would hit them. The suite shares one database, so the steps build on each other.
  */
 
-// Two readers and a writer, filled in by the first block.
-let jane: UserDto;
-let bob: UserDto;
-let carol: UserDto;
-let slug: string;
-let commentId: number;
+const vex = {
+  dto: undefined as unknown as UserDto,
+  profile: { username: "vex", email: "vex@vasselheim.dev", bio: "", image: null },
+};
+const grog = {
+  dto: undefined as unknown as UserDto,
+  profile: { username: "grog", email: "grog@vasselheim.dev", bio: "", image: null },
+};
+const percy = {
+  dto: undefined as unknown as UserDto,
+  profile: { username: "percy", email: "percy@whitestone.dev", bio: "", image: null },
+};
+const PASSWORD = "password123";
+
+beforeAll(async () => {
+  vex.dto = expectOk(await User.register(vex.profile.username, vex.profile.email, PASSWORD, anon));
+  expect(vex.dto).toMatchObject(vex.profile);
+  expect(vex.dto.token).toBeTypeOf("string");
+
+  grog.dto = expectOk(
+    await User.register(grog.profile.username, grog.profile.email, PASSWORD, anon),
+  );
+  expect(grog.dto).toMatchObject(grog.profile);
+
+  percy.dto = expectOk(
+    await User.register(percy.profile.username, percy.profile.email, PASSWORD, anon),
+  );
+  expect(percy.dto).toMatchObject(percy.profile);
+});
 
 describe("Signing up and signing in", () => {
-  it("registers three users", async () => {
-    const janeRes = await User.register("jane", "jane@conduit.dev", "password123", anon);
-    jane = expectOk(janeRes);
-    expect(jane.username).toBe("jane");
-    expect(jane.bio).toBe("");
-    expect(jane.image).toBe(null);
-    expect(jane.token).toBeTypeOf("string");
-
-    bob = expectOk(await User.register("bob", "bob@conduit.dev", "password123", anon));
-    carol = expectOk(await User.register("carol", "carol@conduit.dev", "password123", anon));
-  });
-
   it("rejects a registration that fails schema validation", async () => {
     // `email` carries a [regex] validator and `password` a [minlen 8].
-    expect((await User.register("mallory", "not-an-email", "password123", anon)).status).toBe(400);
-    expect((await User.register("mallory", "mallory@conduit.dev", "short", anon)).status).toBe(400);
+    expect((await User.register("scanlan", "not-an-email", PASSWORD, anon)).status).toBe(400);
+    expect((await User.register("scanlan", "scanlan@vasselheim.dev", "short", anon)).status).toBe(
+      400,
+    );
   });
 
   it("rejects a duplicate username", async () => {
-    const res = await User.register("jane", "other@conduit.dev", "password123", anon);
+    const res = await User.register(vex.profile.username, "other@vasselheim.dev", PASSWORD, anon);
     expect(res.status).toBe(422);
   });
 
   it("logs in and hands back a usable token", async () => {
-    const res = await User.login("jane@conduit.dev", "password123", anon);
-    expect(expectOk(res).username).toBe("jane");
+    const res = await User.login(vex.profile.email, PASSWORD, anon);
+    expect(expectOk(res).username).toBe(vex.profile.username);
 
     // The token from a login works the same as the one from a registration.
-    expect(expectOk(await User.current(as(expectOk(res).token))).username).toBe("jane");
+    expect(expectOk(await User.current(as(expectOk(res).token))).username).toBe(
+      vex.profile.username,
+    );
   });
 
   it("refuses a bad password", async () => {
-    expect((await User.login("jane@conduit.dev", "wrong-password", anon)).status).toBe(401);
+    expect((await User.login(vex.profile.email, "wrong-password", anon)).status).toBe(401);
   });
 
   it("gates the current user behind a token", async () => {
     expect((await User.current(anon)).status).toBe(401);
-    expect(expectOk(await User.current(as(jane.token))).email).toBe("jane@conduit.dev");
+    expect(expectOk(await User.current(as(vex.dto.token))).email).toBe(vex.profile.email);
   });
 
   it("updates the signed-in user", async () => {
-    const res = await User.update({ bio: "Dragon trainer." }, as(jane.token));
-    expect(expectOk(res).bio).toBe("Dragon trainer.");
-    expect(expectOk(res).username).toBe("jane");
+    const newBio = "Ranger of the Myriad Tree.";
+    const res = await User.update({ bio: newBio }, as(vex.dto.token));
+    expect(expectOk(res).bio).toBe(newBio);
+    expect(expectOk(res).username).toBe(vex.profile.username);
 
     // ...and it stuck.
-    expect(expectOk(await User.current(as(jane.token))).bio).toBe("Dragon trainer.");
+    expect(expectOk(await User.current(as(vex.dto.token))).bio).toBe(newBio);
+  });
+});
+
+describe("Avatars", () => {
+  it("404s a user with no avatar", async () => {
+    expect((await User.downloadAvatar(vex.profile.username, anon)).status).toBe(404);
+  });
+
+  it("uploads and downloads an avatar", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    expectOk(await User.uploadAvatar(bytes, as(vex.dto.token)));
+
+    const res = expectOk(await User.downloadAvatar(vex.profile.username, anon));
+    const got = new Uint8Array(await res.arrayBuffer());
+    expect(got).toEqual(bytes);
+  });
+
+  it("requires a token to upload", async () => {
+    expect((await User.uploadAvatar(new Uint8Array([1]), anon)).status).toBe(401);
+  });
+
+  it("404s an unknown username", async () => {
+    expect((await User.downloadAvatar("nobody", anon)).status).toBe(404);
   });
 });
 
 describe("Profiles and following", () => {
   it("serves a public profile", async () => {
-    const res = await User.profile("jane", anon);
-    expect(expectOk(res).username).toBe("jane");
-    expect(expectOk(res).bio).toBe("Dragon trainer.");
-    expect(expectOk(res).following).toBe(false);
+    const res = await User.profile(grog.profile.username, anon);
+    expect(expectOk(res)).toMatchObject({
+      username: grog.profile.username,
+      bio: grog.profile.bio,
+      following: false,
+    });
   });
 
   it("404s an unknown profile", async () => {
@@ -80,38 +121,57 @@ describe("Profiles and following", () => {
   });
 
   it("follows and reflects it back on the profile", async () => {
-    expect(expectOk(await User.follow("jane", as(bob.token))).following).toBe(true);
-    expect(expectOk(await User.profile("jane", as(bob.token))).following).toBe(true);
+    expect(expectOk(await User.follow(vex.profile.username, as(grog.dto.token))).following).toBe(
+      true,
+    );
+    expect(expectOk(await User.profile(vex.profile.username, as(grog.dto.token))).following).toBe(
+      true,
+    );
 
     // Following is per-caller and not symmetric.
-    expect(expectOk(await User.profile("jane", as(carol.token))).following).toBe(false);
-    expect(expectOk(await User.profile("bob", as(jane.token))).following).toBe(false);
+    expect(expectOk(await User.profile(vex.profile.username, as(percy.dto.token))).following).toBe(
+      false,
+    );
+    expect(expectOk(await User.profile(grog.profile.username, as(vex.dto.token))).following).toBe(
+      false,
+    );
   });
 
   it("unfollows", async () => {
-    expectOk(await User.follow("jane", as(carol.token)));
-    expect(expectOk(await User.unfollow("jane", as(carol.token))).following).toBe(false);
-    expect(expectOk(await User.profile("jane", as(carol.token))).following).toBe(false);
+    expectOk(await User.follow(vex.profile.username, as(percy.dto.token)));
+    expect(expectOk(await User.unfollow(vex.profile.username, as(percy.dto.token))).following).toBe(
+      false,
+    );
+    expect(expectOk(await User.profile(vex.profile.username, as(percy.dto.token))).following).toBe(
+      false,
+    );
   });
 
   it("requires a token to follow", async () => {
-    expect((await User.follow("jane", anon)).status).toBe(401);
-    expect((await User.unfollow("jane", anon)).status).toBe(401);
+    expect((await User.follow(vex.profile.username, anon)).status).toBe(401);
+    expect((await User.unfollow(vex.profile.username, anon)).status).toBe(401);
   });
 });
+
+const DRAGON_ARTICLE_TITLE = "How to Track a White Dragon";
+const DRAGON_ARTICLE_BODY = "It takes a Trinket.";
+const EDITED_ARTICLE_BODY = "It takes the Deathwalker's Ward.";
+const DRAGONS_TAG = "dragons";
+const TRACKING_TAG = "tracking";
+let slug: string;
 
 describe("Writing articles", () => {
   it("publishes an article with tags", async () => {
     const res = await Article.create(
-      "How to Train Your Dragon",
+      DRAGON_ARTICLE_TITLE,
       "Ever wonder how?",
-      "It takes a Jacobian.",
-      ["dragons", "training"],
-      as(jane.token),
+      DRAGON_ARTICLE_BODY,
+      [DRAGONS_TAG, TRACKING_TAG],
+      as(vex.dto.token),
     );
 
     const created = expectOk(res);
-    expect(created.title).toBe("How to Train Your Dragon");
+    expect(created.title).toBe(DRAGON_ARTICLE_TITLE);
     expect(created.slug).toBeTypeOf("string");
     expect(created.createdAt).toBeInstanceOf(Date);
     slug = created.slug;
@@ -124,9 +184,9 @@ describe("Writing articles", () => {
   it("reads the article back by slug, hydrated", async () => {
     const got = expectOk(await Article.$get(slug, anon));
 
-    expect(got.title).toBe("How to Train Your Dragon");
-    expect(got.body).toBe("It takes a Jacobian.");
-    expect(got.tags.map((t) => t.tag?.name).sort()).toEqual(["dragons", "training"]);
+    expect(got.title).toBe(DRAGON_ARTICLE_TITLE);
+    expect(got.body).toBe(DRAGON_ARTICLE_BODY);
+    expect(got.tags.map((t) => t.tag?.name).sort()).toEqual([DRAGONS_TAG, TRACKING_TAG]);
     expect(got.comments).toEqual([]);
     expect(got.favoritedBy).toEqual([]);
   });
@@ -137,28 +197,32 @@ describe("Writing articles", () => {
 
   it("edits an article through its instance method", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    const edited = expectOk(await article.update({ body: "It takes a Hessian." }, as(jane.token)));
+    const edited = expectOk(await article.update({ body: EDITED_ARTICLE_BODY }, as(vex.dto.token)));
 
-    expect(edited.body).toBe("It takes a Hessian.");
-    expect(edited.title).toBe("How to Train Your Dragon");
-    expect(expectOk(await Article.$get(slug, anon)).body).toBe("It takes a Hessian.");
+    expect(edited.body).toBe(EDITED_ARTICLE_BODY);
+    expect(edited.title).toBe(DRAGON_ARTICLE_TITLE);
+    expect(expectOk(await Article.$get(slug, anon)).body).toBe(EDITED_ARTICLE_BODY);
   });
 
   it("will not let another user edit it", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    expect((await article.update({ body: "vandalized" }, as(bob.token))).status).toBe(403);
+    expect((await article.update({ body: "vandalized" }, as(grog.dto.token))).status).toBe(403);
   });
 
   it("lists the tags that have been used", async () => {
     const tags = expectOk(await Tag.$list(0, 100, anon));
-    expect(tags.map((t) => t.name)).toEqual(expect.arrayContaining(["dragons", "training"]));
+    expect(tags.map((t) => t.name)).toEqual(expect.arrayContaining([DRAGONS_TAG, TRACKING_TAG]));
   });
 });
 
 describe("Browsing the article list", () => {
+  const grogDragonsTitle = "Grog on Dragons";
+  const grogBearsTitle = "Grog on Bears";
+  const bearsTag = "bears";
+
   beforeAll(async () => {
-    await Article.create("Bob on Dragons", "d", "b", ["dragons"], as(bob.token));
-    await Article.create("Bob on Cats", "d", "b", ["cats"], as(bob.token));
+    await Article.create(grogDragonsTitle, "d", "b", [DRAGONS_TAG], as(grog.dto.token));
+    await Article.create(grogBearsTitle, "d", "b", [bearsTag], as(grog.dto.token));
   });
 
   it("lists everything with no filter", async () => {
@@ -168,16 +232,15 @@ describe("Browsing the article list", () => {
   });
 
   it("filters by tag", async () => {
-    const dragons = expectOk(await Article.$list("dragons", null, null, null, null, anon));
-    expect(dragons.map((a) => a.title).sort()).toEqual([
-      "Bob on Dragons",
-      "How to Train Your Dragon",
-    ]);
+    const dragons = expectOk(await Article.$list(DRAGONS_TAG, null, null, null, null, anon));
+    expect(dragons.map((a) => a.title).sort()).toEqual([grogDragonsTitle, DRAGON_ARTICLE_TITLE]);
   });
 
   it("filters by author", async () => {
-    const byBob = expectOk(await Article.$list(null, "bob", null, null, null, anon));
-    expect(byBob.map((a) => a.title).sort()).toEqual(["Bob on Cats", "Bob on Dragons"]);
+    const byGrog = expectOk(
+      await Article.$list(null, grog.profile.username, null, null, null, anon),
+    );
+    expect(byGrog.map((a) => a.title).sort()).toEqual([grogBearsTitle, grogDragonsTitle]);
   });
 
   it("paginates", async () => {
@@ -192,12 +255,12 @@ describe("Browsing the article list", () => {
   });
 
   it("serves a personal feed of followed authors only", async () => {
-    // bob follows jane, and only jane.
-    const feed = expectOk(await User.feed(null, null, as(bob.token)));
-    expect(feed.map((a) => a.title)).toEqual(["How to Train Your Dragon"]);
+    // grog follows vex, and only vex.
+    const feed = expectOk(await User.feed(null, null, as(grog.dto.token)));
+    expect(feed.map((a) => a.title)).toEqual([DRAGON_ARTICLE_TITLE]);
 
-    // carol follows nobody.
-    expect(expectOk(await User.feed(null, null, as(carol.token)))).toEqual([]);
+    // percy follows nobody.
+    expect(expectOk(await User.feed(null, null, as(percy.dto.token)))).toEqual([]);
   });
 
   it("requires a token for the feed", async () => {
@@ -208,7 +271,7 @@ describe("Browsing the article list", () => {
 describe("Favoriting", () => {
   it("favorites an article, counting it in the article's Durable Object", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    expectOk(await article.favorite(as(bob.token)));
+    expectOk(await article.favorite(as(grog.dto.token)));
 
     const got = expectOk(await Article.$get(slug, anon));
     expect(got.favoriteCount).toBe(1);
@@ -217,25 +280,27 @@ describe("Favoriting", () => {
 
   it("counts a second reader, and is idempotent per reader", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    expectOk(await article.favorite(as(carol.token)));
-    expectOk(await article.favorite(as(carol.token)));
+    expectOk(await article.favorite(as(percy.dto.token)));
+    expectOk(await article.favorite(as(percy.dto.token)));
 
     expect(expectOk(await Article.$get(slug, anon)).favoriteCount).toBe(2);
   });
 
   it("filters the list by who favorited", async () => {
-    const favorited = expectOk(await Article.$list(null, null, "carol", null, null, anon));
+    const favorited = expectOk(
+      await Article.$list(null, null, percy.profile.username, null, null, anon),
+    );
     expect(favorited.map((a) => a.slug)).toEqual([slug]);
   });
 
   it("unfavorites, bringing the count back down", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    expectOk(await article.unfavorite(as(carol.token)));
+    expectOk(await article.unfavorite(as(percy.dto.token)));
 
     expect(expectOk(await Article.$get(slug, anon)).favoriteCount).toBe(1);
 
     // Unfavoriting again is a no-op rather than a negative count.
-    expectOk(await article.unfavorite(as(carol.token)));
+    expectOk(await article.unfavorite(as(percy.dto.token)));
     expect(expectOk(await Article.$get(slug, anon)).favoriteCount).toBe(1);
   });
 
@@ -246,12 +311,16 @@ describe("Favoriting", () => {
   });
 });
 
+const COMMENT_BODY = "Trinket approves!";
+const EDITED_COMMENT_BODY = "Trinket really approves!";
+
 describe("Commenting", () => {
+  let commentId: number;
   it("posts a comment", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    const posted = expectOk(await Comment.create(article.id, "Great read!", as(bob.token)));
+    const posted = expectOk(await Comment.create(article.id, COMMENT_BODY, as(grog.dto.token)));
 
-    expect(posted.body).toBe("Great read!");
+    expect(posted.body).toBe(COMMENT_BODY);
     expect(posted.createdAt).toBeInstanceOf(Date);
     commentId = posted.id;
   });
@@ -265,38 +334,38 @@ describe("Commenting", () => {
     const article = expectOk(await Article.$get(slug, anon));
     const listed = expectOk(await Comment.$list(article.id, anon));
 
-    expect(listed.map((c) => c.body)).toEqual(["Great read!"]);
+    expect(listed.map((c) => c.body)).toEqual([COMMENT_BODY]);
     expect(listed[0].id).toBe(commentId);
   });
 
   it("hangs the comments off the article itself", async () => {
     const got = expectOk(await Article.$get(slug, anon));
-    expect(got.comments.map((c) => c.body)).toEqual(["Great read!"]);
+    expect(got.comments.map((c) => c.body)).toEqual([COMMENT_BODY]);
   });
 
   it("edits a comment in place", async () => {
     const posted = expectOk(
       await Comment.$list(expectOk(await Article.$get(slug, anon)).id, anon),
     )[0];
-    const edited = expectOk(await posted.update({ body: "Great read, actually!" }, as(bob.token)));
+    const edited = expectOk(await posted.update({ body: EDITED_COMMENT_BODY }, as(grog.dto.token)));
 
     expect(edited.id).toBe(commentId);
-    expect(edited.body).toBe("Great read, actually!");
+    expect(edited.body).toBe(EDITED_COMMENT_BODY);
   });
 
   it("will not let another user edit or delete it", async () => {
     const posted = expectOk(
       await Comment.$list(expectOk(await Article.$get(slug, anon)).id, anon),
     )[0];
-    expect((await posted.update({ body: "nope" }, as(carol.token))).status).toBe(403);
-    expect((await posted.del(as(carol.token))).status).toBe(403);
+    expect((await posted.update({ body: "nope" }, as(percy.dto.token))).status).toBe(403);
+    expect((await posted.del(as(percy.dto.token))).status).toBe(403);
   });
 
   it("deletes a comment", async () => {
     const article = expectOk(await Article.$get(slug, anon));
     const posted = expectOk(await Comment.$list(article.id, anon))[0];
 
-    expectOk(await posted.del(as(bob.token)));
+    expectOk(await posted.del(as(grog.dto.token)));
     expect(expectOk(await Comment.$list(article.id, anon))).toEqual([]);
   });
 });
@@ -304,17 +373,19 @@ describe("Commenting", () => {
 describe("Deleting an article", () => {
   it("will not let another user delete it", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    expect((await article.del(as(bob.token))).status).toBe(403);
+    expect((await article.del(as(grog.dto.token))).status).toBe(403);
   });
 
   it("deletes it, along with its tags, favorites and comments", async () => {
     const article = expectOk(await Article.$get(slug, anon));
-    await Comment.create(article.id, "last words", as(bob.token));
+    await Comment.create(article.id, "last words", as(grog.dto.token));
 
-    expectOk(await article.del(as(jane.token)));
+    expectOk(await article.del(as(vex.dto.token)));
 
     expect((await Article.$get(slug, anon)).status).toBe(404);
     expect(expectOk(await Comment.$list(article.id, anon))).toEqual([]);
-    expect(expectOk(await Article.$list(null, "jane", null, null, null, anon))).toEqual([]);
+    expect(
+      expectOk(await Article.$list(null, vex.profile.username, null, null, null, anon)),
+    ).toEqual([]);
   });
 });

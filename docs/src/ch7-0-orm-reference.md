@@ -1,12 +1,8 @@
 # ORM Reference
 
-Cloesce takes a different approach to the traditional ORM.
-
-Instead of utilizing some framework to query data with a declarative syntax (such as Entity Framework, Prisma, Drizzle, etc.), Cloesce is focused on _hydrating_ and _saving_ your Models across different storage backends.
+Cloesce takes a different approach to the traditional ORM: focus on _hydrating data across cloud resources_ and _crud operations_, rather than hosting a complex query-builder.
 
 Additionally, unlike other frameworks that combine an ORM with a REST API (such as Django, Rails, or Coalesce), Cloesce does _not_ use an [Active Record](https://en.wikipedia.org/wiki/Active_record_pattern) pattern, deliberately separating generated database types from database persistence.
-
-Despite this, Cloesce is incredibly powerful: developers can seamlessly interweave business logic with hydration and persistence, with a schema enforced at compile time.
 
 ## The Cloesce Environment
 

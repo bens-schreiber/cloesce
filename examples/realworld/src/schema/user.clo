@@ -24,6 +24,10 @@ model User for Db {
         image: option<string>
         passwordHash: string
     }
+
+    r2 Avatars::avatar(id) {
+        avatar
+    }
 }
 
 [internal]
@@ -52,7 +56,10 @@ api User {
         [minlen 8]
         password: string
 
-        inject { Db }
+        inject {
+            Db
+            Session
+        }
     }
 
     /// Log in an existing user in the system.
@@ -63,6 +70,7 @@ api User {
 
         inject {
             Db
+            Session
         }
     }
 
@@ -122,6 +130,27 @@ api User {
         inject {
             Db
             Auth
+        }
+    }
+
+    /// Given a username, stream that user's avatar image.
+    get downloadAvatar -> stream {
+        username: string
+
+        inject {
+            Db
+            Avatars
+        }
+    }
+
+    /// Upload the current user's avatar image.
+    put uploadAvatar {
+        avatar: stream
+
+        inject {
+            Db
+            Auth
+            Avatars
         }
     }
 }

@@ -129,6 +129,8 @@ export default {
       env.Db.prepare(`DELETE FROM "Comment" WHERE "articleId" = ?1`).bind(self.id),
       env.Db.prepare(`DELETE FROM "Article" WHERE "id" = ?1`).bind(self.id),
     ]);
+
+    env.FavoriteDo.count.put(env.ctx, 0);
   },
 
   async favorite(self, env) {
@@ -177,7 +179,10 @@ export class FavoriteDo extends DurableObject<CfEnv> {
   private base = app().durable(this, [favoriteDoInitial]);
 
   async fetch(request: Request): Promise<Response> {
-    const authed = this.base.register(Auth, await authFromRequest(this.base.env.Db, request));
+    const authed = this.base.register(
+      Auth,
+      await authFromRequest(this.base.env.Db, this.base.env.Session, request),
+    );
 
     return authed.run(request);
   }

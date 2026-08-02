@@ -4,18 +4,6 @@
 //!
 //! Includes all Data Sources and API methods.
 
-/// Users can favorite articles, which increases the articles favorite count.
-/// Cloudflare D1 is not the best at doing read-then-write operations, so we will
-/// store the favorite count in a Durable Object per article, which has an atomic
-/// execution environment.
-durable FavoriteDo {
-    shard {
-        articleId: int
-    }
-
-    count -> int {}
-}
-
 [unique slug]
 [crud get, list]
 model Article for Db {
@@ -143,7 +131,7 @@ api Article {
 
 
     /// Given that the client has some Article, delete it.
-    self delete del {
+    self(InFavoriteDo) delete del {
         inject {
             Db
             Auth

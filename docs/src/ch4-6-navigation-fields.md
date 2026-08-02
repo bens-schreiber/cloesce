@@ -144,7 +144,7 @@ model PersonIndex for D1Db {
 }
 
 model Person for PersonDo::{personId, tenant} {
-    kv PersonDo::{profile(personId, tenant), personId, tenant} {
+    kv PersonDo::{profile, personId, tenant} {
         profile
     }
 

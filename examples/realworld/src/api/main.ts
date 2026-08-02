@@ -31,7 +31,10 @@ export default {
     }
 
     const builder = app().worker(env);
-    const withAuth = builder.register(clo.Auth, await authFromRequest(builder.env.Db, request));
+    const withAuth = builder.register(
+      clo.Auth,
+      await authFromRequest(builder.env.Db, builder.env.Session, request),
+    );
     const res = await withAuth.run(request);
 
     for (const [name, value] of Object.entries(cors)) {

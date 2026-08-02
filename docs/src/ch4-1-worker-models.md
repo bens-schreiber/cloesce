@@ -15,7 +15,7 @@ model Gnat {
 }
 ```
 
-The `Gnat` Model above lives within the context of a request. Its lifetime is very short.
+The `Gnat` Model sources all data from an incoming request URL, and then disappears after the request is complete. It has no backing store, and no persistence.
 
 > [!TIP]
 >

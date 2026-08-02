@@ -7,6 +7,6 @@ Models can be composed of a lot of different kinds of data.
 
 Unlike other ORMs, Cloesce is **not** a general purpose query builder.
 
-Instead, when you need business logic, you define a **Data Source**: stubs implemented in the runtime.
+Instead, when you need business logic, you define a **Data Source**: stubs implemented in the runtime that describe how to `get`, `list`, or `save` data for a Model, from any set of parameters.
 
 This chapter provides a reference for how to write Data Sources in Cloesce, which are the building blocks for all data retrieval in your application.

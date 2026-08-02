@@ -1,6 +1,6 @@
 import { User, Api, Article } from "@cloesce/backend.js";
 import { HttpResult } from "cloesce";
-import { profileDto, requireAuth, userDto } from "./auth.js";
+import { issueToken, profileDto, requireAuth, userDto } from "./auth.js";
 
 const ByName = {
   async get(env, name) {
@@ -31,8 +31,12 @@ export default {
       image: null,
       passwordHash: password,
     });
+    if (!saved.ok) {
+      return HttpResult.fail(saved.status, saved.message);
+    }
 
-    return saved.ok ? userDto(saved.data!) : HttpResult.fail(saved.status, saved.message);
+    const token = await issueToken(env.Session, saved.data!.id);
+    return userDto(saved.data!, token);
   },
 
   async login(env, email, password) {
@@ -43,7 +47,8 @@ export default {
       return HttpResult.fail(401, "Invalid email or password.");
     }
 
-    return userDto(user);
+    const token = await issueToken(env.Session, user.id);
+    return userDto(user, token);
   },
 
   async update(env, user) {
@@ -60,7 +65,9 @@ export default {
       image: user.image === undefined ? me.image : user.image,
     });
 
-    return saved.ok ? userDto(saved.data!) : HttpResult.fail(saved.status, saved.message);
+    return saved.ok
+      ? userDto(saved.data!, env.Auth.token!)
+      : HttpResult.fail(saved.status, saved.message);
   },
 
   async profile(env, username) {
@@ -134,6 +141,29 @@ export default {
 
   current(env) {
     const me = requireAuth(env);
-    return me instanceof HttpResult ? me : userDto(me);
+    return me instanceof HttpResult ? me : userDto(me, env.Auth.token!);
+  },
+
+  async downloadAvatar(env, username) {
+    const them = await env.Db.User.ByName.get(username);
+    if (!them.ok) {
+      return HttpResult.fail(them.status, them.message);
+    }
+
+    const avatar = await env.Avatars.avatar.get(them.data!.id);
+    if (!avatar) {
+      return HttpResult.fail(404, `${username} has no avatar.`);
+    }
+
+    return avatar.body;
+  },
+
+  async uploadAvatar(env, avatar) {
+    const me = requireAuth(env);
+    if (me instanceof HttpResult) {
+      return me;
+    }
+
+    await env.Avatars.avatar.put(me.id, avatar);
   },
 } satisfies Api.User.Of;

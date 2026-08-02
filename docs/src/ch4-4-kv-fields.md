@@ -74,11 +74,15 @@ model User for MyDb {
     }
 
     column {
-        name: string
+        friendId: int
     }
 
     kv MyNamespace::profile(id) {
         profile
+    }
+
+    kv MyNamespace::profile(friendId) {
+        friendProfile
     }
 }
 ```

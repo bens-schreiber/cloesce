@@ -12,6 +12,14 @@ migrations_dir = "./migrations/Db"
 class_name = "FavoriteDo"
 name = "FavoriteDo"
 
+[[kv_namespaces]]
+binding = "Session"
+id = "replace_with_Session_id"
+
 [[migrations]]
 new_sqlite_classes = ["FavoriteDo"]
 tag = "v1"
+
+[[r2_buckets]]
+binding = "Avatars"
+bucket_name = "replace-with-avatars-name"
