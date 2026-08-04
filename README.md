@@ -15,6 +15,85 @@
 | Runtime Type Validation | ✅      |
 | Infrastructure as Code  | 🟨      |
 
+## Overview
+
+Cloesce compiles `.clo` schema files into a typed ORM, an RPC API, SQL migrations, and generated client/backend
+code, all wired to Cloudflare bindings (D1, Durable Objects, KV, R2).
+
+**1. Declare environment bindings.** Each binding maps to a Cloudflare resource and can be injected into APIs:
+
+<img width="701" height="551" alt="image" src="https://github.com/user-attachments/assets/22d24e82-3eb1-4515-973c-da3848a3a8f5" />
+
+
+**2. Model your data, composing across storage backends.** 1:1 (`one`), 1:M (`many`), KV-backed fields, and
+DO-sharded models all compose together:
+
+<img width="552" height="652" alt="image" src="https://github.com/user-attachments/assets/6c3b38d5-d892-4790-a229-ac0e9e94304e" />
+
+
+**3. Define APIs and call the generated backend, with env injection and one-shot hydration:**
+
+<img width="503" height="137" alt="image" src="https://github.com/user-attachments/assets/f1c6465a-73d7-4a4a-832d-68c907c61fbd" />
+
+
+```ts
+export const post = {
+  async create(env, subRedditId, title, content) {
+    const doId = crypto.randomUUID();
+    const meta = { title, content, authorName: env.AuthUser?.username ?? "anonymous", upvotes: 0 };
+
+    await env.PostDo.Post.save(doId, { doId, meta });
+    await env.SubRedditDb.SubReddit.save({
+      id: subRedditId,
+      posts: [{ postId: doId, subRedditId }],
+    });
+
+    // One call, fully hydrated.
+    return env.PostDo.Post.hydrate({ doId });
+  },
+} satisfies clo.Api.Post.Of;
+```
+
+**4. Call it from the generated, fully-typed client:**
+
+```ts
+import { Post, SubReddit } from "@cloesce/client.js";
+
+// GET a hydrated SubReddit.
+const sub = await SubReddit.$get(subRedditId);
+
+// Create a new post.
+const post = await Post.create(subRedditId, "title", "body", fetch);
+
+// Instance methods are available on hydrated results.
+await post.data!.vote(1, fetch);
+```
+
+**5. Cloesce diffs your schema into your Wrangler config (`wrangler.toml` or `wrangler.jsonc`)** (bindings, migrations) so infrastructure stays in sync:
+
+```jsonc
+{
+  "d1_databases": [
+    {
+      "binding": "SubRedditDb",
+      "migrations_dir": "./migrations/SubRedditDb"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "class_name": "PostDo", "name": "PostDo" }]
+  },
+  "kv_namespaces": [{ "binding": "Sessions", "id": "replace_with_Sessions_id" }],
+  "r2_buckets": [
+    {
+      "binding": "Avatar",
+      "bucket_name": "replace-with-avatar-name"
+    }
+  ]
+}
+```
+
+See the [Examples](https://github.com/bens-schreiber/cloesce/tree/main/examples) folder for more examples of Cloesce in action.
+
 ## Documentation
 
 See the [Cloesce Docs](https://cloesce.pages.dev) for more information on getting started, language features, architecture, and roadmap.
