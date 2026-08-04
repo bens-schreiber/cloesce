@@ -40,7 +40,7 @@ DO-sharded models all compose together:
 export const post = {
   async create(env, subRedditId, title, content) {
     const doId = crypto.randomUUID();
-    const meta = { title, content, upvotes: 0 };
+    const meta = { title, content, authorName: env.AuthUser?.username ?? "anonymous", upvotes: 0 };
 
     await env.PostDo.Post.save(doId, { doId, meta });
     await env.SubRedditDb.SubReddit.save({
