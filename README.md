@@ -69,7 +69,7 @@ const post = await Post.create(subRedditId, "title", "body", fetch);
 await post.data!.vote(1, fetch);
 ```
 
-**5. Cloesce diffs your schema into `wrangler.jsonc`** (bindings, migrations) so infrastructure stays in sync:
+**5. Cloesce diffs your schema into your Wrangler config (`wrangler.toml` or `wrangler.jsonc`)** (bindings, migrations) so infrastructure stays in sync:
 
 ```jsonc
 {
