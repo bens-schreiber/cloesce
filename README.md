@@ -22,104 +22,19 @@ code, all wired to Cloudflare bindings (D1, Durable Objects, KV, R2).
 
 **1. Declare environment bindings.** Each binding maps to a Cloudflare resource and can be injected into APIs:
 
-```
-// D1 database
-d1 {
-    SubRedditDb
-}
+<img width="701" height="551" alt="image" src="https://github.com/user-attachments/assets/22d24e82-3eb1-4515-973c-da3848a3a8f5" />
 
-// KV namespace
-kv Sessions {
-    session -> string {
-        token: string
-    }
-}
-
-// R2 bucket
-r2 Avatar {
-    avatar {
-        name: string
-    }
-}
-
-// Durable Object
-durable UserDo {
-    shard {
-        name: string
-    }
-}
-
-// Custom auth context, injectable into any API
-inject {
-    AuthUser
-}
-```
 
 **2. Model your data, composing across storage backends.** 1:1 (`one`), 1:M (`many`), KV-backed fields, and
 DO-sharded models all compose together:
 
-```
-// A SQL table in D1
-model SubReddit for SubRedditDb {
-    primary {
-        id: int
-    }
+<img width="552" height="652" alt="image" src="https://github.com/user-attachments/assets/6c3b38d5-d892-4790-a229-ac0e9e94304e" />
 
-    column {
-        title: string
-        description: string
-    }
-
-    // 1:M
-    many SubRedditPost::subRedditId(id) {
-        posts
-    }
-}
-
-// Sharded by doId, one Durable Object per Post
-model Post for PostDo::doId {
-    // KV-backed field
-    kv PostDo::{ meta, doId(doId) } {
-        meta
-    }
-
-    // 1:M, sharded by DO
-    many Comment::doId {
-        comments
-    }
-}
-
-model Comment for PostDo::doId {
-    primary {
-        id: int
-    }
-
-    column {
-        upvotes: int
-        authorName: string
-        content: string
-    }
-
-    // 1:1, resolved across a different Durable Object
-    one User::name(authorName) {
-        author
-    }
-}
-```
 
 **3. Define APIs and call the generated backend, with env injection and one-shot hydration:**
 
-```
-api Post {
-    post create -> Post {
-        subRedditId: int
-        title: string
-        content: string
+<img width="503" height="137" alt="image" src="https://github.com/user-attachments/assets/f1c6465a-73d7-4a4a-832d-68c907c61fbd" />
 
-        inject { SubRedditDb PostDo AuthUser UserDo }
-    }
-}
-```
 
 ```ts
 export const post = {
