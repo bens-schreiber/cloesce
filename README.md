@@ -49,7 +49,7 @@ export const post = {
     });
 
     // One call, fully hydrated.
-    return env.PostDo.Post.hydrateAll([{ doId }], "Post");
+    return env.PostDo.Post.hydrate({ doId });
   },
 } satisfies clo.Api.Post.Of;
 ```
